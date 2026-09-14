@@ -1,0 +1,9 @@
+{
+  "DestinationPath": "F:\\CompanyBackups",
+  "MinimumFreeSpaceMB": 500,
+  "Mode": "TEST_LOCAL",
+  "ApiBaseUrl": "https://onspa-sku-master-preview.shintung-vn-4458.chatgpt.site",
+  "CredentialTarget": "ONSPA_BACKUP_API",
+  "RetryCount": 3,
+  "RetryDelayMinutes": 15
+}
