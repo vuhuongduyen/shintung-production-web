@@ -186,6 +186,7 @@ const zhTerms: Record<string, string> = {
   "Cấu trúc thành phẩm": "產品結構",
   "Kế hoạch sản xuất": "生產計畫",
   "Quản lý sản xuất": "生產管理",
+  "Hệ thống báo công": "生產管理",
   "MENU CHỨC NĂNG": "功能選單",
   "Quản lý người dùng": "使用者管理",
   "Thiết lập bộ phận": "部門設定",
@@ -5565,7 +5566,7 @@ function ModuleOverview({
     warehouse: "Quản lý kho",
     bom: "Cấu trúc thành phẩm",
     planning: "Kế hoạch sản xuất",
-    production: "Quản lý sản xuất",
+    production: "Hệ thống báo công",
   };
   const steps = moduleOverviewSteps[view].filter((step) =>
     canOpen(view, step.id),
@@ -5674,7 +5675,7 @@ function TopModules({
       {moduleButton("warehouse", "Quản lý kho")}
       {moduleButton("bom", "Cấu trúc thành phẩm")}
       {moduleButton("planning", "Kế hoạch sản xuất")}
-      {moduleButton("production", "Quản lý sản xuất")}
+      {moduleButton("production", "Hệ thống báo công")}
     </div>
   );
 }
@@ -6055,7 +6056,7 @@ function AppSidebar({
         </div>
       )}
       {allowedViews.has("production") && (
-        <FeedbackActionButton onClick={() => onParent("production")}><UiLabel>{"⚙ Quản lý sản xuất"}</UiLabel><i>›</i>
+        <FeedbackActionButton onClick={() => onParent("production")}><UiLabel>{"⚙ Hệ thống báo công"}</UiLabel><i>›</i>
         </FeedbackActionButton>
       )}
     </aside>
@@ -15720,7 +15721,7 @@ type WorkspaceIdentity = {language: Language; authenticated: boolean; session: L
 type WorkspaceState = {overviewRoute: WorkspaceRoute;tabs: Array<{id:string;key:string;route:WorkspaceRoute;intent:{sku?:string;approval?:string;sequence:number}|null}>;active:string|null;nextId:number};
 const workspaceIdentityKey=(identity:WorkspaceIdentity)=>clientAuthorizationKey(identity);
 const workspaceHome: WorkspaceRoute = {view:"sku",child:null,planTab:"base"};
-const workspaceModuleTitles: Record<MainView,string> = {users:"Quản trị hệ thống",sku:"Dữ liệu cơ bản",warehouse:"Quản lý kho",bom:"Cấu trúc thành phẩm",planning:"Kế hoạch sản xuất",production:"Quản lý sản xuất"};
+const workspaceModuleTitles: Record<MainView,string> = {users:"Quản trị hệ thống",sku:"Dữ liệu cơ bản",warehouse:"Quản lý kho",bom:"Cấu trúc thành phẩm",planning:"Kế hoạch sản xuất",production:"Hệ thống báo công"};
 function workspaceTitle(route:WorkspaceRoute,language:Language) {
   if(route.report) {const report=reportTypes.find((item:string[])=>item[0]===route.report);if(report)return planningReportLabel(report,language);}
   const overrides: Record<string,string> = {"department-changes":route.view==="planning"?"Phiếu thay đổi KH":route.view==="production"?"Phiếu thay đổi SX":"Phiếu thay đổi",rules:"Quy tắc áp dụng","users-list":"Quản lý người dùng",feedback:"Phản hồi người dùng",permissions:"Phân quyền",departments:"Thiết lập bộ phận",audit:"Nhật ký thao tác","test-log":"Nhật ký test website",versions:"Quản lý phiên bản","data-status":"Tình trạng dữ liệu","backup-restore":"Sao lưu & Bàn giao","production-report":"SX báo công","report-work":"SX báo công","report-review":"Lịch sản xuất thực tế","report-progress":"Tiến độ sản xuất","report-dashboard":"Nhật ký báo công","report-cancel":"Điều chỉnh báo công","report-output":"Sản lượng và giờ công","report-payroll":"Hiệu suất và tiền sản lượng"};
@@ -16571,7 +16572,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
               </div>
             )}
             <FeedbackActionButton disabled disabledExplanation="Chức năng này chưa được kết nối thao tác tại màn hình hiện tại.">
-              ⚙ Quản lý sản xuất <i>›</i>
+              ⚙ Hệ thống báo công <i>›</i>
             </FeedbackActionButton>
           </nav>
           <TopModules
