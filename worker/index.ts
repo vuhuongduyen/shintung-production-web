@@ -1,3 +1,4 @@
+import {orderTransfer} from './order-transfer.mjs';
 import {environmentRefresh,refreshGuard} from './environment-refresh.mjs';
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
@@ -40,6 +41,7 @@ const worker = {
     const url = new URL(request.url);
     const refreshResponse=await environmentRefresh(request,env);if(refreshResponse)return refreshResponse;
     const refreshBusy=await refreshGuard(request,env);if(refreshBusy)return refreshBusy;
+    const orderTransferResponse=await orderTransfer(request,env);if(orderTransferResponse)return orderTransferResponse;
     const backupResponse=await fullBackupApi(request,env,sourceSnapshot);
     if(backupResponse)return backupResponse;
     const sourceResponse=await sourceSyncApi(request,env,sourceSnapshot);

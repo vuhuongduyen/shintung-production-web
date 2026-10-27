@@ -333,5 +333,17 @@
     "worker/production-incidents.mjs",
     "worker/site-api.mjs",
     "worker/warehouse-sheet.mjs"
-  ]
+  ],
+  "v749_update": {
+    "inherited_sanitization": "All v745 sanitized omissions/placeholders retained",
+    "private_history_omitted": [
+      "docs/FUNCTION_STATUS.md"
+    ],
+    "new_hostname_replacements": [
+      "main.example.invalid",
+      "trial.example.invalid"
+    ],
+    "synthetic_tests_added": 4,
+    "preserved_github_pr": 1
+  }
 }
