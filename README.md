@@ -1,6 +1,6 @@
-# ONSPA — bản sao source để thử GitHub
+# ONSPA — nền TEST v749, giữ PR #1
 
-Nguồn: web chính ONSPA, version **745**, commit gốc **082ae9695affd8694da0077010956eb0213be4d9**. Đối chiếu metadata Sites và Git ngày 27/10/2026 (GMT+7): version 745 gắn commit này; deployment `succeeded`.
+Nguồn: web chính ONSPA, version **749**, commit gốc **f66cb2701613eda59dc3880af5eedcc8b3a9764e**. Đối chiếu metadata Sites và Git ngày 27/10/2026 (GMT+7): version 749 gắn commit này; deployment `succeeded`.
 
 Đây là bản sao đã làm sạch, không phải commit nguyên trạng và không chứa dữ liệu/tài khoản/quyền thực tế. Không có Git remote, CI/CD, cấu hình triển khai Site hay khóa kho thật. Không có thao tác push GitHub hoặc triển khai nào được thực hiện khi xuất gói.
 
@@ -46,3 +46,9 @@ Giữ mã xử lý nghiệp vụ, không xuất bản ghi từ DB, tài khoản,
 Đã đối chiếu commit; kiểm tra cú pháp/TypeScript và build; chạy migration trên DB TEST mới (0 bản ghi); quét mẫu secret và kiểm tra danh mục ZIP. Đã kiểm tra HTTP local: trang chủ trả 200; API test-environment xác nhận TEST, remote=false và yêu cầu tạo tài khoản mới. Build có cảnh báo chunk lớn của Vite. Không có kiểm thử nghiệp vụ với dữ liệu thật, nghiệm thu mọi màn hình hoặc thử triển khai GitHub/hosting mới. Bộ test lịch sử không nằm trong gói vì có fixture và thông tin nội bộ; không tuyên bố đã chạy toàn bộ bộ test đó trên bản đã làm sạch.
 
 Web chính và web thử, DB, tệp, tài khoản và quyền đang chạy không bị sửa bởi việc xuất này.
+
+
+## Cập nhật nền TEST v749
+Giữ menu tiếng Việt “Hệ thống báo công” đã merge tại PR #1. Chỉ cập nhật mã; không có dữ liệu từ DB. `config/local-test.json`, `config/local-files.json`, `.env.example`, Vite local và lockfile giữ nguyên nền TEST. Các tính năng khóa/hủy báo công và chuyển lệnh có source mới, nhưng cổng hostname được đổi thành main.example.invalid / trial.example.invalid: không kích hoạt trên localhost và không kết nối Site thật. Kiểm thử mô phỏng gọi hàm trực tiếp với dữ liệu tổng hợp trên Miniflare local.
+
+Chạy `npm run test:export` để chạy 11 kiểm thử mục tiêu. Đọc PCB-REVIEW.md, DIFF-SUMMARY.json và UPDATE-FROM-GITHUB-MAIN.patch trước khi cập nhật repo. Đây là bản sao độc lập: chưa push/PR/merge/deploy. Không dùng gói để ghi đè production.

@@ -1,3 +1,5 @@
+import {cancelReportingDay} from './cancel-reporting-day.mjs';
+import {productionReportingHold,reportingWriteBlocked} from '../lib/production-reporting-hold.mjs';
 import {sheetBridge,sheetSetup} from './warehouse-sheet.mjs';
 import {skuTransfer} from './sku-transfer.mjs';
 import {hasMenuPermission,entityPermissionMenu,productionMenus} from '../lib/menu-action-access.mjs';
@@ -216,7 +218,7 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/in-transit'&&request.method==='GET'){if(!hasGrant(actor,'Kế hoạch sản xuất / In_transit',['Xem']))return json({error:'Không có quyền xem In Transit'},403);return json(await getTransit(env.DB,Object.fromEntries(url.searchParams),await loadCatalog()));}
   if(path==='/api/production-workflow'&&request.method==='GET'){
    const workflow=await readProductionWorkflow(workflowReadSnapshot(productionDb),actor,await loadCatalog());
-   return json({...workflow,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
+   return json({...workflow,reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
   }
   if(path==='/api/records'&&request.method==='GET'){
    const entity=url.searchParams.get('entity');if(!entities.has(entity))return json({error:'Hạng mục không hợp lệ'},400);
@@ -281,6 +283,8 @@ async function handleSiteApi(request,env,timing){
   if(request.method!=='POST')return json({error:'Method not allowed'},405);
   if(request.headers.get('origin')!==url.origin||!request.headers.get('content-type')?.startsWith('application/json'))return json({error:'Yêu cầu JSON cùng origin.'},403);
   const text=await request.text();if(text.length>8_000_000)return json({error:'Payload quá lớn'},413);const body=JSON.parse(text);
+  const reportingHold=productionReportingHold(url.hostname);
+  if(reportingHold&&reportingWriteBlocked(path,body))return json({error:reportingHold.message,code:'PRODUCTION_REPORTING_PAUSED',reportingHold},423);
   if(path==='/api/change-requests')return json(await changeRequests(env.DB,actor,body));
   if(path==='/api/bom-pdf-reconciliation')return json(await reconcileBomPdf(env.DB,body,actor));
   if(['/api/bom-bulk','/api/bom-change','/api/bom'].includes(path)){if(!canBomAction(actor,body.action,body.expectedRevision!=null,path==='/api/bom'?'Dữ liệu lượng dùng BOM':'Phiếu thay đổi BOM'))return json({error:'Không có quyền thực hiện thao tác BOM này.'},403);const catalog=await loadCatalog();return json(path==='/api/bom'?await mutateBom(env.DB,body,actor,catalog):await mutateBomBulk(env.DB,{...body,single:path==='/api/bom-change'},actor,catalog));}
@@ -344,7 +348,7 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/production-workflow')return json(await mutateProductionWorkflow(productionDb,body,actor,await loadCatalog()));
   if(path==='/api/warehouse-confirm')return json(await confirmSelectedWarehouse(env.DB,body,actor));
   if(path==='/api/warehouse-backfill')return json(await (String(body.action).startsWith('confirm')?confirmWarehouse(env.DB,body,actor):warehouseBackfill(env.DB,body,actor)));
-  if(path==='/api/production-correction')return json(await correctProduction(productionDb,body,actor,await loadCatalog()));
+  if(path==='/api/production-correction')return json(body.operation==='cancel-reporting-day'?await cancelReportingDay(productionDb,body,actor,url.hostname):await correctProduction(productionDb,body,actor,await loadCatalog()));
   if(path==='/api/production-report'){
    if(!actor.isAdmin&&!hasMenuPermission(actor,productionMenus.progress,['Xác nhận']))return json({error:'Chỉ QLSX được duyệt báo công.'},403);
    if(body.action!=='review'||!body.reportId)return json({error:'Yêu cầu kiểm tra báo công không hợp lệ.'},400);

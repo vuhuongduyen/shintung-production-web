@@ -16,7 +16,8 @@
     "db:init": "node scripts/local/cli.mjs init",
     "db:import": "node scripts/local/cli.mjs import",
     "db:export": "node scripts/local/cli.mjs export",
-    "test:account": "node scripts/local/account.mjs"
+    "test:account": "node scripts/local/account.mjs",
+    "test:export": "node --test tests/production-reporting-hold.test.mjs tests/cancel-reporting-day.test.mjs tests/order-transfer.test.mjs tests/test-export-isolation.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
