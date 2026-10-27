@@ -1,0 +1,489 @@
+/* Compact planning views: keep scrolling inside each table, below the shell. */
+html body .sku-confirm-toast{position:fixed;right:18px;top:105px;z-index:10020;max-width:min(430px,calc(100vw - 36px));padding:10px 12px;display:flex;align-items:center;gap:12px;background:#edf7e9;border:1px solid #9eba91;border-radius:6px;box-shadow:0 4px 18px #0002;color:#245a2b;font-size:14px}
+html body .sku-confirm-toast button{flex:none;background:transparent;border:0;font-size:20px;cursor:pointer;color:inherit}
+html body .demand-weekbar.planning-toolbar{display:flex!important;justify-content:flex-start!important;gap:8px!important;flex-wrap:wrap!important}
+html body .demand-weekbar.planning-toolbar>label{display:flex!important;align-items:center;gap:6px;flex:0 0 auto!important}
+html body .demand-weekbar.planning-toolbar>button,html body .demand-weekbar.planning-toolbar> [data-feedback-button] > button{flex:0 0 auto!important}
+html body .demand-weekbar.planning-toolbar>.primary-button,html body .demand-weekbar.planning-toolbar> [data-feedback-button] > .primary-button{margin-left:auto;background:#ed8b00!important;color:white!important}
+html body dialog.de-dialog{position:fixed!important;inset:0!important;margin:auto!important;width:min(720px,calc(100vw - 24px))!important;max-width:760px!important;max-height:88dvh!important;padding:0!important;border:1px solid #abc5ac;border-radius:8px;background:#fffdf6;color:#204a2b;box-shadow:0 18px 60px #0005;overflow:hidden!important;font:inherit;z-index:10000}
+dialog.de-dialog::backdrop{background:#14261e99}
+html body dialog.de-dialog>form{display:flex;flex-direction:column;max-height:88dvh;margin:0!important;padding:0!important}
+html body dialog.de-dialog header,html body dialog.de-dialog footer{flex:none;display:flex;align-items:center;gap:10px;background:#f6f8ee;padding:12px 16px;border-bottom:1px solid #cbd8c7}
+html body dialog.de-dialog h2{font-size:18px;margin:0;flex:1}dialog.de-dialog h2 small{font-size:12px;font-weight:normal}
+html body dialog.de-dialog header button{font-size:24px;border:0;background:none;width:32px;cursor:pointer}
+html body dialog.de-dialog .de-dialog-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 16px}
+html body dialog.de-dialog fieldset{min-width:0;margin:0 0 12px;padding:6px 10px 10px;border:1px solid #d5dece;border-radius:4px}
+html body dialog.de-dialog legend{font-weight:bold;font-size:14px;padding:0 6px}
+html body dialog.de-dialog .de-field{display:grid!important;grid-template-columns:195px minmax(0,1fr);align-items:start;gap:10px;margin:0!important;padding:5px 0!important;font-size:13px!important;width:100%!important}
+html body dialog.de-dialog .de-field>span,html body dialog.de-dialog .de-field>label{padding-top:7px;color:#315239;font-size:13px!important}
+html body dialog.de-dialog .de-field>span,html body dialog.de-dialog .de-field>label{white-space:normal!important;overflow-wrap:anywhere;line-height:1.4!important}
+html body dialog.de-dialog :is(input,select,textarea){width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box;padding:7px 8px!important;border:1px solid #bacbb7;border-radius:4px;background:white;font:inherit;font-size:14px!important;min-height:34px!important;height:auto!important}
+html body dialog.de-dialog input[readonly]{background:#f0f3eb;color:#4e6250}
+html body dialog.de-dialog footer{border-top:1px solid #cbd8c7;border-bottom:0;justify-content:flex-end;flex-wrap:wrap}
+html body dialog.de-dialog footer button{padding:8px 18px;border:1px solid #adbea6;border-radius:4px;background:white;font:inherit;cursor:pointer}
+html body dialog.de-dialog footer button[type=submit]{background:#ed8b00;color:white;border-color:#ed8b00}
+html body dialog.de-dialog button:disabled{opacity:.55;cursor:not-allowed}
+html body dialog.de-dialog .de-error{display:block;color:#a42518;font-size:12px;margin-top:4px}
+html body dialog.de-dialog footer>.de-error{flex:1 1 100%}
+html body dialog.de-dialog .de-suggestions{max-height:160px;overflow-y:auto;border:1px solid #cad7c4;background:#fff}
+html body dialog.de-dialog .de-suggestions button{display:block;width:100%;text-align:left;padding:7px;border:0;border-bottom:1px solid #e5eade;background:white;font:inherit;font-size:12px;cursor:pointer}
+html body dialog.de-dialog .de-suggestions small{display:block;color:#64785d}
+@media(max-width:600px){html body dialog.de-dialog .de-field{grid-template-columns:minmax(0,1fr);gap:3px}html body dialog.de-dialog .de-dialog-body{padding:8px}html body dialog.de-dialog header,html body dialog.de-dialog footer{padding:10px}}
+html body .app-shell:has(.planning-workspace,.pp-workspace){--planning-nav:230px}
+html body .app-shell .planning-workspace,html body .app-shell .pp-workspace{margin-left:var(--planning-nav)!important;width:calc(100% - var(--planning-nav))!important;max-width:calc(100% - var(--planning-nav))!important;padding:8px 12px!important;min-width:0;box-sizing:border-box}
+html body .planning-workspace :is(.planning-toolbar,.base-month-toolbar,.demand-weekbar,.engine-update-bar),html body .pp-workspace :is(.pp-filters,.pp-actions){display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:wrap;min-height:36px!important;padding:5px 8px!important;margin:0!important;border-radius:0!important}
+html body .planning-workspace label,html body .pp-topbar label{display:flex!important;align-items:center;gap:6px;white-space:nowrap}
+html body .planning-workspace :is(button,input,select),html body .pp-workspace :is(button,input,select){font-size:13px!important;line-height:1.2!important;min-height:30px!important;height:30px!important;padding:4px 8px!important;width:auto;max-width:100%;box-sizing:border-box}
+html body .planning-workspace input[type=checkbox],html body .pp-workspace input[type=checkbox]{width:15px!important;min-height:15px!important;height:15px!important;padding:0!important}
+html body .planning-toolbar input[type=date],html body .engine-update-bar input[type=date]{width:135px!important}
+html body .planning-file-button{border:1px solid #bfcfc2;background:#fff9ef;padding:6px 10px!important;border-radius:4px;cursor:pointer;font-size:13px}
+.planning-file-button input[type=file]{display:none!important}
+html body .planning-status{font-size:12px;line-height:1.35;color:#526954;margin:0;padding:4px 8px;overflow-wrap:anywhere}
+html body .planning-input-details,html body .planning-inline-details,html body .snapshot-engine-info{padding:4px 8px!important;margin:0!important;font-size:12px!important;background:#f5f6ed!important;display:block!important;min-height:0!important}
+html body .planning-input-details>div{max-height:180px;overflow:auto}.planning-input-details p{margin:4px 0}.planning-inline-details{position:relative}.planning-inline-details[open]{max-width:100%}
+html body .planning-workspace .snapshot-engine-info span{display:inline-flex;gap:5px;margin:4px 12px 0 0}.snapshot-engine-info summary,.planning-input-details summary,.planning-inline-details summary{cursor:pointer;color:#245f30}
+html body .planning-workspace :is(.bulk-bar,.demand-bulkbar){display:flex!important;align-items:center;flex-wrap:wrap;gap:8px;min-height:32px!important;padding:4px 8px!important;margin:0!important;font-size:12px}
+html body .planning-workspace .bulk-engine>.plan-toolbar{display:none!important}
+html body .planning-workspace :is(.base-summary,.event-summary){display:none!important}
+html body .base-compact>.data-card>.source-note,html body .demand-compact-view>.source-note{display:none!important}
+html body .planning-workspace .table-wrap,html body .pp-workspace .pp-table{display:block!important;overflow:auto!important;max-height:calc(100dvh - 250px)!important;min-height:0!important;height:auto!important;overscroll-behavior:contain;scrollbar-gutter:stable;width:100%!important;max-width:100%!important}
+html body .planning-workspace table{display:table!important;width:100%!important;min-width:1250px!important;table-layout:auto!important;border-collapse:separate!important;border-spacing:0!important}
+html body .planning-workspace table tbody{display:table-row-group!important;height:auto!important;max-height:none!important;overflow:visible!important}
+html body .planning-workspace table tr{display:table-row!important;height:32px!important;max-height:none!important}
+html body .planning-workspace table :is(td,th),html body .pp-workspace .pp-table :is(td,th){padding:4px 7px!important;height:32px!important;font-size:13px!important;line-height:1.25!important;white-space:nowrap;box-sizing:border-box}
+html body .planning-workspace table thead th,html body .pp-workspace .pp-table th{position:sticky!important;top:0!important;z-index:2;background:#245f30!important;color:white!important}
+html body .planning-workspace .table-pagination,html body .pp-pagination{padding:4px 8px!important;margin:0!important;min-height:30px!important;font-size:12px}
+html body .engine-update-bar>div,html body .engine-update-bar>label{padding:0!important;margin:0!important;min-width:0!important;flex:0 1 auto!important}
+html body .engine-update-bar span{font-size:11px!important}.engine-sku-search input{width:190px!important}
+html body .engine-footnote{font-size:12px;padding:4px 8px!important;margin:0!important}
+html body .pp-workspace .pp-heading{display:none}.pp-topbar strong{font-size:13px}.pp-loads{margin:4px 0!important}.pp-loads article{padding:6px!important}.pp-history{padding:4px 8px!important;margin-top:4px!important}.pp-empty{padding:8px!important}
+html body .pp-workspace .pp-table{max-height:calc(100dvh - 280px)!important}.pp-workspace .pp-alert{padding:5px 8px;margin:3px 0;font-size:12px}
+@media(max-width:1050px){html body .app-shell:has(.planning-workspace,.pp-workspace){--planning-nav:190px}html body .planning-workspace .table-wrap,html body .pp-workspace .pp-table{max-height:calc(100dvh - 300px)!important}html body .pp-workspace .pp-filters>input,html body .pp-workspace .pp-filters>select{min-width:115px!important;max-width:190px!important}}
+@media(max-width:820px){html body .app-shell:has(.planning-workspace,.pp-workspace){--planning-nav:72px}html body .planning-workspace,html body .pp-workspace{padding:6px!important}html body .planning-workspace .table-wrap,html body .pp-workspace .pp-table{max-height:calc(100dvh - 340px)!important}}
+
+html body .app-shell .planning-workspace.base-compact>.data-card>.table-wrap>.base-table>tbody>tr,
+html body .app-shell .planning-workspace.base-compact>.data-card>.table-wrap>.base-table>tbody>tr>td,
+html body .app-shell .planning-workspace.demand-compact .demand-compact-view>.table-wrap>table>tbody>tr,
+html body .app-shell .planning-workspace.demand-compact .demand-compact-view>.table-wrap>table>tbody>tr>td,
+html body .app-shell .planning-workspace.proposal-compact>.bulk-engine>.table-wrap>table>tbody>tr,
+html body .app-shell .planning-workspace.proposal-compact>.bulk-engine>.table-wrap>table>tbody>tr>td{height:32px!important;max-height:32px!important;padding-top:4px!important;padding-bottom:4px!important}
+
+/* Production Engine: readable figures, including rows with no replenishment. */
+html body .app-shell .planning-workspace.proposal-compact > .bulk-engine > .table-wrap > .engine-table.bulk-table thead th {
+  font-size: 14px !important;
+  line-height: 1.25 !important;
+  height: 40px !important;
+  color: #183c2a !important;
+}
+html body .app-shell .planning-workspace.proposal-compact > .bulk-engine > .table-wrap > .engine-table.bulk-table tbody tr {
+  opacity: 1 !important;
+  height: 42px !important;
+  max-height: none !important;
+}
+html body .app-shell .planning-workspace.proposal-compact > .bulk-engine > .table-wrap > .engine-table.bulk-table tbody td {
+  font-size: 15px !important;
+  line-height: 1.3 !important;
+  height: 42px !important;
+  max-height: none !important;
+  color: #233c2c !important;
+  padding: 6px 8px !important;
+}
+html body .app-shell .planning-workspace.proposal-compact > .bulk-engine > .table-wrap > .engine-table.bulk-table tbody td.number {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums;
+  color: #16452e !important;
+}
+html body .app-shell .planning-workspace.proposal-compact > .bulk-engine > .table-wrap > .engine-table.bulk-table tbody tr.no-supply-row {
+  background: #f2f6f1;
+}
+html body .app-shell .planning-workspace.proposal-compact > .bulk-engine > .table-wrap > .engine-table.bulk-table tbody .plan-sku.calc-link {
+  font-size: 15px !important;
+  font-weight: 700;
+  color: #17613b;
+}
+html body .app-shell .planning-workspace.proposal-compact > .bulk-engine > .table-wrap > .engine-table.bulk-table tbody .priority.no-add {
+  color: #405547;
+}
+
+/* Keep quantities legible in Forecast, Demand Event and ERP stock tables. */
+html body .app-shell .planning-workspace.base-compact > .data-card > .table-wrap > .base-table tbody td.number,
+html body .app-shell .planning-workspace.demand-compact .demand-compact-view > .table-wrap > .demand-event-table tbody td:nth-child(7).number,
+html body .app-shell .inventory-workspace > .data-card > .table-wrap > .inventory-table:not(.inventory-safety-table) tbody td.number {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: #16452e !important;
+  font-variant-numeric: tabular-nums;
+}
+html body .app-shell .planning-workspace.base-compact > .data-card > .table-wrap > .base-table tbody tr,
+html body .app-shell .planning-workspace.base-compact > .data-card > .table-wrap > .base-table tbody td,
+html body .app-shell .planning-workspace.demand-compact .demand-compact-view > .table-wrap > .demand-event-table tbody tr,
+html body .app-shell .planning-workspace.demand-compact .demand-compact-view > .table-wrap > .demand-event-table tbody td {
+  height: 40px !important;
+  max-height: none !important;
+}
+html body .app-shell .planning-workspace.base-compact > .data-card > .table-wrap > .base-table tbody td.demand-used {
+  color: #154f82 !important;
+}
+/* Confirmations stay in the existing master command bar and table. */
+html body .app-shell .master-data-card tr.selected>td{background:#e2eedc!important;box-shadow:inset 0 1px #6b9f57,inset 0 -1px #6b9f57}
+html body .planning-workspace .leadtime-compact-search{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 8px}
+html body .planning-workspace .leadtime-compact-search input{min-width:220px}
+
+/* Match the fixed sidebar's actual 230px width at the audited desktop sizes. */
+html body .app-shell:has(.planning-workspace,.pp-workspace,.sku-workspace,.bom-workspace){--planning-nav:230px}
+html body .app-shell :is(.sku-workspace,.bom-workspace){margin-left:var(--planning-nav)!important;width:calc(100% - var(--planning-nav))!important;max-width:calc(100% - var(--planning-nav))!important;margin-right:0!important;padding:8px 12px!important;box-sizing:border-box;min-width:0}
+html body .app-shell .sku-workspace .table-wrap input[type=checkbox]{width:15px!important;height:15px!important;min-height:15px!important;padding:0!important}
+html body .app-shell .sku-workspace .table-wrap table{min-width:1150px}
+html body .app-shell .sku-workspace .table-wrap td{padding:6px 8px!important}
+@media(max-width:700px){html body .app-shell:has(.planning-workspace,.pp-workspace,.sku-workspace,.bom-workspace){--planning-nav:190px}}
+/* Reserve space for the real account controls; prevent overlap at 1366/1440. */
+@media(min-width:1000px){html body .app-shell>.topbar>.top-modules{left:230px!important;right:450px!important;width:auto!important;max-width:none!important;overflow-x:auto;overflow-y:hidden}html body .app-shell>.topbar>.top-modules button{flex-shrink:0}}
+@media(min-width:1000px) and (max-width:1500px){html body .app-shell>.topbar>.top-modules button{padding-left:5px!important;padding-right:5px!important;font-size:11px!important}}
+
+/* ONSPA shared table scrolling: all current and future menu data grids. */
+html body .app-shell :is(.table-wrap, .pp-table, .it-table) {
+  max-width: 100%;
+  min-height: 0 !important;
+  max-height: var(--onspa-table-height, max(160px, calc(100dvh - 300px))) !important;
+  overflow-x: auto !important;
+  overflow-y: scroll !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: #78917f #edf2ed;
+}
+html body .app-shell :is(.table-wrap, .pp-table, .it-table)::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+html body .app-shell :is(.table-wrap, .pp-table, .it-table)::-webkit-scrollbar-track {
+  background: #edf2ed;
+}
+html body .app-shell :is(.table-wrap, .pp-table, .it-table)::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 2px solid #edf2ed;
+  border-radius: 8px;
+  background: #78917f;
+}
+
+/* In transit: planning-week separators remain readable during horizontal scrolling. */
+html body .app-shell .it-table tbody tr.it-week-divider > th {
+  background: #e8f1e5 !important;
+  color: #1f5b35 !important;
+  border-top: 1px solid #acc9ae;
+  border-bottom: 1px solid #acc9ae;
+  padding: 10px 12px !important;
+  text-align: left !important;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 17px !important;
+  line-height: 1.35 !important;
+}
+html body .app-shell .it-table .it-week-divider > th > span {
+  position: sticky;
+  left: 10px;
+  display: inline-block;
+  font-size: inherit;
+}
+
+@media (max-width: 900px) {
+  html body .app-shell .it-table tbody tr.it-week-divider > th { font-size: 15px !important; }
+}
+
+/* Compact work-order code and quantity columns in In transit. */
+html body .app-shell .it-table :is(th,td):nth-child(13) {
+  width: 124px !important;
+  min-width: 124px !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+}
+html body .app-shell .it-table :is(th,td):nth-child(14) {
+  width: 84px !important;
+  min-width: 84px !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+}
+html body .app-shell .it-table .it-inline-input.code {
+  width: 112px !important;
+  min-width: 112px !important;
+  max-width: 112px !important;
+  box-sizing: border-box;
+}
+html body .app-shell .it-table .it-inline-input.quantity {
+  width: 72px !important;
+  min-width: 72px !important;
+  max-width: 72px !important;
+  box-sizing: border-box;
+}
+
+/* Data tables size to their available workspace; scroll only when content needs it. */
+html body .app-shell :is(.table-wrap,.pp-table,.it-table){max-width:100%!important;min-width:0;box-sizing:border-box}
+html body .app-shell :is(.table-wrap,.pp-table,.it-table)>table{width:100%!important;min-width:100%!important;table-layout:auto!important}
+html body .app-shell :is(.table-wrap,.pp-table,.it-table)>table>thead>tr>th{white-space:normal!important;overflow-wrap:normal}
+html body .app-shell :is(.table-wrap,.pp-table,.it-table)>table>tbody>tr>td:not([data-type="code"]):not([data-type="date"]):not([data-type="time"]):not([data-type="number"]):not(.number):not(.numeric):not(.qty-cell){white-space:normal!important;overflow-wrap:normal;min-width:0!important}
+
+/* Complete vertical cell grid for all ONSPA data tables. */
+html body .app-shell table{border:1px solid #b8cfb9!important}
+html body .app-shell table tr>:is(th,td){border-left:1px solid #b8cfb9!important;border-right:1px solid #b8cfb9!important}
+
+/* Order-wide correction uses shared table typography and explicit 24-hour inputs. */
+html body .app-shell .production-order-correction .production-correction-context{font-size:17px;color:#173d25;margin:8px 0}
+html body .app-shell .production-order-correction .production-correction-events th,html body .app-shell .production-order-correction .production-correction-events td{font-size:16px;padding:9px;line-height:1.45;white-space:normal}
+html body .app-shell .production-order-correction .production-correction-current{white-space:nowrap!important;min-width:165px}
+html body .app-shell .production-order-correction .production-correction-events fieldset{border:0;padding:0;margin:0;min-width:230px}
+html body .app-shell .production-order-correction .production-correction-events .work-date-time{display:flex;gap:5px;align-items:center;flex-wrap:nowrap}
+html body .app-shell .production-order-correction .production-correction-events input[type=number]{width:95px;min-width:75px}
+html body .app-shell .production-order-correction .production-correction-events .correction-changed>td{background:#fff1d9!important}
+html body .app-shell .production-order-correction .production-correction-events .correction-retired>td{background:#f1f1ed!important;color:#536253}
+html body .app-shell .production-order-correction small{display:block;font-size:14px}
+html body .app-shell .production-order-correction .production-correction-labor{padding:12px;border:1px solid #b6cbb6;background:#f6faf4;margin-bottom:12px}
+html body .app-shell .production-order-correction .production-correction-labor select{max-width:100%}
+html body .app-shell .production-order-correction [hidden]{display:none!important}
+html body .app-shell .production-order-link{color:#205b31;text-decoration:underline;background:transparent;border:0;padding:0;font:inherit}
+html body .app-shell .production-order-correction .production-correction-impact table{font-size:16px}
+html body .app-shell .production-order-correction .production-correction-impact h3{margin:12px 0 8px}
+
+/* Match the small square selectors used across ONSPA; enlarge only the tap area. */
+html body .app-shell .production-corrections-screen input[type=checkbox]{appearance:auto!important;width:15px!important;min-width:15px!important;max-width:15px!important;height:15px!important;min-height:15px!important;padding:0!important;border-radius:0!important;margin:0 7px 0 0!important;vertical-align:middle;accent-color:#286440}
+html body .app-shell .production-corrections-screen [hidden]{display:none!important}
+html body .app-shell .production-correction-steps{display:flex;flex-wrap:wrap;gap:8px 28px;margin:12px 0;padding:12px 12px 12px 32px;background:#edf5e9;border:1px solid #b8cfb9;font-size:16px;color:#23462d}
+html body .app-shell .production-correction-steps li{padding-right:12px}
+html body .app-shell .production-order-correction .correction-editing>td{background:#eef6e9!important}
+html body .app-shell .production-order-correction .production-correction-check{text-align:center;width:60px}
+html body .app-shell .production-order-correction .production-correction-check label{display:inline-flex;align-items:center;justify-content:center;min-height:30px;min-width:30px}
+html body .app-shell .production-order-correction .production-correction-events td label{display:block;margin-top:4px}
+html body .app-shell .production-order-correction .production-correction-labor-select{display:flex;gap:12px 24px;align-items:center;flex-wrap:wrap;margin:12px 0;padding:10px;border-bottom:1px solid #b8cfb9}
+html body .app-shell .production-order-correction .production-correction-selection{font-size:16px;color:#23462d}
+@media(max-width:640px){html body .app-shell .production-order-correction .production-correction-check label{min-width:44px;min-height:44px}html body .app-shell .production-correction-steps{display:block}html body .app-shell .production-correction-steps li{margin:4px 0}}
+
+/* Compact In transit metadata; normalized status keys are accent-free. */
+html body .app-shell .it-table>table>tbody>tr>td.it-compact-meta,
+html body .app-shell .it-table .it-compact-meta .it-badge {
+  font-size:14px!important;font-weight:400!important;line-height:1.3!important;
+  white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;
+}
+html body .app-shell .it-table .it-compact-meta .it-badge {
+  padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;
+}
+html body .app-shell .it-table .it-chua-mo-lsx,
+html body .app-shell .it-table .it-chua-dong-bo,
+html body .app-shell .it-table .it-chua-san-xuat {color:#805600!important}
+html body .app-shell .it-table .it-da-mo-lsx,
+html body .app-shell .it-table .it-da-dong-bo,
+html body .app-shell .it-table .it-ht-dung-tien-do {color:#206b34!important}
+html body .app-shell .it-table .it-ht-som {color:#00756e!important}
+html body .app-shell .it-table .it-huy,
+html body .app-shell .it-table .it-loi-dong-bo,
+html body .app-shell .it-table .it-ht-tre-tien-do {color:#b42318!important}
+html body .app-shell .it-table .it-co-thay-doi,
+html body .app-shell .it-table .it-dang-tam-ngung {color:#a34c00!important}
+html body .app-shell .it-table .it-dang-san-xuat {color:#165cb0!important}
+html body .app-shell .it-table .it-tam-dung-su-co {color:#8b3295!important}
+
+/* Smaller status text only; source remains 14px. */
+html body .app-shell .it-table>table>tbody>tr>td.center.it-compact-meta,
+html body .app-shell .it-table .center.it-compact-meta .it-badge {font-size:13px!important}
+
+html body .app-shell .it-table .center.it-compact-meta .it-badge {text-transform:none!important}
+html body .app-shell .it-table .it-ht-dung-tien-do {color:#206b34!important}
+
+/* Progress labels use colored backgrounds; other status columns stay plain. */
+html body .app-shell .it-table .it-compact-meta.it-progress-cell .it-badge {
+  padding:3px 8px!important;border-radius:3px!important;
+}
+html body .app-shell .it-table .it-progress-cell .it-chua-san-xuat {background:#ffedb0!important;color:#694600!important}
+html body .app-shell .it-table .it-progress-cell .it-dang-san-xuat {background:#cde3ff!important;color:#104d91!important}
+html body .app-shell .it-table .it-progress-cell .it-ht-som {background:#bcece3!important;color:#005e55!important}
+html body .app-shell .it-table .it-progress-cell .it-ht-dung-tien-do {background:#c4e9c6!important;color:#195c2b!important}
+html body .app-shell .it-table .it-progress-cell .it-ht-tre-tien-do {background:#ffd0cd!important;color:#a01c16!important}
+html body .app-shell .it-table .it-progress-cell .it-dang-tam-ngung {background:#ffddb4!important;color:#874000!important}
+html body .app-shell .it-table .it-progress-cell .it-tam-dung-su-co {background:#ebcff5!important;color:#722183!important}
+
+.app-shell button[data-confirm-action="true"]:not(:disabled) {
+  background: #28753a !important;
+  color: #fff !important;
+  border-color: #195a29 !important;
+  box-shadow: 0 1px 3px #195a2933;
+}
+.app-shell button[data-confirm-action="true"]:not(:disabled):hover {background:#1d602d !important;}
+.app-shell button[data-confirm-action="true"]:focus-visible {outline:3px solid #e4a32b;outline-offset:2px;}
+.app-shell button[data-confirm-action="true"]:disabled {background:#e0e9dd !important;color:#667062 !important;border-color:#c2cfbc !important;box-shadow:none;}
+
+
+/* One progress palette shared by planning and production review. */
+html body .app-shell .onspa-progress {display:inline-block;padding:3px 8px!important;border:0!important;border-radius:3px!important;font-size:13px!important;font-weight:400!important;line-height:1.3!important;white-space:nowrap!important;text-transform:none!important}
+html body .app-shell .onspa-progress-waiting {background:#ffedb0!important;color:#694600!important}
+html body .app-shell .onspa-progress-running {background:#cde3ff!important;color:#104d91!important}
+html body .app-shell .onspa-progress-early {background:#bcece3!important;color:#005e55!important}
+html body .app-shell .onspa-progress-completed {background:#c4e9c6!important;color:#195c2b!important}
+html body .app-shell .onspa-progress-late {background:#ffd0cd!important;color:#a01c16!important}
+html body .app-shell .onspa-progress-paused {background:#ffddb4!important;color:#874000!important}
+html body .app-shell .onspa-progress-incident {background:#ebcff5!important;color:#722183!important}
+html body .app-shell .onspa-progress-review {background:#e9ddf4!important;color:#643489!important}
+/* One pinned command area across all menu workspaces; tables retain their own scroll. */
+html body .app-shell [data-onspa-pin-path]{overflow:visible!important}
+html body .app-shell [data-onspa-pinned]{position:sticky!important;top:var(--onspa-pin-top,0px)!important;z-index:10!important;background-color:#fffdf6;isolation:isolate}
+/* An open employee list must clear the following Capacity toolbar's sticky layer.
+   Keep it below the site header (17) and dialogs (20+). */
+html body .app-shell [data-onspa-pinned]:has(.production-allocation-queue button[aria-label="Chọn nhân viên"][aria-expanded="true"]),
+html body .app-shell .production-allocation-queue[data-onspa-pinned]:has(button[aria-label="Chọn nhân viên"][aria-expanded="true"]){z-index:12!important}
+html body .app-shell .topbar[data-onspa-pinned]{z-index:17!important}
+html body .app-shell .workspace-tabs[data-onspa-pinned]{z-index:11!important;background:#eef4ec!important}
+html body .app-shell [data-standard-toolbar][data-onspa-pinned]{box-shadow:0 2px 3px #163d2520}
+html body .app-shell .production-inline-message[data-onspa-pinned].success{background:#e5f3e7!important;color:#174c2a!important}
+html body .app-shell .production-inline-message[data-onspa-pinned].error{background:#fff0ee!important;color:#942020!important}
+html{scroll-padding-top:var(--onspa-pinned-height,220px)}
+
+/* Compact actual attendance edit: one date/time row and separated actions. */
+html body .actual-labor-edit{width:min(720px,calc(100vw - 32px))!important}
+html body .actual-labor-edit-body{display:flex;flex-direction:column;gap:12px;padding:16px!important}
+html body .actual-labor-edit-body p{margin:0}
+html body .actual-labor-edit-body label{display:flex;flex-direction:column;gap:5px;min-width:0}
+html body .actual-labor-edit-time{display:grid;grid-template-columns:minmax(140px,1fr) 100px minmax(140px,1fr) 100px;gap:12px;align-items:end}
+html body .actual-labor-edit-time input{width:100%;min-width:0;box-sizing:border-box}
+html body .actual-labor-edit-actions{display:flex;justify-content:flex-end;align-items:center;gap:16px;padding-top:12px;border-top:1px solid #c8d7ca}
+html body .actual-labor-edit-actions button{min-height:36px;padding:7px 16px}
+@media(max-width:600px){html body .actual-labor-edit-time{grid-template-columns:minmax(140px,1fr) 100px}}
+
+/* Header stays in its original fixed coordinate system, including the logo. */
+html body .app-shell>.topbar{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:17!important;background:#fffdf6!important;isolation:auto!important}
+html body .app-shell [data-onspa-pinned]{background-color:#fffdf6!important;box-shadow:none!important;overflow-anchor:none}
+html body .app-shell main{overflow-anchor:none}
+html body .app-shell .workspace-tabs[data-onspa-pinned]{background:#eef4ec!important}
+
+/* Each data viewport clips rows at its opaque sticky column header. */
+html body .app-shell :is(.actual-scroll,.table-wrap,.pp-table,.it-table,.production-table-wrap){position:relative;isolation:isolate;overflow:auto!important;max-height:var(--onspa-table-height,calc(100dvh - 320px))!important;scrollbar-gutter:stable}
+html body .app-shell :is(.actual-scroll,.table-wrap,.pp-table,.it-table,.production-table-wrap)>table{border-collapse:separate!important;border-spacing:0}
+html body .app-shell :is(.actual-scroll,.table-wrap,.pp-table,.it-table,.production-table-wrap)>table>thead{position:sticky!important;top:0!important;z-index:12;background:#edf4ed!important}
+html body .app-shell :is(.actual-scroll,.table-wrap,.pp-table,.it-table,.production-table-wrap)>table>thead>tr>th{background:#edf4ed!important;color:#193e28!important;background-clip:border-box;box-shadow:0 1px 0 #acc9ae}
+
+html body .production-payroll-screen .payroll-column-title{display:inline-flex;align-items:center;gap:5px}
+html body .production-payroll-screen button.payroll-formula-toggle{border:0!important;background:transparent!important;padding:0 3px!important;min-width:22px;min-height:24px;height:auto!important;color:#195b30!important;font-size:16px!important;cursor:pointer}
+html body .production-payroll-screen .payroll-formula-detail{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:8px 0;padding:9px 12px;border:1px solid #b7cdb8;background:#eef5ed;color:#193e28;white-space:normal}
+html body .production-payroll-screen .payroll-formula-detail button{flex:none;background:transparent;border:0;min-width:28px;cursor:pointer}
+html body .production-payroll-screen .payroll-employees-table :is(th,td):nth-child(2){min-width:90px!important;white-space:nowrap!important;word-break:normal!important}
+html body .production-payroll-screen .payroll-employees-table :is(th,td):nth-child(3){min-width:165px!important;white-space:nowrap!important;word-break:normal!important}
+html body .production-payroll-screen .payroll-employees-table td.number{white-space:nowrap!important;word-break:normal!important}
+
+html body .payroll-formula-popover{z-index:280!important;display:flex;align-items:start;gap:12px;width:300px;max-width:calc(100vw - 24px);padding:12px;background:#f4f8ef;color:#193e28;border:1px solid #a4bfa6;border-radius:4px;font:16px/1.45 "Times New Roman",serif;box-shadow:0 4px 14px #193e2826;animation:none!important;transition:none!important}
+html body .payroll-formula-popover button{flex:none;border:0;background:transparent;min-width:24px;cursor:pointer;color:#193e28;font:inherit}
+
+html body .actual-headcount-trigger{border:0!important;background:transparent!important;color:#195b30!important;padding:2px 6px!important;min-height:24px!important;font:inherit!important;cursor:pointer;white-space:nowrap}
+html body .actual-headcount-popover{z-index:280!important;width:420px;max-width:calc(100vw - 24px);max-height:360px;overflow:auto;padding:10px;background:#f4faf2;color:#193e28;border:1px solid #a4bfa6;border-radius:4px;font:16px/1.4 "Times New Roman",serif;animation:none!important;transition:none!important}
+html body .actual-headcount-popover-title{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}
+html body .actual-headcount-popover-title button{background:transparent;border:0;cursor:pointer;font:inherit}
+html body .actual-headcount-popover table{width:100%;border-collapse:collapse}
+html body .actual-headcount-popover td{padding:8px;border:1px solid #b9d5bd;white-space:normal}
+
+/* Align the open-screen strip to the same content edges as its workspace. */
+html body .app-shell .workspace.workspace-tabs {
+  box-sizing:border-box!important;
+  margin-left:var(--onspa-content-left,242px)!important;
+  margin-right:var(--onspa-content-right,12px)!important;
+  width:calc(100% - var(--onspa-content-left,242px) - var(--onspa-content-right,12px))!important;
+  max-width:none!important;padding:6px 0!important;
+}
+/* SKU details must remain above the pinned toolbar, including title and close. */
+html body .app-shell .sku-detail-overlay {position:fixed!important;inset:var(--onspa-header-height,96px) 0 0!important;z-index:260!important;}
+html body .app-shell .sku-detail-panel {position:fixed!important;top:var(--onspa-header-height,96px)!important;bottom:0!important;z-index:261!important;max-height:calc(100dvh - var(--onspa-header-height,96px));margin:0!important;}
+/* Keep codes and product labels intact; formulas do not determine column width. */
+html body .app-shell .production-output-table>tbody>tr>td:nth-child(2){min-width:190px!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+html body .app-shell .production-output-table>tbody>tr>td:nth-child(3){min-width:125px!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+html body .app-shell .production-output-table>tbody>tr>td:nth-child(4){min-width:115px!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+html body .app-shell .production-output-table>tbody>tr>td:nth-child(5){min-width:235px!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+html body .app-shell .production-output-table>tbody>tr>td:nth-child(6){min-width:100px!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+html body .app-shell .production-output-labor-table>thead>tr>th:nth-child(15),html body .app-shell .production-output-labor-table>tbody>tr>td:nth-child(15){width:110px!important;min-width:110px!important;max-width:110px!important}
+html body .app-shell .production-output-labor-table>thead>tr>th:nth-child(16),html body .app-shell .production-output-labor-table>tbody>tr>td:nth-child(16){width:95px!important;min-width:95px!important;max-width:95px!important}
+html body .app-shell .production-output-table .number{white-space:nowrap!important;overflow-wrap:normal!important}
+.output-column-title{display:flex;align-items:center;gap:4px;justify-content:space-between}
+html body .app-shell .output-formula-arrow{flex:none;padding:0 3px!important;min-width:22px;min-height:24px;border:0;background:transparent;color:#205a36;cursor:pointer;font:inherit}
+/* Use the available page width, excluding the browser's vertical scrollbar. */
+html body div.app-shell.sidebar-collapsed main.workspace{width:calc(100% - 44px)!important;max-width:calc(100% - 44px)!important}
+@media(max-width:700px){html body div.app-shell.sidebar-collapsed main.workspace{width:calc(100% - 40px)!important;max-width:calc(100% - 40px)!important}}
+html body .app-shell .sku-detail-panel>.detail-header{background:#edf4ed!important;color:#193e28!important;border-bottom:1px solid #b8cfb9}
+html body .app-shell .sku-detail-panel>.detail-header :is(p,h2,span){color:#193e28!important}
+html body .app-shell .sku-detail-panel>.detail-header button{color:#193e28!important;border:1px solid #a9c3ad;background:#fffdf6;border-radius:3px}
+html body .app-shell .production-output-table>tbody>tr>td:first-child{min-width:105px!important;white-space:nowrap!important;overflow-wrap:normal!important}
+html body .app-shell .production-output-labor-table>thead>tr>th:nth-child(n+8):nth-child(-n+14){min-width:75px!important}
+html body .app-shell .production-output-labor-table>thead>tr>th:nth-child(17){min-width:125px!important}
+html body .app-shell .production-output-table>thead>tr>th:last-child{min-width:70px!important}
+
+/* Layer contract: table viewports isolate their headers at 0; pinned commands 10,
+   workspace tabs 11, application navigation 17; existing modal backdrops start
+   at 20. Keep ALL pinned surfaces below the lowest dialog, not just SKU. */
+
+/* Week visibility is a compact dialog, not the wide production data grid. */
+html body .app-shell .it-modal.it-hide-rows{width:min(720px,94vw)}
+html body .app-shell .it-hide-options{display:block;min-width:0}
+html body .app-shell .it-hide-options p{white-space:normal;margin:0 0 14px;line-height:1.5}
+html body .app-shell .it-hide-options table{width:100%!important;min-width:0!important;table-layout:fixed!important}
+html body .app-shell .it-hide-options :is(th,td){min-width:0!important;white-space:normal!important;padding:10px 8px;border:1px solid #b5c9ba}
+html body .app-shell .it-hide-options :is(th,td):first-child{width:56%!important}
+html body .app-shell .it-hide-options :is(th,td):not(:first-child){width:22%!important;text-align:center}
+html body .app-shell .it-hide-rows>header{background:#edf4ed;color:#254a35}
+html body .app-shell .it-hide-rows>header :is(h2,button){color:#254a35}
+
+/* Keep percentage triggers inside their column; explanations render in a floating portal. */
+html body .app-shell .production-output-table .labor-deviation-disclosure{display:flex;align-items:center;justify-content:flex-end;gap:4px;width:100%;min-width:0;max-width:100%;height:auto;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:right;cursor:pointer;white-space:normal!important}
+html body .app-shell .production-output-table .labor-deviation-disclosure:focus-visible{outline:2px solid #176b3a;outline-offset:2px}
+html body .app-shell .production-output-table .labor-deviation-value{min-width:0;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal}
+html body .app-shell .production-output-table .labor-deviation-arrow{flex:none;display:inline-block}
+html body .app-shell .production-output-table .labor-deviation-disclosure[data-state="open"] .labor-deviation-arrow{transform:rotate(90deg)}
+
+/* Compact headcount disclosures: names wrap inside the viewport, no wide tables. */
+html body .actual-headcount-popover{width:360px;max-width:min(360px,calc(100vw - 24px));overflow-x:hidden;overflow-y:auto;box-sizing:border-box;overflow-wrap:anywhere;white-space:normal}
+html body .headcount-compact{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+html body .headcount-compact p{margin:4px 0;white-space:normal}
+html body .headcount-compact details{min-width:0;max-width:100%;margin-top:6px}
+html body .headcount-compact summary{cursor:pointer;white-space:normal}
+html body .headcount-compact ul{margin:4px 0;padding-left:18px}
+html body .headcount-compact li{white-space:normal;overflow-wrap:anywhere}
+
+/* Labor output: compact date/quantity/standard columns, readable percentages. */
+html body .app-shell .production-output-labor-table>thead>tr>th:is(:nth-child(1),:nth-child(8),:nth-child(9),:nth-child(10),:nth-child(11)),
+html body .app-shell .production-output-labor-table>tbody>tr>td:is(:nth-child(1),:nth-child(8),:nth-child(9),:nth-child(10),:nth-child(11)){
+ width:110px!important;min-width:110px!important;max-width:110px!important;box-sizing:border-box;
+}
+html body .app-shell .production-output-labor-table>thead>tr>th:is(:nth-child(1),:nth-child(8),:nth-child(9),:nth-child(10),:nth-child(11)){
+ white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;
+}
+html body .app-shell .production-output-labor-table>thead>tr>th:nth-child(16),
+html body .app-shell .production-output-labor-table>tbody>tr>td:nth-child(16){width:155px!important;min-width:155px!important;max-width:155px!important}
+html body .app-shell .production-output-labor-table .labor-deviation-value{white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+
+/* Image entry needs the full planning table, not the single-SKU dialog width. */
+html body dialog.de-dialog.de-dialog-image{width:calc(100vw - 48px)!important;max-width:calc(100vw - 48px)!important;max-height:94dvh!important;padding:16px!important;box-sizing:border-box}
+html body dialog.de-dialog.de-dialog-image .demand-image-import{width:100%;min-width:0}
+html body dialog.de-dialog.de-dialog-image .demand-image-table{width:100%;max-height:68dvh;overflow:auto}
+html body dialog.de-dialog.de-dialog-image .demand-image-table table{width:100%!important;min-width:0!important;table-layout:fixed!important}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(1){width:4%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(2){width:14%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(3){width:23%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(4),html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(5){width:12%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(6){width:10%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(7){width:9%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(8){width:8%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(9){width:8%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table :is(th,td){white-space:normal!important;overflow-wrap:anywhere;min-width:0!important}
+html body dialog.de-dialog.de-dialog-image .demand-image-import>label{display:flex;align-items:center;gap:12px;margin:12px 0}
+html body dialog.de-dialog.de-dialog-image .demand-image-import>label>input{width:210px!important}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(3){width:20%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table th:nth-child(6){width:13%}
+html body dialog.de-dialog.de-dialog-image .demand-image-table td:nth-child(6) select{min-width:115px!important;padding-right:24px!important}
+
+/* Keep image entry inside the content area, following expanded/collapsed navigation. */
+html body dialog.de-dialog.de-dialog-image{left:calc(var(--onspa-sidebar-width,230px) + 12px)!important;right:12px!important;width:calc(100vw - var(--onspa-sidebar-width,230px) - 24px)!important;max-width:calc(100vw - var(--onspa-sidebar-width,230px) - 24px)!important;margin-left:0!important;margin-right:0!important}
+
+/* Shared order note: preserve line breaks without stretching a column. */
+html body .order-planning-note{min-width:180px!important;width:220px;max-width:280px;white-space:pre-wrap!important;overflow-wrap:anywhere}.order-planning-note textarea{width:100%;min-width:160px;resize:vertical;border:1px solid #94b4a0;border-radius:4px;padding:5px;font:inherit;background:#fffdf5;color:#234536}
+
+/* Planning notes from KHSX in the two production views. */
+html body .khsx-planning-note{display:block;background:#fff1bd!important;color:#713b08!important;border:1px solid #e4b34f;border-left:4px solid #d88a16;border-radius:5px;padding:7px 9px;font-weight:700!important;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
+
+/* Production quantities: distinct meanings, never substitute LSX qty for plan qty. */
+html body .app-shell main.production-workspace table:is(.work-table,.progress-order-table) :is(th,td).production-plan-qty{background:#e6f0fb!important;color:#174d7c!important;font-weight:700!important;min-width:85px}
+html body .app-shell main.production-workspace table:is(.work-table,.progress-order-table) :is(th,td).production-order-qty{background:#fff0d9!important;color:#78430c!important;font-weight:700!important;min-width:80px}
+html body .production-workspace .production-compact-note{min-width:110px!important;width:140px!important;max-width:160px!important;white-space:normal!important;overflow-wrap:anywhere}
+html body .production-workspace .production-compact-note .khsx-planning-note{padding:4px 6px}
+html body .production-cancelled-lock,html body .onspa-progress-cancelled{display:inline-block;color:#a11b24!important;background:#ffe4e6!important;border:1px solid #e5a0a5;border-radius:5px;padding:5px 7px;font-weight:700}

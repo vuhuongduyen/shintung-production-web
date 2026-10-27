@@ -1,0 +1,11 @@
+{
+  "source_version": 745,
+  "source_commit": "082ae9695affd8694da0077010956eb0213be4d9",
+  "deployment_status": "succeeded",
+  "verified_date": "2026-10-27",
+  "source_tree_clean": true,
+  "sanitized_derivative": true,
+  "lockfile_sha256": "3d1a51c54c99e4ecd0446ba10247ff5b43024d1f6e8dd87b8af47b5a4de479f2",
+  "production_mutations": false,
+  "github_push": false
+}

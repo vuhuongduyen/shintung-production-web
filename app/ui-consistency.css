@@ -1,0 +1,92 @@
+/* UI audit 491: shared presentation only; business values and handlers unchanged. */
+html body div.app-shell {--onspa-sidebar-width:230px;--planning-nav:var(--onspa-sidebar-width);--onspa-page-title:24px;--onspa-toolbar-title:16px}
+html body div.app-shell.sidebar-collapsed {--onspa-sidebar-width:44px}
+html body div.app-shell main.workspace,
+html body div.app-shell .workspace.workspace-tabs {
+ box-sizing:border-box!important;margin-left:var(--onspa-sidebar-width)!important;margin-right:0!important;
+ width:calc(100% - var(--onspa-sidebar-width))!important;max-width:calc(100% - var(--onspa-sidebar-width))!important;
+ padding-left:12px!important;padding-right:12px!important;min-width:0;
+}
+/* Only physically nested workspaces reuse their parent sidebar offset. */
+html body div.app-shell main.workspace main.workspace {margin-left:0!important;width:100%!important;max-width:100%!important}
+html body div.app-shell>.topbar {
+ display:grid!important;grid-template-columns:190px minmax(0,1fr) auto!important;align-items:center;gap:12px;padding:0 12px!important;
+}
+html body div.app-shell>.topbar>.brand {grid-column:1;position:static!important;width:190px;min-width:0;margin:0!important}
+html body div.app-shell>.topbar>.top-modules {
+ grid-column:2;position:static!important;inset:auto!important;transform:none!important;
+ display:flex!important;min-width:0!important;width:auto!important;max-width:100%!important;
+ overflow-x:auto!important;overflow-y:hidden!important;margin:0!important;
+}
+html body div.app-shell>.topbar>.top-modules button {flex:0 0 auto;font-size:14px!important;padding-inline:10px!important;white-space:nowrap}
+html body div.app-shell>.topbar>.session-user {grid-column:3;position:static!important;inset:auto!important;transform:none!important;display:flex;align-items:center;gap:6px;margin:0!important;width:auto!important}
+html body div.app-shell>.topbar>.session-user .language-switch {position:static!important;inset:auto!important;transform:none!important}
+/* Feedback has its own footer area. No submenu scrolls under its hit target. */
+html body div.app-shell .app-sidebar {width:var(--onspa-sidebar-width)!important;bottom:148px!important;box-sizing:border-box}
+html body div.app-shell .feedback-launch-button {left:24px;bottom:28px;z-index:18}
+html body div.app-shell.sidebar-collapsed .feedback-launch-button {left:4px;width:36px;height:36px;bottom:20px;border-width:2px}
+html body div.app-shell.sidebar-collapsed .feedback-launch-button svg {width:24px;height:24px}
+html body div.app-shell.sidebar-collapsed .feedback-launch-label {display:none}
+html body div.app-shell.sidebar-collapsed .app-sidebar {bottom:76px!important}
+/* Normal word wrapping never breaks identifiers, dates, times or decimal strings. */
+html body div.app-shell :is(.table-wrap,.pp-table,.it-table,.onspa-data-table) table {table-layout:auto!important}
+html body div.app-shell table td {overflow-wrap:normal!important;word-break:normal!important}
+html body div.app-shell table :is(td.number,td.numeric,td[data-type=number],td[data-type=code],td[data-type=date],td[data-type=time],time,code) {white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+html body div.app-shell table :is(td.number,td.numeric,td[data-type=number]) {text-align:right!important;font-variant-numeric:tabular-nums;font-weight:400!important}
+html body div.app-shell table td button {word-break:normal!important;overflow-wrap:normal!important}
+html body div.app-shell main.workspace h1,.onspa-page-header h1 {font-size:var(--onspa-page-title,24px)!important;font-weight:400!important;line-height:1.3}
+html body div.app-shell [data-standard-toolbar]>h2 {font-size:var(--onspa-toolbar-title,16px)!important;font-weight:400!important;line-height:1.3}
+.onspa-page-header {display:flex;align-items:center;gap:12px;min-width:0}
+.onspa-page-header h1 {margin:0;flex:1}
+.onspa-filter-panel {display:flex;align-items:flex-end;gap:6px;min-width:0}
+.onspa-data-table {max-width:100%;overflow:auto;overscroll-behavior:contain}
+.onspa-popover {font:400 16px/1.4 "Times New Roman",serif;background:#fffef8;color:#286440;border:1px solid #b8cfb9;padding:12px;max-width:calc(100vw - 24px);max-height:var(--radix-popover-content-available-height,70vh);overflow:auto;z-index:30}
+.onspa-popover-close {float:right;font:inherit;color:inherit;background:transparent;border:1px solid #b8cfb9;padding:2px 8px;margin:0 0 8px 12px}
+@media(max-width:700px){
+ html body div.app-shell{--onspa-sidebar-width:190px}
+ html body div.app-shell.sidebar-collapsed{--onspa-sidebar-width:40px}
+ html body div.app-shell>.topbar{grid-template-columns:100px minmax(0,1fr);gap:4px}
+ html body div.app-shell>.topbar>.brand{width:100px;grid-row:1}
+ html body div.app-shell>.topbar>.session-user{grid-column:2;grid-row:1;justify-self:end}
+ html body div.app-shell>.topbar>.top-modules{grid-column:1/-1;grid-row:2}
+}
+
+html body div.app-shell .cap-summary-table td.number strong {white-space:nowrap!important;font-weight:400!important}
+html body div.app-shell .cap-summary-table td.number small {white-space:normal}
+
+/* UI-04: same full table path as the legacy wrapping rule plus a semantic cell
+   selector. (0,3,6) beats planning-compact.css (0,2,6), independent of order. */
+html body .app-shell :is(.table-wrap,.pp-table,.it-table,.onspa-data-table)>table>tbody>tr>td:is([data-type="code"],[data-type="date"],[data-type="time"],[data-type="number"],.number,.numeric,.qty-cell) {
+ white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;
+}
+html body .app-shell :is(.table-wrap,.pp-table,.it-table,.onspa-data-table)>table>tbody>tr>td:is([data-type="number"],.number,.numeric,.qty-cell) {text-align:right!important}
+
+/* Generated navigation heading is UI text, never business data. */
+html:lang(en) .app-sidebar .sidebar-children::before { content: "FUNCTION MENU"; }
+html:lang(zh) .app-sidebar .sidebar-children::before { content: "功能選單"; }
+/* PCB24 F1: mobile header uses distinct logo, session and scrollable navigation rows. */
+@media(max-width:700px){
+ html body div.app-shell>.topbar{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto auto!important;align-items:center;gap:4px!important;height:auto!important;min-height:0!important;padding:6px 10px!important;box-sizing:border-box}
+ html body div.app-shell>.topbar>.brand{grid-column:1!important;grid-row:1!important;justify-self:start;width:100px!important;height:auto!important;min-width:0!important;overflow:visible!important}
+ html body div.app-shell>.topbar>.brand img{width:100px!important;max-width:100%!important;height:auto!important}
+ html body div.app-shell>.topbar>.session-user{grid-column:1!important;grid-row:2!important;justify-self:stretch!important;min-width:0!important;max-width:100%!important;flex-wrap:wrap!important;gap:4px!important}
+ html body div.app-shell>.topbar>.session-user .language-switch{position:static!important;flex:0 0 auto;max-width:100%}
+ html body div.app-shell>.topbar>.top-modules{grid-column:1!important;grid-row:3!important;position:static!important;inset:auto!important;height:auto!important;min-height:44px;overflow-x:auto!important;overflow-y:hidden!important;max-width:100%!important;min-width:0!important;white-space:nowrap;overscroll-behavior-x:contain}
+ html body div.app-shell>.topbar>.top-modules button{height:44px!important;flex-shrink:0!important}
+ html body div.app-shell .app-sidebar{top:var(--onspa-header-height,156px)!important}
+}
+/* Header height follows its rendered content, including translated session labels. */
+html body div.app-shell{--onspa-header-height:96px}
+@media(max-width:700px){html body div.app-shell{--onspa-header-height:156px}}
+@media(max-width:700px){
+ html body div.app-shell{--onspa-header-height:190px}
+ html body div.app-shell>.topbar{min-height:190px!important;grid-template-rows:78px minmax(42px,auto) 44px!important;align-content:start}
+ html body div.app-shell>.topbar>.session-user{overflow-x:auto;overflow-y:visible;flex-wrap:nowrap!important;white-space:nowrap}
+ html body div.app-shell>.topbar>.session-user>*{flex-shrink:0}
+}
+@media(min-width:701px) and (max-width:1050px){
+ html body div.app-shell>.topbar{grid-template-columns:150px minmax(0,1fr) minmax(0,auto)!important;gap:6px}
+ html body div.app-shell>.topbar>.brand{width:150px!important}
+ html body div.app-shell>.topbar>.brand img{max-width:140px}
+ html body div.app-shell>.topbar>.session-user{min-width:0;max-width:250px;overflow-x:auto;overscroll-behavior-x:contain}
+}

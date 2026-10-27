@@ -1,0 +1,9 @@
+{
+  "environment": "TEST",
+  "host": "127.0.0.1",
+  "port": 5173,
+  "databaseId": "onspa-test-local-v1",
+  "binding": "DB",
+  "remote": false,
+  "persistPath": ".local-data/d1"
+}

@@ -1,0 +1,100 @@
+/* Compact shared shell: preserve full content width and readable controls. */
+html body div.app-shell>.topbar{height:auto!important;min-height:64px!important;padding-block:4px!important;gap:6px!important}
+html body div.app-shell>.topbar>.brand{height:52px!important;display:flex;align-items:center}
+html body div.app-shell>.topbar>.brand img{max-height:52px!important;width:auto!important;max-width:100%;object-fit:contain}
+html body div.app-shell>.topbar>.top-modules{height:auto!important;min-height:40px!important}
+html body div.app-shell>.topbar>.top-modules button{height:40px!important;min-height:40px!important;padding-block:4px!important}
+html body div.app-shell main.workspace{padding-top:6px!important}
+html body div.app-shell main.workspace>h1,html body div.app-shell .onspa-page-header{margin-block:4px!important;padding-block:0!important}
+html body div.app-shell .workspace.workspace-tabs{padding-block:3px!important;min-height:36px!important}
+html body div.app-shell .app-sidebar{top:var(--onspa-header-height,64px)!important;padding-top:8px!important}
+/* A dedicated slot survives feedback wrappers and collapsed-menu hiding rules. */
+html body div.app-shell .sidebar-toggle-slot{display:block!important;position:fixed;left:calc(var(--onspa-sidebar-width) - 42px);bottom:88px;z-index:18;width:36px;height:36px}
+html body div.app-shell .sidebar-toggle-slot [data-feedback-button]{display:block!important;width:36px}
+html body div.app-shell .sidebar-toggle-slot .sidebar-collapse-toggle{display:grid!important;place-items:center;width:36px!important;height:36px!important;min-height:36px!important;margin:0!important;padding:0!important;border:1px solid #c4dcc9;background:#123f23;color:white;border-radius:5px;cursor:pointer}
+html body div.app-shell .sidebar-toggle-slot .sidebar-collapse-toggle span{font-size:27px!important;line-height:1}
+html body div.app-shell.sidebar-collapsed .sidebar-toggle-slot{left:4px;bottom:80px}
+html body div.app-shell .sidebar-toggle-slot button:focus-visible{outline:2px solid #ef8b13;outline-offset:2px}
+/* SX reporting only. The journal's wider order column is untouched. */
+html body div.app-shell .work-command-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:4px 0;min-width:0}
+html body div.app-shell .work-command-row .work-calendar-banner{flex:1 1 480px;min-width:0;margin:0;padding:5px 8px;gap:4px 10px;align-items:center}
+html body div.app-shell .work-command-row>[data-standard-toolbar]{flex:0 1 auto;min-width:0;margin:0!important;padding:4px 6px!important}
+html body div.app-shell .work-command-row [data-standard-toolbar]>h2{display:none}
+html body div.app-shell .work-command-row [data-standard-toolbar] select{max-width:220px}
+html body div.app-shell .production-work-screen .work-table :is(th,td):nth-child(3){min-width:0;width:auto}
+html body div.app-shell .production-work-screen .work-table :is(th,td).work-order-code{width:122px;min-width:122px;white-space:nowrap!important}
+html body div.app-shell .production-work-screen .work-table .work-order-code .sku-link{font-size:16px!important;font-weight:400!important}
+html body div.app-shell .production-work-screen .work-table :is(th,td).work-product{min-width:220px;width:24%;white-space:normal!important}
+html body div.app-shell .production-work-screen .work-table :is(th,td).work-status{width:125px;min-width:115px;white-space:normal!important}
+html body div.app-shell .production-work-screen .work-table .work-status .onspa-progress{white-space:normal!important}
+html body div.app-shell .production-work-screen .work-table :is(th,td).work-people{min-width:125px;width:125px;white-space:normal!important}
+html body div.app-shell .production-work-screen .work-table :is(th,td).work-plan-id{font-size:13px!important;width:155px;min-width:145px}
+@media(max-width:1050px){
+ html body div.app-shell>.topbar{grid-template-columns:120px minmax(0,1fr)!important;grid-template-rows:auto auto!important;min-height:0!important}
+ html body div.app-shell>.topbar>.brand{grid-column:1!important;grid-row:1!important;width:120px!important;height:42px!important}
+ html body div.app-shell>.topbar>.brand img{max-height:42px!important}
+ html body div.app-shell>.topbar>.session-user{grid-column:2!important;grid-row:1!important;justify-self:end!important;max-width:100%!important;min-width:0!important;flex-wrap:wrap!important;overflow:visible!important}
+ html body div.app-shell>.topbar>.top-modules{grid-column:1/-1!important;grid-row:2!important}
+ html body div.app-shell .work-command-row>*{max-width:100%}
+}
+@media(max-width:600px){
+ html body div.app-shell>.topbar{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto auto!important;padding:3px 8px!important}
+ html body div.app-shell>.topbar>.brand{grid-column:1!important;grid-row:1!important;height:32px!important}
+ html body div.app-shell>.topbar>.brand img{max-height:32px!important}
+ html body div.app-shell>.topbar>.session-user{grid-column:1!important;grid-row:2!important;justify-self:stretch!important;white-space:normal!important}
+ html body div.app-shell>.topbar>.top-modules{grid-row:3!important}
+ html body div.app-shell .work-command-row>[data-standard-toolbar]{flex:1 1 100%}
+}
+/* Commands first; both neighboring panels stretch to the same row height. */
+html body div.app-shell .work-command-row{align-items:stretch}
+html body div.app-shell .work-command-row>.work-calendar-banner{align-content:center;align-self:stretch;box-sizing:border-box}
+html body div.app-shell .work-command-row>[data-standard-toolbar]{display:flex;align-items:center;align-self:stretch;box-sizing:border-box}
+html body div.app-shell .work-command-row>[data-standard-toolbar]>div{width:100%}
+
+html body div.app-shell .production-work-screen .work-table td.work-people small{white-space:normal!important;font-size:14px!important}
+
+html body div.app-shell .production-work-screen .work-table :is(th,td).work-spec{min-width:140px;width:140px;white-space:normal!important}
+html body div.app-shell .production-work-screen .onspa-progress-overdue{background:#b42318!important;color:#fff!important;border-color:#b42318!important}
+
+html body div.app-shell .it-table :is(th,td).it-product-name{min-width:220px!important;width:240px!important;max-width:none!important;white-space:normal!important}
+html body div.app-shell .it-table :is(th,td).it-progress-cell{min-width:105px!important;width:115px!important;white-space:normal!important}
+html body div.app-shell .it-table :is(th,td).it-plan-id{min-width:165px!important;width:175px!important;font-size:13px!important}
+html body div.app-shell.sidebar-collapsed .sidebar-toggle-slot{display:block!important;visibility:visible!important}
+
+html body div.app-shell .progress-order-table .onspa-progress-overdue{background:#b42318!important;color:#fff!important;border-color:#b42318!important}
+
+/* The menu toggle is a shell sibling: never clipped by the scrolling sidebar. */
+html body div.app-shell>.sidebar-toggle-slot{z-index:18;pointer-events:auto}
+html body div.app-shell .app-sidebar .sidebar-children{flex-shrink:0}
+
+html body div.app-shell .it-table .onspa-progress-overdue{background:#b42318!important;color:#fff!important;border-color:#b42318!important}
+
+.onspa-training-entry{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 12px;border:1px solid #9a3412;border-radius:6px;background:#fff3e8;color:#7c2d12!important;font-family:inherit;font-size:16px;font-weight:700;line-height:1.2;text-decoration:none;white-space:nowrap;flex-shrink:0;cursor:pointer}
+.onspa-training-entry:hover{background:#ffdfbd}
+.onspa-training-entry:focus-visible{outline:3px solid #1268a0;outline-offset:2px}
+.login-box>.onspa-training-entry{margin-bottom:12px;width:100%;box-sizing:border-box}
+@media(max-width:640px){.onspa-training-entry{font-size:14px;padding:5px 8px;white-space:normal}}
+/* Readable approval notifications, isolated from header button typography. */
+html body .notification-popover{width:min(420px,calc(100vw - 24px));max-height:calc(100dvh - 110px);overflow-y:auto;background:#fffdf6}
+html body .notification-popover>b{font-size:22px!important;color:#173f2a!important}
+html body .notification-popover .notification-summary{font-size:18px!important;color:#374151!important}
+html body .notification-popover .notification-item{min-height:48px;color:#153e75!important;background:#eff6ff!important;border:1px solid #93b4dc!important;text-align:left}
+html body .notification-popover .notification-item span{font-size:20px!important;font-weight:600;color:#153e75!important;line-height:1.35}
+html body .notification-popover .notification-item strong{font-size:20px!important;min-width:34px;height:30px;background:#153e75!important;color:#fff!important}
+html body .notification-popover .notification-item:hover{background:#dbeafe!important}
+.receipt-code{position:relative;min-width:32px}
+.receipt-code summary{cursor:pointer;color:#153e75;padding:6px;border:1px solid #93b4dc;border-radius:4px;width:32px;background:#eff6ff}
+.receipt-code>span{display:block;max-width:240px;overflow-wrap:anywhere;white-space:normal;margin-top:6px}
+
+.warehouse-receipt-tabs{display:flex;align-items:center;flex-wrap:wrap;gap:8px}.warehouse-receipt-tabs [data-standard-toolbar]{width:auto;flex:0 1 auto;margin:0;padding:0;border:0;background:transparent;}
+/* Shared-font department correspondence; confined to the new dialog. */
+.department-change-overlay{position:fixed;inset:0;background:#142d2366;z-index:1200;display:flex;align-items:center;justify-content:center;padding:18px}
+.department-change-dialog{background:var(--background,#fffef8);border:1px solid #b8cfb9;border-radius:8px;width:900px;max-width:100%;max-height:92vh;overflow:auto;padding:22px;font:inherit;font-size:18px;color:#234432;box-shadow:0 12px 45px #0003}
+.department-change-dialog h2{font-size:24px;margin:0 0 14px}.department-change-dialog label{display:block;margin:16px 0;font-weight:bold}.department-change-dialog textarea{display:block;width:100%;min-height:130px;margin-top:8px;padding:12px;font:inherit;border:1px solid #b8cfb9;border-radius:5px}.department-change-time{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}.department-change-time > input{font:inherit;padding:10px;border:1px solid #b8cfb9;border-radius:5px;min-width:145px}.department-change-history article{border-left:3px solid #508964;background:#f1f6ef;padding:12px 16px;margin:12px 0}.department-change-history small{display:block;margin-top:5px}.department-change-history p{white-space:pre-wrap;margin:10px 0;line-height:1.5}
+.department-change-dialog select{display:block;margin-top:8px;font:inherit;padding:8px 12px;border:1px solid #b8cfb9;border-radius:5px;background:#fffef8;color:inherit;min-width:180px}
+
+.department-change-time-field{margin:16px 0}.department-change-time{align-items:center}.department-change-time .cap-clock{display:inline-flex;align-items:center;flex:none;width:110px;height:38px;border:1px solid #aebead;border-radius:4px;background:white}.department-change-time .cap-clock input[type=text]{width:76px!important;min-width:0!important;height:36px!important;padding:4px!important;border:0!important;background:transparent!important;text-align:center;font:inherit;color:#163822}.department-change-time .cap-clock button{min-width:28px!important;min-height:34px!important;padding:0!important;border:0!important;background:transparent!important;color:#275e3a;cursor:pointer}
+
+.department-change-confirm{margin-top:16px;padding:16px;border:1px solid #c77b18;border-radius:5px;background:#fff8e9;color:#754509;font-size:20px;line-height:1.5}.department-change-confirm>strong{font-size:23px}.department-change-confirm p{margin:8px 0 14px}
+
+.department-change-dialog .incident-checkbox{display:flex;align-items:center;gap:10px;margin:14px 0}.incident-details input[type="checkbox"]{width:18px!important;height:18px!important;min-width:18px;padding:0;flex:none;margin:0}.incident-details .table-wrap{max-height:320px}.incident-details table{width:100%}

@@ -1,0 +1,8 @@
+html body .website-test-log-dialog[data-slot=dialog-content]{background:#fffef8!important;color:#23482e!important;border:1px solid #a9bfa8;box-shadow:0 12px 48px #0005;font-family:"Times New Roman",serif;padding:24px;isolation:isolate}
+html body .website-test-log-dialog [data-slot=dialog-title]{font-size:22px;line-height:1.35}
+html body .website-test-log-dialog [data-slot=dialog-description]{color:#415b42;font-size:16px;line-height:1.5}
+html body .website-test-log-dialog .table-wrap{background:#fffef8;max-height:none!important;overflow-x:auto;overflow-y:visible}
+html body .website-test-log-dialog table{background:#fffef8;color:#23482e}
+html body .website-test-log-dialog th{background:#eaf2e6!important;color:#23482e;position:static!important}
+html body .website-test-log-dialog td{background:#fffef8!important;border:1px solid #ccd9c8;padding:10px;font-size:16px;line-height:1.5}
+html body .website-test-log-dialog th:first-child{width:24%}

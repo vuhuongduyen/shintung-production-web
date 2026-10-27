@@ -1,0 +1,61 @@
+.frame{--green:#286440;--border:#b8cfb9;box-sizing:border-box;min-width:0;max-width:100%;padding:6px 8px 8px;margin:0 0 8px;border:1px solid var(--border);border-radius:5px;background:#fffef8;color:var(--green);font:inherit}.title{margin:0 0 5px;font:inherit;font-weight:700}.scroll{max-width:100%;overflow-x:auto;padding:2px;overscroll-behavior-x:contain}.row{display:flex;align-items:flex-end;justify-content:flex-start;flex-wrap:wrap;gap:6px;min-width:0;width:100%}.actions,.fields,.controls{display:flex;align-items:flex-end;gap:6px;flex-shrink:0}.fields{margin-left:0}.field{display:flex;flex-direction:column;gap:3px}.label{font-size:.8em;font-weight:700;white-space:nowrap}.button,.control{box-sizing:border-box;height:36px;border:1px solid var(--border);border-radius:4px;color:var(--green);background:white;font:inherit;font-size:.94em}.button{display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;padding:0 10px;flex-shrink:0;cursor:pointer}.control{min-width:140px;max-width:260px;padding:0 8px}.control[type=checkbox]{min-width:20px;width:20px}.control[type=hidden]{display:none}.primary{background:var(--green);color:white;border-color:var(--green)}.search{background:#bf510b;color:white;border-color:#bf510b}.danger{background:#a32929;color:white;border-color:#a32929}.button:disabled{background:#f4f5f1;border-color:#ccd5cb;color:#687467;cursor:not-allowed}.button[aria-pressed=true]{background:#e5efdf;border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}.button:focus-visible,.control:focus-visible,.scroll:focus-visible{outline:2px solid var(--green);outline-offset:2px}.note{font-size:.85em;max-width:260px;align-self:center}.error{color:#a32929;margin:6px 0 0}@media(max-width:640px){.button,.control{height:44px}.button{padding-inline:12px}}
+
+/* Toolbar geometry takes precedence over legacy per-menu compact controls. */
+:global(html body) .frame .field{align-items:flex-start!important;gap:3px!important;margin:0!important;padding:0!important}
+:global(html body) .frame .button,:global(html body) .frame .control{height:36px!important;min-height:36px!important;margin:0!important;line-height:1.2!important}
+:global(html body) .frame .button{padding:0 10px!important}
+:global(html body) .frame .control{padding:0 8px!important}
+@media(max-width:640px){:global(html body) .frame .button,:global(html body) .frame .control{height:44px!important;min-height:44px!important}}
+:global(.record-files label[hidden]){display:none!important}
+/* Global `label > span` adds a 7px bottom margin, including the controls
+   wrapper. Reset both wrappers so flex-end aligns the actual control boxes. */
+:global(html body) .frame .field > .label,
+:global(html body) .frame .field > .controls{
+  margin:0!important;
+  padding:0!important;
+}
+:global(html body) .frame .controls{
+  display:flex;
+  align-items:flex-end;
+  line-height:normal!important;
+}
+
+/* Audit 10/10: actions left, lookup group right; no second toolbar. */
+:global(html body) .frame .fields{margin-left:0!important}
+:global(html body) .frame .title{font-size:16px!important;font-weight:400!important}
+
+/* Nested groups may wrap independently without forcing horizontal document overflow. */
+:global(html body) .frame .actions,:global(html body) .frame .fields,:global(html body) .frame .controls{flex-wrap:wrap;flex-shrink:1;min-width:0;max-width:100%}
+:global(html body) .frame .field{min-width:0;max-width:100%}
+:global(html body) .frame .control{max-width:100%;min-width:min(140px,100%)}
+:global(html body) .frame .label{white-space:normal;overflow-wrap:anywhere}
+
+/* Keep a from/to pair together; the whole field may move to the next row. */
+:global(html body) .frame .controls:has(> input[type="date"] + input[type="date"]){
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  width:292px;max-width:100%;gap:6px;flex-wrap:nowrap;
+}
+:global(html body) .frame .controls:has(> input[type="date"] + input[type="date"]) > .control{
+  width:100%;min-width:0;
+}
+
+/* An opt-in explanation target; the contained action remains disabled. */
+.disabledExplanation{display:inline-flex;flex-shrink:0;cursor:not-allowed;border-radius:4px}
+.disabledExplanation > button{pointer-events:none}
+.disabledExplanation:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+.actionShell{display:inline-flex;flex-shrink:0;border-radius:4px}
+
+.suggestions{position:fixed;z-index:11000;box-sizing:border-box;overflow:auto;border:1px solid #b8cfb9;border-radius:4px;background:#fffef8;color:#286440;box-shadow:0 5px 16px #0003;font:inherit}
+.suggestion{padding:10px 12px;cursor:pointer;overflow-wrap:anywhere}.suggestion[aria-selected=true]{background:#e5efdf;outline:1px solid #286440;outline-offset:-1px}
+
+/* An input and its adjacent action form one row; wrap the field as a unit. */
+:global(html body) .frame .field:has(> .controls > .control + [data-feedback-button]){
+  width:max-content;flex:0 0 auto;
+}
+:global(html body) .frame .controls:has(> .control + [data-feedback-button]){
+  flex-wrap:nowrap;flex-shrink:0;width:max-content;max-width:none;
+}
+:global(html body) .frame .controls:has(> .control + [data-feedback-button]) > .control{
+  flex:0 0 auto;width:260px;max-width:260px;
+}

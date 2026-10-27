@@ -1,0 +1,16 @@
+/* One journal-style footer for DOM and React renderers. */
+html body .app-shell .onspa-pagination{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:100%;min-width:0;min-height:48px;padding:9px 16px;border-top:1px solid var(--line);background:#fbfdfb}
+html body .app-shell .onspa-pagination .onspa-pagination-summary{flex:0 1 auto;min-width:0;white-space:normal;color:#718078;font-size:11px}
+html body .app-shell .onspa-pagination .onspa-pagination-pages{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:5px;margin-left:auto;min-width:0;max-width:100%}
+html body .app-shell .onspa-pagination button{min-width:30px;height:30px;min-height:30px;padding:0 8px;border:1px solid #d3ddd3;border-radius:5px;background:#fff;color:#496052;cursor:pointer}
+html body .app-shell .onspa-pagination button.active{background:#fff3e3;border-color:#ef8b13;color:#a95705;font-weight:600}
+html body .app-shell .onspa-pagination button:hover:not(:disabled){border-color:#ef8b13;color:#b65e05}
+html body .app-shell .onspa-pagination button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:480px){html body .app-shell .onspa-pagination{align-items:flex-start}html body .app-shell .onspa-pagination .onspa-pagination-pages{width:100%;justify-content:flex-end;margin-left:0}}
+
+/* Accessible menu-root heading, no visual spacer; default and contextual headings remain visible. */
+.onspa-menu-root-title{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.onspa-menu-root-header:not(:has(> :not(h1))){position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:0!important;overflow:hidden!important;clip-path:inset(50%)!important}
+/* Collapse only wrappers containing a hidden menu-root title and no contextual siblings. */
+.page-heading:has(.onspa-menu-root-title):not(:has(button, .badge, .status, .page-actions)) {margin-block:0!important;padding-block:0!important;min-height:0!important}
+.safety-rules-title:has(> .onspa-menu-root-title){margin:0!important;padding:0!important;height:0!important;min-height:0!important}

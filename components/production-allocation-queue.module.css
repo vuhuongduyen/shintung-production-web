@@ -1,0 +1,92 @@
+.queue{color:#286440;font:inherit;min-width:0;max-width:100%;margin-bottom:8px}
+.queue h3,.queue h4{font:inherit;font-weight:700;margin:0 0 6px}
+.queue p{margin:5px 0;line-height:1.4}
+.panel{border:1px solid #b8cfb9;border-radius:5px;background:#fffef8;padding:8px;margin-bottom:8px;overflow-wrap:anywhere}
+.panel[hidden]{display:none!important}
+.form,.record{border:1px solid #b8cfb9;border-radius:4px;background:#fff;padding:8px;margin:6px 0}
+.form>fieldset{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;border:0;padding:0;margin:6px 0 0;min-width:0}
+.form legend{font-weight:700;margin-bottom:5px}
+.form label{display:flex;flex-direction:column;gap:4px;font:inherit;max-width:100%;margin:0}
+.form input:not([type=checkbox]),.form select,.submit{box-sizing:border-box;min-height:36px;border:1px solid #b8cfb9;border-radius:4px;padding:5px 8px;font:inherit;color:#286440;background:white;max-width:100%}
+.form .people{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 16px;max-height:180px;overflow:auto;border:1px solid #b8cfb9;padding:8px;min-width:0}
+.form .people label{flex-direction:row;align-items:center;gap:6px}
+.form input[type=checkbox]{accent-color:#286440;margin:0}
+.form .submit{background:#286440;color:white;cursor:pointer}
+.form .submit:disabled{background:#e4ece5;color:#285e3c;cursor:not-allowed}
+.notice{color:#a32929}
+@media(max-width:640px){.form input:not([type=checkbox]),.form select,.submit{min-height:44px}.form>fieldset>label{flex-basis:100%}}
+.scope{padding:8px;border:1px solid #b8cfb9;border-radius:4px;background:#fff}
+.scope>summary{font-weight:700;cursor:pointer}
+.scope>label{display:inline-flex;flex-direction:column;gap:4px;margin:8px 12px 8px 0;max-width:100%}
+.scope select,.scope button{box-sizing:border-box;min-height:36px;max-width:100%;padding:5px 8px;font:inherit;border:1px solid #b8cfb9;border-radius:4px;color:#286440;background:#fff}
+.scope button{cursor:pointer;margin:4px}
+.scope [role=status]{font-weight:700}
+@media(max-width:640px){.scope select,.scope button{min-height:44px}}
+
+.history{max-height:360px;overflow:auto;overscroll-behavior:contain}
+
+/* Keep transfer controls on one baseline despite inherited Capacity styles. */
+.queue{--allocation-control-height:36px}
+:global(html body .app-shell.app-shell) .queue .form :is(input:not([type=checkbox]):not([type=hidden]),select,button){box-sizing:border-box;height:var(--allocation-control-height)!important;min-height:var(--allocation-control-height)!important;font:inherit!important}
+:global(html body .app-shell.app-shell) .queue .form :global(.work-date-time){display:inline-flex;align-items:center;flex-wrap:nowrap;margin:0!important;font:inherit!important}
+:global(html body .app-shell.app-shell) .queue .form :global(.work-date-time .cap-clock){box-sizing:border-box;height:var(--allocation-control-height)!important;min-height:var(--allocation-control-height)!important;font:inherit!important}
+@media(max-width:640px){.queue{--allocation-control-height:44px}}
+
+.loading{margin-inline-start:10px;font-weight:400;font-size:inherit}
+.gate{border:0;padding:0;margin:0;min-inline-size:0}
+
+.confirmActions{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-top:10px}
+
+/* One shared heading and one compact row per pending interval. */
+.pendingList{--pending-columns:minmax(250px,1fr) 84px 250px 250px 128px;max-height:320px!important;overflow:auto!important;isolation:isolate;overscroll-behavior:contain}
+.pendingHeader,.form.pendingRow{display:grid;grid-template-columns:var(--pending-columns);gap:12px;align-items:center;min-width:1060px}
+.pendingHeader{position:sticky;top:0;z-index:1;background:#eaf2e8;padding:8px 10px;border-bottom:1px solid #b8cfb9;font-weight:bold}
+.queue .form.pendingRow{border:0;border-bottom:1px solid #b8cfb9;border-radius:0;margin:0;padding:8px 10px;background:#fff}
+.pendingRow>fieldset{display:contents}
+.pendingPerson{min-width:0;line-height:1.3}
+.pendingPerson>strong{display:block}
+.pendingDetails summary{cursor:pointer;color:#286440;margin-top:3px}
+.pendingDetails p{white-space:normal}
+.pendingRow .pendingLabel{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+:global(html body .app-shell.app-shell) .queue .pendingList{font-size:16px!important;line-height:1.3!important}
+:global(html body .app-shell.app-shell) .queue .pendingList :is(strong,summary,p,label,span){font-size:inherit!important}
+:global(html body .app-shell.app-shell) .queue .pendingRow :is(input:not([type=hidden]),select,button){font-size:16px!important}
+.pendingRow .submit{white-space:nowrap}
+
+.selectionList{min-height:0!important;max-height:320px!important;overflow:auto!important;isolation:isolate;font-size:16px!important}
+.selectionList table{border-collapse:collapse;width:100%;min-width:740px;font:inherit}
+.selectionList th{position:sticky;top:0;z-index:1;background:#eaf2e8;text-align:left}
+.selectionList :is(th,td){padding:8px 10px;border-bottom:1px solid #b8cfb9;line-height:1.35}
+.selectionList th:first-child{width:40px}
+.selectionList input[type=checkbox]{width:18px;height:18px;accent-color:#286440;cursor:pointer}
+.selectedRow>td{background:#fff0d8!important}
+:global(html body .app-shell.app-shell) .queue :is(.selectionList,.batchForm){font-size:16px!important}
+:global(html body .app-shell.app-shell) .queue :is(.selectionList,.batchForm) :is(td,th,p,label,strong,summary,span,input,select,button){font-size:16px!important}
+.batchForm{background:#fffaf0}
+
+/* A single compact allocation strip; the roster opens only from the arrow. */
+.queue .compactBatch{margin:0;border:0;padding:0;background:transparent}
+.compactBatch>fieldset{margin:0;gap:10px}
+.pendingPicker{position:relative;flex:0 1 320px;min-width:0;max-width:100%;padding-top:0}
+.pendingPicker>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none;box-sizing:border-box;min-height:36px;padding:5px 10px;border:1px solid #b8cfb9;border-radius:4px;background:#fff;cursor:pointer}
+.pendingPicker>summary::-webkit-details-marker{display:none}
+.pendingPicker>summary:focus-visible{outline:2px solid #e17b12;outline-offset:1px}
+.pendingPicker[open]>summary{background:#fff0d8}
+.pendingDropdown{position:absolute;top:100%;left:0;z-index:12;width:min(780px,calc(100vw - 64px));box-sizing:border-box;margin-top:3px;padding:6px;border:1px solid #b8cfb9;border-radius:4px;background:#fff;box-shadow:0 3px 8px #173f2926}
+.pendingDropdown .selectionList{margin:0!important;max-height:260px!important}
+.pendingDropdown table{min-width:640px}
+.pickerFooter{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:6px}
+@media(max-width:640px){.pendingPicker{flex-basis:100%;padding-top:0}.pendingPicker>summary{min-height:44px}.pendingDropdown{width:calc(100vw - 64px)}}
+
+.historyDialog{width:min(1280px,calc(100vw - 32px))!important;max-width:calc(100vw - 32px)!important;max-height:90dvh;background:#fffdf7!important;color:#173d27;font-family:"Times New Roman",serif;font-size:18px;display:flex!important;flex-direction:column;gap:12px;padding:22px!important;z-index:60!important}
+.historyDialog h2{font-size:24px;margin:0;padding-right:30px}.historyDialog p{font-size:18px;margin:0}
+.historyBody{overflow:auto;min-height:0;flex:1}.historyGroup{border:1px solid #adc0ad;border-radius:5px;margin-bottom:12px;background:white}.historyGroup summary{cursor:pointer;padding:12px;background:#e6f0e1;line-height:1.5}.historyGroup summary span{margin-left:18px;display:inline-block}.historyMeta{display:grid;grid-template-columns:2fr 1fr;gap:12px;padding:14px;margin:0}.historyMeta dt{font-weight:bold}.historyMeta dd{margin:4px 0 0;overflow-wrap:anywhere}.historyTable{overflow:auto;padding:0 14px 14px}.historyTable table{width:100%;border-collapse:collapse;min-width:960px}.historyTable th,.historyTable td{border:1px solid #adc0ad;padding:9px;text-align:left;vertical-align:top;font-size:18px;line-height:1.4}.historyTable th{background:#e6f0e1}.historyDialog>button:last-child{align-self:flex-end}
+@media(max-width:640px){.historyMeta{grid-template-columns:1fr}.historyGroup summary span{display:block;margin-left:0}.historyDialog{padding:14px!important}}
+
+.historyGroup{border:2px solid #8aa98b;overflow:hidden}.historyGroup summary{padding:0;list-style:none}.historyGroup summary::-webkit-details-marker{display:none}.historyGroup summary .historySummary{display:grid;grid-template-columns:1fr 1.3fr 1.8fr 1.5fr;margin:0}.historyGroup summary .historySummary>span{margin:0;padding:12px;display:flex;flex-direction:column;gap:5px;border-right:1px solid #adc0ad}.historyGroup summary .historySummary>span:last-child{border-right:0}.historySummary small{font-size:16px;color:#45634b}.historyGroup[open]>summary{border-bottom:2px solid #8aa98b}.historyMeta>div{border:1px solid #adc0ad;padding:10px;background:#fffdf7}
+@media(max-width:800px){.historyGroup summary .historySummary{grid-template-columns:1fr 1fr}.historyGroup summary .historySummary>span{border-bottom:1px solid #adc0ad}}
+@media(max-width:480px){.historyGroup summary .historySummary{grid-template-columns:1fr}}
+
+.allocationActions{margin:0 14px 14px;padding:12px;border:1px solid #b8cfb9;background:#fffaf0}.allocationActions .confirmActions{align-items:flex-start}.allocationEdit:has(form){flex:1 1 100%;min-width:0}.allocationActions button{font:inherit;min-height:36px;padding:6px 12px;border-radius:4px}.allocationActions .form{margin:0}
+
+.sentPending{margin-top:10px;border:1px solid #b8cfb9;border-radius:4px}.sentPending>summary{padding:8px 10px;cursor:pointer;background:#e6f0e1;font-weight:bold}.sentPending>p{padding:6px 10px}.sentPending table{min-width:620px}

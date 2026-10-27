@@ -1,0 +1,21 @@
+.picker{position:relative;box-sizing:border-box;flex:0 1 360px;width:360px;max-width:100%;min-width:0;color:#286440;font:inherit}
+.caption{display:block;margin-bottom:4px}
+.picker .trigger,.picker .done{box-sizing:border-box;min-height:36px;max-width:100%;border:1px solid #b8cfb9;border-radius:4px;padding:5px 8px;color:inherit;background:#fff;font:inherit;cursor:pointer}
+.picker .trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left}
+.picker .trigger:disabled,.picker .done:disabled{background:#f4f5f1;color:#687467;cursor:not-allowed}
+.dropdown{position:absolute;top:100%;left:0;z-index:12;box-sizing:border-box;width:100%;max-width:100%;margin-top:3px;padding:6px;border:1px solid #b8cfb9;border-radius:4px;background:#fff;box-shadow:0 3px 8px #173f291f}
+.picker input.search{box-sizing:border-box;width:100%;max-width:100%;min-width:0;height:36px;min-height:36px;margin:0 0 6px;border:1px solid #b8cfb9;border-radius:4px;padding:5px 8px;color:inherit;background:#fff;font:inherit}
+.list{max-height:224px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-color:#78917f #edf2ed;scrollbar-width:thin}
+.picker .option{box-sizing:border-box;display:grid;grid-template-columns:16px minmax(0,1fr) auto;flex-direction:row;align-items:center;gap:8px;width:100%;min-width:0;min-height:32px;margin:0;padding:5px 6px;border-radius:3px;font:inherit;cursor:pointer}
+.picker .option:hover,.picker .option:focus-within{background:#f0f6ef}
+.picker .option:has(input:checked){background:#e8f2e8}
+.picker .option:has(input:disabled){cursor:not-allowed;color:#687467}
+/* Override inherited form/global input sizing, including the calendar's mobile rules. */
+.picker .option input[type=checkbox]{box-sizing:border-box;appearance:auto;width:16px!important;min-width:16px!important;max-width:16px!important;height:16px!important;min-height:16px!important;max-height:16px!important;flex:0 0 16px;margin:0!important;padding:0!important;accent-color:#286440;cursor:inherit}
+.name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.code{white-space:nowrap}
+.picker .empty{margin:0;padding:8px 6px;line-height:1.4}
+.footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid #dce6dc}
+.picker .done{min-width:60px}
+.picker :is(button,input):focus-visible{outline:2px solid #e17b12;outline-offset:1px}
+@media(max-width:640px){.picker{flex-basis:100%;width:100%}.picker .trigger,.picker .done,.picker input.search{min-height:44px}.picker .option{min-height:44px}.list{max-height:min(264px,40dvh)}}

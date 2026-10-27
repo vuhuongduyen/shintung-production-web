@@ -1,0 +1,5 @@
+.field{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;max-width:100%;min-width:0}
+.field>input[type=date]{width:138px;min-width:0;max-width:100%}
+.field :global(.cap-clock){display:inline-flex;align-items:center;flex:none;max-width:100%}
+.field :global(.cap-clock) input[type=text]{width:66px!important;min-width:0!important;text-align:center}
+.field :global(.cap-clock) button{min-width:26px}

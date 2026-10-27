@@ -1,0 +1,50 @@
+.pp-workspace { min-width:0; max-width:100%; padding:14px!important; font-family:"Times New Roman","Noto Serif CJK TC","Noto Serif CJK SC","Microsoft JhengHei","Microsoft YaHei",serif; }
+.pp-heading,.pp-filters,.pp-actions,.pp-pagination {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.pp-heading{justify-content:space-between}.pp-heading h1{font-size:26px;margin:2px 0}.pp-heading p{margin:4px 0}.pp-filters label{display:grid;gap:4px}.pp-workspace input,.pp-workspace select,.pp-workspace button{font:inherit;padding:6px 8px;border:1px solid #c7d8cb;border-radius:5px;background:white;color:#174f31}.pp-workspace button:not(:disabled):hover{background:#fff0d9;border-color:#ef8b0b}.pp-workspace button:disabled{opacity:.5;cursor:not-allowed}.pp-workspace button{cursor:pointer}.pp-loads{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:8px;margin:4px 0 10px}.pp-loads article{padding:8px 10px;border:1px solid #cbd9ce;border-left:4px solid #278348}.pp-loads .near{border-left-color:#ef8b0b}.pp-loads .overload{border-left-color:#b32c26}.pp-loads .missing{border-left-color:#929993}.pp-load-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.pp-load-head h3{margin:0;font-size:16px}.pp-load-head>b{padding:3px 8px;border-radius:12px;background:#e8f5eb;color:#17622f}.pp-loads .near .pp-load-head>b{background:#fff1dc;color:#9a5500}.pp-loads .overload .pp-load-head>b{background:#fde7e5;color:#a1221c}.pp-load-card dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:7px 0 3px;border-top:1px solid #e0e7e1}.pp-load-card dl>div{display:block;min-width:0;padding:5px 8px 2px;border-right:1px solid #e0e7e1}.pp-load-card dl>div:last-child{border-right:0}.pp-load-card dt{font-size:12px;color:#68766b}.pp-load-card dd{font-weight:700;margin:2px 0 0}.pp-workspace small{display:block;font-size:12px}.pp-alert{padding:10px;margin:8px 0;background:#eaf5eb;border:1px solid #b9d9be;overflow-wrap:anywhere}.pp-alert.error{background:#fff0e5;border-color:#e6ac80}.pp-table{width:100%;max-height:58vh;overflow:auto;overscroll-behavior:contain}.pp-table table{border-collapse:separate;border-spacing:0;min-width:1450px;width:100%;font-size:13px}.pp-table th{position:sticky;top:0;background:#205d39;color:white;z-index:2;text-align:left;padding:8px}.pp-table td{padding:5px 7px;border-bottom:1px solid #e0e6df;vertical-align:middle;max-width:230px}.pp-table input[type=number]{width:90px}.pp-table input[type=date]{width:128px}.pp-table select{max-width:140px}.pp-table tr:nth-child(even){background:#f9f8f0}.pp-table .pp-urgent{background:#fff0e9}.pp-table .pp-cancelled{color:#777;background:#eee}.pp-empty{padding:36px!important;text-align:center}.pp-source{padding:12px;margin-bottom:12px}.pp-source select{max-width:100%}.pp-source-list{max-height:180px;overflow:auto;display:grid;gap:6px;margin:10px 0}.pp-pagination{justify-content:flex-end;padding:10px;margin:0}.pp-history{padding:12px;margin-top:12px}.pp-history details{margin-top:10px}.pp-history pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}.pp-detail{position:fixed;inset:7% 10%;background:#fffdf7;box-shadow:0 8px 80px #0006;padding:0;z-index:500;overflow:auto;border:2px solid #26663e;border-radius:10px}.pp-detail header{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:14px 18px;background:#f4f8ef;border-bottom:1px solid #c8d8ca}.pp-detail header h2,.pp-detail header p{margin:0}.pp-detail header p{color:#647268;margin-top:3px}.pp-detail section{margin:14px 18px;border:1px solid #cbd9ce;border-radius:6px;overflow:hidden}.pp-detail section h3{margin:0;padding:8px 10px;background:#edf5ed;color:#15582f;border-bottom:1px solid #cbd9ce;font-size:15px}.pp-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0}.pp-detail-grid>div{min-width:0;padding:9px 10px;border-right:1px solid #dfe6df;border-bottom:1px solid #dfe6df}.pp-detail-grid>div:nth-child(3n){border-right:0}.pp-detail-grid dt{font-size:12px;color:#667269;margin-bottom:3px}.pp-detail-grid dd{margin:0;font-weight:600;overflow-wrap:anywhere}.pp-workspace .data-card{min-width:0;overflow:hidden}.pp-workspace .pp-history{overflow:auto}
+@media(max-width:900px){.pp-loads{grid-template-columns:1fr}.pp-heading h1{font-size:22px}.pp-detail{inset:4%}.pp-detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pp-detail-grid>div:nth-child(3n){border-right:1px solid #dfe6df}.pp-detail-grid>div:nth-child(2n){border-right:0}.pp-table{max-height:62vh}.pp-actions{position:sticky;top:0;background:#fffdf6;padding:8px;z-index:3}.pp-workspace{padding:8px!important}}
+/* Scope layout repairs to the new workflow; the existing shell remains shared. */
+html body .app-shell:has(.pp-workspace) .pp-workspace{margin-left:230px!important;width:calc(100% - 230px)!important;max-width:calc(100% - 230px)!important}
+html body .pp-workspace .pp-filters>input,html body .pp-workspace .pp-filters>select{width:auto!important;min-width:140px;max-width:260px;height:34px!important;flex:0 1 auto}
+html body .pp-workspace input[type=checkbox]{width:16px!important;height:16px!important;min-width:16px!important;vertical-align:middle;margin:0 5px 0 0;padding:0!important}
+html body .pp-workspace .pp-source label{display:flex;align-items:center;gap:6px;margin:8px 0}
+html body .pp-workspace .pp-source select{height:34px!important}
+html body .pp-workspace .pp-table input,html body .pp-workspace .pp-table select{height:32px!important;font-size:14px!important}
+html body .pp-workspace .pp-table th{background:#205d39!important;color:#fff!important;font-size:14px!important;padding:8px!important}
+html body .pp-workspace .pp-table td{font-size:14px!important;padding:5px 7px!important}
+@media(max-width:650px){html body .app-shell:has(.pp-workspace)>.app-sidebar{width:150px!important}html body .app-shell:has(.pp-workspace) .pp-workspace{margin-left:150px!important;width:calc(100% - 150px)!important;max-width:calc(100% - 150px)!important}.pp-filters>input,.pp-filters>select{max-width:100%!important}.pp-filters strong{font-size:13px}}
+.pp-confirm-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;margin-left:4px;padding:0 4px;border-radius:9px;background:#be5c09;color:white;font-size:11px;line-height:1}
+.pp-table td.pp-labor-total{font-variant-numeric:tabular-nums;font-weight:700;color:#174f31;white-space:nowrap}
+
+.pp-row-warnings summary { cursor: pointer; white-space: nowrap; color: #8b4a15; }
+.pp-row-warnings[open] small { display: block; white-space: normal; margin-top: 4px; }
+
+/* Compact editable Plan columns; SKU and product name stay separate. */
+html body .app-shell .pp-workspace .pp-table > table.pp-plan-grid {
+  table-layout:fixed!important; min-width:2100px!important; width:100%!important;
+}
+html body .app-shell .pp-workspace .pp-plan-grid > :is(thead,tbody) > tr > :is(th,td) {
+  padding:6px 8px!important; max-width:none;
+}
+html body .app-shell .pp-workspace .pp-plan-grid > tbody > tr > td.pp-sku-cell {
+  white-space:nowrap!important; overflow-wrap:normal; font-weight:400;
+}
+html body .app-shell .pp-workspace .pp-plan-grid > tbody > tr > td.pp-name-cell {
+  white-space:normal!important; overflow-wrap:normal; font-weight:400;
+}
+html body .pp-workspace .pp-plan-grid :is(input:not([type=checkbox]),select) {
+  width:100%!important; min-width:0!important; max-width:100%!important; padding:3px 2px!important;
+}
+html body .pp-workspace .pp-plan-grid td:nth-child(16) button {
+  padding:3px 5px!important; white-space:nowrap;
+}
+html body .pp-workspace .pp-plan-grid .pp-row-warnings summary {
+  white-space:nowrap; overflow-wrap:normal;
+}
+
+/* Separate field borders from table grid while keeping compact controls. */
+html body .app-shell .pp-workspace .pp-plan-grid > :is(thead,tbody) > tr > :is(th,td):first-child {
+  padding-left:4px!important; padding-right:4px!important;
+}
+html body .pp-workspace .pp-plan-grid :is(input:not([type=checkbox]),select) {
+  border-color:#d6dfd7; border-radius:3px; background:#fff;
+}
+.pp-workspace .pp-backlog-open{font:inherit;padding:3px 8px;border:1px solid #86b9a4;border-radius:5px;background:#edf7f2;color:#14604d;cursor:pointer;margin-left:6px}.pp-load-card dl{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.pp-load-card dl>div{border:1px solid #e0e7e1;padding:6px;border-radius:4px}.pp-load-card dl>div:nth-child(2),.pp-load-card dl>div:nth-child(3){background:#fff5df}

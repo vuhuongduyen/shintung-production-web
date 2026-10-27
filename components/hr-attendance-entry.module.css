@@ -1,0 +1,14 @@
+.entry{min-width:0}.entry h2{color:#286440}.table{overflow:auto}.table table{min-width:1250px}.table input:not([type=checkbox]),.table select{box-sizing:border-box;min-height:36px;max-width:220px;padding:4px 8px;border:1px solid #b8cfb9;border-radius:4px;font:inherit;color:#286440;background:#fff}.table input[type=date]{width:145px}.table small{display:block}.table td{vertical-align:top}.error{display:block;max-width:300px;min-width:180px;white-space:normal;color:#922626}.table button{cursor:pointer}.table input:disabled,.table select:disabled{background:#f4f5f1}.table input:focus-visible,.table select:focus-visible{outline:2px solid #286440;outline-offset:1px}
+/* Match the shared 36px controls; clock wrappers already use the same height. */
+:global(html body) .entry .table td{vertical-align:middle}
+:global(html body) .entry .table td>input,:global(html body) .entry .table td>select{height:36px!important;min-height:36px!important;margin:0!important;box-sizing:border-box}
+:global(html body) .entry .table td>input[role=combobox]{width:300px;max-width:100%;min-width:240px}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:4px 0}
+:global(html body) .entry .actions button{min-height:36px;padding:4px 10px;border:1px solid #b8cfb9;border-radius:4px;background:#fff;color:#286440;font:inherit;white-space:nowrap}
+@media(max-width:640px){:global(html body) .entry .table td>input,:global(html body) .entry .table td>select{height:44px!important;min-height:44px!important}}
+
+:global(.actual-schedule #hr-attendance-launch){background:#e87206!important;color:#fff!important;border-color:#d46704!important;font-weight:700}
+.entry :global([data-standard-toolbar=HrAttendanceHistory] button[aria-current=true]){background:#286440;color:#fff}
+.history td{white-space:normal;min-width:90px}.history td:first-child{min-width:230px}.history td:nth-child(6){min-width:220px;max-width:360px;overflow-wrap:anywhere}
+
+:global(html body) .entry .history td{white-space:normal!important}

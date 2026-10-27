@@ -1,0 +1,16 @@
+"use client";
+import {Dialog,DialogContent,DialogTitle,DialogDescription} from './ui/dialog';
+import {displayDate} from '../lib/production-plan.mjs';
+import styles from './plan-daily-load-warning.module.css';
+import {PlanTransitBacklogTable,type TransitBacklogRow} from './plan-transit-backlog';
+export type DailyLoadWarning={token:string;backlog?:TransitBacklogRow[];warnings:{id:string;source?:string;sku:string;name:string;line:string;date:string;start:string;end:string;required:number;available:number;scheduled:number;remaining:number;total:number;over:number}[];notChecked:{sku:string;reason:string}[]};
+export default function PlanDailyLoadWarning({value,language,onDecision}:{value:DailyLoadWarning;language:string;onDecision:(yes:boolean)=>void}){
+ const t=(vi:string,zh:string,en:string)=>language==='zh'?zh:language==='en'?en:vi;
+ const hours=(n:number)=>n.toLocaleString(language==='en'?'en-US':'vi-VN',{maximumFractionDigits:2});
+ return <Dialog open onOpenChange={v=>{if(!v)onDecision(false)}}><DialogContent className={styles.dialog}><DialogTitle className={styles.title}>{t('Lịch xếp vượt giờ khả dụng','排程超過可用工時','Schedule exceeds daily capacity')}</DialogTitle><DialogDescription>{t('Chỉnh sửa này chưa được lưu. Giờ được dồn từ ngày bắt đầu, dùng giờ trống trước rồi chuyển phần dư sang ngày tiếp theo; không tự đổi ngày hoàn thành.','此變更尚未儲存。從開始日期依序使用剩餘工時，不會自動延後完成日期。','These changes are not saved. Hours fill the earliest free day; the completion date is not moved automatically.')}</DialogDescription>
+ {(value.backlog?.length??0)>0&&<PlanTransitBacklogTable rows={value.backlog!} language={language}/>}
+ <section className={styles.section}><h3>{t('Ngày vượt tải sau khi xếp','排程後超載日期','Overloaded days after scheduling')}</h3><div className={styles.table}><table data-no-pagination="true"><thead><tr>{['SKU','Line',t('Ngày vượt','超載日期','Overloaded date'),t('Khả dụng','可用','Available'),t('Đã xếp','已排','Scheduled'),t('Thêm vào ngày này','本日追加','Added this day'),t('Vượt','超出','Over')].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{value.warnings.map((r,i)=><tr key={r.id+':'+i}><td>{r.sku}<small>{r.name}</small><small>{r.source==='inTransit'?'In transit':'Pro plan'}</small></td><td>{r.line}</td><td>{displayDate(r.date)}</td><td>{hours(r.available)}</td><td>{hours(r.scheduled)}</td><td>{hours(r.remaining)}</td><td className={styles.over}>+{hours(r.over)}</td></tr>)}</tbody></table></div></section>
+ <p>{t('Đơn vị: giờ công. Ưu tiên giờ cho lệnh tồn In transit; tính lệnh Pro plan chưa chuyển, không tính trùng. Bỏ lệnh hủy và tạm hoãn. Ngày không làm việc có 0 giờ khả dụng.','單位：人工工時。包含已確認及已轉移計畫，不含取消或暫緩計畫。','Unit: person-hours. Includes confirmed/transferred plans; excludes cancelled/on-hold plans. Non-working days have zero capacity.')}</p>
+ {value.notChecked.length>0&&<p role="alert">{t('Một số lệnh chưa đủ dữ liệu lịch hoặc giờ công để kiểm tra đầy đủ: ','部分工單缺少日程或工時：','Some orders lack schedule or labor data: ')}{value.notChecked.map(r=>r.sku).join(', ')}</p>}
+ <div className={styles.actions}><button type="button" onClick={()=>onDecision(false)}>{t('Quay lại sửa','返回修改','Back to edit')}</button><button type="button" className={styles.confirm} onClick={()=>onDecision(true)}>{t('Đồng ý xếp tiếp','同意繼續安排','Accept and continue')}</button></div></DialogContent></Dialog>;
+}

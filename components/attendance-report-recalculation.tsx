@@ -1,0 +1,18 @@
+'use client';
+import {useState} from 'react';
+import {productionApiFetch} from '../lib/production-api';
+import {FeedbackActionButton as Button} from './action-feedback';
+import {DataTable} from './onspa-ui/DataTable';
+import {productionDisplayTime} from '../lib/production-display-time.mjs';
+import styles from './attendance-report-recalculation.module.css';
+type Row=Record<string,any>;
+const num=(n:number|null)=>n===null?'—':Number(n).toLocaleString('vi-VN',{maximumFractionDigits:2});
+export default function AttendanceReportRecalculation({initialMonth,close,refresh}:{initialMonth:string;close:()=>void;refresh:()=>Promise<boolean>}){
+ const [month,setMonth]=useState(initialMonth),[preview,setPreview]=useState<Row|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[done,setDone]=useState(false);
+ const request=async(mode:'preview'|'apply')=>{if(busy)return;setBusy(true);setMessage('');try{
+  const response=await productionApiFetch('/api/production-workflow',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'recalculate-attendance-hours',mode,month,revision:preview?.revision})});
+  const result=await response.json();if(!response.ok)throw Error(result.error||'Không thể tính lại báo công.');
+  if(mode==='preview'){setPreview(result);setDone(false);}else{setDone(true);setMessage(`Đã cập nhật giờ công cho ${result.updated} báo công. Đã lưu nhật ký điều chỉnh.`);await refresh();window.dispatchEvent(new CustomEvent('onspa-production-updated'));}
+ }catch(e){setMessage((e as Error).message);if(mode==='apply')setPreview(null);}finally{setBusy(false);}};
+ return <div className={styles.overlay}><section className={styles.panel} role="dialog" aria-modal="true" aria-label="Tính lại báo công theo nhân sự"><h2>Tính lại báo công theo nhân sự</h2><p>Đối chiếu giờ báo công với dữ liệu nghỉ, đi trễ, về sớm, phụ kho, công việc khác và điều chuyển đã được ghi nhận.</p><div className={styles.actions}><label>Tháng <input type="month" aria-label="Tháng tính lại báo công" value={month} disabled={busy} onChange={e=>{setMonth(e.target.value);setPreview(null);setDone(false);setMessage('');}}/></label><Button disabled={busy} onClick={()=>void request('preview')}>{busy?'Đang xử lý…':'Đối chiếu giờ công'}</Button><Button disabled={busy} onClick={close}>Đóng</Button></div>{message&&<p role="status">{message}</p>}{preview&&<><p>Đã kiểm tra {preview.checked} báo công có liên quan · {preview.changes.length} báo công thay đổi · {preview.skipped.length} báo công cần đối chiếu riêng. {preview.pendingAttendance>0&&`Còn ${preview.pendingAttendance} biến động cũ chờ duyệt giờ, chưa áp dụng.`}</p><DataTable className="table-wrap"><table><thead><tr>{['LSX','Line','Công đoạn','Hoàn thành','Giờ trước','Giờ sau','Chi tiết nhân viên'].map(s=><th key={s}>{s}</th>)}</tr></thead><tbody>{preview.changes.map((r:Row)=><tr key={r.reportId}><td>{r.lsx}</td><td>{r.line}</td><td>{r.stage}</td><td>{productionDisplayTime(r.completedAt)}</td><td>{num(r.before)}</td><td>{num(r.after)}</td><td><details><summary>Nhân viên ({r.employees.length})</summary>{r.employees.map((p:Row)=><div key={p.id}>{p.name} ({p.id}): {num(p.before)} → {num(p.after)} giờ</div>)}</details></td></tr>)}</tbody></table></DataTable>{preview.skipped.length>0&&<details><summary>Cần đối chiếu riêng ({preview.skipped.length})</summary>{preview.skipped.map((r:Row)=><p key={r.id}>{r.lsx}: {r.reason}</p>)}</details>}<p>Chỉ cập nhật giờ công bằng nhật ký điều chỉnh; giữ sản lượng, trạng thái xác nhận và phiếu kho.</p><Button className="primary-button" disabled={busy||done||!preview.changes.length} onClick={()=>void request('apply')}>Cập nhật giờ đã đối chiếu</Button></>}</section></div>;
+}

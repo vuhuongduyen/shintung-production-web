@@ -1,0 +1,7 @@
+{
+  "environment": "TEST",
+  "binding": "FILES",
+  "bucketId": "onspa-test-files-v1",
+  "persistPath": ".local-data/r2",
+  "remote": false
+}

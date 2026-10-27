@@ -1,0 +1,205 @@
+/* Shared light table surfaces, matching In Transit. Status/event colors stay local. */
+html body .app-shell.app-shell :is(.workspace,.production-workspace,.cap-workspace,.capacity-confirm-pane) table>thead>tr>th,
+html body .app-shell.app-shell :is(.production-workspace,.cap-workspace,.capacity-confirm-pane) table>tbody>tr>th {
+  background:#edf4ee!important;
+  background-image:none!important;
+  color:#1f5b35!important;
+  border-color:#acc9ae!important;
+}
+html body .app-shell.app-shell :is(.production-workspace,.cap-workspace,.capacity-confirm-pane) table :is(th,td) {
+  border:1px solid #acc9ae;
+}
+html body .app-shell.app-shell :is(.production-workspace,.cap-workspace) table>tfoot>tr>:is(th,td),
+html body .app-shell.app-shell .production-workspace table>tbody>tr:is(.progress-week-divider,.production-output-month)>th {
+  background:#e8f1e5!important;
+  color:#1f5b35!important;
+}
+html body .app-shell.app-shell :is(.production-modal,.cap-detail)>header,
+html body .app-shell.app-shell .cap-calendar-workspace :is(.cap-section-heading,.cap-mini-panel h3,.cap-day-staff-aside h3,.cap-entry-section>h3,.cap-entry-section>summary) {
+  background:#e8f1e5!important;
+  background-image:none!important;
+  color:#1f5b35!important;
+  border-color:#acc9ae!important;
+}
+html body .app-shell.app-shell :is(.production-modal,.cap-detail)>header :is(h2,button) {
+  color:#1f5b35!important;
+}
+
+/* One readable data size across all menus; the Capacity total is an emphasis in size only. */
+html body .app-shell {
+  --onspa-table-data-size:16px;
+  --onspa-capacity-total-size:20px;
+}
+html body .app-shell.app-shell.app-shell table,
+html body .app-shell.app-shell.app-shell table :is(th,td),
+html body .app-shell.app-shell.app-shell table :is(th,td) :is(span,small,b,strong,label,summary,button,input:not([type=checkbox]):not([type=radio]),select,textarea) {
+  font-size:var(--onspa-table-data-size)!important;
+  font-weight:400!important;
+  line-height:1.4!important;
+}
+html body .app-shell.app-shell.app-shell table :is(th,td) {
+  height:auto!important;
+  padding:7px 8px!important;
+}
+html body .app-shell.app-shell.app-shell table :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {
+  min-height:30px!important;
+  height:auto!important;
+}
+html body .app-shell.app-shell .cap-calendar-workspace .cap-clock {
+  display:inline-grid!important;
+  grid-template-columns:minmax(0,1fr) 28px;
+  column-gap:8px!important;
+  align-items:center;
+  flex:0 0 112px!important;
+  width:112px!important;
+  min-width:112px!important;
+  height:34px!important;
+  box-sizing:border-box;
+}
+html body .app-shell.app-shell .cap-calendar-workspace .cap-clock input[type=text] {
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+  padding:0 3px!important;
+  font-size:var(--onspa-table-data-size)!important;
+  font-weight:400!important;
+  min-height:30px!important;
+}
+/* The feedback wrapper is the grid item, not its button. Reserve a separate
+   icon column so global button minima can never squeeze the HH:mm text. */
+html body .app-shell.app-shell .cap-calendar-workspace .cap-clock > [data-feedback-button] {
+  display:inline-flex!important;
+  position:static!important;
+  width:28px!important;
+  min-width:28px!important;
+  max-width:28px!important;
+  align-items:center;
+  justify-content:center;
+}
+html body .app-shell.app-shell .cap-calendar-workspace .cap-clock > [data-feedback-button] > button {
+  position:static!important;
+  box-sizing:border-box!important;
+  width:28px!important;
+  min-width:28px!important;
+  max-width:28px!important;
+  height:30px!important;
+  min-height:30px!important;
+  padding:0!important;
+  margin:0!important;
+}
+html body .app-shell.app-shell .cap-calendar-workspace table input[type=number] {
+  min-width:64px!important;
+}
+html body .app-shell.app-shell .cap-workspace .cap-summary-table .cap-summary-available strong {
+  font-size:var(--onspa-capacity-total-size)!important;
+  font-weight:400!important;
+  line-height:1.4!important;
+}
+
+/* Ordinary rows share a white surface; LSX event groups and period headings keep their meaning. */
+html body .app-shell.app-shell.app-shell table>tbody>tr:not(.production-lsx-group):not([data-current-row="true"]) {
+  background:transparent!important;
+  box-shadow:none!important;
+}
+html body .app-shell.app-shell.app-shell table>tbody>tr:not(.production-lsx-group):not([data-current-row="true"])>td {
+  background:#fff!important;
+  box-shadow:none!important;
+}
+html body .app-shell.app-shell.app-shell table>tbody>tr:not(.production-lsx-group):not([data-current-row="true"]):hover {
+  background:transparent!important;
+  box-shadow:none!important;
+}
+/* Shared export snapshots keep review stable while live data refreshes. */
+.onspa-report-tools{margin:8px 0;color:#173d27;font-size:16px;}
+.onspa-report-scroll{overflow:auto;max-height:55vh;margin:8px 0;}
+.onspa-report-scroll table{border-collapse:collapse;min-width:100%;font-size:16px;font-weight:400;}
+.onspa-report-scroll th,.onspa-report-scroll td{border:1px solid #acc9ae;padding:8px;white-space:pre-wrap;color:#173d27;font-weight:400;}
+.onspa-report-scroll th,.report-row-section td,.report-row-total td{background:#edf4ee;}
+.onspa-report-overlay{position:fixed;inset:0;background:#173d2766;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.onspa-report-dialog{background:white;color:#173d27;width:96vw;max-height:94vh;overflow:auto;padding:16px;border:1px solid #acc9ae;border-radius:5px;font-size:16px;}
+.onspa-report-dialog .onspa-report-scroll{max-height:72vh;}
+.app-shell.app-shell.app-shell table td.labor-standard-warning,.app-shell.app-shell.app-shell table td.labor-standard-warning *{color:#c01b22!important;font-weight:400!important;}
+
+/* KHSX legacy Engine/Forecast rules have deeply qualified !important selectors.
+   Keep this scoped override last so every data value, including details, is 16px/regular. */
+html body .app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell :is(.planning-workspace,.pp-workspace,.pp-detail,.it-drawer,.it-modal,.de-dialog,[data-planning-data]) :is(table,th,td,th *,td *,dt,dd,dt *,dd *,input,select,textarea,button,label,summary,legend,b,strong,small,.pp-loads,.pp-loads *,[data-standard-toolbar] *) {
+ font-size:var(--onspa-table-data-size,16px)!important;
+ font-weight:400!important;
+ line-height:1.4!important;
+}
+/* Engine priority levels and useful column widths, independent of legacy badge rules. */
+html body .app-shell.app-shell.app-shell .engine-table :is(th,td).engine-sku-column{width:220px!important;min-width:220px!important;white-space:nowrap!important;}
+html body .app-shell.app-shell.app-shell .engine-table :is(th,td).engine-name-column{width:320px!important;min-width:320px!important;white-space:normal!important;overflow-wrap:anywhere;}
+html body .app-shell.app-shell.app-shell .engine-table :is(.reason-cell,.engine-reason-column){width:180px!important;min-width:160px!important;max-width:180px!important;white-space:normal!important;overflow-wrap:anywhere;text-overflow:clip!important;}
+html body .app-shell.app-shell.app-shell .engine-table span[class*="engine-priority-"]{border:1px solid currentColor!important;border-radius:3px;padding:3px 6px;white-space:nowrap;}
+html body .app-shell.app-shell.app-shell .engine-table span.engine-priority-urgent{color:#b42318!important;background:#fff0ed!important;}
+html body .app-shell.app-shell.app-shell .engine-table span.engine-priority-high{color:#995000!important;background:#fff2d7!important;}
+html body .app-shell.app-shell.app-shell .engine-table span.engine-priority-stock-event{color:#146647!important;background:#e5f4ec!important;}
+html body .app-shell.app-shell.app-shell .engine-table span.engine-priority-load{color:#6b35a0!important;background:#f3eafd!important;}
+html body .app-shell.app-shell.app-shell .engine-table span.engine-priority-no-add{color:#4f5964!important;background:#f0f2f4!important;}
+html body .app-shell.app-shell.app-shell .engine-table span.engine-priority-medium{color:#175fad!important;background:#eaf2ff!important;}
+html body .app-shell.app-shell.app-shell .engine-table span.engine-priority-low{color:#30602b!important;background:#edf5e8!important;}
+.onspa-report-host[data-inline-toolbar=true]{display:inline-flex;align-items:center;}
+
+html body .app-shell.app-shell.app-shell .engine-table :is(.reason-cell,.engine-reason-column){width:100px!important;min-width:100px!important;max-width:100px!important;white-space:nowrap!important;}
+.engine-reason-dialog{width:min(640px,calc(100vw - 32px));max-height:80vh;overflow:auto;border:1px solid #acc9ae;border-radius:6px;padding:18px;background:#fff;color:#173d2c;font:400 16px/1.5 "Times New Roman",serif;}
+.engine-reason-dialog::backdrop{background:rgb(0 0 0 / 25%);}
+.engine-reason-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:1px solid #acc9ae;}
+.engine-reason-heading button{border:1px solid #acc9ae;background:#edf4ee;color:#1f5b35;font:inherit;cursor:pointer;padding:2px 10px;}
+.engine-reason-dialog p{white-space:pre-wrap;overflow-wrap:anywhere;}
+
+/* Engine keeps figures on one line; priority and reason occupy compact columns. */
+html body .app-shell.app-shell.app-shell .engine-table :is(th,td).engine-priority-column{width:130px!important;min-width:130px!important;max-width:130px!important;white-space:nowrap!important;}
+html body .app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell .engine-table span[class*="engine-priority-"]{font-size:13px!important;font-weight:400!important;padding:2px 4px!important;}
+html body .app-shell.app-shell.app-shell .engine-table td.number{min-width:90px!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;}
+html body .app-shell.app-shell.app-shell .engine-table{table-layout:auto!important;width:max-content!important;min-width:100%!important;}
+.engine-reason-popover{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-height:min(248px,calc(100vh - 24px));overflow:auto;border:1px solid #acc9ae;border-radius:4px;padding:12px;background:#fff;color:#173d2c;box-shadow:0 4px 16px #0002;font:400 16px/1.5 "Times New Roman",serif;}
+.engine-reason-popover p{white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0 0;}
+
+/* Engine scrolls as one continuous grid: old fixed column offsets overlapped widened cells. */
+html body .app-shell.app-shell.app-shell .engine-table{border-collapse:collapse!important;border-spacing:0!important;}
+html body .app-shell.app-shell.app-shell .engine-table :is(th,td){border:1px solid #acc9ae!important;box-shadow:none!important;}
+html body .app-shell.app-shell.app-shell .engine-table tbody td{position:static!important;left:auto!important;z-index:auto!important;}
+html body .app-shell.app-shell.app-shell .engine-table thead th{left:auto!important;box-shadow:none!important;}
+html body .app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell .engine-table span[class*="engine-priority-"]{font-size:16px!important;font-weight:400!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;}
+
+/* All Engine headers share the grid style; long labels wrap within compact columns. */
+html body .app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell .engine-table thead th{white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;height:auto!important;min-height:40px;vertical-align:middle!important;line-height:1.3!important;}
+html body .app-shell.app-shell.app-shell .engine-table thead th:not(.engine-sku-column):not(.engine-name-column):not(.engine-priority-column):not(.engine-reason-column){width:100px!important;max-width:140px!important;}
+html body .app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell .engine-table span[class*="engine-priority-"]{font-family:inherit!important;font-size:inherit!important;line-height:inherit!important;font-weight:inherit!important;display:inline!important;vertical-align:baseline!important;}
+
+/* Compact selection column; header and row checkboxes share one centerline. */
+html body .app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell .engine-table.bulk-table :is(th,td):first-child{width:36px!important;min-width:36px!important;max-width:36px!important;padding-left:0!important;padding-right:0!important;text-align:center!important;vertical-align:middle!important;box-sizing:border-box!important;}
+html body .app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell.app-shell .engine-table.bulk-table :is(th,td):first-child input[type=checkbox]{display:block!important;width:15px!important;min-width:15px!important;max-width:15px!important;height:15px!important;min-height:15px!important;margin:0 auto!important;padding:0!important;vertical-align:middle!important;}
+html body .app-shell.app-shell.app-shell .engine-table :is(th,td).engine-priority-column{width:170px!important;min-width:170px!important;max-width:170px!important;}
+
+/* Current-row focus takes precedence over white rows, selected rows and Engine cells. */
+html body .app-shell.app-shell.app-shell table>tbody>tr[data-current-row="true"]>:is(td,th) {
+  background:#d7edcf!important;
+  box-shadow:inset 0 2px #6c9954,inset 0 -2px #6c9954!important;
+}
+html body .app-shell.app-shell.app-shell table>tbody>tr[data-current-row="true"]>:first-child {
+  box-shadow:inset 4px 0 #407d2c,inset 0 2px #6c9954,inset 0 -2px #6c9954!important;
+}
+@media print {
+ html body .app-shell.app-shell.app-shell table>tbody>tr[data-current-row="true"]>:is(td,th) {background:#fff!important;box-shadow:none!important;}
+}
+
+/* Shared affordances: actions look different from business values. */
+html body .app-shell.app-shell .onspa-row-actions{display:flex;align-items:center;flex-wrap:nowrap;gap:8px 12px;padding:3px 0;width:max-content}
+html body .app-shell.app-shell table td>[data-feedback-button]+[data-feedback-button]{margin-inline-start:12px}
+html body .app-shell.app-shell table td button[data-onspa-action="default"]{
+ display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:32px;height:auto;padding:4px 10px!important;border:1px solid #789d80!important;border-radius:4px;background:#edf5ee!important;color:#195b32!important;white-space:nowrap;cursor:pointer;text-decoration:none;line-height:1.4;
+}
+html body .app-shell.app-shell table td button[data-onspa-action="default"]:hover:not(:disabled){background:#dcebdc!important;border-color:#286440!important;box-shadow:0 1px 3px #173f2926}
+html body .app-shell.app-shell table td button[data-action-tone="danger"]{border-color:#ba7272!important;background:#fff0ed!important;color:#9b2525!important}
+html body .app-shell.app-shell table td button[data-action-tone="danger"]:hover:not(:disabled){background:#f9dcd6!important;border-color:#9b2525!important}
+html body .app-shell.app-shell table td button[data-onspa-action="default"]:disabled{background:#f0f1ed!important;border-color:#bdc5bb!important;color:#657063!important;box-shadow:none;cursor:not-allowed}
+html body .app-shell.app-shell table td :is(button,a[href],summary):focus-visible{outline:2px solid #df7c13;outline-offset:2px}
+html body .app-shell.app-shell table td :is(a[href],summary){cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+html body .app-shell.app-shell table td :is(a[href],summary):hover{color:#a95000!important}
+@media(max-width:640px){html body .app-shell.app-shell table td button[data-onspa-action="default"]{min-height:44px}}
+html body .app-shell.app-shell table td :is(.actual-headcount-trigger,.production-order-link){text-decoration:underline!important;text-underline-offset:3px;cursor:pointer}
+
+html body .app-shell.app-shell .cap-calendar-workspace .cap-time-pair{gap:8px!important}

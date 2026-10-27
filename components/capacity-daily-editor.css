@@ -1,0 +1,336 @@
+.cap-daily-editor{min-width:0;padding:10px;color:#173f29}.cap-editor-title{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px;margin-bottom:8px}.cap-editor-title h2{font-size:19px;margin:0;color:#174d2d}.cap-editor-title strong{font-size:14px}.cap-daily-editor label{display:flex;flex-direction:column;gap:3px;font-size:14px}.cap-daily-editor input:not([type=checkbox]),.cap-daily-editor select{border:1px solid #b4cdbb;background:white;color:#174329;font:inherit;font-size:14px;padding:3px 5px;min-height:32px;border-radius:3px;max-width:100%;min-width:0}.cap-daily-editor input[type=checkbox]{width:18px!important;height:18px!important;min-height:18px!important;min-width:18px!important;cursor:pointer}.cap-daily-editor button{font:inherit;font-size:14px;border:1px solid #a9c5ad;background:#fffdf8;color:#174329;padding:4px 8px;min-height:32px;border-radius:3px;cursor:pointer}.cap-daily-editor button:disabled{opacity:.5;cursor:default}.cap-daily-settings{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:0 0 9px}.cap-daily-settings input{width:115px}.cap-days-wrap,.cap-entry-scroll{max-width:100%;overflow:auto;scrollbar-color:#78917f #edf2ed;scrollbar-width:thin}.cap-days-wrap{max-height:49vh}.cap-days-table,.cap-entry-table{border-collapse:separate;border-spacing:0;width:100%;font-size:14px}.cap-days-table{min-width:1060px}.cap-days-table th,.cap-entry-table th{position:sticky;top:0;z-index:2;background:#205735;color:white;text-align:left;padding:6px;border-right:1px solid #548365;white-space:nowrap}.cap-days-table td,.cap-entry-table td{border-bottom:1px solid #d6e4d9;padding:5px 6px;vertical-align:middle}.cap-days-table td:first-child{position:sticky;left:0;background:#fffdf8;z-index:1;min-width:145px}.cap-days-table tr.cap-day-off td:first-child{background:#eef4ee}.cap-days-table tr.cap-day-off{color:#6f7b70;background:#f7f9f7}.cap-days-table tr:nth-child(even):not(.cap-day-off){background:#f8fbf7}.cap-time-pair{display:flex;align-items:center;gap:2px;white-space:nowrap}.cap-time-pair+.cap-time-pair{margin-top:3px}.cap-time-pair input[type=time]{width:94px}.cap-time-pair span{color:#67816d}.cap-day-note{margin:5px 0 9px;font-size:13px;color:#596c5c}.cap-schedule-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}.cap-entry-section{border:1px solid #bad2c0;background:#fffefa;border-radius:4px;margin:0 0 8px;min-width:0}.cap-entry-section>summary{cursor:pointer;list-style:none;background:#205735;color:white;font-size:15px;font-weight:bold;padding:6px 9px}.cap-entry-section>summary::before{content:'▾';margin-right:6px}.cap-entry-section:not([open])>summary::before{content:'▸'}.cap-entry-section>p,.cap-entry-section>small{display:block;margin:6px 9px;font-size:13px;color:#526758}.cap-clean-day{border-bottom:1px solid #d4e5d8;padding:6px 9px}.cap-clean-day>strong{display:block;font-size:14px;margin-bottom:4px}.cap-clean-row,.cap-overtime-row{display:flex;flex-wrap:wrap;align-items:end;gap:6px;padding:5px 9px;border-bottom:1px solid #dae8dd}.cap-clean-row{padding:3px 0}.cap-clean-row input[type=number],.cap-overtime-row input[type=number]{width:70px}.cap-clean-row input[type=time],.cap-overtime-row input[type=time]{width:110px}.cap-clean-row>span,.cap-overtime-row>span{display:grid;gap:3px;font-size:13px;min-width:70px}.cap-clean-row>span b,.cap-overtime-row>span b{font-size:14px;color:#194e30}.cap-clean-day>button{margin:5px 0}.cap-overtime-row>strong{min-width:120px;font-size:14px}.cap-entry-table{min-width:1010px}.cap-entry-table td:first-child input{width:66px}.cap-entry-table td:nth-child(2) select,.cap-entry-table td:nth-child(3) select{width:116px}.cap-entry-table input[type=time]{width:106px}.cap-entry-table input[type=text]{width:100%;min-width:125px}.cap-entry-table input[type=number]{width:80px}.cap-entry-table td:last-child button{min-width:32px}.cap-add{margin:6px 9px}.cap-daily-editor :disabled{opacity:.6}.cap-daily-editor :focus-visible{outline:2px solid #e17b12;outline-offset:1px}
+@media(max-width:800px){.cap-schedule-details{grid-template-columns:1fr}.cap-daily-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.cap-daily-settings input{width:100%}.cap-days-wrap{max-height:none;overflow:visible}.cap-days-table{display:block;min-width:0}.cap-days-table thead{display:none}.cap-days-table tbody{display:grid;gap:8px}.cap-days-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid #bad2c0;border-radius:5px;background:#fffefa!important;padding:7px}.cap-days-table td{border:0;padding:4px;min-width:0}.cap-days-table td::before,.cap-entry-table td::before{content:attr(data-label);display:block;font-size:13px;font-weight:bold;color:#205735;margin-bottom:4px}.cap-days-table td:first-child{position:static;grid-column:1/-1;border-bottom:1px solid #d6e4d9;background:transparent!important}.cap-days-table td:nth-child(7),.cap-days-table td:nth-child(3),.cap-days-table td:nth-child(8){grid-column:1/-1}.cap-time-pair{flex-wrap:wrap}.cap-time-pair input[type=time]{width:calc(50% - 12px)}.cap-daily-editor input:not([type=checkbox]),.cap-daily-editor select,.cap-daily-editor button{min-height:40px}.cap-clean-row,.cap-overtime-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.cap-overtime-row>strong{grid-column:1/-1}.cap-clean-row label,.cap-overtime-row label{min-width:0}.cap-clean-row input,.cap-overtime-row input{width:100%!important}.cap-entry-scroll{overflow:visible}.cap-entry-table{display:block;min-width:0}.cap-entry-table thead{display:none}.cap-entry-table tbody{display:grid;gap:8px;margin:8px}.cap-entry-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;border:1px solid #d5e5d8;border-radius:5px;padding:7px}.cap-entry-table td{min-width:0;padding:3px;border:0}.cap-entry-table td input,.cap-entry-table td select{width:100%!important;min-width:0!important}.cap-entry-table td:last-child{align-self:end}.cap-entry-table td:last-child button{width:100%}.cap-entry-table td:has(input[type=text]){grid-column:1/-1}}
+@media(max-width:430px){.cap-daily-settings{grid-template-columns:1fr}.cap-clean-row,.cap-overtime-row{grid-template-columns:1fr 1fr}.cap-days-table tr{grid-template-columns:1fr 1fr}}
+.cap-roster-body{padding:8px 10px}.cap-roster-body>p{margin:0 0 8px;color:#536b58}.cap-roster-body>label{max-width:225px}.cap-roster-table{min-width:670px}.cap-roster-table td:first-child{min-width:180px}.cap-roster-table td:first-child input{width:auto}.cap-roster-borrow{display:flex;align-items:end;gap:9px;flex-wrap:wrap;margin-top:9px}.cap-roster-borrow label{min-width:250px;flex:1}.cap-roster-borrow button{white-space:nowrap}@media(max-width:800px){.cap-roster-table{min-width:0}.cap-roster-table td:first-child{min-width:0}.cap-roster-borrow label,.cap-roster-borrow button{width:100%}}
+.cap-employee-picker{position:relative;min-width:175px}.cap-employee-picker>summary{min-height:32px;padding:5px;border:1px solid #b4cdbb;border-radius:3px;cursor:pointer;background:#fff;max-width:225px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cap-employee-picker>div{position:absolute;z-index:6;top:100%;left:0;width:min(320px,75vw);max-height:210px;overflow-y:auto;padding:7px;background:#fff;border:1px solid #a9c5ad;box-shadow:0 3px 12px #153f2922}.cap-employee-picker label{display:flex;flex-direction:row;align-items:center;gap:6px;padding:4px 3px;cursor:pointer}.cap-entry-table:has(.cap-employee-picker){min-width:1230px}@media(max-width:800px){.cap-entry-table:has(.cap-employee-picker){min-width:0}.cap-employee-picker>div{position:static;width:100%;box-shadow:none}}
+
+/* Compact weekly work schedule, following the approved seven-day reference. */
+.cap-calendar-workspace .cap-daily-editor{padding:0;border:0;background:transparent;box-shadow:none}
+.cap-calendar-workspace .cap-daily-settings{gap:7px 14px;margin:3px 0 5px;align-items:center}
+.cap-calendar-workspace .cap-daily-settings label{flex-direction:row;align-items:center;gap:5px;font-weight:700;white-space:nowrap}
+.cap-calendar-workspace .cap-daily-settings input{width:54px!important;height:26px;min-height:26px!important;padding:2px 4px!important;font-weight:400}
+.cap-calendar-workspace .cap-daily-settings small{font-size:12px;color:#6a786c}
+.cap-section-heading,.cap-mini-panel h3{margin:0;background:#164d38;color:#fff;font-size:14px;line-height:1.2;font-weight:700;padding:4px 8px}
+.cap-calendar-workspace .cap-days-wrap{max-height:none;border:1px solid #d4e1d6;overflow-x:auto}
+.cap-calendar-workspace .cap-days-table{min-width:780px;table-layout:fixed;font-size:12px}
+.cap-calendar-workspace .cap-days-table th{background:#f2f8f2;color:#153b2c;font-size:12px;padding:3px 5px;border-right:1px solid #d4e1d6;position:static}
+.cap-calendar-workspace .cap-days-table td{padding:2px 5px;height:23px;border-right:1px solid #dce7df;white-space:nowrap}
+.cap-calendar-workspace .cap-days-table td:first-child{position:static;min-width:0;text-align:center;background:inherit}
+.cap-calendar-workspace .cap-days-table td:nth-child(6),.cap-calendar-workspace .cap-days-table td:nth-child(5){text-align:center}
+.cap-calendar-workspace .cap-days-table th:first-child{width:52px}.cap-calendar-workspace .cap-days-table th:nth-child(2){width:137px}.cap-calendar-workspace .cap-days-table th:is(:nth-child(3),:nth-child(n+7):nth-child(-n+9)){width:103px}.cap-calendar-workspace .cap-days-table th:nth-child(10){width:100px}.cap-calendar-workspace .cap-days-table th:nth-child(11),.cap-calendar-workspace .cap-days-table th:nth-child(4){width:55px}
+.cap-calendar-workspace .cap-days-table strong{font-weight:400}
+.cap-calendar-workspace .cap-days-table input[type=time],.cap-mini-panel input[type=time]{border:0;background:transparent;box-shadow:none;width:43px;min-width:43px;min-height:20px;height:20px;padding:0;font:inherit;font-size:12px;appearance:none;color:#153b2c}
+.cap-calendar-workspace .cap-days-table input[type=time]::-webkit-calendar-picker-indicator,.cap-mini-panel input[type=time]::-webkit-calendar-picker-indicator{display:none}
+.cap-calendar-workspace .cap-days-table input[type=time]:hover,.cap-calendar-workspace .cap-days-table input[type=time]:focus,.cap-mini-panel input[type=time]:hover,.cap-mini-panel input[type=time]:focus{background:#fff;border:1px solid #8cba99}
+.cap-calendar-workspace .cap-days-table input[type=checkbox]{width:15px!important;height:15px!important;min-width:15px!important;min-height:15px!important;vertical-align:middle;accent-color:#087b49}
+.cap-calendar-workspace .cap-time-pair{gap:1px;flex-wrap:nowrap}
+.cap-calendar-workspace .cap-day-off td{background:#f9faf9;color:#89968c}
+.cap-calendar-workspace .cap-roster{margin:5px 0;border:1px solid #b7d3c0}
+.cap-calendar-workspace .cap-roster>summary{background:#f5faf6;color:#19482e;font-size:13px;padding:5px 8px;min-height:32px}
+.cap-calendar-workspace .cap-schedule-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:4px 0 5px}
+.cap-mini-panel{border:1px solid #bed6c5;border-radius:3px;min-width:0;background:white}
+.cap-mini-scroll{overflow-x:auto}
+.cap-mini-panel table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px}
+.cap-mini-panel th{background:#f3f9f5;text-align:left;font-weight:700;padding:3px 5px;white-space:nowrap}
+.cap-mini-panel td{height:24px;border-top:1px solid #dfebe2;padding:2px 5px;white-space:nowrap}
+.cap-mini-panel input[type=number]{width:43px!important;min-height:22px!important;height:22px;padding:1px 3px!important;border:0;background:transparent;font-size:12px!important}
+.cap-mini-panel td button{min-width:20px;min-height:20px;padding:0 3px;border:0}
+.cap-mini-panel p{margin:4px 6px;font-size:12px;color:#64766a}
+.cap-mini-date{font-size:11px;color:#526b59}
+.cap-mini-panel .cap-mobile-add{margin:3px 6px;min-height:22px;padding:1px 5px;font-size:12px}
+.cap-calendar-workspace .cap-entry-section:not(.cap-roster){margin:4px 0 5px;border:0;border-radius:0;background:#fff}
+.cap-calendar-workspace .cap-entry-section:not(.cap-roster)>summary{background:#164d38;font-size:14px;line-height:1.2;padding:4px 8px}
+.cap-calendar-workspace .cap-entry-section:not(.cap-roster)>summary::before{content:none}
+.cap-calendar-workspace .cap-entry-scroll{overflow-x:auto;border:1px solid #d5e4da;border-top:0}
+.cap-calendar-workspace .cap-entry-table,.cap-calendar-workspace .cap-entry-table:has(.cap-employee-picker){min-width:790px;table-layout:fixed;font-size:12px}
+.cap-calendar-workspace .cap-ot-section .cap-entry-table,.cap-calendar-workspace .cap-ot-section .cap-entry-table:has(.cap-employee-picker){min-width:980px}
+.cap-calendar-workspace .cap-ot-section .cap-entry-table th:first-child{width:19%}
+.cap-calendar-workspace .cap-ot-section .cap-entry-table th:nth-child(2){width:25%}
+.cap-calendar-workspace .cap-ot-section .cap-entry-table th:nth-child(3){width:16%}
+.cap-calendar-workspace .cap-ot-section .cap-entry-table th:nth-child(4),.cap-calendar-workspace .cap-ot-section .cap-entry-table th:nth-child(5){width:9%}
+.cap-calendar-workspace .cap-entry-table th{position:static;background:#f2f8f3;color:#17422d;padding:3px 5px;font-size:12px;border-right:1px solid #dde8df}
+.cap-calendar-workspace .cap-entry-table td{height:25px;padding:1px 4px;border-right:1px solid #e0ebe3;white-space:nowrap}
+.cap-calendar-workspace .cap-entry-table th:first-child{width:18%}.cap-calendar-workspace .cap-entry-table th:last-child{width:35px}
+.cap-calendar-workspace .cap-entry-table input:not([type=checkbox]),.cap-calendar-workspace .cap-entry-table select{height:23px;min-height:23px;padding:1px 3px;font-size:12px;border:0;background:transparent;width:100%;min-width:0}
+.cap-calendar-workspace .cap-entry-table input:not([type=checkbox]):focus,.cap-calendar-workspace .cap-entry-table select:focus{border:1px solid #91bba0;background:white}
+.cap-calendar-workspace .cap-entry-table td:nth-child(2) select,.cap-calendar-workspace .cap-entry-table td:nth-child(3) select{width:100%}
+.cap-calendar-workspace .cap-entry-table td:first-child input{width:100%}
+.cap-calendar-workspace .cap-entry-table button{min-height:20px;padding:0 3px;border:0}
+.cap-calendar-workspace .cap-employee-picker{min-width:0}.cap-calendar-workspace .cap-employee-picker>summary{min-height:23px;max-width:none;padding:2px 3px;border:0;font-size:12px;background:transparent}
+.cap-calendar-workspace .cap-entry-section:not(.cap-roster)>small{margin:2px 6px;font-size:12px}.cap-calendar-workspace .cap-entry-section:not(.cap-roster)>.cap-add{min-height:24px;padding:2px 6px;margin:3px 6px;font-size:12px}
+.cap-rules{border:1px solid #e8d0a2;border-radius:3px;background:#fffaf0;padding:6px 8px;font-size:13px}.cap-rules p{margin:3px 0}.cap-calendar-workspace .cap-available{margin:4px 0;padding:5px 8px;font-size:13px}
+@media(min-width:801px){.cap-calendar-workspace .cap-entry-section:not(.cap-roster)>.cap-add{display:none}.cap-calendar-workspace .cap-mini-panel .cap-mobile-add{display:inline-block}}
+@media(max-width:800px){.cap-calendar-workspace .cap-daily-settings{display:flex;gap:6px 12px}.cap-calendar-workspace .cap-schedule-details{grid-template-columns:1fr}.cap-calendar-workspace .cap-days-wrap{overflow:visible;border:0}.cap-calendar-workspace .cap-days-table{min-width:0}.cap-calendar-workspace .cap-days-table tbody{gap:6px}.cap-calendar-workspace .cap-days-table tr{padding:5px}.cap-calendar-workspace .cap-days-table td{height:auto;white-space:normal}.cap-calendar-workspace .cap-days-table td:first-child{grid-column:auto}.cap-calendar-workspace .cap-days-table td:nth-child(2){grid-column:1/-1;grid-row:1;font-weight:700;border-bottom:1px solid #dce7df}.cap-calendar-workspace .cap-days-table td:nth-child(n+3):nth-child(-n+7){grid-column:1/-1}.cap-calendar-workspace .cap-days-table td::before,.cap-calendar-workspace .cap-entry-table td::before{font-size:12px;margin-bottom:2px}.cap-calendar-workspace .cap-days-table input[type=time]{width:65px;min-width:65px;height:30px}.cap-calendar-workspace .cap-time-pair{gap:4px}.cap-mini-panel table{min-width:380px}.cap-calendar-workspace .cap-entry-scroll{overflow:visible}.cap-calendar-workspace .cap-entry-table,.cap-calendar-workspace .cap-entry-table:has(.cap-employee-picker){min-width:0}.cap-calendar-workspace .cap-entry-table tbody{margin:6px;gap:6px}.cap-calendar-workspace .cap-entry-table tr{padding:5px}.cap-calendar-workspace .cap-entry-table td{height:auto;white-space:normal}.cap-calendar-workspace .cap-entry-table input:not([type=checkbox]),.cap-calendar-workspace .cap-entry-table select,.cap-calendar-workspace .cap-entry-table .cap-employee-picker>summary{height:38px;min-height:38px;border:1px solid #bad2c0;background:white;font-size:14px}.cap-calendar-workspace .cap-entry-section:not(.cap-roster)>.cap-add{display:inline-block;min-height:40px;font-size:14px}.cap-calendar-workspace .cap-mini-panel .cap-mobile-add{min-height:40px;font-size:14px}.cap-calendar-workspace .cap-entry-table button{min-height:40px}}
+@media(max-width:800px){.cap-calendar-workspace .cap-ot-section .cap-entry-table,.cap-calendar-workspace .cap-ot-section .cap-entry-table:has(.cap-employee-picker){min-width:0}.cap-calendar-workspace .cap-ot-section .cap-entry-table td:nth-child(2){grid-column:1/-1}}
+/* Browser-native time controls use AM/PM in some locales and clip the hour in narrow cells. */
+.cap-calendar-workspace .cap-time-pair input[type=text],.cap-calendar-workspace .cap-mini-panel input[inputmode=numeric]{width:42px;min-width:42px;height:21px;min-height:21px;padding:0;border:0;background:transparent;font:inherit;font-size:12px;color:#153b2c}
+.cap-calendar-workspace .cap-time-pair input[type=text]:focus,.cap-calendar-workspace .cap-mini-panel input[inputmode=numeric]:focus{border:1px solid #8cba99;background:#fff;outline:2px solid #e17b12}
+.cap-calendar-workspace .cap-mini-panel table{min-width:0!important;width:100%!important}
+.cap-calendar-workspace .cap-mini-panel th{width:auto}
+.cap-calendar-workspace .cap-mini-panel th:last-child{width:30px}
+@media(max-width:800px){.cap-calendar-workspace .cap-time-pair input[type=text]{width:65px;min-width:65px;height:36px;border:1px solid #b4cdbb;padding:2px 5px;font-size:14px}.cap-calendar-workspace .cap-mini-panel input[inputmode=numeric]{width:80px;height:36px;border:1px solid #b4cdbb;padding:2px 5px;font-size:14px}}
+@media(min-width:801px){
+ .cap-calendar-workspace .cap-days-table th,.cap-calendar-workspace .cap-days-table td{height:20px!important;padding:0 4px!important;line-height:1.2!important}
+ .cap-calendar-workspace .cap-days-table input[type=checkbox]{width:13px!important;height:13px!important;min-width:13px!important;min-height:13px!important}
+ .cap-calendar-workspace .cap-time-pair input[type=text]{height:18px;min-height:18px}
+ .cap-calendar-workspace .cap-entry-table th,.cap-calendar-workspace .cap-entry-table td{height:21px!important;padding:0 4px!important;line-height:1.2!important}
+ .cap-calendar-workspace .cap-entry-table input:not([type=checkbox]),.cap-calendar-workspace .cap-entry-table select,.cap-calendar-workspace .cap-employee-picker>summary{height:20px;min-height:20px}
+ .cap-calendar-workspace .cap-entry-section:not(.cap-roster)>small{line-height:1.15;margin:1px 6px 2px}
+ .cap-calendar-workspace .cap-mini-panel th,.cap-calendar-workspace .cap-mini-panel td{height:20px;padding:0 4px;line-height:1.2}
+ .cap-calendar-workspace .cap-mini-panel p{line-height:1.2;margin:2px 6px}
+ .cap-calendar-workspace .cap-mini-panel .cap-mobile-add{min-height:20px;margin:1px 6px 2px}
+}
+.cap-calendar-workspace .cap-mini-panel:first-child th:last-child{width:30px}
+.cap-calendar-workspace .cap-mini-panel:last-child th:last-child{width:auto}
+.cap-calendar-workspace .cap-roster>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cap-calendar-workspace .cap-roster>summary small{display:block;font-weight:400;font-size:12px;color:#355940;margin-top:1px}
+.cap-roster-open{display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:1px 10px;border:1px solid #73a586;border-radius:3px;background:#fff;font-size:12px;white-space:nowrap}
+@media(max-width:800px){.cap-roster-open{min-height:40px;font-size:14px}}
+
+/* A readable 24-hour value over the browser's native time picker. */
+.cap-calendar-workspace .cap-clock{position:relative;display:inline-flex;align-items:center;width:61px;min-width:61px;height:20px;vertical-align:middle;white-space:nowrap}
+.cap-calendar-workspace .cap-clock-value{display:flex;align-items:center;justify-content:space-between;width:100%;font-size:12px;color:#153b2c;pointer-events:none}
+.cap-calendar-workspace .cap-clock-value span{font-size:14px;color:#397455}
+.cap-calendar-workspace .cap-clock input[type=time],.cap-calendar-workspace .cap-mini-panel .cap-clock input[type=time],.cap-calendar-workspace .cap-entry-table .cap-clock input[type=time]{position:absolute;inset:0;width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;max-width:none!important;opacity:0!important;cursor:pointer;z-index:1}
+.cap-calendar-workspace .cap-clock:focus-within{outline:2px solid #e17b12;outline-offset:1px;background:#f1f8f2}
+.cap-calendar-workspace .cap-clock:has(input:disabled){opacity:.6}
+.cap-calendar-workspace .cap-mini-scroll{overflow:visible;min-width:0}
+.cap-calendar-workspace .cap-mini-panel{display:flex;flex-direction:column;min-width:0;align-self:stretch}
+.cap-calendar-workspace .cap-mini-panel p{margin-top:auto}
+.cap-calendar-workspace .cap-mini-panel table{min-width:0!important;max-width:100%;table-layout:fixed}
+.cap-calendar-workspace .cap-mini-panel td,.cap-calendar-workspace .cap-mini-panel th{overflow:visible;min-width:0}
+.cap-calendar-workspace .cap-mini-panel .cap-clock{width:61px;min-width:0;max-width:100%}
+.cap-calendar-workspace .cap-mini-panel:first-child th:first-child{width:25%}
+.cap-calendar-workspace .cap-mini-panel:first-child th:last-child{width:26px}
+.cap-calendar-workspace .cap-mini-panel:last-child th:first-child{width:22%}
+.cap-calendar-workspace .cap-mini-panel .cap-clean-picker{min-width:0;width:100%}
+.cap-calendar-workspace .cap-mini-panel .cap-clean-picker>summary{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font-size:12px}
+.cap-calendar-workspace .cap-entry-table .cap-clock{width:68px;max-width:100%}
+.cap-calendar-workspace .cap-linked-leave{background:#f4faf4;color:#21583b}
+@media(max-width:800px){.cap-calendar-workspace .cap-mini-panel table{min-width:0!important}.cap-calendar-workspace .cap-clock{width:82px;height:38px}.cap-calendar-workspace .cap-mini-panel .cap-clock{width:min(61px,100%)}.cap-calendar-workspace .cap-clock-value{font-size:14px}.cap-calendar-workspace .cap-mini-panel .cap-clean-picker>summary{min-height:36px;font-size:14px}.cap-calendar-workspace .cap-mini-panel th{font-size:11px;white-space:normal}.cap-calendar-workspace .cap-mini-panel td{padding:2px!important}}
+
+/* Eleven compact columns: use the date and staff counts to open each day's names. */
+.cap-calendar-workspace .cap-days-table{min-width:820px;width:100%}
+.cap-calendar-workspace .cap-days-table th:first-child{width:42px}
+.cap-calendar-workspace .cap-days-table th:nth-child(2){width:112px}
+.cap-calendar-workspace .cap-days-table th:nth-child(7),.cap-calendar-workspace .cap-days-table th:nth-child(n+8):nth-child(-n+10){width:94px}
+.cap-calendar-workspace .cap-days-table th:nth-child(3),.cap-calendar-workspace .cap-days-table th:nth-child(6){width:61px}
+.cap-calendar-workspace .cap-days-table th:nth-child(11){width:91px}
+.cap-calendar-workspace .cap-days-table th:nth-child(4),.cap-calendar-workspace .cap-days-table th:nth-child(5){width:44px}
+.cap-calendar-workspace .cap-days-table th:nth-child(4),.cap-calendar-workspace .cap-days-table th:nth-child(5){white-space:normal;text-align:center}
+.cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock{width:43px;min-width:43px}
+.cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock-value span{display:none}
+.cap-calendar-workspace .cap-days-table .cap-time-pair{gap:0}
+.cap-calendar-workspace .cap-day-expand,.cap-calendar-workspace .cap-staff-count{border:0;background:transparent;min-height:18px;padding:0;color:#164d38;font-size:12px;white-space:nowrap}
+.cap-calendar-workspace .cap-day-expand{display:flex;align-items:center;justify-content:space-between;gap:3px;width:100%;text-align:left}
+.cap-calendar-workspace .cap-staff-count{width:100%;font-weight:600}
+.cap-calendar-workspace .cap-day-staff-detail td{padding:5px 9px!important;background:#f5faf6!important;white-space:normal!important;text-align:left!important}
+.cap-calendar-workspace .cap-day-staff-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cap-calendar-workspace .cap-day-staff-grid section{min-width:0}
+.cap-calendar-workspace .cap-day-staff-grid ul{display:flex;flex-wrap:wrap;gap:3px 15px;list-style:none;padding:0;margin:3px 0}
+.cap-calendar-workspace .cap-day-staff-grid li{min-width:135px}
+.cap-calendar-workspace .cap-day-staff-grid p{margin:3px 0;color:#6a786c}
+.cap-calendar-workspace .cap-day-staff-grid small{color:#ad6414}
+.cap-calendar-workspace .cap-schedule-layout{min-width:0}
+.cap-calendar-workspace .cap-schedule-main{min-width:0}
+.cap-calendar-workspace .cap-day-staff-aside{display:none}
+.cap-calendar-workspace .cap-staff-select{display:flex;flex-direction:row;align-items:center;gap:5px;font-size:12px;cursor:pointer}
+.cap-calendar-workspace .cap-staff-select input[type=checkbox]{width:14px!important;height:14px!important;min-width:14px!important;min-height:14px!important;margin:0;flex:none}
+.cap-calendar-workspace .cap-transfer-selected{min-height:24px;padding:2px 6px;font-size:12px;border-color:#7aab88}
+@media(min-width:1550px){
+ .cap-calendar-workspace .cap-schedule-layout{display:grid;grid-template-columns:minmax(820px,1.8fr) minmax(350px,1fr);gap:8px;align-items:start}
+ .cap-calendar-workspace .cap-day-staff-aside{display:block;border:1px solid #d4e1d6;min-width:0;background:#f9fcf9}
+ .cap-calendar-workspace .cap-day-staff-aside h3{margin:0;padding:4px 8px;background:#164d38;color:white;font-size:14px;line-height:1.2}
+ .cap-calendar-workspace .cap-day-staff-aside .cap-day-staff-grid{display:block;max-height:260px;overflow:auto;padding:5px 9px}
+ .cap-calendar-workspace .cap-day-staff-aside .cap-day-staff-grid section+section{border-top:1px solid #d4e1d6;margin-top:5px;padding-top:5px}
+ .cap-calendar-workspace .cap-day-staff-aside p{margin:4px 9px;color:#63766a;font-size:12px}
+ .cap-calendar-workspace .cap-day-staff-detail{display:none}
+ .cap-calendar-workspace .cap-days-table tr:has(.cap-day-expand[aria-expanded=true]){background:#e9f4e9}
+}
+@media(max-width:800px){
+ .cap-calendar-workspace .cap-days-table{min-width:0}
+ .cap-calendar-workspace .cap-days-table td:nth-child(3),.cap-calendar-workspace .cap-days-table td:nth-child(6){grid-column:auto}
+ .cap-calendar-workspace .cap-days-table td:nth-child(n+8):nth-child(-n+11){grid-column:1/-1}
+ .cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock{width:72px;min-width:72px}
+ .cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock-value span{display:inline}
+ .cap-calendar-workspace .cap-days-table tr.cap-day-staff-detail{display:block;padding:0;margin-top:-6px;background:#f5faf6!important}
+ .cap-calendar-workspace .cap-days-table tr.cap-day-staff-detail td{display:block;border:0}
+ .cap-calendar-workspace .cap-day-staff-grid{grid-template-columns:1fr}
+ .cap-calendar-workspace .cap-day-expand,.cap-calendar-workspace .cap-staff-count{min-height:40px;font-size:14px}
+}
+/* Daily roster and registrations open only from the compact action row. */
+.cap-calendar-workspace .cap-panel-toggles{display:flex;align-items:center;flex-wrap:wrap;gap:5px 20px;border:1px solid #bad2c0;background:#f9fcf9;padding:5px 9px;margin:5px 0}
+.cap-calendar-workspace .cap-panel-toggles label{display:inline-flex;flex-direction:row;align-items:center;gap:6px;min-height:26px;font-size:13px;font-weight:600;cursor:pointer}
+.cap-calendar-workspace .cap-panel-toggles small{font-weight:400;color:#536b58}
+.cap-calendar-workspace .cap-day-leave-count{display:block;white-space:normal;color:#a45b0b;font-size:11px;line-height:1.2}
+.cap-calendar-workspace .cap-entry-section:not(.cap-roster)>h3{background:#164d38;color:white;font-size:14px;line-height:1.2;padding:4px 8px;margin:0}
+.cap-calendar-workspace .cap-roster>header{display:flex;align-items:center;padding:5px 9px;background:#f5faf6;color:#19482e;font-size:14px;font-weight:bold}
+.cap-calendar-workspace .cap-roster>header small{display:block;font-size:12px;font-weight:400;color:#355940}
+.cap-calendar-workspace .cap-schedule-details:has(>.cap-mini-panel:only-child){grid-template-columns:minmax(0,1fr)}
+.cap-calendar-workspace .cap-entry-scroll:has(.cap-employee-picker[open]){overflow:visible}
+.cap-calendar-workspace .cap-entry-table .cap-employee-picker[open]>div,.cap-calendar-workspace .cap-mini-panel .cap-clean-picker[open]>div{position:static;width:100%;box-shadow:none;max-height:210px;overflow:auto}
+.cap-calendar-workspace .cap-entry-table .cap-employee-picker[open]>summary,.cap-calendar-workspace .cap-mini-panel .cap-clean-picker[open]>summary{white-space:normal;overflow:visible}
+.cap-calendar-workspace .cap-days-wrap{max-height:none}
+@media(max-width:800px){.cap-calendar-workspace .cap-panel-toggles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px}.cap-calendar-workspace .cap-panel-toggles label{min-height:42px;font-size:14px}.cap-calendar-workspace .cap-entry-table .cap-employee-picker[open]>div{width:100%}}
+/* The weekly schedule uses the same full workspace width as the panels below it. */
+@media(min-width:1550px){.cap-calendar-workspace .cap-schedule-layout{display:block}.cap-calendar-workspace .cap-day-staff-detail{display:table-row}}
+.cap-calendar-workspace .cap-days-table{width:100%}
+.cap-calendar-workspace .cap-day-staff-grid ul{max-height:165px;overflow-y:auto;align-content:start;padding:4px 0}
+.cap-calendar-workspace .cap-employee-picker{min-width:0}
+.cap-calendar-workspace .cap-employee-picker>summary{cursor:pointer;background:#f3faf5;border:1px solid #94b99d;min-height:24px;padding:2px 6px;max-width:100%;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+.cap-calendar-workspace .cap-employee-picker[open]>.cap-employee-picker-body{position:static;display:block;min-width:0;width:100%;padding:6px;background:white;border:1px solid #9abfa5;box-shadow:none;max-height:none;overflow:visible;font-size:12px}
+.cap-calendar-workspace .cap-employee-picker-body>strong{display:block;margin-bottom:3px;color:#164b37}
+.cap-calendar-workspace .cap-employee-picker-options{max-height:165px;overflow-y:auto}
+.cap-calendar-workspace .cap-employee-picker-options label{display:flex;flex-direction:row;align-items:center;gap:6px;min-height:27px;white-space:normal;cursor:pointer}
+.cap-calendar-workspace .cap-employee-picker-body>.cap-picker-done{display:block;margin:5px 0 0 auto;background:#0e6a47;color:white;border-color:#0e6a47;min-height:26px}
+.cap-calendar-workspace .cap-transfer-pickers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:6px 0}
+.cap-calendar-workspace .cap-transfer-pickers>section{min-width:0;border:1px solid #cbded0;padding:6px}
+.cap-calendar-workspace .cap-transfer-pickers strong{display:block;margin-bottom:4px}
+.cap-calendar-workspace .cap-transfer-pickers .cap-employee-picker{max-width:360px}
+.cap-calendar-workspace .cap-transfer-pickers button:not(.cap-picker-done){margin-top:5px}
+.cap-calendar-workspace .cap-roster-assign{margin:7px 0;border-top:1px solid #d4e5d8}
+.cap-calendar-workspace .cap-roster-assign>summary{padding:7px;cursor:pointer;color:#164b37;font-weight:bold}
+.cap-calendar-workspace .cap-entry-table th:first-child{width:27%}
+.cap-calendar-workspace .cap-entry-table th:nth-child(2){width:17%}
+.cap-calendar-workspace .cap-entry-table th:nth-child(3){width:18%}
+.cap-calendar-workspace .cap-entry-table th:nth-child(4),.cap-calendar-workspace .cap-entry-table th:nth-child(5){width:10%}
+.cap-calendar-workspace .cap-entry-table th:nth-child(6){width:14%}
+.cap-calendar-workspace .cap-entry-table th:last-child{width:4%}
+.cap-calendar-workspace .cap-entry-table .cap-inline-option{display:inline-flex;flex-direction:row;align-items:center;gap:3px;font-size:11px;white-space:nowrap}
+.cap-calendar-workspace .cap-entry-table .cap-inline-option input[type=number]{width:48px!important}
+.cap-calendar-workspace .cap-date-range>summary{font-size:11px;color:#176043;cursor:pointer;white-space:nowrap}
+.cap-calendar-workspace .cap-date-range label{font-size:11px}
+@media(min-width:801px){.cap-calendar-workspace .cap-entry-section:not(.cap-roster)>.cap-add{display:inline-flex}}
+@media(max-width:800px){.cap-calendar-workspace .cap-transfer-pickers{grid-template-columns:1fr}.cap-calendar-workspace .cap-employee-picker-body>.cap-picker-done{min-height:40px}.cap-calendar-workspace .cap-employee-picker-options label{min-height:40px}}
+/* One assignment table: shift/day controls, a single transfer checkbox and an add action. */
+.cap-calendar-workspace .cap-roster-controls{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.cap-calendar-workspace .cap-roster-controls label{min-width:125px}
+.cap-calendar-workspace .cap-roster-controls button{margin-bottom:0}
+.cap-calendar-workspace .cap-roster-table th:first-child{width:35%}
+.cap-calendar-workspace .cap-roster-table th:nth-child(2){width:20%}
+.cap-calendar-workspace .cap-roster-table th:nth-child(n+3){width:15%}
+.cap-calendar-workspace .cap-roster-body>small{display:block;margin:5px 0;color:#526758;font-size:12px}
+.cap-calendar-workspace .cap-roster-borrow{border-top:1px solid #d4e5d8;padding-top:6px}
+/* Cleaning names, times and remove control must stay inside their own half-width panel. */
+.cap-calendar-workspace .cap-mini-scroll{overflow-x:auto;overflow-y:visible;min-width:0}
+.cap-calendar-workspace .cap-mini-scroll:has(.cap-clean-picker[open]){overflow:visible}
+.cap-calendar-workspace .cap-mini-panel:first-child table{min-width:355px!important}
+.cap-calendar-workspace .cap-mini-panel:first-child th:first-child{width:36%}
+.cap-calendar-workspace .cap-mini-panel:first-child th:nth-child(2),.cap-calendar-workspace .cap-mini-panel:first-child th:nth-child(3){width:18%}
+.cap-calendar-workspace .cap-mini-panel:first-child th:nth-child(4){width:19%}
+.cap-calendar-workspace .cap-mini-panel:first-child th:last-child{width:9%;text-align:center}
+.cap-calendar-workspace .cap-mini-panel:first-child td:last-child{text-align:center}
+.cap-calendar-workspace .cap-mini-panel .cap-clean-picker>summary{display:block;min-width:0;max-width:100%;text-overflow:ellipsis;white-space:nowrap}
+.cap-calendar-workspace .cap-mini-panel .cap-clean-picker[open]>summary{white-space:normal;overflow-wrap:anywhere}
+.cap-calendar-workspace .cap-mini-panel .cap-clean-picker[open]>div{overflow-wrap:anywhere}
+/* Keep the leave-OT choice visible in the note column, outside the narrow mode cell. */
+.cap-calendar-workspace .cap-entry-table th:nth-last-child(2){width:19%}
+.cap-calendar-workspace .cap-leave-note{display:flex;align-items:center;gap:5px;min-width:0}
+.cap-calendar-workspace .cap-leave-note .cap-inline-option{flex:none;min-width:82px;white-space:normal;font-size:12px}
+.cap-calendar-workspace .cap-leave-note input[type=text]{flex:1;min-width:35px;width:100%}
+.cap-calendar-workspace .cap-leave-note input[type=checkbox]{opacity:1;flex:none}
+/* Editable 24-hour text and an explicit 00–23 / 00–59 picker. */
+.cap-calendar-workspace .cap-clock{display:inline-flex;align-items:center;width:72px;min-width:72px;height:22px}
+.cap-calendar-workspace .cap-clock input[type=text],.cap-calendar-workspace .cap-time-pair .cap-clock input[type=text],.cap-calendar-workspace .cap-mini-panel .cap-clock input[type=text],.cap-calendar-workspace .cap-entry-table .cap-clock input[type=text]{width:48px!important;min-width:0!important;height:22px;min-height:22px!important;padding:0 1px!important;border:0;background:transparent;font-size:12px!important;color:#153b2c;text-align:center;opacity:1!important;position:static}
+.cap-calendar-workspace .cap-clock button{flex:none;border:0!important;background:transparent!important;color:#397455;padding:0!important;min-width:20px!important;min-height:22px!important;font-size:16px;line-height:1}
+.cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock{width:57px;min-width:57px}
+.cap-calendar-workspace .cap-entry-table .cap-clock{width:75px}
+.cap-calendar-workspace .cap-mini-panel .cap-clock{width:70px;max-width:100%}
+.cap-clock-picker{position:fixed;z-index:9999;width:172px;padding:8px;border:1px solid #6f9b79;border-radius:4px;background:white;box-shadow:0 5px 20px #123c2955;color:#173f29;font:14px 'Times New Roman',serif}
+.cap-clock-picker strong{display:block;margin-bottom:5px}
+.cap-clock-picker>div{display:flex;align-items:end;justify-content:space-between;gap:3px}
+.cap-clock-picker label{display:grid;gap:2px;font-size:12px}
+.cap-clock-picker select{min-width:61px;height:34px;background:white;border:1px solid #91bba0;font:14px 'Times New Roman',serif;color:#173f29}
+.cap-clock-picker>button{display:block;margin:7px 0 0 auto;padding:3px 12px;border:1px solid #97bda0;border-radius:3px;background:#f4faf4;color:#174329;font:14px 'Times New Roman',serif}
+@media(max-width:800px){.cap-calendar-workspace .cap-roster-controls label{min-width:0;flex:1}.cap-calendar-workspace .cap-roster-controls button{width:100%}.cap-calendar-workspace .cap-mini-scroll{overflow-x:auto}.cap-calendar-workspace .cap-clock{height:38px;width:82px}.cap-calendar-workspace .cap-clock input[type=text],.cap-calendar-workspace .cap-time-pair .cap-clock input[type=text],.cap-calendar-workspace .cap-mini-panel .cap-clock input[type=text],.cap-calendar-workspace .cap-entry-table .cap-clock input[type=text]{height:36px;min-height:36px!important;width:58px!important;font-size:14px!important}.cap-calendar-workspace .cap-clock button{min-height:36px!important}.cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock{width:82px;min-width:82px}.cap-calendar-workspace .cap-mini-panel:first-child table{min-width:355px!important}.cap-calendar-workspace .cap-leave-note{flex-wrap:wrap}}
+/* Readable numbers and times; dates in one horizontal range for HC leave. */
+.cap-calendar-workspace .cap-hc-section .cap-entry-table,.cap-calendar-workspace .cap-ot-section .cap-entry-table,.cap-calendar-workspace .cap-other-section .cap-entry-table{font-size:14px}
+.cap-calendar-workspace .cap-hc-section .cap-entry-table,.cap-calendar-workspace .cap-hc-section .cap-entry-table:has(.cap-employee-picker){min-width:1060px}
+.cap-calendar-workspace .cap-hc-section .cap-entry-table th:first-child{width:24%}
+.cap-calendar-workspace .cap-hc-section .cap-entry-table th:nth-child(2){width:23%}
+.cap-calendar-workspace .cap-hc-section .cap-entry-table th:nth-child(3){width:14%}
+.cap-calendar-workspace .cap-hc-section .cap-entry-table th:nth-child(4),.cap-calendar-workspace .cap-hc-section .cap-entry-table th:nth-child(5){width:9%}
+.cap-calendar-workspace .cap-hc-section .cap-entry-table th:nth-child(6){width:17%}
+.cap-calendar-workspace .cap-hc-section .cap-entry-table th:last-child{width:4%}
+.cap-calendar-workspace .cap-leave-date-range{display:flex;align-items:center;gap:4px;white-space:nowrap;width:100%}
+.cap-calendar-workspace .cap-leave-date-range select{flex:1 1 0;width:calc(50% - 9px)!important;min-width:0;color:#173f29!important;font-size:14px!important}
+.cap-calendar-workspace .cap-leave-date-range select:disabled{opacity:1;color:#173f29!important;-webkit-text-fill-color:#173f29;background:#f4f8f4}
+.cap-calendar-workspace .cap-leave-date-range span{flex:none;color:#173f29;font-size:15px}
+.cap-calendar-workspace .cap-mini-panel table{font-size:14px}
+.cap-calendar-workspace .cap-mini-panel th{font-size:13px}
+.cap-calendar-workspace .cap-mini-panel input[type=number]{width:57px!important;height:27px!important;min-height:27px!important;font-size:15px!important;font-weight:600;color:#143e2b!important;opacity:1!important;-webkit-text-fill-color:#143e2b}
+.cap-calendar-workspace .cap-mini-panel:first-child table{min-width:430px!important}
+.cap-calendar-workspace .cap-mini-panel:last-child table{min-width:430px!important}
+.cap-calendar-workspace .cap-mini-panel .cap-clock{width:80px;min-width:80px;max-width:none;height:27px}
+.cap-calendar-workspace .cap-entry-table .cap-clock{width:80px;min-width:80px;height:27px}
+.cap-calendar-workspace .cap-mini-panel .cap-clock input[type=text],.cap-calendar-workspace .cap-entry-table .cap-clock input[type=text]{width:59px!important;height:27px!important;min-height:27px!important;font-size:15px!important;font-weight:600;color:#143e2b!important;-webkit-text-fill-color:#143e2b}
+.cap-calendar-workspace .cap-mini-panel .cap-clock button,.cap-calendar-workspace .cap-entry-table .cap-clock button{min-height:27px!important;color:#245b3e!important;opacity:1!important}
+.cap-calendar-workspace .cap-clock:has(input:disabled){opacity:1}
+.cap-calendar-workspace .cap-clock input[type=text]:disabled{opacity:1!important;color:#143e2b!important;-webkit-text-fill-color:#143e2b}
+.cap-calendar-workspace .cap-days-table{font-size:13px;min-width:950px}
+.cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock input[type=text]{font-size:13px!important;color:#143e2b!important;-webkit-text-fill-color:#143e2b}
+.cap-calendar-workspace .cap-days-table .cap-staff-count{font-size:13px}
+.cap-calendar-workspace .cap-mini-panel td,.cap-calendar-workspace .cap-mini-panel th{white-space:nowrap}
+@media(min-width:801px){.cap-calendar-workspace .cap-mini-panel th,.cap-calendar-workspace .cap-mini-panel td{height:29px!important;line-height:1.25!important}.cap-calendar-workspace .cap-hc-section .cap-entry-table th,.cap-calendar-workspace .cap-hc-section .cap-entry-table td,.cap-calendar-workspace .cap-ot-section .cap-entry-table th,.cap-calendar-workspace .cap-ot-section .cap-entry-table td,.cap-calendar-workspace .cap-other-section .cap-entry-table th,.cap-calendar-workspace .cap-other-section .cap-entry-table td{height:30px!important;line-height:1.25!important}.cap-calendar-workspace .cap-entry-table .cap-employee-picker>summary,.cap-calendar-workspace .cap-entry-table select{height:27px;min-height:27px}}
+@media(max-width:800px){.cap-calendar-workspace .cap-hc-section .cap-entry-table,.cap-calendar-workspace .cap-hc-section .cap-entry-table:has(.cap-employee-picker){min-width:0}.cap-calendar-workspace .cap-hc-section .cap-entry-table td:nth-child(2){grid-column:1/-1}.cap-calendar-workspace .cap-leave-date-range{gap:6px}.cap-calendar-workspace .cap-leave-date-range select{height:40px;min-height:40px;font-size:14px!important}.cap-calendar-workspace .cap-mini-panel .cap-clock{width:80px;min-width:80px;height:38px}.cap-calendar-workspace .cap-mini-panel .cap-clock input[type=text]{width:59px!important;height:38px!important;min-height:38px!important}.cap-calendar-workspace .cap-mini-panel:first-child table,.cap-calendar-workspace .cap-mini-panel:last-child table{min-width:430px!important}}
+.actual-event-employees{min-width:200px;white-space:normal}.actual-event-employees>div{line-height:1.5}
+
+.actual-event-note { min-width: 140px; white-space: normal; overflow-wrap: anywhere; }
+.actual-event-actions { min-width: 260px; }
+.actual-event-action-list { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.actual-event-action-list .production-row-actions { display: contents; }
+.actual-event-action-list button { white-space: nowrap; margin: 0; }
+
+/* UI-03: two clock controls must fit inside their own cell. */
+@media(min-width:801px){
+ html body .app-shell .cap-calendar-workspace .cap-days-wrap{overflow-x:auto;max-width:100%;min-width:0}
+ html body .app-shell .cap-calendar-workspace .cap-days-table{table-layout:auto!important;min-width:1320px!important;width:100%}
+ html body .app-shell .cap-calendar-workspace .cap-days-table :is(th,td):nth-child(7),
+ html body .app-shell .cap-calendar-workspace .cap-days-table :is(th,td):nth-child(n+8):nth-child(-n+10){min-width:176px!important;width:176px!important}
+ html body .app-shell .cap-calendar-workspace .cap-days-table .cap-time-pair{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;min-width:160px;white-space:nowrap}
+ html body .app-shell .cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock{flex:0 0 70px!important;width:70px!important;min-width:70px!important}
+ html body .app-shell .cap-calendar-workspace .cap-days-table .cap-clock-value{font-size:14px!important;white-space:nowrap}
+ html body .app-shell .cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock-value span{display:inline}
+ html body .app-shell .cap-calendar-workspace .cap-days-table :is(th,td):nth-child(2){min-width:140px}
+ html body .app-shell .cap-calendar-workspace .cap-days-table :is(th,td):nth-child(3),
+ html body .app-shell .cap-calendar-workspace .cap-days-table :is(th,td):nth-child(6){min-width:80px}
+}
+/* PCB24 F2: override the late desktop table minimum in the mobile card layout. */
+@media(max-width:800px){
+ html body .app-shell .cap-calendar-workspace .cap-days-wrap{width:100%;max-width:100%;min-width:0;overflow:visible!important}
+ html body .app-shell .cap-calendar-workspace .cap-days-table{display:block!important;min-width:0!important;width:100%!important;max-width:100%!important;table-layout:auto!important}
+ html body .app-shell .cap-calendar-workspace .cap-days-table tbody{display:grid!important;grid-template-columns:minmax(0,1fr);gap:8px}
+ html body .app-shell .cap-calendar-workspace .cap-days-table tr{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;box-sizing:border-box}
+ html body .app-shell .cap-calendar-workspace .cap-days-table td{display:block;min-width:0!important;width:auto!important;max-width:100%;white-space:normal!important;box-sizing:border-box}
+ html body .app-shell .cap-calendar-workspace .cap-days-table td:first-child{grid-column:1/-1}
+ html body .app-shell .cap-calendar-workspace .cap-days-table .cap-time-pair{flex-wrap:wrap!important;white-space:normal!important;min-width:0}
+ html body .app-shell .cap-calendar-workspace .cap-days-table .cap-clock{max-width:100%;flex-shrink:1}
+ html body .app-shell .cap-calendar-workspace .cap-daily-editor{min-width:0;max-width:100%}
+ html body .app-shell .cap-calendar-workspace .data-card:has(.cap-days-wrap){overflow:visible}
+}
+@media(max-width:800px){
+ html body .app-shell .data-card:has(.cap-calendar-workspace){overflow:visible}
+ html body .app-shell .cap-calendar-workspace .cap-days-table thead{display:none!important}
+ html body .app-shell .cap-calendar-workspace .cap-days-table td::before{content:attr(data-label);display:block;white-space:normal;font-weight:700}
+}
+
+/* PCB25: keep weekly settings inside the narrow workspace with sidebar open. */
+@media (max-width:800px){
+  .cap-calendar-workspace .cap-daily-settings{min-width:0;max-width:100%;display:flex;flex-wrap:wrap;justify-content:flex-start}
+  .cap-calendar-workspace .cap-daily-settings label{min-width:0;max-width:100%;flex:1 1 130px;flex-wrap:wrap;white-space:normal;overflow-wrap:anywhere}
+  .cap-calendar-workspace .cap-daily-settings label input{flex:0 1 54px;min-width:0;box-sizing:border-box}
+  .cap-calendar-workspace .cap-daily-settings small{min-width:0;max-width:100%;overflow-wrap:anywhere}
+}
+
+/* Derived daily roster is presentation-only and never writes default inputs. */
+.cap-calendar-workspace .cap-roster-summary{min-width:0;flex:1 1 180px;max-width:100%;white-space:normal}
+.cap-calendar-workspace .cap-roster-summary ul{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr));gap:3px 8px;list-style:none;padding:0;margin:4px 0}
+.cap-calendar-workspace .cap-roster-summary li{display:flex;justify-content:space-between;gap:6px;min-width:0;font-size:13px}
+.cap-calendar-workspace .cap-roster-summary output{font-weight:700;font-variant-numeric:tabular-nums}
+.cap-calendar-workspace .cap-roster-summary small{display:block;white-space:normal}
+
+/* In column labels flex-basis must not turn the clock width into height. */
+html body .app-shell.app-shell .cap-calendar-workspace .cap-roster-controls{align-items:flex-end;gap:8px;min-height:0}
+html body .app-shell.app-shell .cap-calendar-workspace .cap-roster-controls>label{display:flex;flex-direction:column;gap:4px;min-width:112px;height:auto;margin:0;flex:0 0 auto}
+html body .app-shell.app-shell .cap-calendar-workspace .cap-roster-controls>label>.cap-clock{flex:0 0 auto!important;height:34px!important;min-height:34px!important;max-height:34px!important}
+html body .app-shell.app-shell .cap-calendar-workspace .cap-roster-controls>label>select{height:34px;min-height:34px}

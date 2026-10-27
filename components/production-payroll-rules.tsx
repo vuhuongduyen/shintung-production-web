@@ -1,0 +1,59 @@
+'use client';
+export default function ProductionPayrollRules({t}:{t:(text:string)=>string}){
+ const section=(title:string,headers:string[],rows:string[][])=><section className="payroll-rule-section"><h3>{t(title)}</h3><div className="table-wrap"><table data-no-pagination="true"><colgroup><col style={{width:"23%"}}/><col style={{width:"33%"}}/><col style={{width:"44%"}}/></colgroup><thead><tr>{headers.map(h=><th key={h}>{t(h)}</th>)}</tr></thead><tbody>{rows.map((row,i)=><tr key={i}>{row.map((cell,j)=><td key={j}>{t(cell)}</td>)}</tr>)}</tbody></table></div></section>;
+ return <div className="payroll-rules payroll-rules-tables">
+ <p className="payroll-rule-notice">{t('Hướng dẫn tính tiền sản lượng dành cho HR, QLSX và nhân viên. Các số trong ví dụ chỉ để minh họa, không phải tiền thực nhận.')}</p>
+ {section('A. Quỹ sản lượng của line được tính thế nào?',['Bước','Cách tính','Hiểu đơn giản'],[
+ ['1. Ghi nhận thành phẩm','Giờ công chuẩn HT = SL đã xác nhận × Giờ công chuẩn/SP tại menu Giờ công. Cộng các lệnh của từng line.','Chỉ tính thành phẩm ở công đoạn cuối, kể cả xuất một phần. Hoàn thành tháng nào tính tháng đó; công đoạn trước hoàn thành chưa được tính thành phẩm.'],
+ ['2. Chia quỹ A và B','Quỹ phân bổ trước hệ số = Quỹ chung A + B (đồng) × Giờ công chuẩn HT (line đang chọn) ÷ (Giờ công chuẩn HT (Line A) + Giờ công chuẩn HT (Line B)).','Quỹ chung đang mặc định 6.000.000 đồng/tháng. Line có tỷ trọng giờ hoàn thành cao hơn nhận phần quỹ lớn hơn.'],
+ ['3. Tính hiệu suất','Hiệu suất (%) = Giờ công chuẩn HT (line đang chọn) ÷ Giờ SX × 100%.','Đối chiếu thành phẩm làm được với thời gian thực tế đã sử dụng.'],
+ ['4. Áp dụng hệ số','Quỹ sản lượng được hưởng = Quỹ phân bổ trước hệ số × Hệ số quỹ.','Từ 100%: hệ số 1; từ 95% đến dưới 100%: 0,95; từ 90% đến dưới 95%: 0,90; từ 85% đến dưới 90%: 0,85; dưới 85%: 0. Phần chưa được hưởng không chuyển sang line khác.'],
+ ['Ví dụ','Quỹ chung 6.000.000; A và B có giờ hoàn thành bằng nhau → mỗi line được phân bổ 3.000.000.','Line A đạt hiệu suất 92% → hệ số 0,90 → quỹ được hưởng 2.700.000; còn 300.000 chưa phân bổ cho NV.']])}
+ {section('Hệ số hiệu suất: khi nào có tiền sản lượng?',['Hiệu suất của line trong tháng','Hệ số được hưởng','Ví dụ quỹ line trước hệ số là 3.000.000 đồng'],[
+ ['Từ 100% trở lên','1,00 — hưởng 100% quỹ','Nhận quỹ 3.000.000 đồng; hiệu suất trên 100% vẫn áp dụng hệ số 1,00.'],
+ ['Từ 95% đến dưới 100%','0,95 — hưởng 95% quỹ','Nhận quỹ 2.850.000 đồng; 150.000 đồng chưa được hưởng.'],
+ ['Từ 90% đến dưới 95%','0,90 — hưởng 90% quỹ','Nhận quỹ 2.700.000 đồng; 300.000 đồng chưa được hưởng.'],
+ ['Từ 85% đến dưới 90%','0,85 — hưởng 85% quỹ','Nhận quỹ 2.550.000 đồng; 450.000 đồng chưa được hưởng.'],
+ ['Dưới 85%','0 — không được hưởng quỹ sản lượng','Quỹ chi tiền sản lượng bằng 0: NV không có tiền sản lượng từ line này trong tháng. Vẫn ghi nhận đầy đủ sản lượng, giờ làm và đóng góp thực tế.'],
+ ['Cách xác định ngưỡng','Dùng hiệu suất thực tế trước khi làm tròn để chọn hệ số.','84,99% chưa đạt 85% → hệ số 0. Đúng 85% → 0,85; đúng 90% → 0,90; đúng 95% → 0,95.'],
+ ['Ví dụ cách tính hiệu suất','Giờ công chuẩn HT 840 giờ ÷ Giờ SX 1.000 giờ × 100% = 84%.','84% dưới 85% → hệ số 0. Nếu hoàn thành chuẩn 900 giờ với cùng 1.000 giờ SX → hiệu suất 90% → hệ số 0,90.'],
+ ['Phân biệt với điều kiện cá nhân','Hệ số áp dụng cho quỹ chung của từng line; điều kiện cá nhân áp dụng sau đó khi chia tiền.','Line đạt hiệu suất vẫn có thể có NV không được nhận: NV mới chưa đến tháng hưởng, nghỉ việc chưa đủ tháng hoặc NV Line C. Xem phần C.']])}
+ {section('B. Thời gian đóng góp và tiền của mỗi người',['Nội dung','Cách xác định','Ví dụ / Lưu ý'],[
+ ['Giờ hiện diện','Giờ hiện diện = Giờ lịch HC + Giờ lịch TC − Vắng HC − Vắng TC do HR ghi nhận.','Lịch đã trừ nghỉ trưa và giải lao. TC mặc định 17:30–21:00; 17:00–17:30 là giờ nghỉ.'],
+ ['Giờ SX','Giờ SX = Giờ hiện diện − Giờ phụ kho − Giờ CV khác.','Phụ kho lấy theo từng người tại Lịch SX thực tế đã được QLSX xác nhận.'],
+ ['Giờ tính SL','Dùng giờ hiện diện, bao gồm cả thời gian làm phụ kho.','Không lấy tổng giờ báo công LSX thay cho giờ hiện diện. Giờ báo công dùng để đối chiếu định mức.'],
+ ['Tỷ trọng (%)','Giờ tính SL của NV ÷ Tổng Giờ tính SL của nhóm được chia tiền × 100%.','Một người có 120 giờ, người còn lại có 80 giờ → tổng 200 giờ; tỷ trọng lần lượt 60% và 40%.'],
+ ['Tiền sản lượng','Tiền sản lượng = Phần theo đóng góp + Tiền chia thêm (NV đủ điều kiện). Phần theo đóng góp = Quỹ sản lượng được hưởng × Tỷ trọng (%) ÷ 100.','Nếu số tiền được chia là 2.700.000: người 120 giờ nhận 1.620.000; người 80 giờ nhận 1.080.000. Đây là ví dụ chỉ có 2 người đủ điều kiện.'],
+ ['Làm việc ở cả Line A và B','NV làm tại line nào thì nhận trực tiếp phần tiền tương ứng với thời gian đóng góp tại line đó. Phần theo đóng góp tại A = Quỹ sản lượng được hưởng (Line A) × Tỷ trọng (%) của NV tại A ÷ 100; tính tương tự tại B. Không chuyển tiền về line gốc để chia đều.','Ví dụ NV đủ điều kiện làm 10 ngày ở A và 16 ngày ở B: nhận tiền theo 10 ngày đóng góp tại A, cộng tiền theo 16 ngày đóng góp tại B. Mỗi phần quy đổi theo giờ hiện diện thực tế tại line đó, có xét nghỉ, đi trễ và tăng ca; không chia đều theo đầu người. NV Line C áp dụng riêng theo phần C.'],
+ ['Làm tròn tiền','Tiền mỗi người hiển thị đến 1 đồng, không có số lẻ sau dấu phẩy. Phần đồng còn dư được cộng lần lượt cho người có phần lẻ lớn hơn, để tổng tiền chia không thiếu hoặc vượt quỹ.','Ví dụ chia đều 1.000 đồng cho 3 người: kết quả là 334, 333 và 333 đồng; tổng vẫn đúng 1.000 đồng.'],
+ ['Thiếu dữ liệu thì chưa có kết quả tiền','Cần đủ giờ công chuẩn/SP của các sản phẩm đã hoàn thành và giờ hiện diện của NV ở cả hai line. Thiếu dữ liệu thì phải bổ sung trước khi tính quỹ và chia tiền.','Thiếu giờ công chuẩn: kiểm tra menu Giờ công. Thiếu giờ hiện diện: kiểm tra lịch làm việc và dữ liệu vắng mặt của HR. Chưa tính được không có nghĩa là NV được nhận 0 đồng.'],
+ ['Ô chọn nhân viên','Bỏ tích đang loại cả giờ và tiền của NV khỏi phép tính hiệu suất và chia tiền.','Không dùng bỏ tích để thay cho quy tắc NV mới, nghỉ việc hoặc Line C: vẫn phải giữ giờ đóng góp thực tế.']])}
+ {section('Thời gian phụ kho ảnh hưởng thế nào?',['Nội dung','Quy tắc','Ví dụ dễ hiểu'],[
+ ['Nguồn giờ phụ kho','Lấy khoảng Từ–Đến theo tên NV tại Lịch SX thực tế, đã được QLSX xác nhận. Có nhiều khoảng trong ngày thì cộng thời gian hợp lệ.','Đi phụ kho 08:00–09:00 và 14:00–15:00 → tổng 2 giờ.'],
+ ['Không tính trùng hoặc ngoài lịch','Chỉ tính phần nằm trong lịch làm việc thực tế; loại giờ nghỉ trưa, giải lao và ngoài ca. Hai khoảng phụ kho chồng nhau chỉ tính một lần.','09:00–11:00 có giải lao 10:00–10:10 → phụ kho hợp lệ 1 giờ 50 phút. Không lấy nguyên 2 giờ.'],
+ ['Khi tính hiệu suất line','Trừ giờ phụ kho khỏi giờ hiện diện để xác định thời gian trực tiếp SX.','Hiện diện 160 giờ, phụ kho 20 giờ, không có CV khác → giờ SX = 140 giờ.'],
+ ['Khi chia tiền cho NV','Giữ giờ phụ kho trong giờ tính sản lượng vì NV vẫn làm nhiệm vụ được phân công. Không trừ thêm lần nữa khi chia tiền.','Cũng ví dụ trên: giờ đóng góp dùng chia tiền = 160 giờ, không phải 140 giờ. NV vẫn phải đủ điều kiện được nhận tại phần C.'],
+ ['So sánh hai người','Nếu hai NV đều hiện diện 160 giờ tại cùng line và đều đủ điều kiện, một người phụ kho 20 giờ, người kia không phụ kho: giờ tính tiền của mỗi người vẫn là 160.','Nếu chỉ có hai người này và tiền được chia là 2.000.000 → tỷ trọng mỗi người 50%, nhận 1.000.000/người.'],
+ ['Chưa xác nhận / giờ không hợp lệ','Phụ kho chờ duyệt hoặc thiếu dữ liệu lịch cần được xử lý trước khi dùng kết quả tính tiền.','Không xem khoản đang tạm tính là tiền đã được chốt.']])}
+ {section('C. Ai được nhận? Phần không nhận chuyển đi đâu?',['Đối tượng','Được nhận khi nào?','Xử lý phần tiền'],[
+ ['NV A/B đủ điều kiện','Nhận tiền theo tỷ trọng thời gian đóng góp tại line.','Nhận phần tính theo tỷ trọng và phần được chia lại trong line.'],
+ ['NV nghỉ việc chưa làm đủ tháng','Không nhận toàn bộ tiền sản lượng của tháng nghỉ. Ví dụ ngưng ngày 20/10 hoặc 21/10: không nhận tiền sản lượng tháng 10, kể cả ngày 01–19/10.','Chia lại toàn bộ phần tiền tháng đó cho NV đủ điều kiện trong cùng line theo tỷ trọng; giữ nguyên lịch sử giờ làm.'],
+ ['NV mới bắt đầu ngày 01–10','Được tính và nhận từ tháng kế tiếp. Ví dụ bắt đầu 10/03 → hưởng từ 01/04.','Trong thời gian chưa được hưởng, phần tiền chia lại cho NV đủ điều kiện trong cùng line.'],
+ ['NV mới bắt đầu ngày 11–cuối tháng','Được tính và nhận từ tháng thứ hai sau tháng bắt đầu. Ví dụ bắt đầu 11/03 → hưởng từ 01/05.','Tháng 03 và 04 chưa được hưởng; phần tiền chia lại trong line. Ngày bắt đầu lấy từ Danh sách nhân viên.'],
+ ['NV Line C tham gia A/B','Vẫn ghi nhận đóng góp và tính phần tiền tương ứng, nhưng không nhận tiền sản lượng tại A/B.','Hoàn phần tiền đó về quỹ chung của công ty; không chia lại cho NV A/B.'],
+ ['Chia lại theo tỷ trọng','Tiền chia thêm = Tổng tiền cần chia lại × Giờ tính SL của NV đủ điều kiện ÷ Tổng Giờ tính SL của nhóm đủ điều kiện trong line.','Ví dụ cần chia lại 600.000; tỷ trọng hai người là 60% và 40% → nhận thêm 360.000 và 240.000.'],
+ ['Giữ dữ liệu thực tế','NV mới, NV nghỉ việc và NV Line C vẫn được giữ giờ làm, lịch sử báo công và đóng góp thực tế.','Không xóa giờ làm chỉ vì người đó không được nhận tiền sản lượng.']])}
+ {section('D. Theo dõi quỹ hàng tháng',['Khoản quỹ','Ý nghĩa','Cách xử lý'],[
+ ['Quỹ phân bổ trước hệ số','Quỹ chung tháng và phần được phân cho từng line trước hệ số.','Theo dõi riêng từng tháng, từng line.'],
+ ['Quỹ chưa phân bổ','Phần quỹ chưa được hưởng sau khi áp dụng hệ số hiệu suất.','Giữ riêng để tổng hợp, xét thưởng cuối năm; không tự cộng vào tháng sau.'],
+ ['Quỹ hoàn lại','Phần tiền đã tính cho NV Line C nhưng không chi trả.','Trả về quỹ chung công ty, giữ riêng để xét thưởng cuối năm.'],
+ ['Tiền chia lại trong line','Phần của NV mới chưa đủ điều kiện và NV nghỉ chưa đủ tháng.','Chia cho NV đủ điều kiện theo tỷ trọng. Khoản này không tính thêm là quỹ hoàn lại.'],
+ ['Đối chiếu cuối tháng','Quỹ phân bổ trước hệ số = Tiền thực trả + Quỹ chưa phân bổ + Quỹ hoàn lại.','Theo dõi lũy kế khoản giữ lại để xét thưởng cuối năm; không cộng trùng tiền đã chia lại.']])}
+ {section('E. Trách nhiệm rà soát trước khi chốt tiền sản lượng',['Bộ phận','Nội dung cần kiểm tra','Khi phát hiện sai hoặc thiếu'],[
+ ['HR — Thông tin NV và vắng mặt','Kiểm tra ngày bắt đầu, ngày ngưng làm việc, tháng bắt đầu được hưởng sản lượng; dữ liệu nghỉ, đi trễ và về sớm. Đối chiếu thông tin line gốc với QLSX.','Bổ sung hoặc sửa dữ liệu thuộc trách nhiệm HR; trao đổi với QLSX nếu thời gian vắng mặt không khớp lịch và tình hình làm việc thực tế.'],
+ ['QLSX — Báo công và sản lượng','Kiểm tra đúng lệnh, công đoạn, thời điểm báo công, số lượng thành phẩm hoàn thành và xác nhận báo công thuộc line phụ trách.','Sửa hoặc yêu cầu SX bổ sung báo công; kiểm tra lại thành phẩm và tháng ghi nhận để tránh thiếu, trùng hoặc ghi sai sản lượng.'],
+ ['QLSX — Lịch và thời gian đóng góp','Kiểm tra lịch SX thực tế, HC/TC, thời gian phụ kho đã xác nhận, CV khác, chuyển/phân bổ nhân sự và thời gian từng NV thực sự tham gia tại mỗi line.','Đối chiếu giữa line giao và line nhận. NV làm 10 ngày tại A, 16 ngày tại B phải được ghi đúng phần đóng góp từng line; không cộng trùng hoặc gom về chia đều.'],
+ ['HR và QLSX — Đối chiếu kết quả','Cùng kiểm tra giờ hiện diện, giờ SX, giờ tính sản lượng, tỷ trọng và danh sách NV được nhận, không được nhận hoặc có tiền hoàn quỹ. Mỗi bên chịu trách nhiệm dữ liệu thuộc phạm vi của mình.','QLSX xác minh thực tế SX; HR xác minh hồ sơ và vắng mặt. Thống nhất cách xử lý chênh lệch, cập nhật đúng dữ liệu nguồn rồi tính lại trước khi chốt.']])}
+ <p className="payroll-rule-notice">{t('Chỉ dùng kết quả để chốt khi HR và QLSX đã rà soát đầy đủ phần thuộc trách nhiệm của mình. Nếu thiếu dữ liệu, có chênh lệch chưa giải quyết hoặc không có NV đủ điều kiện nhận, cần xử lý trước; không tự phân tiền.')}</p>
+ </div>;
+}
