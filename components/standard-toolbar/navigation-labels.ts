@@ -4,6 +4,7 @@ export const navigationLabels: Record<string, readonly [string,string]> = {
  'Quản trị hệ thống':['System administration','系統管理'], 'Dữ liệu cơ bản':['Master data','基本資料'],
  'Quản lý kho':['Warehouse management','倉庫管理'], 'Cấu trúc thành phẩm':['Product structure','成品結構'],
  'Kế hoạch sản xuất':['Production planning','生產計畫'], 'Quản lý sản xuất':['Production management','生產管理'],
+ 'Hệ thống báo công':['Production management','生產管理'],
  'Quản lý người dùng':['User management','使用者管理'], 'Phân quyền':['Permissions','權限設定'],
  'Thiết lập bộ phận':['Department setup','部門設定'], 'Nhật ký thao tác':['Activity log','操作紀錄'], 'Nhật ký test website':['Website test log','網站測試紀錄'],
  'Phản hồi người dùng':['User feedback','使用者回饋'], 'Quản lý phiên bản':['Version management','版本管理'],
