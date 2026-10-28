@@ -1,3 +1,4 @@
+import {createReportReviewPreview,reviewPreviewHost} from './report-review-preview.mjs';
 import {commitRecordWithAudit} from '../../lib/record-mutation-audit.mjs';
 import {adminReadPaths,adminReadResponse} from '../../lib/admin-readonly.mjs';
 import {readSkuStock} from "../../lib/sku-stock.mjs";
@@ -34,22 +35,32 @@ import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
 const allowed=new Set(['users','permissions','departments','department_permissions','versions','sku','sku_history','leadtime','leadtime_versions','leadtime_audit','safety_days','safety_rules','safety_rule_groups','safety_rule_audit','labor_hours','labor_hours_history','production_engine_snapshot','inventory','warehouse_in','warehouse_out','warehouse_transfer','warehouse_docs','warehouse_count','inventory_snapshot','inventory_snapshot_audit','bom','bom_change','forecast','forecast_import_history','demand_event','production_engine','production_plan','in_transit','in_transit_audit','production_report','labor_adjustment','capacity']);
 export function localTestPlugin(testOptions = {}){
  return {name:'onspa-test-api',enforce:'pre',async configureServer(server){
-  const config=configuration(),connection=await openDatabase(testOptions.persistPath);
-  try{await migrate(connection.db);}catch(error){await connection.close();throw error;}
+  const config=configuration(),reviewPreview=createReportReviewPreview(config),previewHost=reviewPreviewHost(config);
+  const connection=reviewPreview?null:await openDatabase(testOptions.persistPath);
+  if(connection)try{await migrate(connection.db);}catch(error){await connection.close();throw error;}
   const sessions=new Map(),attempts=new Map();const authFile=testOptions.authFile || resolve(root,'.local-data/auth.json');
-  server.httpServer?.once('close',()=>connection.close());
+  server.httpServer?.once('close',()=>connection?.close());
   server.middlewares.use(async(req,res,next)=>{
    const url=new URL(req.url||'/',`http://${config.host}:${config.port}`);
    if(!url.pathname.startsWith('/api/'))return next();
    const send=(status,data)=>{res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(data));};
    const host=req.headers.host;
-   if(!['127.0.0.1:5173','localhost:5173'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress))return send(403,{error:'TEST chỉ chấp nhận loopback.'});
+   if(!['127.0.0.1:5173','localhost:5173',...(previewHost?[previewHost]:[])].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress))return send(403,{error:'TEST chỉ chấp nhận loopback.'});
    const origin=req.headers.origin;
-   if(origin&&!['http://127.0.0.1:5173','http://localhost:5173'].includes(origin))return send(403,{error:'Origin không hợp lệ.'});
+   if(origin&&!['http://127.0.0.1:5173','http://localhost:5173',...(previewHost?[`https://${previewHost}`]:[])].includes(origin))return send(403,{error:'Origin không hợp lệ.'});
    try{
-    if(url.pathname==='/api/test-environment'&&req.method==='GET')return send(200,{environment:'TEST',remote:false,database:'.local-data/d1',engine:'Miniflare D1',setupRequired:!existsSync(authFile)});
+    if(url.pathname==='/api/test-environment'&&req.method==='GET')return send(200,{environment:'TEST',remote:false,database:reviewPreview?null:'.local-data/d1',engine:reviewPreview?'Synthetic memory only':'Miniflare D1',reviewPreview:!!reviewPreview,setupRequired:!existsSync(authFile)});
     const cookie=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('onspa_test='))?.slice(11);
     const session=sessions.get(cookie);const authenticated=session&&session.expires>Date.now();
+    if(reviewPreview&&url.pathname!=='/api/test-session'){
+     let body;
+     if(req.method!=='GET'){
+      if(!origin||!req.headers['content-type']?.startsWith('application/json'))return send(403,{error:'Yêu cầu JSON cùng origin.'});
+      let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>100_000)return send(413,{error:'Payload quá lớn'});}body=JSON.parse(raw);
+     }
+     const result=reviewPreview.handle({path:url.pathname,method:req.method,body,session:authenticated?session:null});return send(result.status,result.data);
+    }
+
     if(['/api/feedback','/api/feedback-image'].includes(url.pathname)){
      let raw='';if(req.method==='POST')for await(const chunk of req){raw+=chunk;if(raw.length>15_000_000)return send(413,{error:'Payload quá lớn'});}
      const response=await feedbackApi(new Request(url,{method:req.method,headers:{origin:origin||'','content-type':req.headers['content-type']||''},...(req.method==='POST'?{body:raw}:{})}),{DB:connection.db,FILES:connection.bucket},authenticated?{...session,isAdmin:true}:null);
@@ -108,6 +119,7 @@ export function localTestPlugin(testOptions = {}){
      if(body.logout){sessions.delete(cookie);res.setHeader('Set-Cookie','onspa_test=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');return send(200,{ok:true});}
      if(typeof body.login!=='string'||typeof body.password!=='string')return send(400,{error:'Thiếu tài khoản TEST.'});
      if(!existsSync(authFile)){
+      if(reviewPreview)return send(403,{error:'Cần tài khoản TEST hiện có. Thiết lập bằng quy trình TEST thông thường trước khi mở chế độ xem thử.'});
       if(body.setup!==true||!/^[a-zA-Z0-9_-]{3,40}$/.test(body.login)||!/^\d{4}$/.test(body.password))return send(400,{error:'Lần đầu: tạo tài khoản TEST 3–40 ký tự và mật khẩu đúng 4 chữ số.'});
       const salt=randomBytes(24).toString('hex');writeFileSync(authFile,JSON.stringify({login:body.login,salt,hash:scryptSync(body.password,salt,64).toString('hex')}),{flag:'wx',mode:0o600});
      }

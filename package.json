@@ -18,8 +18,9 @@
     "db:export": "node scripts/local/cli.mjs export",
     "test:account": "node scripts/local/account.mjs",
     "test:export": "node --test tests/production-reporting-hold.test.mjs tests/cancel-reporting-day.test.mjs tests/order-transfer.test.mjs tests/test-export-isolation.test.mjs",
-    "test:review": "node --test tests/production-review-selection.test.mjs tests/production-review-api.test.mjs tests/report-review-dom.test.mjs",
-    "test:review-ui": "node scripts/local/review-fixture.mjs"
+    "test:review": "node --test tests/production-review-selection.test.mjs tests/production-review-api.test.mjs tests/report-review-dom.test.mjs tests/report-review-preview.test.mjs",
+    "test:review-ui": "node scripts/local/review-fixture.mjs",
+    "dev:review-preview": "node scripts/local/review-app-preview.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

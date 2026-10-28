@@ -1,4 +1,5 @@
 "use client";
+import {LOCAL_TEST} from "../lib/runtime";
 import {createReviewRunner,submitReviewSelection} from '../lib/production-review-selection.mjs';
 import type {ReviewSelection} from './production-report-day-review';
 import ProductionReportingDayCancel from './production-reporting-day-cancel';
@@ -46,7 +47,7 @@ import {productionSnapshot,readProductionWorkflow} from "../lib/production-workf
 import {useDataRefresh,WorkspaceActivityContext} from '../lib/data-sync';
 import {createProductionWorkspaceReader} from '../lib/production-workspace-reader.mjs';
 type Row = Record<string, any>;
-type WorkflowData={canCancelReportingDay?:boolean;reportingHold?:{active:boolean;endsAt:string;remainingMs:number;message:string}|null;progressOrders?:Row[];orders:Row[];reports:Row[];events:Row[];payrollEmployees?:Row[];employees:Row[];actualSchedules:Row[];approvedSchedules:Row[];rights:{stageLive?:boolean;crossLineView?:boolean;hr?:boolean;confirm?:boolean;manager:boolean;work?:boolean;correct?:boolean;line:string|null;examples?:boolean;historyImport?:boolean}};
+type WorkflowData={previewNotice?:string;canCancelReportingDay?:boolean;reportingHold?:{active:boolean;endsAt:string;remainingMs:number;message:string}|null;progressOrders?:Row[];orders:Row[];reports:Row[];events:Row[];payrollEmployees?:Row[];employees:Row[];actualSchedules:Row[];approvedSchedules:Row[];rights:{stageLive?:boolean;crossLineView?:boolean;hr?:boolean;confirm?:boolean;manager:boolean;work?:boolean;correct?:boolean;line:string|null;examples?:boolean;historyImport?:boolean}};
 const emptyWorkflow:WorkflowData={orders:[],reports:[],events:[],employees:[],actualSchedules:[],approvedSchedules:[],rights:{manager:false,line:null}};
 type Mode = "payroll" | "schedule" | "work" | "review" | "progress" | "journal" | "output" | "reports" | "labor" | "capacity" | "recovery" | "correction";
 const fmt = (value: any) => Number(value || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 });
@@ -170,7 +171,7 @@ export default function ProductionManagement({ mode, sessionLine, preferenceUser
   const filteredReports=reports.filter(r=>shown.some(row=>row.id===r.transitId));
   const outputApproved=filteredReports.filter(r=>r.reviewStatus==="Đã xác nhận"), totalQty=outputApproved.reduce((sum,r)=>sum+Number(r.approvedQuantity??r.reportedQuantity),0);
   const totalHc=outputApproved.reduce((sum,r)=>sum+Number(r.hours?.hc||0),0), totalOt=outputApproved.reduce((sum,r)=>sum+Number(r.hours?.ot||0),0), missingHours=outputApproved.some(r=>!r.hours);
-  return <main onClickCapture={onInteraction} onChangeCapture={onInteraction} className={`workspace production-workspace ${mode==="work"?"production-work-screen":""}`}><PageTitle variant="menu-root">{mode==="work"?"SX BÁO CÔNG":title[mode]}</PageTitle>{reportingPaused&&<div role="status" className="data-card production-attendance-note">{data.reportingHold?.message}</div>}{mode==="correction"&&data.reportingHold?.active&&data.canCancelReportingDay&&<ProductionReportingDayCancel refresh={refreshJournal}/>}<div className={mode==="work"?"work-command-row":undefined}> {!["schedule","journal","correction","progress","review","payroll","output","reports"].includes(mode)&&<StandardToolbar permissionFeedback name="ProductionManagement" items={mode==="work"?[
+  return <main onClickCapture={onInteraction} onChangeCapture={onInteraction} className={`workspace production-workspace ${mode==="work"?"production-work-screen":""}`}><PageTitle variant="menu-root">{mode==="work"?"SX BÁO CÔNG":title[mode]}</PageTitle>{LOCAL_TEST&&data.previewNotice&&<p role="status" className="production-attendance-note">{data.previewNotice}</p>}{reportingPaused&&<div role="status" className="data-card production-attendance-note">{data.reportingHold?.message}</div>}{mode==="correction"&&data.reportingHold?.active&&data.canCancelReportingDay&&<ProductionReportingDayCancel refresh={refreshJournal}/>}<div className={mode==="work"?"work-command-row":undefined}> {!["schedule","journal","correction","progress","review","payroll","output","reports"].includes(mode)&&<StandardToolbar permissionFeedback name="ProductionManagement" items={mode==="work"?[
  toolbar.action({onClick:()=>{setShowSearch(true);}},'Tra cứu',true,'lookup'),
  ...(showSearch?[
  toolbar.field('Tra theo',[toolbar.select({value:workSearchBy,onChange:e=>{setWorkSearchBy(e.target.value);setQuery('');setStatusFilter('all');}},<><option value="">Chọn hạng mục</option>{['LSX','SKU','Tên sản phẩm','Plan ID','Line','Trạng thái'].map(v=><option key={v}>{v}</option>)}</>)]),

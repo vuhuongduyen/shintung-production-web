@@ -4,6 +4,7 @@ import {sourceSyncSnapshot} from "./build/source-sync-plugin";
 import { defineConfig } from "vite";
 
 
+import {reviewPreviewHost} from './scripts/local/report-review-preview.mjs';
 import { configuration } from "./scripts/local/database.mjs";
 import { localTestPlugin } from "./scripts/local/server.mjs";
 
@@ -39,7 +40,7 @@ const localBindingConfig = {
 
 export default defineConfig(async ({command}) => {
   prepareDemandOcrAssets();
-  configuration(); // Fail closed before loading any Cloudflare runtime.
+  const config=configuration(); // Fail closed before loading any Cloudflare runtime.
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= "false";
@@ -53,7 +54,7 @@ export default defineConfig(async ({command}) => {
     server: {
       fs: { deny: ["**/.env*", "**/.git/**", "**/.local-data/**", "**/backups/**", "**/handoff/**", "**/.sites-runtime/**", "**/*.pdf"] },
       host: "127.0.0.1",
-      allowedHosts: ["localhost", "127.0.0.1", "terminal.local"],
+      allowedHosts: ["localhost", "127.0.0.1", "terminal.local",...(command==='serve'&&reviewPreviewHost(config)?[reviewPreviewHost(config)!]:[])],
       watch: {
         ignored: ["**/handoff/**", "**/backups/**", "**/.local-data/**", "**/.sites-runtime/**", "**/.wrangler/**"],
         ...(isCodexSeatbeltSandbox ? { useFsEvents: false, usePolling: true } : {}),

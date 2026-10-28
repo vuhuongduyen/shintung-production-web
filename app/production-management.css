@@ -408,10 +408,21 @@ html body .app-shell .payroll-help-dialog .payroll-rule-section :is(th,td){width
 .report-day-table table{min-width:1250px}
 .report-review-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;padding:.75rem;background:#edf3e8;border:1px solid #8caa96}
 .report-review-toolbar button{min-height:44px;white-space:normal}
-.report-day-review .production-employee-count summary{display:list-item!important;list-style:disclosure-closed!important;min-height:32px;padding:.3rem .5rem;min-width:44px;cursor:pointer}
+.report-day-review .production-employee-count summary{display:list-item!important;list-style:disclosure-closed!important;box-sizing:border-box;min-height:44px;padding:.3rem .5rem;min-width:44px;cursor:pointer}
 .report-day-review .production-employee-count[open] summary{list-style:disclosure-open!important}
 .report-day-review .production-employee-count>.production-employee-grid{position:static;width:30rem;max-width:80vw;overflow:auto}
 .report-day-review :is(button,summary,input):focus-visible{outline:2px solid #bc660b;outline-offset:2px}
 @media(max-width:600px){.report-review-toolbar{align-items:stretch}.report-review-toolbar button{width:100%}.report-day-group>summary>span{display:block;margin:.25rem 0}.report-day-review .progress-delay input{max-width:14rem}}
 
 @media(max-width:1100px){.report-day-review{max-width:min(100%,calc(100vw - 4rem))}}
+
+/* Hidden action labels must be positioned against their own in-table wrapper. */
+.report-day-review [data-feedback-button]{position:relative}
+.report-day-review .report-time-cell>div{display:block;line-height:1.5;white-space:nowrap}
+.report-day-review .report-started-time{margin-top:.3rem}
+.report-day-review td>small{display:block;margin-top:.25rem}
+.report-review-toolbar{white-space:normal}
+.report-review-toolbar>strong{min-width:0;overflow-wrap:anywhere}
+.report-review-toolbar>[data-feedback-button]{min-width:0;max-width:100%}
+.report-review-toolbar button{box-sizing:border-box;max-width:100%;overflow-wrap:anywhere}
+.report-day-review>p{white-space:normal;overflow-wrap:anywhere}
