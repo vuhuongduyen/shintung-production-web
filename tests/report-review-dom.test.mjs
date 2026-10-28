@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,readFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join,resolve} from 'node:path';import {build} from 'vite';import react from '@vitejs/plugin-react';import {JSDOM} from 'jsdom';
+test('synthetic component DOM: unchecked, no writes on select, employees, warnings, resets, permission and double submit',async()=>{
+ const out=await mkdtemp(join(tmpdir(),'onspa-review-dom-'));let dom;
+ try{await build({configFile:false,define:{'process.env.NODE_ENV':JSON.stringify('production')},plugins:[react()],logLevel:'error',build:{outDir:out,emptyOutDir:true,lib:{entry:resolve('tests/fixtures/report-review.tsx'),name:'ReviewFixture',formats:['iife'],fileName:()=> 'fixture.js'}}});
+ dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/',runScripts:'outside-only',pretendToBeVisual:true});dom.window.eval(await readFile(join(out,'fixture.js'),'utf8'));const doc=dom.window.document;
+ const settle=()=>new Promise(r=>setTimeout(r,60));await settle();const button=text=>[...doc.querySelectorAll('button')].find(b=>b.textContent.includes(text));const rows=()=>[...doc.querySelectorAll('.report-checked input')];
+ assert.equal(rows().length,4);assert.ok(rows().every(e=>!e.checked));assert.ok(button('Xác nhận đã chọn').disabled);assert.equal(doc.querySelectorAll('.production-employee-count summary').length,4);assert.match(doc.querySelector('.production-employee-table').textContent,/Nhân viên TEST 1/);assert.match(doc.querySelector('.production-employee-table').textContent,/0,5/);
+ doc.querySelector('.report-day-select input').click();await settle();assert.ok(rows().every(e=>e.checked),JSON.stringify(rows().map(e=>({disabled:e.disabled,checked:e.checked})))+' '+doc.querySelector('.report-review-toolbar').textContent);assert.match(doc.querySelector('#fixture-calls').textContent,/: 0/);assert.match(button('Xác nhận đã chọn').textContent,/\(4\)/);
+ button('Mô phỏng dữ liệu đổi').click();await settle();assert.ok(rows().every(e=>!e.checked));
+ button('Thêm ngày có cảnh báo').click();await settle();assert.equal(doc.querySelectorAll('.report-day-group').length,2);assert.equal(rows().filter(e=>e.disabled).length,1);
+ button('Đổi quyền').click();await settle();assert.ok(rows().every(e=>e.disabled));assert.ok(button('Xác nhận đã chọn').disabled);button('Đổi quyền').click();await settle();
+ [...doc.querySelectorAll('.report-day-select input')].find(e=>!e.disabled).click();await settle();const confirm=button('Xác nhận đã chọn');confirm.click();confirm.click();await settle();await settle();assert.match(doc.querySelector('#fixture-calls').textContent,/: 4/);assert.match(doc.querySelector('[role=status]').textContent,/4\/4/);assert.ok(rows().every(e=>!e.checked));
+ }finally{dom?.window.close();await rm(out,{recursive:true,force:true});}
+});

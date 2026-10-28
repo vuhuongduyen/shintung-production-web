@@ -396,3 +396,22 @@ html body .app-shell .payroll-help-dialog .payroll-rule-section .table-wrap{scro
 html body .app-shell .payroll-help-dialog .payroll-rule-section table{width:100%!important;min-width:0!important;table-layout:fixed!important;margin:0!important;}
 html body .app-shell .payroll-help-dialog .payroll-rule-section :is(th,td){width:auto!important;min-width:0!important;max-width:none!important;white-space:normal!important;overflow-wrap:anywhere;box-sizing:border-box;}
 .payroll-help-dialog .payroll-rule-section h3{width:100%;box-sizing:border-box;}
+
+/* Date groups stay inside the existing progress detail; wide detail tables scroll locally. */
+.report-day-review{min-width:0;width:100%;max-width:min(100%,calc(100vw - 22rem))}
+.report-day-group{border:1px solid #8caa96;margin:.75rem 0;background:#fffdf5;max-width:100%;min-width:0}
+.report-day-group>summary{display:list-item;cursor:pointer;padding:.7rem;color:#174f39;background:#edf3e8;white-space:normal;overflow-wrap:anywhere}
+.report-day-group>summary>span{display:inline-block;margin:.25rem .75rem}
+.report-day-select,.report-checked{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem;white-space:normal}
+.report-day-review input[type=checkbox]{width:20px;height:20px;flex-shrink:0}
+.report-day-table{max-width:100%;overflow:auto!important}
+.report-day-table table{min-width:1250px}
+.report-review-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;padding:.75rem;background:#edf3e8;border:1px solid #8caa96}
+.report-review-toolbar button{min-height:44px;white-space:normal}
+.report-day-review .production-employee-count summary{display:list-item!important;list-style:disclosure-closed!important;min-height:32px;padding:.3rem .5rem;min-width:44px;cursor:pointer}
+.report-day-review .production-employee-count[open] summary{list-style:disclosure-open!important}
+.report-day-review .production-employee-count>.production-employee-grid{position:static;width:30rem;max-width:80vw;overflow:auto}
+.report-day-review :is(button,summary,input):focus-visible{outline:2px solid #bc660b;outline-offset:2px}
+@media(max-width:600px){.report-review-toolbar{align-items:stretch}.report-review-toolbar button{width:100%}.report-day-group>summary>span{display:block;margin:.25rem 0}.report-day-review .progress-delay input{max-width:14rem}}
+
+@media(max-width:1100px){.report-day-review{max-width:min(100%,calc(100vw - 4rem))}}
