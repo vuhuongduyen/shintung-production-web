@@ -52,6 +52,7 @@ export function localTestPlugin(testOptions = {}){
     if(url.pathname==='/api/test-environment'&&req.method==='GET')return send(200,{environment:'TEST',remote:false,database:reviewPreview?null:'.local-data/d1',engine:reviewPreview?'Synthetic memory only':'Miniflare D1',reviewPreview:!!reviewPreview,setupRequired:!existsSync(authFile)});
     const cookie=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('onspa_test='))?.slice(11);
     const session=sessions.get(cookie);const authenticated=session&&session.expires>Date.now();
+    if(reviewPreview&&url.pathname==='/api/test-session'&&req.method==='GET')return send(200,{reviewPreview:true,authenticated:!!authenticated,name:authenticated?session.login:null});
     if(reviewPreview&&url.pathname!=='/api/test-session'){
      let body;
      if(req.method!=='GET'){

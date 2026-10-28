@@ -24,7 +24,19 @@ test('real TEST middleware uses existing auth but never opens a DB in preview mo
   const call=(path,body,cookie='')=>new Promise((resolve,reject)=>{const req=request(base+path,{method:body?'POST':'GET',headers:{host:'127.0.0.1:5173',origin:'http://127.0.0.1:5173','content-type':'application/json',cookie}},res=>{let text='';res.on('data',chunk=>text+=chunk);res.on('end',()=>resolve({status:res.statusCode,headers:{get:name=>Array.isArray(res.headers[name])?res.headers[name][0]:res.headers[name]},json:async()=>JSON.parse(text)}));});req.on('error',reject);req.end(body?JSON.stringify(body):undefined);});
   const info=await call('/api/test-environment').then(r=>r.json());assert.equal(info.database,null,JSON.stringify(info));assert.equal((await call('/api/production-workflow')).status,401);
   const login=await call('/api/test-session',{login:'TEST-DEMO',password:'1234'});assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0];
+  // Reload and a fresh tab both ask the server again using the same HttpOnly cookie.
+  for(let i=0;i<2;i++){const restored=await call('/api/test-session',null,cookie).then(r=>r.json());assert.deepEqual(restored,{reviewPreview:true,authenticated:true,name:'TEST-DEMO'});}
+  assert.equal((await call('/api/test-session').then(r=>r.json())).authenticated,false);
+  assert.equal((await call('/api/test-session',null,'onspa_test=synthetic-invalid').then(r=>r.json())).authenticated,false);
   const workflow=await call('/api/production-workflow',null,cookie).then(r=>r.json());assert.equal(workflow.reports.length,4);const r=workflow.reports[0];const result=await call('/api/production-report',{action:'review',approve:true,reportId:r.id,expectedVersion:r.version,expectedReview:reviewSnapshot(workflow.orders[0],r)},cookie);assert.equal(result.status,200);assert.equal((await result.json()).persistentWrites,false);
   assert.equal((await call('/api/warehouse-confirm',{},cookie)).status,403);assert.equal((await call('/api/records',{},cookie)).status,403);assert.equal(existsSync(dbPath),false);assert.equal(readFileSync(authFile,'utf8'),auth);
+  await call('/api/test-session',{logout:true},cookie);assert.deepEqual(await call('/api/test-session',null,cookie).then(r=>r.json()),{reviewPreview:true,authenticated:false,name:null});
  }finally{await new Promise(resolve=>server.close(resolve));if(previous===undefined)delete process.env.ONSPA_TEST_REVIEW_PREVIEW;else process.env.ONSPA_TEST_REVIEW_PREVIEW=previous;rmSync(tmp,{recursive:true,force:true});}
+});
+
+test('client restoration accepts only a server-validated preview session and never uses local identity storage',async()=>{
+ const {readTestPreviewSession}=await import('../lib/test-preview-session.mjs');let request;
+ const name=await readTestPreviewSession(async(path,options)=>{request={path,options};return {ok:true,json:async()=>({reviewPreview:true,authenticated:true,name:'TEST-DEMO'})};});assert.equal(name,'TEST-DEMO');assert.deepEqual(request,{path:'/api/test-session',options:{method:'GET',cache:'no-store',credentials:'same-origin'}});
+ for(const data of [{reviewPreview:true,authenticated:false,name:'TEST-DEMO'},{reviewPreview:false,authenticated:true,name:'TEST-DEMO'},{authenticated:true,name:'TEST-DEMO'},{reviewPreview:true,authenticated:true,name:''}])assert.equal(await readTestPreviewSession(async()=>({ok:true,json:async()=>data})),null);
+ assert.equal(await readTestPreviewSession(async()=>({ok:false})),null);
 });

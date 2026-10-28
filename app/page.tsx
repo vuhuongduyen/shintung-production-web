@@ -35,6 +35,7 @@ import {canPlanAction} from "../lib/production-plan-permissions.mjs";
 import { StandardToolbar, ToolbarPermissions, ExportPermissionContext, toolbar as toolbarConfig } from "../components/standard-toolbar/StandardToolbar";
 import { registerToolbarTerms, toolbarLocale, subscribeToolbarLocale, translateToolbar } from "../components/standard-toolbar/translations";
 import { LOCAL_TEST } from "../lib/runtime";
+import {readTestPreviewSession} from "../lib/test-preview-session.mjs";
 import { recordFetch, linkedRecordFetch, knownRecordRevision, acceptRecordRevision } from "../lib/record-fetch";
 import {enginePriorityTone} from '../lib/planning-display.mjs';
 import EngineReason from "../components/engine-reason";
@@ -11410,6 +11411,11 @@ type LoginSession =
     }
   | { kind: "line"; line: "A" | "B"; login?: string; name: string; detail: string };
 
+// Same identity projection already used by successful TEST login; no new grant or persistence.
+function localTestLoginSession(name:string):LoginSession {
+  return {kind:'account',login:name,name,detail:'Tài khoản TEST local',role:'SUPER_ADMIN',isAdmin:true,grants:[]};
+}
+
 function restoredLoginSession(user: {login:string; name?:string; email?:string; role?:string; isAdmin?:boolean; grants?:string[]; allocationGroup?:"C"|"AB"|null; authMode?:string; line?:"A"|"B"; isSetupAdmin?:boolean; setupAdminExpiresAt?:string|null}): LoginSession {
   if(user.authMode === "quick_line" && (user.line === "A" || user.line === "B"))return {kind:"line",login:user.login,line:user.line,name:user.name || `Line ${user.line}`,detail:`Sản xuất · Line ${user.line}`};
   return {kind:"account",login:user.login,name:user.name || user.email || user.login,detail:user.isSetupAdmin?"SUPER_ADMIN · CHẾ ĐỘ THIẾT LẬP":user.isAdmin?"Quản trị ONSPA":"Tài khoản ONSPA",role:user.role || "USER",isAdmin:user.isAdmin===true,grants:Array.isArray(user.grants)?user.grants:[],allocationGroup:user.allocationGroup === "C" || user.allocationGroup === "AB" ? user.allocationGroup : null,isSetupAdmin:user.isSetupAdmin===true,setupAdminExpiresAt:user.setupAdminExpiresAt||null};
@@ -11674,15 +11680,7 @@ function LoginGate({
         return;
       }
       if (LOCAL_TEST) {
-        onLogin({
-          kind: "account",
-          login: data.name,
-          name: data.name,
-          detail: "Tài khoản TEST local",
-          role: "SUPER_ADMIN",
-          isAdmin: true,
-          grants: [],
-        });
+        onLogin(localTestLoginSession(data.name));
         return;
       }
       const sessionResponse = await fetch("/api/site-session", {
@@ -15864,9 +15862,17 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
   const language = identity.language;
   const setLanguage = (language:Language) => onIdentity({...identity,language});
   const {authenticated,session}=identity;
-  const [siteSessionLoading, setSiteSessionLoading] = useState(!LOCAL_TEST && !identity.authenticated);
+  const [siteSessionLoading, setSiteSessionLoading] = useState(!identity.authenticated);
   useEffect(() => {
-    if (LOCAL_TEST || identity.authenticated) return;
+    if (identity.authenticated) return;
+    if(LOCAL_TEST){
+      let current=true;
+      readTestPreviewSession()
+        .then(name=>{if(current)onIdentity({...identity,authenticated:!!name,session:name?localTestLoginSession(name):null});})
+        .catch(()=>{if(current)onIdentity({...identity,authenticated:false,session:null});})
+        .finally(()=>{if(current)setSiteSessionLoading(false);});
+      return()=>{current=false;};
+    }
     fetch("/api/site-session", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
@@ -16414,6 +16420,9 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
         ),
       );
   };
+
+  if (LOCAL_TEST && siteSessionLoading && !authenticated)
+    return <main className="login-gate"><section className="login-stage"><p role="status">Đang kiểm tra phiên đăng nhập…</p></section></main>;
 
   if (!authenticated)
     return (
