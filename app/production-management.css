@@ -426,3 +426,11 @@ html body .app-shell .payroll-help-dialog .payroll-rule-section :is(th,td){width
 .report-review-toolbar>[data-feedback-button]{min-width:0;max-width:100%}
 .report-review-toolbar button{box-sizing:border-box;max-width:100%;overflow-wrap:anywhere}
 .report-day-review>p{white-space:normal;overflow-wrap:anywhere}
+
+/* Optional order overview: report checks and warnings remain outside this disclosure. */
+.progress-order-summary{min-width:0;max-width:min(100%,calc(100vw - 4rem));margin:.5rem 0}
+.progress-order-summary>summary{box-sizing:border-box;min-height:44px;cursor:pointer;display:list-item;list-style:disclosure-closed;padding:.6rem .75rem;white-space:normal;background:#edf3e8;color:#174f39;border:1px solid #8caa96}
+.progress-order-summary[open]>summary{list-style:disclosure-open}
+.progress-order-summary:not([open]) .progress-summary-hide,.progress-order-summary[open] .progress-summary-show{display:none}
+.progress-order-summary>summary:focus-visible{outline:2px solid #bc660b;outline-offset:2px}
+.progress-order-summary [data-feedback-button]{position:relative}

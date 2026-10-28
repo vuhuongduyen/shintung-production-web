@@ -1,0 +1,12 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,readFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join,resolve} from 'node:path';import {build} from 'vite';import react from '@vitejs/plugin-react';import {JSDOM} from 'jsdom';
+test('actual progress screen keeps both overview panels collapsed by default, reports visible, and resets disclosure across orders/tabs',async()=>{
+ const out=await mkdtemp(join(tmpdir(),'onspa-summary-dom-'));let dom;
+ try{await build({configFile:false,define:{'process.env.NODE_ENV':JSON.stringify('production')},plugins:[react()],logLevel:'error',build:{outDir:out,emptyOutDir:true,lib:{entry:resolve('tests/fixtures/progress-summary.tsx'),name:'ProgressSummaryTest',formats:['iife'],fileName:()=> 'fixture.js'}}});
+ dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/',runScripts:'outside-only',pretendToBeVisual:true});dom.window.eval(await readFile(join(out,'fixture.js'),'utf8'));const doc=dom.window.document,settle=()=>new Promise(r=>setTimeout(r,100));await settle();
+ const orderButtons=()=>[...doc.querySelectorAll('button.production-order-link')],overview=()=>doc.querySelector('.progress-order-summary');
+ orderButtons()[0].click();await settle();assert.equal(overview().open,false);assert.equal(overview().querySelectorAll('.progress-detail-grid>section,.progress-detail-grid>aside').length,2);assert.equal(overview().querySelector('.report-day-review'),null);assert.equal(doc.querySelectorAll('.report-checked input').length,4);assert.equal(doc.querySelector('.report-day-group').open,true);
+ overview().querySelector('summary').click();await settle();assert.equal(overview().open,true);assert.match(overview().textContent,/Xem toàn bộ báo công/);overview().querySelector('summary').click();await settle();assert.equal(overview().open,false);
+ overview().querySelector('summary').click();await settle();orderButtons()[1].click();await settle();assert.equal(overview().open,false);assert.match(doc.querySelector('.work-selected').textContent,/TEST-SECOND/);
+ overview().querySelector('summary').click();await settle();[...doc.querySelectorAll('[role=tab]')].find(b=>b.textContent.startsWith('Báo công')).click();await settle();assert.equal(overview(),null);assert.equal(doc.querySelectorAll('.report-checked input').length,4);[...doc.querySelectorAll('[role=tab]')].find(b=>b.textContent==='Chi tiết LSX').click();await settle();assert.equal(overview().open,false);
+ }finally{dom?.window.close();await rm(out,{recursive:true,force:true});}
+});
