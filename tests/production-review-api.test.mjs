@@ -9,6 +9,14 @@ test('isolated API: stale review rejects before confirmation; per-report audit a
  const read=async()=>{const response=await call('/api/production-workflow');assert.equal(response.status,200);return response.json();};
  const initial=await read();assert.equal(initial.reports.length,4,JSON.stringify(initial.progressOrders));const currentOrder=initial.progressOrders.find(o=>o.id===order.id),report=initial.reports.find(r=>r.id===reports[0].id),body={action:'review',reportId:report.id,approve:true,expectedVersion:0,expectedReview:reviewSnapshot(currentOrder,report)};
  assert.equal((await call('/api/production-report',body,false)).status,401);
+ // A warning can change without incrementing the report version or altering hours.
+ for(const warning of [{estimatedStaffing:true},{unallocatedHours:0.5}]){
+  await put('production_report',report.id,{...reports[0],manualHours:true,...warning});
+  const rejected=await call('/api/production-report',body);assert.equal(rejected.status,409,JSON.stringify(await rejected.json()));
+  const unchanged=JSON.parse((await c.db.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(report.id).first()).payload);
+  assert.equal(unchanged.version,0);assert.equal(unchanged.reviewStatus,'Chờ kiểm tra');assert.equal(unchanged.reviewedAt,undefined);
+ }
+ assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity IN ('warehouse_in','production_event')").first()).n,0);
  await put('production_report',report.id,{...reports[0],manualHours:true,hours:{...reports[0].hours,total:2}});
  const stale=await call('/api/production-report',body);assert.equal(stale.status,409,JSON.stringify(await stale.json()));assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='warehouse_in'").first()).n,0);
  const refreshed=await read();for(const id of [reports[0].id,reports[3].id]){const r=refreshed.reports.find(r=>r.id===id);const response=await call('/api/production-report',{...body,reportId:id,expectedReview:reviewSnapshot(refreshed.progressOrders.find(o=>o.id===order.id),r)});assert.equal(response.status,200,JSON.stringify(await response.json()));}
