@@ -400,19 +400,19 @@ html body .app-shell .payroll-help-dialog .payroll-rule-section :is(th,td){width
 /* Date groups stay inside the existing progress detail; wide detail tables scroll locally. */
 .report-day-review{min-width:0;width:100%;max-width:min(100%,calc(100vw - 22rem))}
 .report-day-group{border:1px solid #8caa96;margin:.75rem 0;background:#fffdf5;max-width:100%;min-width:0}
-.report-day-group>summary{display:list-item;cursor:pointer;padding:.7rem;color:#174f39;background:#edf3e8;white-space:normal;overflow-wrap:anywhere}
-.report-day-group>summary>span{display:inline-block;margin:.25rem .75rem}
 .report-day-select,.report-checked{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem;white-space:normal}
 .report-day-review input[type=checkbox]{width:20px;height:20px;flex-shrink:0}
 .report-day-table{max-width:100%;overflow:auto!important}
 .report-day-table table{min-width:1250px}
 .report-review-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;padding:.75rem;background:#edf3e8;border:1px solid #8caa96}
 .report-review-toolbar button{min-height:44px;white-space:normal}
-.report-day-review .production-employee-count summary{display:list-item!important;list-style:disclosure-closed!important;box-sizing:border-box;min-height:44px;padding:.3rem .5rem;min-width:44px;cursor:pointer}
-.report-day-review .production-employee-count[open] summary{list-style:disclosure-open!important}
+.report-day-review .production-employee-count summary{display:inline-flex!important;align-items:center;gap:6px;list-style:none!important;box-sizing:border-box;min-height:44px;padding:.3rem .5rem;min-width:44px;cursor:pointer}
+.report-day-review .production-employee-count summary::marker{content:""}
+.report-day-review .production-employee-count summary::-webkit-details-marker{display:none}
+.production-employee-arrow{display:inline-block;flex:none;width:1em;text-align:center}
 .report-day-review .production-employee-count>.production-employee-grid{position:static;width:30rem;max-width:80vw;overflow:auto}
 .report-day-review :is(button,summary,input):focus-visible{outline:2px solid #bc660b;outline-offset:2px}
-@media(max-width:600px){.report-review-toolbar{align-items:stretch}.report-review-toolbar button{width:100%}.report-day-group>summary>span{display:block;margin:.25rem 0}.report-day-review .progress-delay input{max-width:14rem}}
+@media(max-width:600px){.report-review-toolbar{align-items:stretch}.report-review-toolbar button{width:100%}.report-day-review .progress-delay input{max-width:14rem}}
 
 @media(max-width:1100px){.report-day-review{max-width:min(100%,calc(100vw - 4rem))}}
 
@@ -429,8 +429,11 @@ html body .app-shell .payroll-help-dialog .payroll-rule-section :is(th,td){width
 
 /* Optional order overview: report checks and warnings remain outside this disclosure. */
 .progress-order-summary{min-width:0;max-width:min(100%,calc(100vw - 4rem));margin:.5rem 0}
-.progress-order-summary>summary{box-sizing:border-box;min-height:44px;cursor:pointer;display:list-item;list-style:disclosure-closed;padding:.6rem .75rem;white-space:normal;background:#edf3e8;color:#174f39;border:1px solid #8caa96}
-.progress-order-summary[open]>summary{list-style:disclosure-open}
-.progress-order-summary:not([open]) .progress-summary-hide,.progress-order-summary[open] .progress-summary-show{display:none}
-.progress-order-summary>summary:focus-visible{outline:2px solid #bc660b;outline-offset:2px}
 .progress-order-summary [data-feedback-button]{position:relative}
+
+.progress-detail-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;max-width:min(100%,calc(100vw - 4rem));overflow-x:auto}
+.progress-detail-toolbar .progress-tabs{flex:none;margin:0}
+.progress-overview-toggle{flex:none;min-height:36px;padding:7px 10px;border:1px solid #8caa96;border-radius:3px;background:#edf3e8;color:#174f39;font:inherit;white-space:nowrap;cursor:pointer}
+.progress-overview-toggle:focus-visible{outline:2px solid #bc660b;outline-offset:-2px}
+.report-day-controls{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.report-day-toggle{flex:none;min-height:36px;padding:4px 8px;border:0;background:transparent;color:#174f39;font:inherit;white-space:nowrap;cursor:pointer}
