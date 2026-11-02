@@ -2,6 +2,8 @@
 
 Folder này là nguồn mã chính thức trong giai đoạn phát triển. Không push, kết nối GitHub/Vercel, tạo Site hoặc xuất bản nếu chưa được yêu cầu. Giữ nguyên `.openai/hosting.json`.
 
+**Quy trình làm việc cố định:** đọc [PR → link test full ONSPA → nghiệm thu → merge](docs/ONSPA-DEVELOPMENT-WORKFLOW.md) cùng `AGENTS.md` trước mỗi thay đổi. Tài liệu này quy định các điểm kiểm chứng và bàn giao; không thay thế quyền thực hiện từng bước của người dùng.
+
 ## Môi trường
 
 - Windows 10/11, macOS hoặc Linux; Node.js **22.13 trở lên** kèm npm (đã kiểm tra Node 24).
