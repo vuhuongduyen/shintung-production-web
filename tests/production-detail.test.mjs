@@ -1,6 +1,7 @@
 import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
+import {JSDOM} from 'jsdom';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {createServer} from 'vite';
 import {fileURLToPath} from 'node:url';
@@ -95,13 +96,13 @@ test('timestamps are date first in Vietnam and employee count keeps names inside
  assert.equal(productionDisplayTime('2026-10-03'),'03/10/2026');
  const {default:Count}=await vite.ssrLoadModule('/components/production-employee-count.tsx');
  const html=renderToStaticMarkup(React.createElement(Count,{row:{count:4,employees:['NV1'],hours:{perEmployee:[{id:'NV1',hc:1.5,ot:0.5,total:2}]}},employees}));
- assert.match(html,/<details class="production-employee-count" name="onspa-employee-lists"><summary[^>]*>4<\/summary>/);
+ const disclosure=JSDOM.fragment(html).querySelector('details.production-employee-count');assert.ok(disclosure);assert.equal(disclosure.getAttribute('name'),'onspa-employee-lists');assert.equal(disclosure.open,false);assert.equal(disclosure.querySelector('summary').textContent,'4');assert.equal(disclosure.querySelector('summary').getAttribute('aria-label'),'Nhân viên · 4');
  assert.match(html,/Nhân viên Giả Một/);assert.match(html,/<th scope="col">Giờ HC<\/th><th scope="col">Giờ TC<\/th><th scope="col">Tổng giờ công<\/th>/);assert.match(html,/<td class="number">1,5<\/td><td class="number">0,5<\/td><td class="number">2<\/td>/);assert.doesNotMatch(html,/<details[^>]* open/);
  const {default:Journal}=await vite.ssrLoadModule('/components/production-journal.tsx');
  const journal=renderToStaticMarkup(React.createElement(Journal,{orders,reports:[report],events:[event],employees,open:()=>{},refresh:()=>{},busy:false}));
  assert.match(journal,/<thead><tr><th>Thời gian ghi nhận<\/th><th>Plan ID<\/th><th>LSX<\/th>/);
  assert.match(journal,/<th>Số người<\/th>/);assert.match(journal,/name="onspa-employee-lists"/);
- assert.match(journal,/<td>05\/10\/2026<\/td><td>05\/10\/2026<\/td>/);
+ const journalTable=JSDOM.fragment(journal).querySelector('.production-report-journal'),headers=[...journalTable.tHead.rows[0].cells].map(c=>c.textContent),cells=journalTable.tBodies[0].rows[0].cells;assert.equal(cells[headers.indexOf('Ngày bắt đầu')].textContent,'05/10/2026 08:00:00');assert.equal(cells[headers.indexOf('Ngày hoàn thành')].textContent,'05/10/2026 10:00:00');
  assert.match(journal,/<th>Quy cách<\/th>/);assert.match(journal,/<td>80cm<\/td>/);assert.match(journal,/<td>PLAN-40<\/td>/);
  for(const label of ['Ngày bắt đầu','Ngày hoàn thành','Số lượng hoàn thành','Người ghi nhận (ID)','Số người','Giờ HC / TC','Trạng thái','Chi tiết'])assert.ok(journal.includes(`<th>${label}</th>`),label);
 });
@@ -146,11 +147,10 @@ test('QLSX progress workspace presents review quantities, separate sync destinat
 
 test('progress opens with every planning-synced order, including orders without any production reports or events',async()=>{
  const {default:Progress}=await vite.ssrLoadModule('/components/production-progress-review.tsx');
- const waiting={...orders[0],id:'waiting-order',planId:'PLAN-41',lsxCode:'LSX-CHUA-SX',name:'Dây cấp nước',spec:'120cm',planStart:'2026-10-08',planEnd:'2026-10-09',actualStartedAt:undefined,actualCompletedAt:undefined,completedQty:0,inTransitQty:1000};
+ const waiting={...orders[0],id:'waiting-order',syncStatus:'ĐÃ ĐỒNG BỘ',planId:'PLAN-41',lsxCode:'LSX-CHUA-SX',name:'Dây cấp nước',spec:'120cm',planStart:'2026-10-08',planEnd:'2026-10-09',actualStartedAt:undefined,actualCompletedAt:undefined,completedQty:0,inTransitQty:1000};
  const html=renderToStaticMarkup(React.createElement(Progress,{orders:[orders[0],waiting],reports:[{...report,reviewStatus:'Chờ kiểm tra'}],events:[event],employees,manager:true,busy:false,refresh:()=>{},open:()=>{},active:o=>o.id===waiting.id?{count:0,employees:[],running:false,known:false}:{count:1,employees:['NV1'],running:true,known:true},onReview:async()=>true,late:[],onApproveHours:()=>{}}));
  for(const label of ['LSX-01','LSX-CHUA-SX','PLAN-41','Dây cấp nước','120cm','08/10/2026','09/10/2026','Chưa SX'])assert.ok(html.includes(label),label);
- const waitingRow=html.slice(html.indexOf('aria-label="Mở LSX-CHUA-SX"'),html.indexOf('</tr>',html.indexOf('aria-label="Mở LSX-CHUA-SX"')));
- assert.ok(waitingRow.includes('class="number">1.000</td>'));assert.ok(waitingRow.includes('class="number">0</td>'));
+ const waitingRow=[...JSDOM.fragment(html).querySelectorAll('tbody tr')].find(row=>[...row.cells].some(cell=>cell.textContent.includes('LSX-CHUA-SX')));assert.ok(waitingRow);const quantities=[...waitingRow.querySelectorAll('td.number')].map(cell=>cell.textContent);assert.ok(quantities.includes('1.000'));assert.ok(quantities.includes('0'));
  const noReports=renderToStaticMarkup(React.createElement(Progress,{orders:[waiting],reports:[],events:[],employees,manager:true,busy:false,refresh:()=>{},open:()=>{},active:()=>({count:0,known:false,running:false}),onReview:async()=>true,late:[],onApproveHours:()=>{}}));
  assert.ok(noReports.includes('LSX-CHUA-SX'));assert.ok(!noReports.includes('Không có dữ liệu phù hợp'));
 });
