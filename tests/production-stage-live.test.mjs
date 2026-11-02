@@ -23,6 +23,9 @@ const final=await send('complete','12:00',[{stage:'FINAL',quantity:100}]);assert
 assert.equal((await db.prepare("SELECT count(*) n FROM app_records WHERE entity='warehouse_in'").first()).n,0);
 await assert.rejects(()=>send('start','13:00',[{stage:'FINAL',people:['N1']}]),/Công đoạn|đã báo đủ/);
 await assert.rejects(()=>send('pause','12:30',[{stage:'CUT'}],{orderId:'O2',expectedStages:{'["O2","CUT"]':'old'}}),/vừa thay đổi/);
+// Supply the actual preceding-stage exit for O2 before its Saturday Final.
+// Keep the overtime scenario valid under the agreed Final prerequisite rule.
+const cutO2=await send('complete','16:00',[{stage:'CUT',quantity:100}],{orderId:'O2'});assert.equal(cutO2.reports[0].stageQuantity,100);assert.equal(cutO2.reports[0].reportedQuantity,0);
 // Saturday outside calendar: explicit extra work counts only selected person, stops at 17h.
 await send('extra','08:00',[{stage:'FINAL',people:['N1']}],{orderId:'O2',effectiveAt:'2026-09-26T08:00:00+07:00'});
 const extra=await send('complete','18:00',[{stage:'FINAL',quantity:100}],{orderId:'O2',effectiveAt:'2026-09-26T18:00:00+07:00'});assert.ok(Math.abs(extra.reports[0].hours.total-7.6667)<0.001);

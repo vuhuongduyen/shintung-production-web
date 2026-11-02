@@ -24,3 +24,11 @@ Bốn test thông báo và một test tích hợp FINAL từng lỗi ở baselin
 ## Còn lại
 
 Các nhóm audit denied/quyền, ba sai khác Capacity, selector/tìm kiếm/điều phối và các lỗi khác trong bàn giao chưa mặc nhiên được giải quyết. Không thay quyền, bỏ audit hoặc đổi công thức để làm xanh. Full CI sau commit này dùng để đo ảnh hưởng và residual của các bản sửa cụ thể; không rerun y nguyên. PR vẫn draft, cần full-app preview đúng SHA và nghiệm thu trước khi xem xét merge riêng.
+
+## CI đầu và fixture theo giới hạn FINAL
+
+[Run 41426110730](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41426110730), head `35fced946f10b27d7edcd028be28ae4728f4fa14`: TypeScript và ba build đạt; 246 file chạy, 1.386 pass / 98 fail, 0 cancelled/skipped/timeout và không thiếu thống kê cuối. Đối chiếu tên test: hết đúng 5 ca lỗi mục tiêu, phát sinh một ca trong `production-stage-live.test.mjs`.
+
+Nguyên nhân ca mới đã xác minh: fixture O2 nhập CUT nhưng chưa xuất CUT rồi kỳ vọng FINAL 100 thành công để kiểm giờ làm thứ Bảy. Guard trả đúng “CUT đã xuất 0”. Bổ sung bước xuất CUT 100 qua API workflow thật vào chiều thứ Sáu, kiểm `stageQuantity=100` và `reportedQuantity=0`, rồi giữ nguyên toàn bộ assertion giờ công, retry, quyền, kho và Final của ca cũ. Không sửa source/guard hoặc bỏ assertion. Đây là sửa dữ liệu giả để ca overtime có đủ tiền đề đã được yêu cầu, không phải ngoại lệ mới cho FINAL.
+
+Kiểm lại riêng `production-stage-live` và `production-final-limit`: **11 pass / 0 fail / 0 cancelled / 0 skipped**, 27,9 giây. Không đổi mã ứng dụng kể từ typecheck/build đã đạt. Push fixture nhằm xác nhận residual sau sửa có nguyên nhân rõ; không rerun y nguyên.
