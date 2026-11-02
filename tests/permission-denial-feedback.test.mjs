@@ -1,3 +1,5 @@
+import {productionMenuRights,hasMenuPermission,productionMenus} from '../lib/menu-action-access.mjs';
+import {createReviewRunner,submitReviewSelection} from '../lib/production-review-selection.mjs';
 import {actionFeedbackComponentFixture, actionFeedbackHelpers} from './helpers/action-feedback-fixture.mjs';
 import {canPlanAction} from '../lib/production-plan-permissions.mjs';
 import test from 'node:test';
@@ -104,7 +106,7 @@ test('actual production guard preserves Lưu-only, line, and manager access whil
   [{kind:'account',grants:['Quản lý sản xuất / Lịch SX thực tế / Ghi vắng mặt']},false,false],
   [{kind:'line'},false,true],
   [{kind:'account',grants:[]},true,true],
- ])assert.equal(executable(expression,{data:{rights:{manager}},canUseProduction:workspacePermission(session)}),expected);
+ ])assert.equal(executable(expression,{mode:'work',data:{rights:{...productionMenuRights(session),manager,hr:hasMenuPermission(session,productionMenus.schedule,['Ghi vắng mặt'])}},canUseProduction:workspacePermission(session)}),expected);
  let network=0;const ask=executable(declared(read('components/production-management.tsx'),'ask'),{canMutateProduction:false,data:{rights:{hr:true}},denyProduction:()=>{throw Error('HR incorrectly denied');},setBusy:()=>{},setMessage:()=>{},fetch:async()=>{network++;throw Error('synthetic endpoint');}});
  for(const action of ['line-absence','attendance-override','attendance-correction','attendance-cancel','attendance-edit'])await ask({action});
  assert.equal(network,5);
@@ -157,4 +159,18 @@ test('actual ProPlan toolbar uses exact close/reopen grants and preserves the le
  }
  assert.equal(workspacePermission({kind:'line',login:'TEST',grants:['Kế hoạch sản xuất / Production_plan / Hủy xác nhận']})('ProductionPlan','Mở chốt'),false);
  assert.equal(workspacePermission({kind:'account',login:'TEST',grants:['Kế hoạch sản xuất / In_transit / Hủy xác nhận']})('ProductionPlan','Mở chốt'),false);
+});
+
+// Current batch handler coverage supplements (does not remove) the historical
+// per-report/no-state-change assertions above. Use the real runner and request
+// adapter so a denied call cannot pass through a stubbed authorization result.
+test('actual batch review requires both API confirmation rights and menu confirmation permission before any request',async()=>{
+ const expression=declared(read('components/production-management.tsx'),'reviewSelected');
+ for(const [api,menu] of [[false,false],[false,true],[true,false]]){
+  const busy=[];let requests=0,refreshes=0;
+  const review=executable(expression,{setBusy:value=>busy.push(value),data:{rights:{confirm:api}},confirmReportAllowed:menu,runSelectedReview:createReviewRunner(),submitReviewSelection,fetch:()=>{requests++;throw Error('denied network call');},load:()=>{refreshes++;throw Error('denied refresh');}});
+  const result=await review([{report:{id:'SYNTHETIC-REPORT'}}]);
+  assert.equal(result.error,'Không có quyền xác nhận');assert.deepEqual(result.results,[]);
+  assert.equal(requests,0);assert.equal(refreshes,0);assert.deepEqual(busy,[true,false]);
+ }
 });

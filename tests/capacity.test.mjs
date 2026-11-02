@@ -1,3 +1,6 @@
+// Positive confirmation fixtures explicitly acknowledge absent cleaning for the
+// selected Lines. Missing/wrong-Line acknowledgement remains tested separately
+// in capacity-cleaning-reminder.test.mjs; mutation helpers never add consent.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdirSync,mkdtempSync} from 'node:fs';
@@ -78,7 +81,7 @@ async function unlock(db,line,reason='Adjust capacity'){const s=await readCapaci
 test('adjustment cutoff is Saturday before plan week in Vietnam; backend blocks every unlock path',()=>isolated(async db=>{
  assert.equal(capacityAdjustmentOpen(week,Date.parse('2026-09-19T23:59:59+07:00')),true);
  assert.equal(capacityAdjustmentOpen(week,Date.parse('2026-09-20T00:00:00+07:00')),false);
- await mutate(db,'create',0);await mutate(db,'confirm',1,{lines:['A']});await review(db,'A');
+ await mutate(db,'create',0);await mutate(db,'confirm',1,{noCleaningAcknowledgedLines:['A'],lines:['A']});await review(db,'A');
  let state=await readCapacity(db,week,admin);
  const at=(action,extra,time)=>mutateCapacityAtTime(db,{action,week,revision:state.revision,lines:['A'],...(action==='requestChange'?{intendedChange:'Change work schedule'}:{}),...extra},admin,()=>Date.parse(time));
  await assert.rejects(()=>at('requestChange',{reason:'Late'},'2026-09-19T17:00:00Z'),e=>e.status===409);
@@ -97,7 +100,7 @@ test('durable A/B confirmation, KHSX approval, one-time adjustment and CAS',()=>
  await mutate(db,'create',0);
  const p=input(),b={...input(),workers:10,otWorkers:10};
  let s=await mutate(db,'save',1,{inputs:{A:p,B:b}});assert.equal(summary([],s.rows,week)[0].available,null);
- s=await mutate(db,'confirm',2);assert.equal(s.rows[0].version,1);assert.equal(s.rows[0].editCount,0);
+ s=await mutate(db,'confirm',2,{noCleaningAcknowledgedLines:['A','B']});assert.equal(s.rows[0].version,1);assert.equal(s.rows[0].editCount,0);
  assert.equal(s.rows[0].reviewStatus,'await-sync');assert.equal((await listCapacityRequests(db,admin)).length,0);
  s=await mutate(db,'sync',s.revision);assert.equal((await listCapacityRequests(db,admin)).length,2);
  await assert.rejects(()=>mutate(db,'sync',s.revision,{lines:['A']}),e=>e.status===409);
@@ -109,7 +112,7 @@ test('durable A/B confirmation, KHSX approval, one-time adjustment and CAS',()=>
  p.workers=16;p.otWorkers=16;
  await mutate(db,'save',s.revision,{lines:['A'],inputs:{A:p}});s=await readCapacity(db,week,admin);
  await mutate(db,'save',s.revision,{lines:['A'],inputs:{A:p}});s=await readCapacity(db,week,admin);
- const old=s.revision;s=await mutate(db,'confirm',s.revision,{lines:['A']});assert.equal(s.rows[0].editCount,1);assert.equal(s.rows[1].editCount,0);assert.equal(s.rows[0].version,2);
+ const old=s.revision;s=await mutate(db,'confirm',s.revision,{noCleaningAcknowledgedLines:['A'],lines:['A']});assert.equal(s.rows[0].editCount,1);assert.equal(s.rows[1].editCount,0);assert.equal(s.rows[0].version,2);
  assert.equal(s.rows[0].reviewStatus,'await-sync');assert.ok(s.rows[0].history.at(-1).changes.some(c=>c.field==='workers'&&c.old===15&&c.new===16));
  await assert.rejects(()=>mutate(db,'save',old,{lines:['B'],inputs:{B:b}}),e=>e.status===409);
  const both=await Promise.allSettled([mutate(db,'save',s.revision,{lines:['B'],inputs:{B:b}}),mutate(db,'save',s.revision,{lines:['B'],inputs:{B:b}})]);
@@ -117,7 +120,7 @@ test('durable A/B confirmation, KHSX approval, one-time adjustment and CAS',()=>
  const nextWeek=await readCapacity(db,'2026-09-28',admin);assert.equal(nextWeek.revision,0);
 }));
 test('older adjustment approvals can be edited directly without a revoke',()=>isolated(async db=>{
- await mutate(db,'create',0);await mutate(db,'confirm',1,{lines:['A']});await review(db,'A');
+ await mutate(db,'create',0);await mutate(db,'confirm',1,{noCleaningAcknowledgedLines:['A'],lines:['A']});await review(db,'A');
  let state=await readCapacity(db,week,admin);await mutate(db,'requestChange',state.revision,{lines:['A'],reason:'Change shift'});await review(db,'A');
  state=await readCapacity(db,week,admin);const legacy=structuredClone(state);delete legacy.permissions;delete legacy.employees;delete legacy.legacy;
  const row=legacy.rows.find(r=>r.line==='A');row.status='Đã xác nhận';row.reviewStatus='adjust-approved';row.editPermission={version:row.version,approvedAt:row.unlockedAt,approvedBy:row.unlockedBy,used:false};
@@ -133,7 +136,7 @@ test('permission separation, employee without login, removal of overtime with le
  p.otDays[0].enabled=false;await assert.rejects(()=>mutate(db,'save',2,{lines:['A'],inputs:{A:p}}),/xử lý/);
  const confirmer={login:'approve',grants:['Quản lý sản xuất / Capacity tuần / Xem','Quản lý sản xuất / Capacity tuần / Xác nhận']};
  await assert.rejects(()=>mutateCapacity(db,{action:'confirm',week,revision:2,lines:['A'],inputs:{A:p}},confirmer),e=>e.status===403);
- const s=await mutateCapacity(db,{action:'confirm',week,revision:2,lines:['A']},confirmer);assert.equal(s.rows[0].confirmedBy,'approve');
+ const s=await mutateCapacity(db,{action:'confirm',week,revision:2,lines:['A'],noCleaningAcknowledgedLines:['A']},confirmer);assert.equal(s.rows[0].confirmedBy,'approve');
  assert.equal((await db.prepare("SELECT count(*) n FROM app_records WHERE entity='users'").first()).n,0);
 }));
 test('Plan waits for KHSX, preserves frozen basis, blocks new close while adjusting',()=>isolated(async db=>{
@@ -143,7 +146,7 @@ test('Plan waits for KHSX, preserves frozen basis, blocks new close while adjust
  await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_plan',week,JSON.stringify({week,revision:1,rows:[row,nextRow]}),'TEST','test').run();
  const close=(revision)=>mutatePlan(db,{action:'close',week,revision,ids:[row.id]},admin);
  await assert.rejects(()=>close(1),e=>e.message==='capacityUnconfirmed');
- await mutate(db,'confirm',2,{lines:['A']});await assert.rejects(()=>close(1),e=>e.message==='capacityUnconfirmed');
+ await mutate(db,'confirm',2,{noCleaningAcknowledgedLines:['A'],lines:['A']});await assert.rejects(()=>close(1),e=>e.message==='capacityUnconfirmed');
  await review(db,'A');await close(1);
  let plan=await getPlan(db,week);const basis=structuredClone(plan.rows[0].capacityBasis);assert.equal(basis.version,1);
  assert.equal(summary(plan.rows,plan.capacity,week)[0].available,basis.availableHours);
@@ -151,7 +154,7 @@ test('Plan waits for KHSX, preserves frozen basis, blocks new close while adjust
  plan=await getPlan(db,week);assert.deepEqual(plan.rows[0].capacityBasis,basis);assert.equal(summary(plan.rows,plan.capacity,week)[0].available,null);assert.equal(plan.capacity[0].status,'Chờ điều chỉnh');
  await assert.rejects(()=>mutatePlan(db,{action:'close',week,revision:plan.revision,ids:[nextRow.id]},admin),e=>e.message==='capacityUnconfirmed');
  await review(db,'A');assert.equal((await readCapacity(db,week,admin)).rows[0].status,'Nháp');
- const p=input();p.workers=20;p.otWorkers=20;await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{lines:['A'],inputs:{A:p}});
+ const p=input();p.workers=20;p.otWorkers=20;await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:p}});
  plan=await getPlan(db,week);assert.deepEqual(plan.rows[0].capacityBasis,basis);assert.equal(summary(plan.rows,plan.capacity,week)[0].available,null);assert.equal(plan.capacity[0].status,'Chờ điều chỉnh');
  await review(db,'A');plan=await getPlan(db,week);assert.notEqual(summary(plan.rows,plan.capacity,week)[0].available,basis.availableHours);assert.equal(plan.capacity[0].status,'Đã xác nhận');
  const newHours=plan.capacity[0].availableHours;await mutatePlan(db,{action:'close',week,revision:plan.revision,ids:[nextRow.id]},admin);
@@ -169,10 +172,10 @@ test('aggregate leave deducts Line totals once, preserves detail and rejects neg
 });
 test('aggregate leave saves without employees and retains total changes in confirmation history',()=>isolated(async db=>{
  await mutate(db,'create',0);const p={...input(),leaveMode:'aggregate',hcLeaveTotal:10,otLeaveTotal:8.5};
- await mutate(db,'confirm',1,{lines:['A'],inputs:{A:p}});
+ await mutate(db,'confirm',1,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:p}});
  let s=await readCapacity(db,week,admin);near(s.rows[0].result.otHours,44);assert.equal(s.employees.length,0);
  await review(db,'A');await unlock(db,'A','Adjust total leave');p.otLeaveTotal=7;
- s=await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{lines:['A'],inputs:{A:p}});near(s.rows[0].result.otHours,45.5);assert.equal(s.rows[0].editCount,1);
+ s=await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:p}});near(s.rows[0].result.otHours,45.5);assert.equal(s.rows[0].editCount,1);
  assert.ok(s.rows[0].history.at(-1).changes.some(c=>c.field==='otLeaveTotal'&&c.old===8.5&&c.new===7));
  const plan=await getPlan(db,week);near(plan.capacity[0].availableHours,s.rows[0].availableHours);
 }));
@@ -204,10 +207,10 @@ test('counted leave rows persist, revise with history and update Plan; old total
  const p={...input(),leaveMode:'aggregate',hcLeaveTotal:10,otLeaveTotal:8.5};
  await mutate(db,'save',1,{lines:['A'],inputs:{A:p}});
  const detailed={...p,leaveMode:'counted',hcLeaveMode:'rows',otLeaveMode:'aggregate',hcLeaveRows:[{people:1,from:'2026-09-26',to:'2026-09-26',mode:'full'}],otLeaveRows:[]};
- let s=await mutate(db,'confirm',2,{lines:['A'],inputs:{A:detailed}});near(s.rows[0].result.otHours,44);assert.equal(s.employees.length,0);
+ let s=await mutate(db,'confirm',2,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:detailed}});near(s.rows[0].result.otHours,44);assert.equal(s.employees.length,0);
  assert.equal(s.rows[0].history.at(-1).before.hcLeaveTotal,10);assert.equal(s.rows[0].input.hcLeaveRows[0].people,1);
  await review(db,'A');await unlock(db,'A','More people absent');detailed.hcLeaveRows[0].people=2;
- s=await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{lines:['A'],inputs:{A:detailed}});assert.equal(s.rows[0].editCount,1);
+ s=await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:detailed}});assert.equal(s.rows[0].editCount,1);
  assert.ok(s.rows[0].history.at(-1).changes.some(c=>c.field==='hcLeaveRows.0.people'&&c.old===1&&c.new===2));
  near((await getPlan(db,week)).capacity[0].availableHours,s.rows[0].availableHours);
 }));
@@ -249,8 +252,8 @@ test('numbered cleaning groups can overlap while their sum stays within attendin
  assert.throws(()=>calculateCapacity(p,week),/cùng thời điểm/);
 });
 test('saving numbered cleaning validates daily attendance at the backend',()=>isolated(async db=>{
- await saveEmployee(db,{id:'A-001',name:'Nhân viên A',line:'A',active:true,version:0},admin);
- await saveEmployee(db,{id:'A-002',name:'Nhân viên B',line:'A',active:true,version:0},admin);
+ await saveEmployee(db,{id:'A-001',name:'Nhân viên A',line:'A',startDate:'2026-01-01',active:true,version:0},admin);
+ await saveEmployee(db,{id:'A-002',name:'Nhân viên B',line:'A',startDate:'2026-01-01',active:true,version:0},admin);
  const initial=await readCapacity(db,week,admin),inputs=Object.fromEntries(initial.rows.map(row=>[row.line,row.input]));
  inputs.A.dailySchedule[0].cleaning=[{people:1,start:'16:00',end:'17:00'},{people:1,start:'16:30',end:'17:00'}];
  const saved=await mutate(db,'save',initial.revision,{lines:['A'],inputs});
@@ -264,7 +267,7 @@ test('saving numbered cleaning validates daily attendance at the backend',()=>is
 test('KHSX rejection keeps approved Capacity locked; mismatched review request cannot overwrite decision',()=>isolated(async db=>{
  await mutate(db,'create',0);
  const p=newDailyCapacity(week,'A').input;p.workers=15;p.otWorkers=15;
- await mutate(db,'confirm',1,{lines:['A'],inputs:{A:p}});
+ await mutate(db,'confirm',1,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:p}});
  let s=await readCapacity(db,week,admin);assert.equal(s.rows[0].request,null);await mutate(db,'sync',s.revision,{lines:['A']});s=await readCapacity(db,week,admin);const pending=s.rows[0].request;
  await assert.rejects(()=>mutate(db,'review',s.revision,{lines:['A'],requestAt:'stale',decision:'approve'}),e=>e.status===409);
  await review(db,'A');s=await readCapacity(db,week,admin);assert.equal(s.rows[0].khsxAcceptedBy,admin.login);
@@ -296,7 +299,7 @@ test('daily leave range skips days without work; linked overtime leave is explic
 });
 
 test('three HC leave days can link two OT days, edit OT hours, and persist without double deduction',()=>isolated(async db=>{
- for(let i=1;i<=2;i++)await saveEmployee(db,{id:`A-00${i}`,name:`Nhân viên A${i}`,line:'A',active:true,version:0},admin);
+ for(let i=1;i<=2;i++)await saveEmployee(db,{id:`A-00${i}`,name:`Nhân viên A${i}`,line:'A',startDate:'2026-01-01',active:true,version:0},admin);
  const state=await readCapacity(db,week,admin),inputs=Object.fromEntries(state.rows.map(row=>[row.line,row.input])),p=inputs.A;
  for(let i=0;i<3;i++){p.dailySchedule[i].ot=true;p.dailyRoster[i].ot=[...p.dailyRoster[i].hc];}
  p.dailyHcLeave=[{date:week,to:'2026-09-23',people:1,employees:['A-001'],mode:'full',includeOt:true,otFrom:week,otTo:'2026-09-22',otMode:'hours',otStart:'18:00',otEnd:'20:00'}];
@@ -326,7 +329,7 @@ test('named cleaning groups may overlap for distinct staff; linked OT stays sepa
 });
 
 test('employee directory retains the short ID and Line C without assigning Line C to Capacity A/B',()=>isolated(async db=>{
- const saved=await saveEmployee(db,{id:'S2024006',secondaryId:'389S',name:'Nhân viên Line C',line:'C',active:true,version:0},admin);
+ const saved=await saveEmployee(db,{id:'S2024006',secondaryId:'389S',name:'Nhân viên Line C',line:'C',startDate:'2026-01-01',active:true,version:0},admin);
  assert.equal(saved.employee.secondaryId,'389S');
  assert.equal((await readEmployees(db,admin)).employees[0].line,'C');
  const capacity=await readCapacity(db,week,admin);
@@ -336,17 +339,17 @@ test('employee directory retains the short ID and Line C without assigning Line 
 test('Capacity viewing grant can read employees but cannot import; import is atomic and never replaces an existing ID',()=>isolated(async db=>{
  const viewer={login:'viewer',grants:['Quản lý sản xuất / Capacity tuần / Xem']};
  assert.equal((await readEmployees(db,viewer)).employees.length,0);
- const rows=[{id:'S001',secondaryId:'001S',name:'Nhân viên A',line:'A'},{id:'S002',secondaryId:'002S',name:'Nhân viên C',line:'C'}];
+ const rows=[{startDate:'2026-01-01',id:'S001',secondaryId:'001S',name:'Nhân viên A',line:'A'},{startDate:'2026-01-01',id:'S002',secondaryId:'002S',name:'Nhân viên C',line:'C'}];
  await assert.rejects(()=>importEmployees(db,{rows},viewer),e=>e.status===403);
  assert.equal((await importEmployees(db,{rows},admin)).imported,2);
- assert.deepEqual((await importEmployees(db,{rows:[{...rows[0],name:'Không ghi đè'},{id:'S003',name:'Người mới',line:'B'}]},admin)).duplicates,['S001']);
+ assert.deepEqual((await importEmployees(db,{rows:[{...rows[0],name:'Không ghi đè'},{startDate:'2026-01-01',id:'S003',name:'Người mới',line:'B'}]},admin)).duplicates,['S001']);
  assert.equal((await readEmployees(db,admin)).employees.length,2);
  assert.equal((await readEmployees(db,admin)).employees[0].name,'Nhân viên A');
 }));
 
 test('new week uses 95%; employee roster, named time and first Save persist without a separate Create',()=>isolated(async db=>{
- await saveEmployee(db,{id:'A-001',name:'Nhân viên A',line:'A',active:true,version:0},admin);
- await saveEmployee(db,{id:'B-001',name:'Nhân viên B',line:'B',active:true,version:0},admin);
+ await saveEmployee(db,{id:'A-001',name:'Nhân viên A',line:'A',startDate:'2026-01-01',active:true,version:0},admin);
+ await saveEmployee(db,{id:'B-001',name:'Nhân viên B',line:'B',startDate:'2026-01-01',active:true,version:0},admin);
  assert.equal((await readEmployees(db,admin)).employees.length,2);
  const original=await readCapacity(db,week,admin);
  assert.equal(original.rows[0].input.factor,95);
@@ -369,9 +372,9 @@ test('unsynced revoke is allowed for cnphuong and ntnphung but synced versions r
  let s=await mutateCapacityAtTime(db,{action:'create',week,revision:0},owner,clock);
  const act=async(action,extra={},actor=owner)=>s=await mutateCapacityAtTime(db,{action,week,revision:s.revision,lines:['A'],...extra},actor,clock);
  const users=['cnphuong','ntnphung'].map(permissionLogin=>({login:permissionLogin+'@example.test',permissionLogin,grants:['Quản lý sản xuất/Capacity tuần/Xem']}));
- for(const u of users){assert.equal(capacityPermissions(u).revoke,true);assert.equal(capacityPermissions(u).review,false);await act('confirm',{inputs:{A:input()}});await act('revoke',{reason:'Sửa trước đồng bộ'},u);assert.equal(s.rows[0].status,'Nháp');assert.equal(s.rows[0].history.at(-1).actorId,u.permissionLogin);}
+ for(const u of users){assert.equal(capacityPermissions(u).revoke,true);assert.equal(capacityPermissions(u).review,false);await act('confirm',{noCleaningAcknowledgedLines:['A'],inputs:{A:input()}});await act('revoke',{reason:'Sửa trước đồng bộ'},u);assert.equal(s.rows[0].status,'Nháp');assert.equal(s.rows[0].history.at(-1).actorId,u.permissionLogin);}
  assert.equal(capacityPermissions({login:'other',grants:[]}).revoke,false);
- await act('confirm');await act('sync');
+ await act('confirm',{noCleaningAcknowledgedLines:['A']});await act('sync');
  for(const u of [...users,owner])await assert.rejects(()=>act('revoke',{reason:'Không được bỏ qua'},u),e=>e.status===409);
  await act('review',{decision:'approve',requestAt:s.rows[0].request.at});
  for(const u of [...users,owner])await assert.rejects(()=>act('revoke',{reason:'Không được bỏ qua'},u),e=>e.status===409);
@@ -379,14 +382,14 @@ test('unsynced revoke is allowed for cnphuong and ntnphung but synced versions r
  await act('review',{decision:'reject',reason:'Giữ lịch cũ',requestAt:s.rows[0].request.at});assert.equal(s.rows[0].status,'Đã xác nhận');
  await act('requestChange',{reason:'Change',intendedChange:'Change hours'});
  await act('review',{decision:'approve',requestAt:s.rows[0].request.at});assert.equal(s.rows[0].status,'Nháp');
- await act('save',{inputs:{A:input()}});await act('confirm');
- for(const u of users){await act('revoke',{reason:'Sửa bản điều chỉnh chưa đồng bộ'},u);assert.equal(s.rows[0].reviewStatus,'adjusting');await act('confirm');}
+ await act('save',{inputs:{A:input()}});await act('confirm',{noCleaningAcknowledgedLines:['A']});
+ for(const u of users){await act('revoke',{reason:'Sửa bản điều chỉnh chưa đồng bộ'},u);assert.equal(s.rows[0].reviewStatus,'adjusting');await act('confirm',{noCleaningAcknowledgedLines:['A']});}
  await act('sync');await assert.rejects(()=>act('revoke',{reason:'Đã đồng bộ'}),e=>e.status===409);
 }));
 
 test('timed Line C imports persist with audit and reject simultaneous assignment at backend',()=>isolated(async db=>{
  const {transferCapacityStaff}=await import('../lib/capacity-transfers.mjs');
- await saveEmployee(db,{id:'C-001',name:'Kiểm thử Line C',line:'C',active:true,version:0},admin);
+ await saveEmployee(db,{id:'C-001',name:'Kiểm thử Line C',line:'C',startDate:'2026-01-01',active:true,version:0},admin);
  const state=await readCapacity(db,week,admin);
  const changed=transferCapacityStaff(state.rows,state.employees,{ids:['C-001'],from:'C',to:'A',date:week,toDate:week,shift:'hc',start:'09:00',end:'11:00'});
  const inputs=Object.fromEntries(changed.rows.map(r=>[r.line,r.input]));
