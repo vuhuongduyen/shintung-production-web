@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import vm from 'node:vm';import ts from 'typescript';import {createProductionSnapshotCache} from '../lib/production-snapshot-cache.mjs';
+test('light work cache cannot satisfy full confirmation read; both caches clear on session change',async()=>{
+ let generation=0,invalidate;const calls=[],exports={};const body=path=>({orders:[{id:path}],reports:[],events:[],employees:[],actualSchedules:[],approvedSchedules:[],rights:{work:true}});
+ const code=ts.transpileModule(readFileSync(new URL('../lib/production-workflow-cache.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ vm.runInNewContext(code,{exports,window:{},Promise,Date,Error,require:name=>name==='./production-api'?{productionApiFetch:async(path)=>{calls.push(path);return Response.json(body(path));}}:name==='./data-sync'?{clientReadGeneration:()=>generation,subscribeClientReadInvalidation:fn=>{invalidate=fn;}}:{createProductionSnapshotCache}});
+ await exports.readProductionWorkflow(false,'work');assert.equal(exports.productionSnapshot('full'),null);await exports.readProductionWorkflow(false,'full');assert.deepEqual(calls,['/api/production-workflow?view=work','/api/production-workflow']);assert.notEqual(exports.productionSnapshot('work'),exports.productionSnapshot('full'));
+ await exports.readProductionWorkflow(false,'work');assert.equal(calls.length,2);generation++;await exports.readProductionWorkflow(false,'work');assert.equal(calls.length,3);invalidate('session');assert.equal(exports.productionSnapshot('work'),null);assert.equal(exports.productionSnapshot('full'),null);
+});

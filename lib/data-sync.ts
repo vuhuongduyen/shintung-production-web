@@ -40,8 +40,10 @@ export async function sessionFetch(input:RequestInfo|URL,init?:RequestInit):Prom
  const userAction=mutation||isExplicitActionAttempt();
  const feedbackScope=actionFeedbackScope();
  let auditContext:Record<string,any>|undefined;
+ let inlineCancellation=false;
  if(auditMutation){
  let body:Record<string,any>={};try{if(typeof init?.body==='string')body=JSON.parse(init.body);}catch{}
+ inlineCancellation=requestPath==='/api/production-correction';
  const active=currentActionContext();
  const labels:Record<string,string>={save:'Lưu',send:'Gửi',review:'Xác nhận báo công',start:'Nhập trạm',pause:'Tạm ngưng',resume:'Tiếp tục',complete:'Xuất trạm','incident-create':'Báo sự cố','incident-confirm':'Xác nhận sự cố','incident-reply':'Gửi hướng xử lý','warehouse-duty':'Ghi nhận phụ kho'};
  const requestId=crypto.randomUUID();
@@ -54,11 +56,11 @@ export async function sessionFetch(input:RequestInfo|URL,init?:RequestInit):Prom
    let expectedPlanConfirmation=false;
    if(requestPath==='/api/production-plan'&&response.status===409){try{expectedPlanConfirmation=(await response.clone().json()).error==='dailyCapacityConfirmation';}catch{/* Ordinary error handling remains below. */}}
    if(auditContext&&!response.ok)recordClientAttempt({outcome:'ui-blocked',operation:auditContext.operation,...auditContext,httpStatus:response.status,validationMessage:expectedPlanConfirmation?'Chờ KHSX xác nhận xếp vượt giờ khả dụng':mutationFailureMessage(response.status)});
-   if(!expectedPlanConfirmation&&userAction&&feedbackScope===actionFeedbackScope()&&!response.ok)notifyActionFailure(mutationFailureMessage(response.status),undefined,undefined,false,feedbackScope,!auditContext);
+   if(!inlineCancellation&&!expectedPlanConfirmation&&userAction&&feedbackScope===actionFeedbackScope()&&!response.ok)notifyActionFailure(mutationFailureMessage(response.status),undefined,undefined,false,feedbackScope,!auditContext);
    return response;
  } catch(error) {
    if(auditMutation&&generation===sessionGeneration&&!(error instanceof Error&&error.name==='AbortError')&&!init?.signal?.aborted)recordClientAttempt({outcome:'network-unknown',operation:auditContext?.operation||'Gửi yêu cầu ghi dữ liệu',...auditContext});
-   if(userAction&&feedbackScope===actionFeedbackScope()&&generation===sessionGeneration&&!(error instanceof Error&&error.name==='AbortError')&&!init?.signal?.aborted)notifyActionFailure('Không thể kết nối để hoàn tất thao tác. Kiểm tra danh sách đã lưu trước khi thử lại.',undefined,undefined,false,feedbackScope,!auditContext);
+   if(!inlineCancellation&&userAction&&feedbackScope===actionFeedbackScope()&&generation===sessionGeneration&&!(error instanceof Error&&error.name==='AbortError')&&!init?.signal?.aborted)notifyActionFailure('Không thể kết nối để hoàn tất thao tác. Kiểm tra danh sách đã lưu trước khi thử lại.',undefined,undefined,false,feedbackScope,!auditContext);
    throw error;
  }
 }

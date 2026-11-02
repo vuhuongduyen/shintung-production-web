@@ -1,0 +1,23 @@
+import test from 'node:test';
+import {productionOrderIndex} from '../lib/production-order-index.mjs';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {productionRuntime} from '../lib/production-runtime.mjs';
+import {progressOrderStatus,progressReviewSummary} from '../lib/production-progress-review.mjs';
+import {productionProgressDisplay} from '../lib/production-progress-display.mjs';
+const source=readFileSync(new URL('../components/production-management.tsx',import.meta.url),'utf8');
+const expression=source.match(/const workStatus=\(row:Row\)=>(.*);/)[1];
+const evaluate=new Function('row','reports','active','productionProgressDisplay','progressOrderStatus','progressReviewSummary','liveEvents','orderEvents',`return ${expression}`);
+const row={id:'2903',lsxCode:'510-26102903',lsxQty:1000,inTransitQty:1000,progressStatus:'CHƯA SẢN XUẤT'};
+const at=Date.parse('2026-10-30T09:00:00Z');
+const event=(stage,status,people=[])=>({sourceId:row.id,kind:'stage-work',stageReporting:true,stageName:stage,effectiveAt:'2026-10-30T06:00:00Z',stageAfter:{status,people}});
+const status=events=>evaluate(row,[],()=>productionRuntime(row,events,at),productionProgressDisplay,progressOrderStatus,progressReviewSummary,events,()=>events);
+test('2903: ASSY entered with six workers and CUT paused is running before first output',()=>assert.equal(status([event('A-CUT','paused'),event('A-ASSY','running',['1','2','3','4','5','6'])]).tone,'running'));
+test('all entered stages paused shows paused rather than stale waiting',()=>assert.equal(status([event('A-ASSY','paused')]).tone,'paused'));
+test('no station entry retains waiting',()=>assert.equal(status([]).tone,'waiting'));
+test('voided entry does not start an order',()=>assert.equal(status([{...event('A-ASSY','running',['1']),voided:true}]).tone,'waiting'));
+
+const board=readFileSync(new URL('../components/production-work-board.tsx',import.meta.url),'utf8');
+const boardExpression=board.match(/const status=\(row:Row\)=>(.*);/)[1];
+const boardEvaluate=new Function('row','reports','active','productionProgressDisplay','progressOrderStatus','progressReviewSummary','events','summary','orderIndex',`return ${boardExpression}`);
+test('actual board badge shows running for entered 2903 without any output report',()=>{const events=[event('A-CUT','paused'),event('A-ASSY','running',['1','2','3','4','5','6'])];assert.equal(boardEvaluate(row,[],()=>productionRuntime(row,events,at),productionProgressDisplay,progressOrderStatus,progressReviewSummary,events,productionOrderIndex([row],[],events).summaryFor,productionOrderIndex([row],[],events)).tone,'running');});

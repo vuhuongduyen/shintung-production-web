@@ -1,11 +1,11 @@
 /** Add this NEW file to warehouse Apps Script. Do not paste the old SX push file here. */
-const ONSPA_REAL_SHEET = 'SAMPLE_SHEET_ID_NOT_CONFIGURED';
+const ONSPA_REAL_SHEET = '1y5J-G5IoIzEgXsf_2hpqrXOTgvL0RJp5lBjR9bbapk4';
 function ONSPA_caiDatKetNoi() {
  const ui=SpreadsheetApp.getUi(),ss=SpreadsheetApp.getActive();
  const url=ui.prompt('Kết nối ONSPA','Dán địa chỉ web (https://...)',ui.ButtonSet.OK_CANCEL);if(url.getSelectedButton()!==ui.Button.OK)return;
  const base=url.getResponseText().trim().replace(/\/$/,'');
- if(!/^https:\/\/(sanxuat|onspa-thu-nghiem-21102026)\.example-disabled\.chatgpt\.site$/.test(base))throw Error('Địa chỉ web không đúng.');
- if(ss.getId()===ONSPA_REAL_SHEET&&base!=='https://disabled.example.invalid')throw Error('Không nối web thử vào kho thật.');
+ if(!/^https:\/\/(sanxuat|onspa-thu-nghiem-21102026)\.shintung-vn-4458\.chatgpt\.site$/.test(base))throw Error('Địa chỉ web không đúng.');
+ if(ss.getId()===ONSPA_REAL_SHEET&&base!=='https://sanxuat.shintung-vn-4458.chatgpt.site')throw Error('Không nối web thử vào kho thật.');
  const token=ui.prompt('Khóa kết nối','Dán khóa từ nút Kết nối Google Sheet trên web',ui.ButtonSet.OK_CANCEL);if(token.getSelectedButton()!==ui.Button.OK)return;
  PropertiesService.getScriptProperties().setProperties({ONSPA_URL:base,ONSPA_TOKEN:token.getResponseText().trim(),ONSPA_SHEET:ss.getId()});
  ONSPA_khoiPhucKetNoi();

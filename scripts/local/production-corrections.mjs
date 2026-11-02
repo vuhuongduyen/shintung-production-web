@@ -1,3 +1,5 @@
+import {readRecordPages} from './production-record-pages.mjs';
+import {cancelStageWork} from './production-stage-cancel.mjs';
 import {correctStageWork} from './production-stage-correction.mjs';
 import {productionMenuRights} from '../../lib/menu-action-access.mjs';
 import {correctSourceTimes} from './production-source-time-correction.mjs';
@@ -11,7 +13,7 @@ import {vnMoment} from '../../lib/production-attendance.mjs';
 
 const fail=(message,status=409)=>{throw Object.assign(new Error(message),{status});};
 const editable=new Set(['start','pause','resume','complete','transfer','add','reduce','incident','absence','line-absence','attendance-override']);
-const read=async(db,entity)=>(await db.prepare('SELECT record_key,payload FROM app_records WHERE entity=?').bind(entity).all()).results.map(r=>({key:r.record_key,raw:r.payload,value:JSON.parse(r.payload)}));
+const read=async(db,entity)=>(await readRecordPages(db,{where:'entity=?',args:[entity]})).map(r=>({key:r.record_key,raw:r.payload,value:JSON.parse(r.payload)}));
 const parseTime=value=>{const n=Date.parse(value);if(!Number.isFinite(n)||!/(Z|[+-]\d\d:\d\d)$/.test(String(value))||n>Date.now()+600000)fail('Thời điểm thực tế cần hợp lệ, có múi giờ và không ở tương lai.',422);return new Date(n).toISOString();};
 const unique=values=>[...new Set(values.filter(Boolean))];
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -37,17 +39,15 @@ function validateTimeline(events,orders) {
    const receiving=event.kind==='transfer'?event.destinationId:event.sourceId;
    const existing=employeesAt(before,receiving,instant)||[];
    if(event.employees?.some(id=>existing.includes(id))&&!(event.kind==='transfer'&&event.destinationIncludedInStart))fail(`${label}: nhân viên bị phân công trùng trong cùng LSX.`);
-   for(const order of orders.filter(o=>o.id!==receiving&&o.id!==event.sourceId)) {
-    const assigned=employeesAt(before,order.id,instant)||[];
-    if(event.employees?.some(id=>assigned.includes(id)))fail(`${order.lsxCode}: nhân viên còn đang được phân công. Hủy/điều chỉnh sẽ gây trùng người; xử lý thao tác phụ thuộc trước.`);
-   }
+   // Cross-order overlaps are permitted in corrections and audited separately.
   }
   before.push(event);
  }
 }
 
-export async function correctProduction(db,body,actor,catalog=[]) {
+async function runCorrection(db,body,actor,catalog=[]) {
  if(!productionMenuRights(actor).correct)fail("Không có quyền Điều chỉnh báo công.",403);
+ if(body.operation==='cancel-stage')return cancelStageWork(db,body,actor,catalog);
  if(body.stageWorkCorrection===true)return correctStageWork(db,body,actor,catalog);
  if(body.sourceTimeCorrection===true)return correctSourceTimes(db,body,actor,catalog);
  if(body.operation==='adjust-report-hours')return correctReportHours(db,body,actor,catalog);
@@ -244,4 +244,11 @@ export async function correctProduction(db,body,actor,catalog=[]) {
  for(const r of newRows)writes.push(db.prepare("INSERT INTO app_records SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key='global' AND payload=?)").bind(r.entity,r.key,JSON.stringify(r.value),actor.login,now,nextCursor));
  const result=await db.batch(writes);if(result[0].meta.changes!==1)fail(conflictMessage);
  return {ok:true,event:audit,reportImpacts,orderImpacts};
+}
+
+export async function correctProduction(...args){
+ try{return await runCorrection(...args);}catch(error){
+  if(/SQLITE_TOOBIG|Serialized RPC|32MiB|string or blob too big/i.test(error.message))throw Object.assign(Error('Hệ thống chưa xử lý được yêu cầu vì lượng dữ liệu quá lớn. Đây là lỗi hệ thống, không phải do bạn nhập sai giờ. Chưa xác nhận lưu thành công; tải lại dữ liệu để kiểm tra trước khi thử lại.'),{status:503});
+  throw error;
+ }
 }

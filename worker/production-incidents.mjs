@@ -22,7 +22,7 @@ export async function createProductionIncident(db,actor,body,workflow){
  const event={id:'incident:'+id,kind:'stage-incident',sourceId:order.id,line:order.line,stages,reason,incidentId:id,stopWork:true,effectiveAt:now,recordedAt:now,actor:login,actorId:login};
  const statements=[write,db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'production_event',?,?,?,? WHERE changes()=1").bind(event.id,snapshot(event),login,now)];
  statements.push(db.prepare("INSERT INTO app_records SELECT 'production_cursor','global',?,?,? WHERE changes()=1 ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(JSON.stringify({version:Date.now(),token:crypto.randomUUID()}),login,now));
- if(login!=='sample_user_15')statements.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'admin_audit',?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(),snapshot({entity:'department_change',action:'incident-create',key:id,actor:login,at:now,after:r}),login,now));
+ if(login!=='vthduyen')statements.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'admin_audit',?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(),snapshot({entity:'department_change',action:'incident-create',key:id,actor:login,at:now,after:r}),login,now));
  const result=await db.batch(statements);if(!result[0].meta.changes)fail('Phiếu vừa được lưu. Mở Phiếu báo sự cố để kiểm tra trước khi tạo lại.',409);
  return {ok:true,record:r};
 }
@@ -55,7 +55,7 @@ export async function updateProductionIncident(db,actor,body){
  if(body.action==='incident-resolve'){content=text(body.text);if(!content||content.length>12000)fail('Nhập kết quả xử lý.');next.incident.actualHours=hours(body.actualHours);next.incident.resolvedAt=now;next.incident.resolvedBy=login;next.incident.status='resolved';next.pendingDepartments=[];content=`Đã xử lý trong ${next.incident.actualHours} giờ. ${content}`;}
  next.messages.push({text:content,at:now,login,department,action:body.action});next.revision++;next.updatedAt=now;
  const write=db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='department_change' AND record_key=? AND payload=?").bind(snapshot(next),login,now,r.id,row.payload);
- const statements=[write];if(login!=='sample_user_15')statements.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'admin_audit',?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(),snapshot({entity:'department_change',action:body.action,key:r.id,actor:login,at:now,before:r,after:next}),login,now));
+ const statements=[write];if(login!=='vthduyen')statements.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'admin_audit',?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(),snapshot({entity:'department_change',action:body.action,key:r.id,actor:login,at:now,before:r,after:next}),login,now));
  const result=await db.batch(statements);if(!result[0].meta.changes)fail('Phiếu vừa được cập nhật. Mở lại phiếu để xem trạng thái mới.',409);
  return {ok:true,record:next};
 }

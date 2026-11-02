@@ -1,0 +1,26 @@
+{
+  "baseCommit": "b1820e3568f3c57841610235f06f168ff660d998",
+  "files": [
+    {
+      "file": "app/page.tsx",
+      "count": 104,
+      "sha256": "9e7d4712c4a3315712f2bb889684f16ece2df60b9ae98a35cf9a4f51a0a70448",
+      "jsxCount": 288,
+      "jsxSha256": "1a17b80c89ff6ea1a9e1476fc48d7e4895282d95575155058e5099ba8ed1f752"
+    },
+    {
+      "file": "components/labor-hours-master.tsx",
+      "count": 8,
+      "sha256": "aede068b8ed67845ca572d52294df1f16dc48d9e12ecbf294e46f39a8f45c841",
+      "jsxCount": 15,
+      "jsxSha256": "c1739a6df78968e62a123eb3c86a5197155183ecbe62b8ec055c946985fe7a6b"
+    },
+    {
+      "file": "components/weekly-capacity.tsx",
+      "count": 18,
+      "sha256": "d85a5c4a0cecfc07565f058d9c739dcb179f3b336ffe07563ea8c8744e4d2219",
+      "jsxCount": 40,
+      "jsxSha256": "6ce41b5ae694ef99401263ab1ccd9cac782c792465b5079769208166b5e346f2"
+    }
+  ]
+}

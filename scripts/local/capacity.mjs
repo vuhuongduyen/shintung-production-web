@@ -22,7 +22,7 @@ export function capacityPermissions(actor){
  const grants=actor?.grants||[],admin=actor?.isAdmin||actor?.role==='local-owner';
  const has=actions=>Boolean(actor?.login&&(admin||grants.some(g=>{const parts=String(g).split('/').map(x=>x.trim().toLowerCase());return parts.includes('capacity tuần')&&actions.some(a=>parts.at(-1)===a.toLowerCase());})));
  const planReview=Boolean(actor?.login&&(admin||grants.some(g=>{const p=String(g).split('/').map(x=>x.trim().toLowerCase());return p.includes('production_plan')&&['xác nhận','chốt','confirm'].includes(p.at(-1));})));
- return {reopenPast:Boolean(admin&&actor?.login&&!actor?.line),view:has(['Xem'])||planReview,edit:has(['Thêm','Sửa','Lưu','Nhập','Tạo']),confirm:has(['Xác nhận']),revoke:has(['Hủy xác nhận']),factor:has(['Sửa hệ số','Sửa']),review:planReview};
+ return {reopenPast:Boolean(admin&&actor?.login&&!actor?.line),view:has(['Xem'])||planReview,edit:has(['Thêm','Sửa','Lưu','Nhập','Tạo']),confirm:has(['Xác nhận']),revoke:has(['Hủy xác nhận'])||Boolean(actor?.login&&actor?.authMode!=='quick_line'&&['cnphuong','ntnphung'].includes(String(actor.permissionLogin||actor.userId||actor.login).toLowerCase())),factor:has(['Sửa hệ số','Sửa']),review:planReview};
 }
 async function records(db,entity){return (await db.prepare('SELECT record_key,payload FROM app_records WHERE entity=?').bind(entity).all()).results.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}));}
 export async function latestCapacityWeek(db,actor){
@@ -169,23 +169,17 @@ export function prepareCapacityMutation(body,actor,{state,hasRaw,queue,clock=()=
    row.lastConfirmed={input:structuredClone(row.input),availableHours:row.availableHours,version:row.version,confirmedAt:now,confirmedBy:actor.login};
   }
   if(action==='sync'){
-   if(row.status!=='Đã xác nhận'||row.reviewStatus!=='await-sync'||row.request)fail(`Line ${line}: chỉ đồng bộ Capacity đã xác nhận, chưa gửi KHSX`,409);
+   if(row.status!=='Đã xác nhận'||row.reviewStatus!=='await-sync'||row.request?.status==='pending')fail(`Line ${line}: chỉ đồng bộ Capacity đã xác nhận, chưa gửi KHSX`,409);
    row.reviewStatus='pending';row.request={kind:'capacity',status:'pending',at:now,by:actor.login,version:row.version};row.syncedBy=actor.login;row.syncedAt=now;
   }
   if(action==='revoke'){
-   const wasAccepted=capacityHasAcceptedVersion(row);
-   if(wasAccepted&&!capacityAdjustmentOpen(week,nowMs)&&!rights.reopenPast)fail(`Line ${line}: bản đã được KHSX duyệt đã qua hạn điều chỉnh.`,409);
-   if(row.status!=='Đã xác nhận')fail(`Line ${line}: chưa xác nhận`,409);
-   if(['approved','pending','adjust-pending'].includes(row.reviewStatus)&&!rights.reopenPast)fail(`Line ${line}: KHSX đã/đang xem xét Capacity, hãy gửi yêu cầu điều chỉnh`,409);
-   if(row.reviewStatus==='adjust-approved'&&!rights.reopenPast)fail(`Line ${line}: đã được KHSX đồng ý; hãy sửa trực tiếp trong Lịch làm việc`,409);
-   if(rights.reopenPast)row.historicalReopen={at:now,by:actor.login,reason:String(body.reason).trim(),previousReviewStatus:row.reviewStatus};
+   if(row.status!=='Đã xác nhận'||row.reviewStatus!=='await-sync'||row.request?.status==='pending')fail(`Line ${line}: chỉ hủy xác nhận phiên bản chưa đồng bộ KHSX; bản đã đồng bộ phải theo quy trình điều chỉnh, kể cả Admin.`,409);
    row.status='Nháp';row.revokedBy=actor.login;row.revokedAt=now;row.revokeReason=String(body.reason).trim();
-   if(row.editPermission)row.editPermission.used=true;
-   row.reviewStatus=wasAccepted?'adjusting':null;row.request=null;
+   row.reviewStatus=capacityHasAcceptedVersion(row)?'adjusting':null;row.request=null;row.editPermission=null;
   }
   if(action==='requestChange'){
    if(row.status!=='Đã xác nhận'||row.reviewStatus!=='approved'||row.request?.status==='pending')fail(`Line ${line}: Capacity chưa ở trạng thái được KHSX đồng ý`,409);
-   row.request={kind:'adjust',status:'pending',at:now,by:actor.login,version:row.version,reason:String(body.reason).trim(),intendedChange:String(body.intendedChange).trim(),previousHours:row.availableHours};
+   row.request={kind:'adjust',previousReviewStatus:row.reviewStatus,status:'pending',at:now,by:actor.login,version:row.version,reason:String(body.reason).trim(),intendedChange:String(body.intendedChange).trim(),previousHours:row.availableHours};
    row.reviewStatus='adjust-pending';
   }
   if(action==='review'){
@@ -193,7 +187,7 @@ export function prepareCapacityMutation(body,actor,{state,hasRaw,queue,clock=()=
    const kind=row.request.kind;
    if(kind==='adjust'&&body.decision==='approve'&&!capacityAdjustmentOpen(week,nowMs))fail(`Line ${line}: đã qua hạn điều chỉnh; KHSX không thể mở khóa sửa.`,409);
    row.request={...row.request,status:body.decision==='approve'?'approved':'rejected',reviewedAt:now,reviewedBy:actor.login,reviewReason:String(body.reason||'').trim()};
-   row.reviewStatus=body.decision==='approve'?(kind==='adjust'?'adjusting':'approved'):(kind==='adjust'?'approved':'rejected');
+   row.reviewStatus=body.decision==='approve'?(kind==='adjust'?'adjusting':'approved'):(kind==='adjust'?(row.request.previousReviewStatus||'approved'):'rejected');
    if(kind==='capacity'&&body.decision==='approve'){row.khsxAcceptedBy=actor.login;row.khsxAcceptedAt=now;}
    if(kind==='adjust'&&body.decision==='approve'){
     row.status='Nháp';row.unlockedBy=actor.login;row.unlockedAt=now;row.editPermission=null;

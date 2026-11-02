@@ -1,5 +1,5 @@
 // Scoped bridge: only newly approved receipts explicitly marked for Sheets are exported.
-export const REAL_SHEET='SAMPLE_SHEET_ID_NOT_CONFIGURED';
+export const REAL_SHEET='1y5J-G5IoIzEgXsf_2hpqrXOTgvL0RJp5lBjR9bbapk4';
 export const sha=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');
 const fail=(message,status=422)=>{throw Object.assign(Error(message),{status});};
 const read=async(db,e,k)=>{const r=await db.prepare('SELECT payload FROM app_records WHERE entity=? AND record_key=?').bind(e,k).first();return r?JSON.parse(r.payload):null;};
@@ -17,7 +17,7 @@ export async function sheetSetup(request,env,actor){
  }
  const spreadsheetId=String(body.spreadsheetId||'').trim(),host=new URL(request.url).hostname;
  if(!/^[A-Za-z0-9_-]{20,150}$/.test(spreadsheetId))fail('Nhập ID file Google Sheet hợp lệ.');
- if(spreadsheetId===REAL_SHEET&&host!=='disabled.example.invalid')fail('Môi trường thử không được kết nối file kho thật.',403);
+ if(spreadsheetId===REAL_SHEET&&host!=='sanxuat.shintung-vn-4458.chatgpt.site')fail('Môi trường thử không được kết nối file kho thật.',403);
  if(old?.spreadsheetId&&old.spreadsheetId!==spreadsheetId)fail('Đã liên kết file khác. Cần đối chiếu phiếu trước khi đổi file.',409);
  const token=crypto.randomUUID()+crypto.randomUUID(),now=new Date().toISOString();
  const config={spreadsheetId,tokenHash:await sha(token),enabled:true,createdAt:old?.createdAt||now,updatedAt:now,updatedBy:actor.login};
@@ -38,7 +38,7 @@ export async function sheetBridge(request,env){
  if(!token)return reply({code:'TOKEN_MISSING',error:'Web không nhận được khóa kết nối. Thay code WEB.gs bằng bản mới rồi chạy ONSPA_khoiPhucKetNoi.'},401);
  if(token.length<32||token.length>256||await sha(token)!==config.tokenHash)return reply({code:'TOKEN_INVALID',error:'Khóa đã lưu trong Apps Script không khớp web này. Chạy ONSPA_caiDatKetNoi và nhập đúng địa chỉ web, khóa hiện hành.'},401);
  if(b.spreadsheetId!==config.spreadsheetId)fail('Sai file Google Sheet đã liên kết.',403);
- if(config.spreadsheetId===REAL_SHEET&&new URL(request.url).hostname!=='disabled.example.invalid')fail('Cấm kết nối file kho thật từ môi trường thử.',403);
+ if(config.spreadsheetId===REAL_SHEET&&new URL(request.url).hostname!=='sanxuat.shintung-vn-4458.chatgpt.site')fail('Cấm kết nối file kho thật từ môi trường thử.',403);
  const contactAt=new Date().toISOString();
  // JSON-path update plus hash guard cannot re-enable or overwrite a concurrently rotated key.
  await db.prepare("UPDATE app_records SET payload=json_set(payload,'$.lastContactAt',?) WHERE entity='warehouse_sheet_config' AND record_key='connection' AND json_extract(payload,'$.tokenHash')=? AND json_extract(payload,'$.enabled')=1").bind(contactAt,config.tokenHash).run();
@@ -54,9 +54,11 @@ export async function sheetBridge(request,env){
  const now=new Date().toISOString();let next;
  if(b.action==='ack'||b.action==='error'){
   const report=await read(db,'production_report',p.reportId),latest=report?.completedAt||p.sourceCompletedAt||'';
+  if(b.action==='ack'&&p.sheetSync.correctionRevision&&(b.correctionRevision!==p.sheetSync.correctionRevision||Number(b.proposedQuantity)!==Number(p.proposedQuantity)))fail('Phiếu đã điều chỉnh số lượng. Cập nhật mã đồng bộ kho và tải lại phiếu mới trước khi xác nhận đồng bộ.',409);
   if(b.action==='ack'&&b.sourceCompletedAt!==latest)fail('Ngày xuất trạm vừa thay đổi. Hệ thống sẽ cập nhật lại.',409);
-  next={...p,...(b.action==='ack'?{sourceCompletedAt:latest}:{}),sheetSync:{...p.sheetSync,...(b.action==='ack'?{exportedCompletedAt:latest}:{}),status:b.action==='ack'?'sent':'error',at:now,error:b.action==='error'?String(b.error||'Lỗi ghi Sheet').slice(0,1000):'',spreadsheetId:config.spreadsheetId}};
+  next={...p,...(b.action==='ack'?{sourceCompletedAt:latest}:{}),sheetSync:{...p.sheetSync,...(b.action==='ack'?{exportedCompletedAt:latest,exportedCorrectionRevision:p.sheetSync.correctionRevision||null}:{}),status:b.action==='ack'?'sent':'error',at:now,error:b.action==='error'?String(b.error||'Lỗi ghi Sheet').slice(0,1000):'',spreadsheetId:config.spreadsheetId}};
  }else if(b.action==='confirm'){
+  if(p.sheetSync.correctionRevision&&p.sheetSync.exportedCorrectionRevision!==p.sheetSync.correctionRevision)fail('Phiếu vừa điều chỉnh, cần đồng bộ lại số lượng mới trước khi kho xác nhận.',409);
   const qty=b.receivedQuantity,at=String(b.confirmedAt||''),by=String(b.confirmedBy||'').trim(),reason=String(b.differenceReason||'').trim();
   if(typeof qty!=='number'||!Number.isFinite(qty)||qty<0||Number(b.proposedQuantity)!==Number(p.proposedQuantity))fail('Số lượng không hợp lệ hoặc SL đề nghị đã thay đổi. Kiểm tra lại phiếu.');
   if(!by||by==='KHÔNG XÁC ĐỊNH'||!Number.isFinite(Date.parse(at)))fail('Thiếu người hoặc thời gian kho xác nhận.');
@@ -81,7 +83,7 @@ function receiptDay(value){
 }
 async function sheetBackfill(db,config,body,actor,host){
  if(!config?.enabled||!config.lastContactAt)fail('Cần kết nối Google Sheet thành công trước khi đồng bộ phiếu cũ.');
- if(config.spreadsheetId===REAL_SHEET&&host!=='disabled.example.invalid')fail('Không được đồng bộ kho thật từ môi trường thử.',403);
+ if(config.spreadsheetId===REAL_SHEET&&host!=='sanxuat.shintung-vn-4458.chatgpt.site')fail('Không được đồng bộ kho thật từ môi trường thử.',403);
  const {from,to}=body;
  if(!/^\d{4}-\d{2}-\d{2}$/.test(from||'')||!/^\d{4}-\d{2}-\d{2}$/.test(to||'')||!Number.isFinite(Date.parse(from))||!Number.isFinite(Date.parse(to))||from>to||(Date.parse(to)-Date.parse(from))/86400000>31)fail('Chọn khoảng ngày hợp lệ, tối đa 31 ngày.');
  const rows=(await db.prepare("SELECT w.record_key,w.payload,r.payload AS report_payload FROM app_records w JOIN app_records r ON r.entity='production_report' AND r.record_key=json_extract(w.payload,'$.reportId') WHERE w.entity='warehouse_in' AND json_extract(w.payload,'$.source')='Sản xuất' ORDER BY w.record_key").all()).results;

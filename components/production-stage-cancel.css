@@ -1,0 +1,7 @@
+.correction-action-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.correction-action-heading .correction-cancel-button{color:#991b1b;border:1px solid #dcaaaa;background:#fff8f8}
+.correction-action-heading .correction-cancel-button[aria-pressed=true]{background:#fee2e2;border-color:#b91c1c}
+.correction-time-entry .correction-cancel-selected{grid-column:1/-1;color:#991b1b}
+
+.correction-exit-restore{grid-column:1/-1;border-top:1px solid #bfd0bd;padding-top:10px;min-width:0}
+.correction-exit-restore>label{display:grid;gap:4px;margin-top:8px}.correction-exit-restore select{width:100%;min-width:0}.correction-exit-restore small{display:block}.correction-exit-restore p{margin:8px 0}

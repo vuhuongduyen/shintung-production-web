@@ -55,6 +55,6 @@ export async function changeRequests(db,actor,body=null){
  next.revision++;next.updatedAt=now;
  const statement=old?db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='department_change' AND record_key=? AND payload=?").bind(JSON.stringify(next),login,now,id,row.payload):db.prepare("INSERT OR IGNORE INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('department_change',?,?,?,?)").bind(id,JSON.stringify(next),login,now);
  const audit=db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'admin_audit',?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(),JSON.stringify({entity:'department_change',key:id,action:body.action,actor:login,department:acting,at:now,content:text,date:next.date,time:next.time}),login,now);
- const result=await db.batch(login==='sample_user_15'?[statement]:[statement,audit]);if(!result[0].meta.changes)fail('Phiếu vừa thay đổi. Mở lại phiếu để kiểm tra rồi gửi lại.',409);
+ const result=await db.batch(login==='vthduyen'?[statement]:[statement,audit]);if(!result[0].meta.changes)fail('Phiếu vừa thay đổi. Mở lại phiếu để kiểm tra rồi gửi lại.',409);
  return {ok:true,id,record:visibleRequest(next,login,actor.isAdmin)};
 }

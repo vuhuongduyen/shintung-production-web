@@ -1,3 +1,8 @@
+import {stageValidationPayload} from './production-stage-read.mjs';
+import {workflowReadSnapshot} from '../../worker/read-performance.mjs';
+import {backfillStageWork} from './production-backfill.mjs';
+import {readRecordPages} from './production-record-pages.mjs';
+import {hasScheduledWorkday,extraWorkBlockedMessage} from '../../lib/production-extra-policy.mjs';
 import {calculateErpStage,erpFallbackDay,erpScheduleDay} from '../../lib/production-erp-stage.mjs';
 import {employeeActiveOn} from '../../lib/employee-employment.mjs';
 import {writeStageWork} from './production-stage-live.mjs';
@@ -27,7 +32,7 @@ import { effectiveAttendance, activeStaffMovement, transferStaffCandidates, atte
 
 const fail = (message, status = 422) => { throw Object.assign(new Error(message), { status }); };
 const parse = (r) => ({ key: r.record_key, payload: JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at });
-const rows = async (db, entity) => (await db.prepare("SELECT record_key,payload,updated_by,updated_at FROM app_records WHERE entity=? ORDER BY updated_at,record_key").bind(entity).all()).results.map(parse);
+const rows = async (db, entity, stageValidation=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:stageValidation?stageValidationPayload(entity):'payload'})).sort((a,b)=>String(a.updated_at).localeCompare(String(b.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
 const upper = (value) => String(value || "").trim().toUpperCase();
 const clock = (value) => {
   const result = Date.parse(value);
@@ -228,17 +233,18 @@ function reportMetadata(calendar,events,row,directory) {
  if(row.kind!=="completion")return {};
  const {hours,sourceSnapshot,...meta}=reportCalculation(calendar,events,row,directory,false);return meta;
 }
-export async function readProductionWorkflow(db, actor, catalog = []) {
+export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, reviewReportId=null, stageValidation=false} = {}) {
   if (!canWork(actor) && !canHr(actor) && !hasRole(actor, "xem")) fail("Không có quyền xem Quản lý sản xuất.", 403);
   // Menu visibility does not broaden the authenticated Line data boundary.
   const crossLineView=false,readActor=actor;
   // Share this request's capacity read; do not cache across users or requests.
   const capacityRead = rows(db, "capacity");
   const [state, eventRecords, reportRecords, directory, calendar, capacityRecords,accountRecords,laborRecords,historyRecords] = await Promise.all([
-    getTransit(db, {}, catalog), rows(db, "production_event"), rows(db, "production_report"), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,"labor_hours"),rows(db,'production_history_import'),
+    getTransit(db, {}, catalog,{includeHistory:false,stageValidation}), rows(db, "production_event"), rows(db, "production_report",stageValidation), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,"labor_hours"),rows(db,'production_history_import',stageValidation),
   ]);
   const orders = state.rows.filter((row) => ((row.syncStatus === "ĐÃ ĐỒNG BỘ" && row.lsxCode) || row.status === "HỦY") && permitted(readActor, row.line));
   const employeeDirectory = directory.map(row => ({...row.payload, id: row.key,active:employeeActiveOn(row.payload)}));
+  const scopedRosterIds=new Set(actor.line?[...calendar.approved.entries()].filter(([key])=>key.endsWith(':'+actor.line)).flatMap(([,r])=>(r.roster||[]).flatMap(day=>[...(day.hc||[]),...(day.ot||[])])):[]);
   const accounts=accountRecords.map(row=>({...row.payload,id:row.key}));
   const actorIdFor=row=>productionEntryActorId(row.payload,accounts)||(row.updatedAt===row.payload.recordedAt?productionEntryActorId({actor:row.updatedBy},accounts):'');
   const journalEvents=eventRecords.map(row=>({...row.payload,actorId:actorIdFor(row)})),allEvents=journalEvents.filter(e=>!e.voided);
@@ -246,11 +252,11 @@ export async function readProductionWorkflow(db, actor, catalog = []) {
   const scopedJournal=actor.line?[...journalEvents.filter(event=>!personalHrEvent(event)),...projectedHr]:journalEvents;
   const calculationEvents=actor.line?scopedJournal.filter(event=>!event.voided):allEvents;
   const events = eventRows(scopedJournal, readActor).map(event => ({...event, employeeDetails:eventEmployees(event, employeeDirectory),
-    affectedOrderIds:!event.sourceId&&["line-absence","attendance-override"].includes(event.kind)?orders.filter(order=>{
+    affectedOrderIds:includeDerivedHours&&!reviewReportId&&!event.sourceId&&["line-absence","attendance-override"].includes(event.kind)?orders.filter(order=>{
       const start=Date.parse(event.effectiveAt),end=Date.parse(event.endsAt),points=[start,end,...allEvents.map(e=>Date.parse(e.effectiveAt)).filter(t=>t>start&&t<end)].sort((a,b)=>a-b);
       return points.slice(1).some((t,i)=>peopleAt(allEvents,order.id,(points[i]+t)/2).people.some(id=>event.employees?.includes(id)));
     }).map(o=>o.id):undefined}));
-  for (const order of orders) {
+  if(includeDerivedHours&&!reviewReportId)for (const order of orders) {
     const moments=allEvents.filter(e=>e.sourceId===order.id||e.destinationId===order.id).map(e=>Date.parse(e.effectiveAt)).filter(Number.isFinite);
     if(!moments.length)continue;
     const map=toScheduleMap(calendar,new Date(Math.min(...moments)).toISOString(),new Date(Math.max(...moments)).toISOString(),order.line);
@@ -263,10 +269,10 @@ export async function readProductionWorkflow(db, actor, catalog = []) {
       }
     }
   }
-  const scheduleHistory = [...calendar.actual.values()].filter((row) => permitted(readActor, row.line)).flatMap((row) =>
+  const scheduleHistory = reviewReportId ? [] : [...calendar.actual.values()].filter((row) => permitted(readActor, row.line)).flatMap((row) =>
     (row.history || []).map((entry, index) => ({ id: `schedule:${row.key}:${index}`, kind: "schedule", sourceId: null, line: row.line,
       week: row.week, effectiveAt: entry.at, recordedAt: entry.at, actor: entry.by, actorId:productionEntryActorId(entry,accounts), reason: entry.reason, before: entry.before, after: entry.after })));
-  const capacityHistory = canManage(actor)||hasQuickLineReadScope(actor) ? capacityRecords.flatMap((record) => (record.payload.rows || []).filter((row) => permitted(readActor, row.line)).flatMap((row) =>
+  const capacityHistory = !reviewReportId&&(canManage(actor)||hasQuickLineReadScope(actor)) ? capacityRecords.flatMap((record) => (record.payload.rows || []).filter((row) => permitted(readActor, row.line)).flatMap((row) =>
     (row.history || []).map((entry, index) => ({ id: `capacity:${record.key}:${row.line}:${index}`, kind: "capacity", sourceId: null,
       line: row.line, week: record.key, effectiveAt: entry.at, recordedAt: entry.at, actor: entry.actor, actorId:productionEntryActorId(entry,accounts), reason: entry.reason,
       capacityAction: entry.action, capacityDecision:entry.decision, requestDescription:entry.request?.intendedChange||entry.request?.reason, before: entry.previousHours, after: entry.newHours })))) : [];
@@ -277,7 +283,7 @@ export async function readProductionWorkflow(db, actor, catalog = []) {
   const historical=reconcileHistorySource(historyRecords.flatMap(row=>(row.payload.reports||[]).filter(r=>permitted(readActor,r.line))).map(r=>({...r,standardUnit:historyStandards.get(r.sku)??null}))).map(r=>reviewedHistory.get(r.id)||r).filter(r=>permitted(readActor,r.line)&&(!r.orderSnapshot||permitted(readActor,r.orderSnapshot.line)));
   for(const r of historical)if(!orderIds.has(r.transitId)&&r.orderSnapshot){orders.push({...r.orderSnapshot,historicalOnly:true});orderIds.add(r.transitId);}
   for(const r of reportRecords.map(r=>({...r.payload,id:r.key})).filter(r=>r.erpStageImport&&!r.cancelled&&permitted(readActor,r.line)))if(!orderIds.has(r.transitId)&&r.orderSnapshot){orders.push({...r.orderSnapshot,historicalOnly:true});orderIds.add(r.transitId);}
-  const historyEvents=historical.filter(r=>!r.sourceVerified&&!r.cancelled&&!r.voided).flatMap(r=>[...(!historical.some(p=>p.transitId===r.transitId&&p.completedAt<r.completedAt)?[{id:r.id+':start',kind:'start',effectiveAt:r.actualStartedAt||r.startedAt}]:[]),...(r.pauses||[]).flatMap((p,i)=>[{id:r.id+':pause:'+i,kind:'pause',effectiveAt:p[0]},{id:r.id+':resume:'+i,kind:'resume',effectiveAt:p[1]}]),{id:r.id+':complete',kind:'complete',effectiveAt:r.completedAt,quantity:r.reportedQuantity,reportId:r.id,cumulativeLaborHours:historical.filter(p=>p.transitId===r.transitId&&p.completedAt<=r.completedAt).reduce((s,p)=>s+Number(p.hours?.total||0),0)}].map(e=>({...e,sourceId:r.transitId,planId:r.planId,lsxCode:r.lsxCode,sku:r.sku,name:r.name,spec:r.spec,line:r.line,recordedAt:r.importedAt,actor:r.reportedBy,actorId:r.reportedById,historicalImport:true,estimatedStaffing:true,reviewStatus:r.reviewStatus,reason:'Nhập lịch sử · phân bổ ước tính. Giờ lũy kế Sheet: '+(r.sourceCumulativeHours??'—')+'. '+(r.sourceNote||'')})));
+  const historyEvents=reviewReportId?[]:historical.filter(r=>!r.sourceVerified&&!r.cancelled&&!r.voided).flatMap(r=>[...(!historical.some(p=>p.transitId===r.transitId&&p.completedAt<r.completedAt)?[{id:r.id+':start',kind:'start',effectiveAt:r.actualStartedAt||r.startedAt}]:[]),...(r.pauses||[]).flatMap((p,i)=>[{id:r.id+':pause:'+i,kind:'pause',effectiveAt:p[0]},{id:r.id+':resume:'+i,kind:'resume',effectiveAt:p[1]}]),{id:r.id+':complete',kind:'complete',effectiveAt:r.completedAt,quantity:r.reportedQuantity,reportId:r.id,cumulativeLaborHours:historical.filter(p=>p.transitId===r.transitId&&p.completedAt<=r.completedAt).reduce((s,p)=>s+Number(p.hours?.total||0),0)}].map(e=>({...e,sourceId:r.transitId,planId:r.planId,lsxCode:r.lsxCode,sku:r.sku,name:r.name,spec:r.spec,line:r.line,recordedAt:r.importedAt,actor:r.reportedBy,actorId:r.reportedById,historicalImport:true,estimatedStaffing:true,reviewStatus:r.reviewStatus,reason:'Nhập lịch sử · phân bổ ước tính. Giờ lũy kế Sheet: '+(r.sourceCumulativeHours??'—')+'. '+(r.sourceNote||'')})));
   const stageScopes=historyRecords.filter(r=>r.payload.erpStageImport&&r.payload.scope).map(r=>r.payload.scope);
  const supersededTime=e=>!e.erpStageImport&&stageScopes.some(s=>s.orderIds.includes(e.sourceId)&&Date.parse(e.effectiveAt)>=Date.parse(s.from+'T00:00:00+07:00')&&Date.parse(e.effectiveAt)<=Date.parse(s.to+'T23:59:59+07:00'));
  const sourceTimeEvents=[...new Map(historyRecords.slice().sort((a,b)=>String(a.payload.createdAt).localeCompare(String(b.payload.createdAt))).flatMap(row=>row.payload.timeEvents||[]).filter(e=>permitted(readActor,e.line)&&(!e.orderSnapshot||permitted(readActor,e.orderSnapshot.line))).map(e=>[e.id,e])).values()];
@@ -309,26 +315,33 @@ export async function readProductionWorkflow(db, actor, catalog = []) {
   };
   return {
     progressOrders: [...new Map([...state.rows.filter(row=>permitted(readActor,row.line)),...orders].map(row=>[row.id,row])).values()],
-    orders:orders.map(order=>{const row=catalog.find(r=>upper(r.key||r.code||r.payload?.code)===upper(order.sku));const master=row?.payload||row;return {...order,processes:Array.isArray(master?.processes)?master.processes:[]};}), events: [...events, ...historyEvents, ...sourceTimeEvents.filter(e=>!supersededTime(e)&&!events.some(saved=>saved.id===e.id&&saved.sourceTimeCorrected)), ...scheduleHistory, ...capacityHistory].map(projectEvent).sort((a, b) =>
+    orders:orders.map(order=>{const row=catalog.find(r=>upper(r.key||r.code||r.payload?.code)===upper(order.sku));const master=row?.payload||row;return {...order,processes:Array.isArray(master?.processes)?master.processes:[]};}), events: reviewReportId?[]:[...events, ...historyEvents, ...sourceTimeEvents.filter(e=>!supersededTime(e)&&!events.some(saved=>saved.id===e.id&&saved.sourceTimeCorrected)), ...scheduleHistory, ...capacityHistory].map(projectEvent).sort((a, b) =>
       String(a.recordedAt || a.effectiveAt).localeCompare(String(b.recordedAt || b.effectiveAt))),
     reports: [...historical.filter(r=>!reviewedHistory.has(r.id)),...reportRecords.map((row) => ({ id: row.key, ...row.payload,actorId:productionEntryActorId(row.payload,accounts) })).filter((row) => orderIds.has(row.transitId)&&permitted(readActor,row.line))
-      .map((row) => ({ ...row, ...(overrides.has(row.id)&&(!row.correctedAt||overrides.get(row.id).at>row.correctedAt) ? { hours: overrides.get(row.id).hours, hourStatus: "Đã duyệt điều chỉnh" } : {}),
-        ...(!row.historicalImport?reportMetadata(calendar, calculationEvents, row, directory):{}),
-        ...(!row.manualHours&&!row.historicalImport&&!row.cancelled&&row.reviewStatus==="Chờ kiểm tra" ? {hours:reportCalculation(calendar,calculationEvents,row,directory).hours} : {}) }))].map(projectEvent),
-    payrollEmployees:directory.map(row=>({...row.payload,id:row.key})).filter(row=>!row._deleted&&(permitted(readActor,row.line)||actor.line&&(projectedHr.some(event=>event.employees.includes(row.id))||effectiveAttendance(allEvents).some(event=>event.destinationLine===actor.line&&event.employees?.includes(row.id))))).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}),
-    employees: directory.map((row) => ({ ...row.payload, id: row.key,active:employeeActiveOn(row.payload) })).filter((row) => row.active !== false && (canManage(actor) || permitted(readActor, row.line)||actor.line&&activeStaffMovement(allEvents,row.id,Date.now())?.destinationLine===actor.line)).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}).concat(actor.line?employeeDirectory.filter(person=>!permitted(readActor,person.line)&&projectedHr.some(event=>event.employees.includes(person.id))&&person.active!==false&&!canManage(actor)&&activeStaffMovement(allEvents,person.id,Date.now())?.destinationLine!==actor.line).map(person=>({id:person.id,name:person.name,line:person.line,active:person.active})):[]),
-    actualSchedules: [...calendar.actual.values()].filter((row) => permitted(readActor, row.line)),
-    approvedSchedules: [...calendar.approved.entries()].filter(([key]) => permitted(readActor, key.split(":")[1])).map(([key, reference]) => ({ key, ...reference, days: resolveSchedule(calendar, ...key.split(":")).days })),
+      .map((row) => {
+        const derive=includeDerivedHours&&(!reviewReportId||row.id===reviewReportId)&&!row.historicalImport;
+        const refreshHours=derive&&!row.manualHours&&!row.cancelled&&row.reviewStatus==='Chờ kiểm tra';
+        // Stage/ERP metadata also computes hours: reuse that result instead of calculating twice.
+        const calculation=derive&&(row.kind==='completion'||refreshHours)?reportCalculation(calendar,calculationEvents,row,directory,refreshHours):null;
+        const {hours,sourceSnapshot,...meta}=calculation||{};
+        return {...row,...(overrides.has(row.id)&&(!row.correctedAt||overrides.get(row.id).at>row.correctedAt)?{hours:overrides.get(row.id).hours,hourStatus:'Đã duyệt điều chỉnh'}:{}),
+          ...(derive&&row.kind==='completion'?meta:{}),...(refreshHours?{hours}: {})};
+      })].map(projectEvent),
+    payrollEmployees:reviewReportId?[]:directory.map(row=>({...row.payload,id:row.key})).filter(row=>!row._deleted&&(permitted(readActor,row.line)||scopedRosterIds.has(row.id)||actor.line&&(projectedHr.some(event=>event.employees.includes(row.id))||effectiveAttendance(allEvents).some(event=>event.destinationLine===actor.line&&event.employees?.includes(row.id))))).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}),
+    employees: reviewReportId?[]:directory.map((row) => ({ ...row.payload, id: row.key,active:employeeActiveOn(row.payload) })).filter((row) => row.active !== false && (canManage(actor) || permitted(readActor, row.line)||scopedRosterIds.has(row.id)||actor.line&&activeStaffMovement(allEvents,row.id,Date.now())?.destinationLine===actor.line)).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}).concat(actor.line?employeeDirectory.filter(person=>!permitted(readActor,person.line)&&!scopedRosterIds.has(person.id)&&projectedHr.some(event=>event.employees.includes(person.id))&&person.active!==false&&!canManage(actor)&&activeStaffMovement(allEvents,person.id,Date.now())?.destinationLine!==actor.line).map(person=>({id:person.id,name:person.name,line:person.line,active:person.active})):[]),
+    actualSchedules: reviewReportId?[]:[...calendar.actual.values()].filter((row) => permitted(readActor, row.line)),
+    approvedSchedules: reviewReportId?[]:[...calendar.approved.entries()].filter(([key]) => permitted(readActor, key.split(":")[1])).map(([key, reference]) => ({ key, ...reference, days: resolveSchedule(calendar, ...key.split(":")).days })),
     rights: { stageLive:true, crossLineView, historyImport:Boolean(actor.isAdmin&&!actor.line),hr:canHr(actor), ...productionMenuRights(actor), line: actor.line || null },
   };
 }
 export async function mutateProductionWorkflow(db, body, actor, catalog = []) {
- const result=await mutateProductionWorkflowInternal(db,body,actor,catalog);
- if(!hasQuickLineReadScope(actor)||(!result.event&&!result.report))return result;
- const visible=await readProductionWorkflow(db,actor,catalog);
- return {...result,...(result.event?{event:visible.events.find(row=>row.id===result.event.id)||null}:{}),...(result.report?{report:visible.reports.find(row=>row.id===result.report.id)||null}:{})};
+ const responseScope={};
+ const result=await mutateProductionWorkflowInternal(db,body,actor,catalog,responseScope);
+ if(!hasQuickLineReadScope(actor)||responseScope.committedStages||(!result.event&&!result.report))return result;
+ const visible=await readProductionWorkflow(workflowReadSnapshot(db),actor,catalog,{includeDerivedHours:!body.backfill&&!body.stageEntries});
+ return {...result,...(result.event?{event:visible.events.find(row=>row.id===result.event.id)||null}:{}),...(result.report?{report:visible.reports.find(row=>row.id===result.report.id)||null}:{}),...(result.events?{events:result.events.map(event=>visible.events.find(row=>row.id===event.id)).filter(Boolean)}:{}),...(result.reports?{reports:result.reports.map(report=>visible.reports.find(row=>row.id===report.id)).filter(Boolean)}:{})};
 }
-async function mutateProductionWorkflowInternal(db, body, actor, catalog = []) {
+async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], responseScope={}) {
   if (!workflowActionAllowed(actor,body)) fail("Không có quyền thao tác tại menu này.",403);
   if (!canWork(actor)&&!canHr(actor)) fail("Không có quyền ghi dữ liệu sản xuất.", 403);
   const action = String(body.action || ""), permittedActions = ["recalculate-attendance-hours","staff-recall", "staff-recall-approve", "warehouse-duty", "preview-report", "attendance-edit", "attendance-cancel", "line-movement", "attendance-correction", "extra", "start", "transfer", "add", "reduce", "absence", "line-absence", "attendance-override", "schedule", "pause", "resume", "incident", "complete", "approve-hours"];
@@ -342,22 +355,38 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = []) {
   if(body.attendanceScope==='employee'&&(!canHr(actor)||actor.line))fail('Chỉ HR không giới hạn Line được ghi nhận theo nhân viên.',403);
   const requestId=String(body.requestIdempotency||"");
   if(requestId && !/^[a-zA-Z0-9-]{16,80}$/.test(requestId)) fail("Mã thao tác không hợp lệ.");
-  if(requestId){const existing=(await rows(db,"production_event")).find(r=>r.payload.requestIdempotency===requestId);
+  if(requestId&&(!body.backfill||['apply','save'].includes(body.backfill.mode))){const match=await db.prepare("SELECT payload FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(requestId).first();const existing=match?{payload:JSON.parse(match.payload)}:null;
     if(existing){if(personalHrEvent(existing.payload)&&(!canHr(actor)||actor.line))fail("Không có quyền đọc lại dữ liệu HR theo nhân viên.",403);if(existing.payload.actor!==actor.login)fail("Mã thao tác thuộc người khác.",409);return {event:existing.payload,replayed:true,...(existing.payload.kind==='staff-recall-request'?{pendingRecall:true,requestId:existing.payload.requestId}:{})};}}
+  if(body.backfill){if(action!=='start'||!canWork(actor)||!canManage(actor)&&!actor.line)fail('Nhập trạm bù yêu cầu quyền báo công của Line hoặc QLSX/Admin.',403);if(!requestId)fail('Thiếu mã thao tác nhập bù.');return backfillStageWork(db,body,actor,catalog);}
   const cursorBefore=await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first();
   const expectedCursor=cursorBefore?.payload||JSON.stringify({version:0,token:""});
   const commit=(db,actor,now,items,report=null,record=null,extraRecords=[])=>commitEvents(db,actor,now,items,report,record,expectedCursor,extraRecords);
-  const state = await readProductionWorkflow(db, { ...actor, line: null }, catalog);
-  const events = state.events.filter(e=>!e.voided&&!e.historicalImport), calendar = await schedules(db), now = new Date().toISOString();
+  const mutationReads=workflowReadSnapshot(db);
+  const [state,calendar]=await Promise.all([
+    readProductionWorkflow(mutationReads, { ...actor, line: null }, catalog,{includeDerivedHours:!body.stageEntries,stageValidation:Boolean(body.stageEntries)}),
+    schedules(mutationReads),
+  ]);
+  const events = state.events.filter(e=>!e.voided&&!e.historicalImport), now = new Date().toISOString();
   if(body.stageEntries){
     const effectiveAt=iso(body.effectiveAt,actor);
-    return writeStageWork({db,body,actor,state,events,now,commit,effectiveAt,
+    if(action==='extra'){const order=expectedOrder(state.orders,body.orderId),date=vnMoment(effectiveAt).date,actual=resolveSchedule(calendar,weekOf(date),order.line);if(hasScheduledWorkday([{...actual,line:order.line}],order.line,date))fail(extraWorkBlockedMessage);}
+    const result=await writeStageWork({db,body,actor,state,events,now,commit,effectiveAt,
       calculate:(history,report)=>reportCalculation(calendar,history,report,[],true,true),
       validatePeople:(ids,order,extra)=>{const moment=vnMoment(effectiveAt),actual=resolveSchedule(calendar,weekOf(moment.date),order.line),day=actual.days.find(d=>d.date===moment.date),part=shiftAt(day,moment.minute);
-        if(!extra&&(!actual.approved||!part))fail('Thời điểm không thuộc lịch làm việc đã duyệt. Chọn Làm việc phát sinh nếu làm ngoài lịch.');
+        if(!extra&&(!actual.approved||!part))fail('Thời điểm không thuộc lịch làm việc đã duyệt. Làm việc phát sinh chỉ dùng cho ngày không có lịch làm việc.');
         if(!extra){const ref={...calendar.approved.get(`${weekOf(moment.date)}:${order.line}`),days:actual.days};const staff=eligibleStaff({reference:ref,events,employees:state.employees,line:order.line,date:moment.date,at:moment.minute,part});if(ids.some(id=>!staff.allowed.some(p=>p.id===id)))fail('Nhân viên chưa thuộc ca hoặc đang nghỉ. Kiểm tra Lịch SX thực tế.');}},
-      legacyPeople:(ids,order,current,at)=>state.orders.some(o=>!Object.values(current).some(s=>s.orderId===o.id&&s.startedAt)&&peopleAt(events,o.id,Date.parse(at)).people.some(id=>ids.includes(id)))
+      legacyPeople:(ids,order,current,at)=>state.orders.some(o=>!Object.values(current).some(s=>s.orderId===o.id&&s.startedAt)&&peopleAt(events,o.id,Date.parse(at)).people.some(id=>ids.includes(id)&&(!activeStaffMovement(events,id,Date.parse(at))?.destinationLine||activeStaffMovement(events,id,Date.parse(at)).destinationLine===o.line)))
     });
+    // writeStageWork validates every changed source/destination against the
+    // authenticated Line before its atomic commit. Return those exact committed
+    // records, not another whole-history read that can include a later write.
+    // Backfill and replay paths do not use this shortcut.
+    if(hasQuickLineReadScope(actor)&&result.events?.length&&result.events.every(e=>e.kind==='stage-work'&&e.line===actor.line)&&result.reports.every(r=>r.line===actor.line&&r.orderSnapshot?.line===actor.line)){
+      result.events=result.events.map(e=>({...e,employeeDetails:eventEmployees(e,state.employees)}));
+      result.event=result.events.find(e=>e.id===result.event.id);
+      responseScope.committedStages=true;
+    }
+    return result;
   }
   if(['start','pause','resume','complete','add','reduce','transfer'].includes(action)&&events.some(e=>e.stageReporting&&e.sourceId===body.orderId))fail('Lệnh đang báo công theo công đoạn. Mở SX báo công và chọn thao tác theo công đoạn.',409);
   const adjustmentEvents=(changes,event,reason,requestIds)=>{
@@ -466,7 +495,13 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = []) {
       else {if(!canHr(actor))fail("Chỉ HR được hủy dữ liệu vắng mặt.",403);assertHrAttendancePeriod(vnMoment(original.effectiveAt).date);}
     }
     if(original?.movementType==='recall')fail('Bản thu hồi được giữ trong lịch sử thực tế; không sửa bằng thao tác chuyển Line.',409);
-    if(original?.kind==='line-movement'&&effectiveAttendance(events,true).some(e=>(e.parentMovementIds||[]).includes(original.id)))fail("Nhân viên đã được cho Line khác mượn tiếp. Hãy hủy lượt mượn sau trước khi sửa hoặc hủy lượt này.",409);
+    // Ending an open movement preserves all existing onward loans and their history.
+    const movementIds=new Set();for(let prior=original;prior;prior=prior.before){if(prior.id)movementIds.add(prior.id);if(prior.supersedes)movementIds.add(prior.supersedes);}
+    const onward=[];let found=true;const activeMovements=effectiveAttendance(events,true);
+    while(found){found=false;for(const e of activeMovements){if(!movementIds.has(e.id)&&(e.parentMovementIds||[]).some(id=>movementIds.has(id))){onward.push(e);movementIds.add(e.id);found=true;}}}
+    const closingMovement=action==='attendance-edit'&&original?.kind==='line-movement'&&!original.endsAt&&Boolean(body.endsAt)&&Date.parse(body.effectiveAt)===Date.parse(original.effectiveAt)&&upper(body.line)===upper(original.line)&&upper(body.destinationLine)===upper(original.destinationLine)&&JSON.stringify([...new Set((body.employees||[]).map(upper))].sort())===JSON.stringify([...new Set((original.employees||[]).map(upper))].sort());
+    if(closingMovement&&onward.some(e=>!e.endsAt||Date.parse(e.endsAt)>Date.parse(body.endsAt)||Date.parse(e.effectiveAt)<Date.parse(original.effectiveAt)))fail('Ngày kết thúc phải bao trọn các lượt mượn tiếp đã ghi nhận. Không được cắt ngang hoặc để lượt mượn tiếp chưa có ngày kết thúc.',409);
+    if(original?.kind==='line-movement'&&onward.length&&!closingMovement)fail("Nhân viên đã được cho Line khác mượn tiếp. Hãy hủy lượt mượn sau trước khi sửa hoặc hủy lượt này.",409);
     if(action==="attendance-cancel") {
       affected=original;
       event={...original,id:crypto.randomUUID(),kind:"attendance-cancel",supersedes:original.id,approvedFrom:original.approvedFrom,approved:true,before:original,after:{cancelled:true},reason,recordedAt:now,actor:actor.login,requestIdempotency:requestId||undefined};
@@ -497,14 +532,14 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = []) {
       if(endsAt&&Date.parse(endsAt)<=Date.parse(effectiveAt))fail("Thời điểm kết thúc phải sau bắt đầu.");
       const active=effectiveAttendance(events,true),directory=new Map(state.employees.map(p=>[upper(p.id),p]));
       if(employees.some(id=>!directory.has(id)))fail("Nhân viên phải đang hoạt động trong danh sách.");
-      if((body.directoryAssignment||original?.directoryAssignment)&&employees.some(id=>upper(directory.get(id).line)!==destinationLine))fail("Line nhận phải khớp Line hiện tại trong Danh sách nhân viên. Tải lại để lấy dữ liệu mới.",409);
+      if(!closingMovement&&(body.directoryAssignment||original?.directoryAssignment)&&employees.some(id=>upper(directory.get(id).line)!==destinationLine))fail("Line nhận phải khớp Line hiện tại trong Danh sách nhân viên. Tải lại để lấy dữ liệu mới.",409);
       const previous=active.filter(e=>e.id!==original?.id);
       const references=state.approvedSchedules;
-      if(endsAt&&!body.directoryAssignment&&!original?.directoryAssignment){
+      if(!closingMovement&&endsAt&&!body.directoryAssignment&&!original?.directoryAssignment){
         const available=new Set(transferStaffCandidates({references,events:previous,employees:state.employees,line,effectiveAt,endsAt}).map(e=>upper(e.id)));
         if(employees.some(id=>!available.has(id)))fail("Nhân viên không có đủ thời gian tại Line nguồn trong khoảng đã chọn. Tải lại và kiểm tra các lượt mượn hoặc lịch điều phối.",409);
-      }else if(previous.some(e=>e.kind==='line-movement'&&e.employees?.some(id=>employees.includes(id))&&Date.parse(e.effectiveAt)<(endsAt?Date.parse(endsAt):Infinity)&&(e.endsAt?Date.parse(e.endsAt):Infinity)>Date.parse(effectiveAt)))fail("Nhân viên đã có chuyển Line trùng khoảng giờ. Hủy bản sai trước khi nhập lại.",409);
-      const parentMovementIds=[...new Set(previous.filter(e=>['transfer','line-movement'].includes(e.kind)&&e.destinationLine===line&&e.employees?.some(id=>employees.includes(upper(id)))&&Date.parse(e.effectiveAt)<(endsAt?Date.parse(endsAt):Infinity)&&(!e.endsAt||Date.parse(e.endsAt)>Date.parse(effectiveAt))).map(e=>e.id))];
+      }else if(previous.some(e=>(!closingMovement||!onward.some(child=>child.id===e.id))&&e.kind==='line-movement'&&e.employees?.some(id=>employees.includes(id))&&Date.parse(e.effectiveAt)<(endsAt?Date.parse(endsAt):Infinity)&&(e.endsAt?Date.parse(e.endsAt):Infinity)>Date.parse(effectiveAt)))fail("Nhân viên đã có chuyển Line trùng khoảng giờ. Hủy bản sai trước khi nhập lại.",409);
+      const parentMovementIds=closingMovement?(original.parentMovementIds||[]):[...new Set(previous.filter(e=>['transfer','line-movement'].includes(e.kind)&&e.destinationLine===line&&e.employees?.some(id=>employees.includes(upper(id)))&&Date.parse(e.effectiveAt)<(endsAt?Date.parse(endsAt):Infinity)&&(!e.endsAt||Date.parse(e.endsAt)>Date.parse(effectiveAt))).map(e=>e.id))];
       event={id:crypto.randomUUID(),kind:'line-movement',parentMovementIds,directoryAssignment:Boolean(body.directoryAssignment||original?.directoryAssignment),sourceId:null,line,destinationLine,employees,count:employees.length,employeeDetails:eventEmployees({employees},state.employees),effectiveAt,endsAt,approved:true,supersedes:original?.id,before:original,reason,recordedAt:now,actor:actor.login,requestIdempotency:requestId||undefined};affected={...event,employees:[...new Set([...employees,...(original?.employees||[])])]};
     }
     const updated=[...events,event];

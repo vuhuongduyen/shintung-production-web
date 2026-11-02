@@ -1,0 +1,16 @@
+import test,{after} from 'node:test';import assert from 'node:assert/strict';import {createRequire} from 'node:module';import {createServer} from 'vite';import {fileURLToPath} from 'node:url';
+const {JSDOM}=createRequire(import.meta.url)('jsdom');const dom=new JSDOM('<html><body></body></html>',{url:'https://synthetic.test',pretendToBeVisual:true});
+for(const k of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','CustomEvent','Node','MutationObserver'])globalThis[k]=dom.window[k];globalThis.IS_REACT_ACT_ENVIRONMENT=true;URL.createObjectURL=()=> 'blob:test';URL.revokeObjectURL=()=>{};
+const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');const calls=[];
+const fixture={week:'2026-10-26',rows:[{sku:'SKU1',qty:4000,requestDate:'2026-10-26',delivery:'2026-10-30',type:'Bù tải',priority:'Thường'},{sku:'SKU1',qty:500,requestDate:'2026-10-26',delivery:'2026-10-31',type:'Bù tải',priority:'Thường'}]};
+globalThis.__testDemandFixture=fixture;globalThis.__testDemandCalls=calls;
+const vite=await createServer({appType:'custom',configFile:false,plugins:[{name:'test-dependencies',enforce:'pre',load(id){if(id.endsWith('/lib/demand-image-ocr.ts'))return 'export async function readDemandImage(){return globalThis.__testDemandFixture}';if(id.endsWith('/lib/record-fetch.ts'))return `export async function recordFetch(url,init){if(!init?.body)return Response.json({records:[]});const b=JSON.parse(init.body);globalThis.__testDemandCalls.push(b);return Response.json({payload:b.payload});}`;}}],resolve:{alias:{'@':fileURLToPath(new URL('..',import.meta.url))}},server:{middlewareMode:true,hmr:false}});
+const {default:Entry}=await vite.ssrLoadModule('/components/demand-image-import.tsx');after(async()=>{await vite.close();dom.window.close();});
+test('image rows keep editable defaults and save all rows with SKU master metadata',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);let saved=false;
+ try{await act(async()=>root.render(React.createElement(Entry,{masterRows:[{code:'SKU1',name:'Tên từ master',specification:'Quy cách master',confirmation_status:'Đã xác nhận',usage_status:'Đang sử dụng'}],operator:'TEST',onBack(){},onBusyChange(){},onSaved(){saved=true;}})));
+ const input=host.querySelector('input[type=file]');Object.defineProperty(input,'files',{value:[new dom.window.File(['TEST'],'table.png',{type:'image/png'})]});await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));
+ assert.equal(host.querySelectorAll('tbody tr').length,2);assert.match(host.textContent,/Tên từ master/);assert.equal(host.querySelector('[aria-label="Loại dòng 1"]').value,'Bù tải');
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Lưu').click());assert.equal(calls.length,2);assert.equal(saved,true);assert.notEqual(calls[0].key,calls[1].key);assert.equal(calls[0].payload.name,'Tên từ master');assert.equal(calls[0].payload.qty,4000);assert.equal(calls[0].payload.requestDate,'26/10/2026');assert.equal(calls[0].payload.delivery,'30/10/2026');assert.equal(calls[0].createOnly,true);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

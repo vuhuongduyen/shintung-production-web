@@ -1,0 +1,17 @@
+'use client';
+import {useState} from 'react';
+import {Dialog,DialogContent,DialogTitle,DialogDescription} from './ui/dialog';
+import {StandardToolbar,toolbar} from './standard-toolbar/StandardToolbar';
+import {productionOverlapRows} from '../lib/production-overlap-report.mjs';
+import {tableExportReport} from '../lib/table-report.mjs';
+import {productionDisplayTime} from '../lib/production-display-time.mjs';
+import ReportPreview from './report-preview';
+type Row=Record<string,any>;
+export default function ProductionOverlapReport({events,reports,orders,employees,sessionLine,close}:{events:Row[];reports:Row[];orders:Row[];employees:Row[];sessionLine?:string;close:()=>void}){
+ const today=new Date(Date.now()+25200000).toISOString().slice(0,10);
+ const [from,setFrom]=useState(today.slice(0,8)+'01'),[to,setTo]=useState(today),[line,setLine]=useState(sessionLine||''),[search,setSearch]=useState(''),[rows,setRows]=useState<Row[]>([]),[checked,setChecked]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState<any>(null);
+ const headers=['Nhân viên','Line 1','LSX 1','Công đoạn 1','Line 2','LSX 2','Công đoạn 2','Trùng từ','Trùng đến','Phút trùng','Trạng thái'];
+ const values=rows.map(r=>[r.employeeName,r.a.line,r.a.lsx,r.a.stage,r.b.line,r.b.lsx,r.b.stage,productionDisplayTime(r.from),productionDisplayTime(r.to),Math.round(r.minutes*100)/100,r.status]);
+ const run=()=>{try{const needle=search.trim().toLocaleLowerCase('vi');setRows(productionOverlapRows({events,reports,orders,employees,from,to}).filter((r:Row)=>(!line||r.a.line===line||r.b.line===line)&&(!needle||[r.employeeId,r.employeeName,r.a.lsx,r.b.lsx].join(' ').toLocaleLowerCase('vi').includes(needle))));setChecked(true);setError('');}catch(e){setError((e as Error).message);}};
+ return <><Dialog open onOpenChange={v=>{if(!v)close();}}><DialogContent className="production-overlap-dialog"><DialogTitle>Báo cáo chồng chéo</DialogTitle><DialogDescription>Kiểm tra riêng; không chặn lưu điều chỉnh. Dữ liệu theo lần tải gần nhất. Khoảng đã hết trùng tự rời danh sách.</DialogDescription><StandardToolbar name="ProductionOverlapReport" items={[toolbar.field('Từ ngày',[toolbar.input({type:'date',value:from,onChange:e=>setFrom(e.target.value)})]),toolbar.field('Đến ngày',[toolbar.input({type:'date',value:to,onChange:e=>setTo(e.target.value)})]),toolbar.field('Line',[toolbar.select({value:line,disabled:!!sessionLine,onChange:e=>setLine(e.target.value)},<><option value="">Tất cả</option>{['A','B','C'].map(l=><option key={l}>{l}</option>)}</>)]),toolbar.field('Nhân viên / LSX',[toolbar.input({value:search,onChange:e=>setSearch(e.target.value),onKeyDown:e=>{if(e.key==='Enter')run();}})]),toolbar.action({onClick:run},'Kiểm tra'),toolbar.action({disabled:!checked,onClick:()=>setPreview(tableExportReport({title:'Báo cáo chồng chéo',subtitle:'Khoảng thời gian trùng; không dùng cộng giờ công hoặc tiền lương',headers,rows:values}))},'Xuất Excel')]}/>{error&&<p role="alert">{error}</p>}<div className="table-wrap"><table className="production-table"><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{values.map((v,i)=><tr key={i}>{v.map((x,j)=><td key={j}>{x}</td>)}</tr>)}</tbody></table></div><p>{checked?`${rows.length} khoảng chồng chéo`:'Chọn khoảng ngày rồi bấm Kiểm tra.'} · Phần chưa xuất trạm thể hiện khoảng phân công; cần đối chiếu lịch làm việc. Thời gian trùng không được dùng để cộng thêm giờ thực tế.</p></DialogContent></Dialog>{preview&&<ReportPreview report={preview} close={()=>setPreview(null)}/>}</>;
+}

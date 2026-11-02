@@ -1,0 +1,4 @@
+.production-unassigned-alert{border:2px solid #b91c1c!important;background:#fff5f5!important;color:#991b1b!important;width:min(560px,calc(100vw - 32px))!important;max-height:80dvh;overflow:auto;font-family:inherit}
+.production-unassigned-alert h2,.production-unassigned-alert [data-slot=dialog-description]{color:#991b1b!important}
+.production-unassigned-alert ul{padding-left:22px;max-height:45dvh;overflow:auto}.production-unassigned-alert li{margin:10px 0}
+.production-unassigned-summary{color:#991b1b;background:#fff5f5;border:1px solid #fca5a5;padding:8px 12px;margin:8px 0}

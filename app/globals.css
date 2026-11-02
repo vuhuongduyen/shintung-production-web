@@ -13039,3 +13039,18 @@ html body .app-shell .it-drawer .it-detail-table {
   max-width: 100%;
   table-layout: fixed;
 }
+/* Stage corrections: quantity follows staffing; keep complete date and time inputs. */
+.production-time-correction-dialog{max-width:min(1180px,96vw)!important}
+.production-time-correction-dialog .correction-time-entry{grid-template-columns:minmax(160px,1fr) minmax(300px,1.6fr) minmax(160px,1fr) minmax(100px,.65fr)}
+.production-time-correction-dialog .correction-time-entry>label input[type=number]{width:100%;min-width:0}
+@media(max-width:900px){.production-time-correction-dialog .correction-time-entry{grid-template-columns:1fr 1fr}.production-time-correction-dialog .correction-time-entry>p{grid-column:1/-1}}
+@media(max-width:560px){.production-time-correction-dialog .correction-time-entry{grid-template-columns:1fr}}
+/* Compact correction rows: dates/times, staffing and quantity remain aligned. */
+.production-time-correction-dialog{width:min(1180px,96vw)!important;max-width:min(1180px,96vw)!important}
+.correction-operation-group{border:1px solid #aecab4;border-radius:4px;margin:12px 0;background:#f8fbf7;padding:10px}
+.correction-operation-group h3{margin:0 0 8px;color:#174d32}
+.correction-grid-scroll{overflow:auto}.correction-grid-scroll table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:780px}
+.correction-grid-scroll th,.correction-grid-scroll td{border:1px solid #cfdfd0;padding:8px;vertical-align:top}.correction-grid-scroll th{background:#eaf2e8;text-align:center}
+.correction-grid-scroll th:nth-child(1){width:45px}.correction-grid-scroll th:nth-child(2){width:290px}.correction-grid-scroll th:nth-child(3){width:260px}.correction-grid-scroll th:nth-child(4){width:115px}.correction-grid-scroll th:nth-child(5){width:150px}
+.correction-grid-scroll td>input{width:100%;box-sizing:border-box}.correction-grid-scroll small{display:block;margin-top:5px;color:#526d59}.correction-grid-scroll .correction-staffing-field>label>input{width:75px}.correction-grid-scroll .correction-staffing-options{max-height:190px;overflow:auto}.correction-grid-scroll td:last-child button{display:block;margin-bottom:6px}
+.correction-group-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px}.production-overlap-dialog{width:96vw!important;max-width:1400px!important}.production-overlap-dialog .table-wrap{max-height:55vh}

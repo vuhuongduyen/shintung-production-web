@@ -26,7 +26,7 @@ function ProductionJournal({reports,events,orders,employees,open,refresh,busy,ex
  const [reasonOpen,setReasonOpen]=useState<string|null>(null);
  const locale=useSyncExternalStore(subscribeToolbarLocale,toolbarLocale,()=> 'vi'),t=(v:string)=>translateToolbar(v,locale);
  const [category,setCategory]=useState(initialCategory),[filters,setFilters]=useState<Record<string,Row>>({}),[applied,setApplied]=useState<Record<string,Row>>({}),[searches,setSearches]=useState<Record<string,boolean>>({});
- const laborView=category==='labor'?<ProductionLaborJournal events={events} orders={orders} employees={employees} t={t} open={open} refresh={refresh} busy={busy} extraItems={extraItems} setCategory={setCategory}/>:null;
+ const laborView=category==='labor'?<ProductionLaborJournal reports={reports} events={events} orders={orders} employees={employees} t={t} open={open} refresh={refresh} busy={busy} extraItems={extraItems} setCategory={setCategory}/>:null;
  const current=filters[category]||{field:'lsx',value:'',line:'all',status:'all',from:'',to:''};
  const patch=(change:Row)=>setFilters(old=>({...old,[category]:{...current,...change}}));
  const finalIds=useMemo(()=>category==='report'?finalReportIds(reports,orders):new Set(),[category,reports,orders]);

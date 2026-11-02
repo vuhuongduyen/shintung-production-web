@@ -1,0 +1,9 @@
+{
+  "DestinationPath": "F:\\CompanyBackups",
+  "MinimumFreeSpaceMB": 500,
+  "Mode": "TEST_LOCAL",
+  "ApiBaseUrl": "http://127.0.0.1:5173",
+  "CredentialTarget": "ONSPA_BACKUP_API",
+  "RetryCount": 3,
+  "RetryDelayMinutes": 15
+}

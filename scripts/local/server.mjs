@@ -1,3 +1,4 @@
+import {productionUnassignedReminder} from './production-unassigned-alert.mjs';
 import {commitRecordWithAudit} from '../../lib/record-mutation-audit.mjs';
 import {adminReadPaths,adminReadResponse} from '../../lib/admin-readonly.mjs';
 import {readSkuStock} from "../../lib/sku-stock.mjs";
@@ -79,7 +80,7 @@ export function localTestPlugin(testOptions = {}){
     if(url.pathname==='/api/in-transit'&&req.method==='GET'){const sku=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}));return send(200,await getTransit(connection.db,Object.fromEntries(url.searchParams),sku));}
     if(url.pathname==='/api/production-standards'&&req.method==='GET'){if(!authenticated)return send(401,{error:'Vui lòng đăng nhập.'});const rows=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;return send(200,{records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}))).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});}
     if(url.pathname==='/api/production-hr-hours'&&req.method==='GET')return send(200,await readHrMonth(connection.db,url.searchParams.get('month'),authenticated?{...session,isAdmin:true}:null,url.searchParams.get('examples')==='1'));
-    if(url.pathname==='/api/production-workflow'&&req.method==='GET')return send(200,await readProductionWorkflow(connection.db,authenticated?{...session,isAdmin:true}:null));
+    if(url.pathname==='/api/production-workflow'&&req.method==='GET'){const actor=authenticated?{...session,isAdmin:true}:null,workflow=await readProductionWorkflow(connection.db,actor,[],{includeDerivedHours:url.searchParams.get('unassignedAlerts')!=='1'});return send(200,url.searchParams.get('unassignedAlerts')==='1'?await productionUnassignedReminder(connection.db,actor,workflow):workflow);}
     if(adminReadPaths.has(url.pathname)){
      // Administrative reads require the existing Super Admin permission.
      const authorized=!!authenticated&&await isSuperAdmin(connection.db,session);
@@ -128,6 +129,7 @@ export function localTestPlugin(testOptions = {}){
     if(url.pathname==='/api/in-transit'){const sku=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}));return send(200,await mutateTransit(connection.db,body,authenticated?session:null,sku));}
     if(url.pathname==='/api/production-correction')return send(200,await correctProduction(connection.db,body,authenticated?{...session,isAdmin:true}:null));
     if(url.pathname==='/api/production-hr-hours')return send(200,await saveHrMonth(connection.db,connection.bucket,body,authenticated?{...session,isAdmin:true}:null,url.searchParams.get('examples')==='1'));
+    if(url.pathname==='/api/production-workflow'&&body.action==='unassigned-reminder'){const actor=authenticated?{...session,isAdmin:true}:null;return send(200,await productionUnassignedReminder(connection.db,actor,await readProductionWorkflow(connection.db,actor,[],{includeDerivedHours:false}),body.reminder));}
     if(url.pathname==='/api/production-workflow')return send(200,await mutateProductionWorkflow(connection.db,body,authenticated?{...session,isAdmin:true}:null));
     if(url.pathname==='/api/engine-run')return send(200,await saveEngine(connection.db,body,authenticated?session:null));
     if(url.pathname==='/api/sku-confirm')return send(200,await confirmSkus(connection.db,body,authenticated?session:null));

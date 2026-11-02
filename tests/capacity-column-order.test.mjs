@@ -1,0 +1,26 @@
+import test,{after} from 'node:test';
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {createServer} from 'vite';
+import {newDailyCapacity,calculateCapacity} from '../lib/capacity.mjs';
+const vite=await createServer({appType:'custom',configFile:false,server:{middlewareMode:true,hmr:false}});
+after(()=>vite.close());
+const {default:Editor}=await vite.ssrLoadModule('/components/capacity-daily-editor.tsx');
+const week='2026-10-19';
+const order=[['Làm HC','Thứ / Ngày','NV HC','Vệ sinh','Tăng ca','NV TC','Giờ HC','Nghỉ trưa','Giải lao sáng','Giải lao chiều','Nghỉ trước TC'],['正常工作','星期／日期','正常人員','清潔','加班','加班人員','正常時段','午休','上午休息','下午休息','加班前休息'],['Work','Day / date','HC staff','Cleaning','Overtime','OT staff','Regular hours','Lunch','Morning break','Afternoon break','Before OT']];
+const render=(row,disabled,language)=>renderToStaticMarkup(React.createElement(Editor,{week,row,disabled,t:(...labels)=>labels[language],onChange:()=>assert.fail('Rendering must not change data'),onError:()=>assert.fail('Unexpected error')}));
+for(const disabled of [false,true])for(const overtime of [false,true])for(const language of [0,1,2])test(`schedule columns match their cells; locked=${disabled}, OT=${overtime}, language=${language}`,()=>{
+ const row=newDailyCapacity(week,'A');row.input.workers=10;row.input.otWorkers=4;row.input.dailySchedule[0].ot=overtime;
+ const before=JSON.stringify(row),calculation=calculateCapacity(row.input,week);
+ const html=render(row,disabled,language),table=html.match(/<table class="cap-days-table">([\s\S]*?)<\/table>/)[1];
+ assert.deepEqual([...table.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map(x=>x[1]),order[language]);
+ const rows=[...table.matchAll(/<tr class="[^"]*">([\s\S]*?)<\/tr>/g)];assert.equal(rows.length,7);
+ for(const row of rows)assert.deepEqual([...row[1].matchAll(/<td[^>]*data-label="([^"]*)"/g)].map(x=>x[1]),order[language]);
+ const cells=[...rows[0][1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)].map(x=>x[1]);
+ assert.match(cells[2],/10 /);assert.match(cells[3],/type="checkbox"/);assert.match(cells[4],/type="checkbox"/);assert.match(cells[5],new RegExp(`${overtime?4:0} `));
+ assert.match(cells[6],/HC bắt đầu/);assert.equal(cells[10],overtime?'17:00 – 17:30':'—');
+ assert.equal(JSON.stringify(row),before);assert.deepEqual(calculateCapacity(row.input,week),calculation);
+ if(disabled)assert.match(cells[4],/disabled=""/);
+ assert.equal(html.includes('Lịch tăng ca')||html.includes('加班日曆')||html.includes('Overtime schedule'),overtime);
+});

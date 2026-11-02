@@ -396,3 +396,59 @@ html body .app-shell .payroll-help-dialog .payroll-rule-section .table-wrap{scro
 html body .app-shell .payroll-help-dialog .payroll-rule-section table{width:100%!important;min-width:0!important;table-layout:fixed!important;margin:0!important;}
 html body .app-shell .payroll-help-dialog .payroll-rule-section :is(th,td){width:auto!important;min-width:0!important;max-width:none!important;white-space:normal!important;overflow-wrap:anywhere;box-sizing:border-box;}
 .payroll-help-dialog .payroll-rule-section h3{width:100%;box-sizing:border-box;}
+
+/* Date groups stay inside the existing progress detail; wide detail tables scroll locally. */
+.report-day-review{min-width:0;width:100%;max-width:min(100%,calc(100vw - 22rem))}
+.report-day-group{border:1px solid #8caa96;margin:.75rem 0;background:#fffdf5;max-width:100%;min-width:0}
+.report-day-select,.report-checked{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem;white-space:normal}
+.report-day-review input[type=checkbox]{width:20px;height:20px;flex-shrink:0}
+.report-day-table{max-width:100%;overflow:auto!important}
+.report-day-table table{min-width:1250px}
+.report-review-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;padding:.75rem;background:#edf3e8;border:1px solid #8caa96}
+.report-review-toolbar button{min-height:44px;white-space:normal}
+.report-day-review .production-employee-count summary{display:inline-flex!important;align-items:center;gap:6px;list-style:none!important;box-sizing:border-box;min-height:44px;padding:.3rem .5rem;min-width:44px;cursor:pointer}
+.report-day-review .production-employee-count summary::marker{content:""}
+.report-day-review .production-employee-count summary::-webkit-details-marker{display:none}
+.production-employee-arrow{display:inline-block;flex:none;width:1em;text-align:center}
+.report-day-review .production-employee-count>.production-employee-grid{position:static;width:30rem;max-width:80vw;overflow:auto}
+.report-day-review :is(button,summary,input):focus-visible{outline:2px solid #bc660b;outline-offset:2px}
+@media(max-width:600px){.report-review-toolbar{align-items:stretch}.report-review-toolbar button{width:100%}.report-day-review .progress-delay input{max-width:14rem}}
+
+@media(max-width:1100px){.report-day-review{max-width:min(100%,calc(100vw - 4rem))}}
+
+/* Hidden action labels must be positioned against their own in-table wrapper. */
+.report-day-review [data-feedback-button]{position:relative}
+.report-day-review .report-time-cell>div{display:block;line-height:1.5;white-space:nowrap}
+.report-day-review .report-started-time{margin-top:.3rem}
+.report-day-review td>small{display:block;margin-top:.25rem}
+.report-review-toolbar{white-space:normal}
+.report-review-toolbar>strong{min-width:0;overflow-wrap:anywhere}
+.report-review-toolbar>[data-feedback-button]{min-width:0;max-width:100%}
+.report-review-toolbar button{box-sizing:border-box;max-width:100%;overflow-wrap:anywhere}
+.report-day-review>p{white-space:normal;overflow-wrap:anywhere}
+
+/* Optional order overview: report checks and warnings remain outside this disclosure. */
+.progress-order-summary{min-width:0;max-width:min(100%,calc(100vw - 4rem));margin:.5rem 0}
+.progress-order-summary [data-feedback-button]{position:relative}
+
+.progress-detail-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;max-width:min(100%,calc(100vw - 4rem));overflow-x:auto}
+.progress-detail-toolbar .progress-tabs{flex:none;margin:0}
+.progress-overview-toggle{flex:none;min-height:36px;padding:7px 10px;border:1px solid #8caa96;border-radius:3px;background:#edf3e8;color:#174f39;font:inherit;white-space:nowrap;cursor:pointer}
+.progress-overview-toggle:focus-visible{outline:2px solid #bc660b;outline-offset:-2px}
+.report-day-controls{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.report-day-toggle{flex:none;min-height:36px;padding:4px 8px;border:0;background:transparent;color:#174f39;font:inherit;white-space:nowrap;cursor:pointer}
+
+/* Employee history is visible immediately, independent of the table scroll. */
+.production-labor-overlay{position:fixed;inset:0;background:#0006;z-index:60;display:flex;align-items:center;justify-content:center;padding:12px}
+.production-labor-overlay .production-labor-history{background:#fff;border:1px solid #86a991;border-radius:8px;width:1100px;max-width:100%;max-height:90dvh;min-width:0;display:flex;flex-direction:column;padding:12px;margin:0}
+.production-labor-overlay h3{display:flex;gap:12px;justify-content:space-between;align-items:center;margin:0 0 8px;flex-wrap:wrap}
+.production-labor-overlay .table-wrap{min-height:0;max-height:65dvh;overflow:auto}
+.production-labor-overlay .production-labor-table{min-width:760px}
+.production-labor-filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.production-labor-filters input{max-width:150px}
+
+.production-labor-overlay .production-labor-table{min-width:850px!important;width:100%;border-collapse:collapse}
+.production-labor-overlay .production-labor-table :is(th,td){white-space:normal!important;border:1px solid #9db6a2!important;font-size:16px!important;line-height:1.4;vertical-align:top;padding:7px!important}
+.production-labor-overlay .production-labor-table .production-subtext{display:block;font-size:14px;line-height:1.4;margin-top:3px}
+.production-labor-overlay .production-labor-table th{background:#edf3ed!important;color:#174c30!important}
+.production-labor-overlay button{border:1px solid #9db6a2;border-radius:3px;padding:5px 8px;background:#f4f8f4;color:#174c30}
