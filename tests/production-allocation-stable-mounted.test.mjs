@@ -1,10 +1,12 @@
+import {trackBrowserChannels} from './helpers/browser-channels.mjs';
+const closeBrowserChannels=trackBrowserChannels();
 import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {createServer} from 'vite';
+import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 const {JSDOM}=createRequire(import.meta.url)('jsdom');
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'https://synthetic.test',pretendToBeVisual:true});
-for(const k of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','CustomEvent','Node','localStorage'])globalThis[k]=dom.window[k];
+for(const k of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','CustomEvent','Node','localStorage','MutationObserver','getComputedStyle','Element','HTMLButtonElement','DocumentFragment'])globalThis[k]=dom.window[k];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
 const vite=await createServer({appType:'custom',configFile:false,server:{middlewareMode:true,hmr:false}});
@@ -13,7 +15,7 @@ const {default:Capacity}=await vite.ssrLoadModule('/components/weekly-capacity.t
 const cache=await vite.ssrLoadModule('/lib/capacity-workspace-cache.ts');
 const sync=await vite.ssrLoadModule('/lib/data-sync.ts');
 const originalFetch=globalThis.fetch;
-after(async()=>{globalThis.fetch=originalFetch;await vite.close();dom.window.close();});
+after(async()=>{globalThis.fetch=originalFetch;await vite.close();closeBrowserChannels();dom.window.close();});
 const data=(revision=1)=>({revision,readOnly:false,group:'C',sourceLines:['C'],pendingPeople:0,offers:[],candidates:[{id:'C1',name:'Nhân viên kiểm thử',line:'C'}]});
 const settle=async()=>act(async()=>{await new Promise(r=>setTimeout(r,20));});
 const button=(host,label)=>[...host.querySelectorAll('button')].find(n=>n.textContent.trim()===label);

@@ -2,7 +2,7 @@ import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {createServer} from 'vite';
+import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 import {newDailyCapacity} from '../lib/capacity.mjs';
 const week='2026-10-12';
 const vite=await createServer({appType:'custom',configFile:false,server:{middlewareMode:true,hmr:false}});

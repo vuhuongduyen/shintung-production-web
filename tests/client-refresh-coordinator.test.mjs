@@ -1,4 +1,5 @@
-import {actionFeedbackHelpers} from './helpers/action-feedback-fixture.mjs';
+import {auditSubmittedInput} from '../lib/audit-submitted-input.mjs';
+import {actionFeedbackHelpers,clientActionAuditFixture} from './helpers/action-feedback-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createReadCache} from '../lib/client-read-cache.mjs';
@@ -74,7 +75,7 @@ test('hidden documents do not poll, disposed account readers cannot publish late
 
 test('actual shared reader isolates explicit request context, skips POST, and resets account generations',async()=>{
  const exports={},requests=[];
- const context={module:{exports},exports,window:{},Headers,Response,Request,URL,fetch:(path,init)=>{requests.push({path,init});return Promise.resolve(Response.json({call:requests.length}));},require:name=>name.includes('action-feedback')?actionFeedbackHelpers:name==='react'?{createContext:()=>({})}:name.includes('client-read-cache')?{createReadCache}:{createRefreshCoordinator}};
+ const context={module:{exports},exports,window:{},crypto,Headers,Response,Request,URL,fetch:(path,init)=>{requests.push({path,init});return Promise.resolve(Response.json({call:requests.length}));},require:name=>name.includes('audit-submitted-input')?{auditSubmittedInput}:name.includes('client-action-audit')?clientActionAuditFixture:name.includes('action-feedback')?actionFeedbackHelpers:name==='react'?{createContext:()=>({})}:name.includes('client-read-cache')?{createReadCache}:{createRefreshCoordinator}};
  vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../lib/data-sync.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,context);
  const {sharedRead,clearClientReads,clientReadGeneration,subscribeClientReadInvalidation}=exports;
  const [a,b,a2]=await Promise.all([sharedRead('/api/records?entity=sku',{headers:{'x-context':'A'}}),sharedRead('/api/records?entity=sku',{headers:{'x-context':'B'}}),sharedRead('/api/records?entity=sku',{headers:{'X-Context':'A'}})]);

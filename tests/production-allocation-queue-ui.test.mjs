@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {createServer} from 'vite';
+import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 const vite=await createServer({appType:'custom',configFile:false,server:{middlewareMode:true,hmr:false}});
 after(()=>vite.close());
 const {default:Queue}=await vite.ssrLoadModule('/components/production-allocation-queue.tsx');

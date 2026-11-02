@@ -1,3 +1,4 @@
+import * as weekVisibility from '../lib/week-visibility.mjs';
 import {actionFeedbackComponentFixture, actionFeedbackHelpers} from './helpers/action-feedback-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,6 +27,9 @@ function harness(initialActive=true){
   if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;
   if(name.includes('data-sync'))return{apiFetch:fetch,useDataRefresh:()=>revision,clientSessionGeneration:()=>0,subscribeClientReadInvalidation:fn=>listeners.push(fn),WorkspaceActivityContext:{displayName:'WorkspaceActivityContext'},ClientSessionReadCancelled:class extends Error{}};
   if(name.includes('production-plan.mjs'))return plan;if(name.includes('lib/in-transit.mjs'))return transit;if(name.includes('in-transit-edit-feedback'))return editFeedback;if(name.includes('production-progress-display'))return progress;
+  // Display-only child is outside this effect/request harness; no authorization is stubbed.
+  if(name.endsWith('week-visibility.mjs'))return weekVisibility;
+  if(name.endsWith('production-status-legend'))return {default:()=>null};
   if(name.includes('in-transit-semantics'))return{inTransitCellKind:()=> 'text'};if(name.includes('StandardToolbar'))return{toolbar,StandardToolbar:()=>null};if(name.includes('ManualPagination'))return{ManualPagination:()=>null};if(name.includes('DataCell'))return{DataCell:()=>null};if(name.includes('transit-history-import'))return{default:()=>null};throw Error(name);
  }});
  const commit=()=>{c=r=e=0;const tree=exports.InTransit({});while(pending.length)pending.shift()();return tree;};

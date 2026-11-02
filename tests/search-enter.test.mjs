@@ -1,4 +1,6 @@
-import test, {after} from 'node:test';
+import {trackBrowserChannels} from './helpers/browser-channels.mjs';
+const closeBrowserChannels=trackBrowserChannels();
+import test, {after,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createServer} from 'vite';
@@ -16,12 +18,16 @@ const {ActionFeedbackHost}=await vite.ssrLoadModule('/components/action-feedback
 const {FeedbackInbox}=await vite.ssrLoadModule('/components/user-feedback.tsx');
 const {default:ActualWorkSchedule}=await vite.ssrLoadModule('/components/actual-work-schedule.tsx');
 const {default:PlanningReports}=await vite.ssrLoadModule('/components/planning-reports.tsx');
-after(async()=>{await vite.close();dom.window.close();});
+after(async()=>{await vite.close();closeBrowserChannels();dom.window.close();});
 const el = React.createElement;
+const mounted=new Set();
+afterEach(async()=>{for(const view of mounted)await view.close();});
 async function mount(component) {
   const host=document.createElement('div'); document.body.append(host); const root=createRoot(host);
+  const view={host, async close(){if(!mounted.delete(view))return;await act(async()=>root.unmount());host.remove();}};
+  mounted.add(view);
   await act(async()=>root.render(component));
-  return {host, async close(){await act(async()=>root.unmount());host.remove();}};
+  return view;
 }
 async function key(input, options={}) {await act(async()=>input.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true,...options})));}
 async function change(input,value) {await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new window.Event('input',{bubbles:true}));});}
@@ -152,11 +158,11 @@ async function choose(select,value){await act(async()=>{select.value=value;selec
 test('ACTUAL schedule monthly lookup Enter from month field opens chosen month without touching HR save',async()=>{
  const view=await mount(actualFixture());await click([...view.host.querySelectorAll('button')].find(b=>b.textContent==='Tổng hợp tháng'));
  const toolbar=view.host.querySelector('[data-standard-toolbar=ActualWorkSchedule]');await choose(toolbar.querySelector('select'),'Tổng hợp tháng');
- const month=toolbar.querySelector('input[type=month]');assert.ok(month);await change(month,'2026-11');assert.equal(view.host.querySelector('.actual-month-results'),null);
+ const month=toolbar.querySelector('input[type=month]');assert.ok(month);await change(month,'2026-11');assert.equal(Boolean(view.host.querySelector('.actual-month-results')),false);
  await key(month);assert.ok(view.host.querySelector('.actual-month-results'));assert.equal(view.host.querySelector('[data-standard-toolbar=ActualWorkSchedule] input[type=month]').value,'2026-11');await view.close();
 });
 test('ACTUAL schedule category select accepts an open picker then closed Enter applies monthly lookup',async()=>{
- const view=await mount(actualFixture());await click([...view.host.querySelectorAll('button')].find(b=>b.textContent==='Tổng hợp tháng'));const select=view.host.querySelector('[data-standard-toolbar=ActualWorkSchedule] select');await choose(select,'Tổng hợp tháng');select.matches=selector=>selector===':open';await key(select);assert.equal(view.host.querySelector('.actual-month-results'),null);select.matches=()=>false;await key(select);assert.ok(view.host.querySelector('.actual-month-results'));await view.close();
+ const view=await mount(actualFixture());await click([...view.host.querySelectorAll('button')].find(b=>b.textContent==='Tổng hợp tháng'));const select=view.host.querySelector('[data-standard-toolbar=ActualWorkSchedule] select');await choose(select,'Tổng hợp tháng');select.matches=selector=>selector===':open';await key(select);assert.equal(Boolean(view.host.querySelector('.actual-month-results')),false);select.matches=()=>false;await key(select);assert.ok(view.host.querySelector('.actual-month-results'));await view.close();
 });
 
 test('ACTUAL schedule closed Line filter Enter equals click and cannot change a locked or busy Line',async()=>{
@@ -174,7 +180,7 @@ test('ACTUAL schedule week Enter normalizes date once and IME/repeated keys do n
  const weeks=[];let saves=0;const view=await mount(actualFixture({hr:true,approved:{version:1,days:[]},setWeek:value=>weeks.push(value),save:async()=>{saves++;return true;}}));await click([...view.host.querySelectorAll('button')].find(b=>b.textContent==='Tổng hợp tháng'));
  const toolbar=view.host.querySelector('[data-standard-toolbar=ActualWorkSchedule]');await choose(toolbar.querySelector('select'),'Tuần');const date=toolbar.querySelector('input[type=date]');await change(date,'2026-11-04');
  await key(date,{isComposing:true});await key(date,{keyCode:229});await key(date,{repeat:true});assert.deepEqual(weeks,[]);await key(date);assert.deepEqual(weeks,['2026-11-02']);
- assert.equal(view.host.querySelector('.actual-line-leave'),null);assert.equal(saves,0);assert.deepEqual(weeks,['2026-11-02']);await view.close();
+ assert.equal(Boolean(view.host.querySelector('.actual-line-leave')),false);assert.equal(saves,0);assert.deepEqual(weeks,['2026-11-02']);await view.close();
 });
 test('shared lookup selects preserve open selection, ignore IME/repeat, apply closed Enter once and support older picker fallback',async()=>{
  const calls=[];const view=await mount(fixture({calls}));const select=view.host.querySelector('select');

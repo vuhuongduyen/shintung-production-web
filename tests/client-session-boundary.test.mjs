@@ -1,4 +1,5 @@
-import {actionFeedbackHelpers} from './helpers/action-feedback-fixture.mjs';
+import {auditSubmittedInput} from '../lib/audit-submitted-input.mjs';
+import {actionFeedbackHelpers,clientActionAuditFixture} from './helpers/action-feedback-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -8,7 +9,7 @@ import {clientAuthorizationKey} from '../lib/client-authorization-context.mjs';
 import {createReadCache} from '../lib/client-read-cache.mjs';
 import {createRefreshCoordinator} from '../lib/client-refresh-coordinator.mjs';
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
-function reader(fetch){const exports={};const context={exports,module:{exports},window:{},Headers,Response,Request,URL,fetch,require:n=>n.includes('action-feedback')?actionFeedbackHelpers:n==='react'?{createContext:()=>({})}:n.includes('client-read-cache')?{createReadCache}:{createRefreshCoordinator}};vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../lib/data-sync.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,context);return exports;}
+function reader(fetch){const exports={};const context={exports,module:{exports},window:{},crypto,Headers,Response,Request,URL,fetch,require:n=>n.includes('audit-submitted-input')?{auditSubmittedInput}:n.includes('client-action-audit')?clientActionAuditFixture:n.includes('action-feedback')?actionFeedbackHelpers:n==='react'?{createContext:()=>({})}:n.includes('client-read-cache')?{createReadCache}:{createRefreshCoordinator}};vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../lib/data-sync.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,context);return exports;}
 test('authorization fingerprint ignores cosmetics/order but detects effective scope changes',()=>{
  const base={authenticated:true,session:{kind:'internal',login:'a',role:'HR',line:'A',grants:['Read SKU','Edit Capacity'],name:'Name'}};
  const key=s=>clientAuthorizationKey({...base,session:{...base.session,...s}});

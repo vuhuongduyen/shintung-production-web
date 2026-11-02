@@ -1,6 +1,6 @@
 import test,{after} from 'node:test';import assert from 'node:assert/strict';import {createRequire} from 'node:module';import {createServer} from 'vite';import {readFileSync} from 'node:fs';
 const {JSDOM}=createRequire(import.meta.url)('jsdom');const dom=new JSDOM('<html><body></body></html>',{url:'https://synthetic.test'});
-for(const key of ['window','document','HTMLElement','CustomEvent','Event'])globalThis[key]=dom.window[key];globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+for(const key of ['window','document','HTMLElement','MutationObserver','CustomEvent','Event'])globalThis[key]=dom.window[key];globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');const el=React.createElement;
 const vite=await createServer({appType:'custom',configFile:false,server:{middlewareMode:true,hmr:false}});
 const {ActionFeedbackHost,FeedbackActionButton}=await vite.ssrLoadModule('/components/action-feedback.tsx');const feedback=await vite.ssrLoadModule('/lib/action-feedback.ts');const sync=await vite.ssrLoadModule('/lib/data-sync.ts');

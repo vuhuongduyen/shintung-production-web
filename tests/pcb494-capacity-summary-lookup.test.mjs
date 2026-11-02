@@ -2,9 +2,9 @@ import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {createServer} from 'vite';
+import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 // Synthetic ready-state fixture bypasses only the initial async load gate; no API runs in SSR.
-const vite=await createServer({plugins:[{name:'test-capacity-ready',enforce:'pre',transform(source,id){if(!id.endsWith('/components/weekly-capacity.tsx'))return;const before='[weekReady,setWeekReady]=useState(initial.ready)';assert.equal(source.split(before).length,2);return source.replace(before,'[weekReady,setWeekReady]=useState(true)').replace('[search,setSearch]=useState(false)','[search,setSearch]=useState(Boolean(globalThis.__capacityLookupFixture))');}}],configFile:false,appType:'custom',server:{middlewareMode:true,hmr:false}});after(()=>vite.close());
+const vite=await createServer({plugins:[{name:'test-capacity-ready',enforce:'pre',transform(source,id){if(!id.endsWith('/components/weekly-capacity.tsx'))return;const before='[weekReady,setWeekReady]=useState(initial.ready)';assert.equal(source.split(before).length,2);assert.equal(source.split('[state,setState]=useState<Item|null>(initial.snapshot?.data||null)').length,2);return source.replace('[state,setState]=useState<Item|null>(initial.snapshot?.data||null)','[state,setState]=useState<Item|null>({revision:0,rows:[],permissions:{}})').replace(before,'[weekReady,setWeekReady]=useState(true)').replace('[search,setSearch]=useState(false)','[search,setSearch]=useState(Boolean(globalThis.__capacityLookupFixture))');}}],configFile:false,appType:'custom',server:{middlewareMode:true,hmr:false}});after(()=>vite.close());
 const {default:WeeklyCapacity}=await vite.ssrLoadModule('/components/weekly-capacity.tsx');
 function render(view){return renderToStaticMarkup(React.createElement(WeeklyCapacity,{view,onNavigateSummary:()=>{throw Error('No navigation during render');}}));}
 test('Summary omits lookup button and retains week and Line fields',()=>{

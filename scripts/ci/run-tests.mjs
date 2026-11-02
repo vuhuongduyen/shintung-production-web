@@ -5,7 +5,7 @@ import {pathToFileURL} from 'node:url';
 // A completed assertion does not guarantee that a Vite/DOM test releases its
 // handles. Bound each file, fail on timeout, and still run every remaining file.
 export async function runFile(file, timeoutMs = 180_000) {
-  const child = spawn(process.execPath, ['--test', '--test-concurrency=1', '--test-reporter=tap', file], {
+  const child = spawn(process.execPath, ['--max-old-space-size=2048', '--test', '--test-concurrency=1', '--test-reporter=tap', file], {
     stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32',
   });
   let pending = '', timedOut = false;

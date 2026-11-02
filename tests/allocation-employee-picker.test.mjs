@@ -1,7 +1,7 @@
 import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {createServer} from 'vite';
+import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 const {JSDOM}=createRequire(import.meta.url)('jsdom');
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'https://synthetic.test'});
 for(const name of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','KeyboardEvent','CustomEvent','Node','localStorage'])globalThis[name]=dom.window[name];

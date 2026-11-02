@@ -1,3 +1,5 @@
+import {trackBrowserChannels} from './helpers/browser-channels.mjs';
+const closeBrowserChannels=trackBrowserChannels();
 import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
@@ -12,7 +14,7 @@ const vite=await createServer({appType:'custom',configFile:false,resolve:{alias:
 const {default:Screen}=await vite.ssrLoadModule('/components/production-payroll.tsx');
 const originalFetch=globalThis.fetch;
 globalThis.fetch=async url=>{assert.equal(String(url),'/api/production-standards');return Response.json({records:[{key:'ONSPA-TEST',payload:{sku:'ONSPA-TEST',laborHour:1}}]});};
-after(async()=>{globalThis.fetch=originalFetch;await vite.close();dom.window.close();});
+after(async()=>{globalThis.fetch=originalFetch;await vite.close();closeBrowserChannels();dom.window.close();});
 test('mounted monthly totals, staff eligibility, line selection and missing dates follow policy',async()=>{
  const employees=[{id:'THAO',name:'Quách Chanh Thảo',line:'A',startDate:'2020-01-01'},{id:'TIN',name:'Đoàn Hữu Tín',line:'C',startDate:'2020-01-01'},{id:'VIET',name:'Trần Quốc Việt',line:'B',startDate:'2020-01-01'}];
  const schedules=['A','B'].map(line=>{const days=Array.from({length:31},(_,i)=>({date:`2026-10-${String(i+1).padStart(2,'0')}`,working:i===0,ot:false}));return {line,days,roster:days.map(d=>({date:d.date,hc:line==='A'?['THAO','TIN']:['VIET'],ot:[]})),input:{dailySchedule:days}};});

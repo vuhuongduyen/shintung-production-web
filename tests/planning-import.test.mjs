@@ -1,3 +1,4 @@
+import {pendingDemand,engineDemandMatches,engineInputRows} from '../lib/engine-demand.mjs';
 import {demandMatchesWeek} from '../lib/demand-week.mjs';
 import {usableSku} from '../lib/sku-state.mjs';
 import test from 'node:test';
@@ -28,7 +29,7 @@ test('report month rollover and Demand composite identity preserve blank weeks',
 test('Engine excludes planned events including Bù tải; missing inputs default per SKU; MOQ rounds up',()=>{
  const source=readFileSync(new URL('../app/page.tsx',import.meta.url),'utf8');
  const fn=source.slice(source.indexOf('function buildProductionEngine('),source.indexOf('const proposalRows:',source.indexOf('function buildProductionEngine(')));
- const context=vm.createContext({usableSku,demandMatchesWeek,forecastData:{},leadtimeRows:[],skus:[{code:'A',confirmation_status:'Đã xác nhận',usage_status:'Đang sử dụng',leadTime:'2',moq:10,line:'A'}],leadtimeBySku:new Map(),
+ const context=vm.createContext({pendingDemand,engineDemandMatches,engineInputRows,usableSku,demandMatchesWeek,forecastData:{},leadtimeRows:[],skus:[{code:'A',confirmation_status:'Đã xác nhận',usage_status:'Đang sử dụng',leadTime:'2',moq:10,line:'A'}],leadtimeBySku:new Map(),
   mondayOf:d=>{const x=new Date(d);x.setDate(x.getDate()-(x.getDay()+6)%7);return x;},
   parseViDate:s=>{const [d,m,y]=s.split('/');return new Date(`${y}-${m}-${d}T00:00:00`);},
   formatViDate:d=>d.toISOString().slice(0,10),safetyBreakdown:()=>({total:1}),priorityRank:()=>1});

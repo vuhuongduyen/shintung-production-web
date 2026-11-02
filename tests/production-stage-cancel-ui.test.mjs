@@ -1,3 +1,5 @@
+import {trackBrowserChannels} from './helpers/browser-channels.mjs';
+const closeBrowserChannels=trackBrowserChannels();
 import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -10,7 +12,7 @@ const React=await import('react'),{act}=React,{createRoot}=await import('react-d
 const vite=await createServer({appType:'custom',configFile:false,optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:false}});
 const {useStageCancellation}=await vite.ssrLoadModule('/components/production-stage-cancel.tsx');
 const originalFetch=globalThis.fetch;
-after(async()=>{globalThis.fetch=originalFetch;await vite.close();dom.window.close();});
+after(async()=>{globalThis.fetch=originalFetch;await vite.close();closeBrowserChannels();dom.window.close();});
 test('one shared reason, explicit preview/apply, changed reason invalidates preview, backend reason replaces generic failure',async()=>{
  const requests=[];let api,reason='Sai giờ',saved=0,fail=false,restore=null;
  globalThis.fetch=async(path,init)=>{requests.push(JSON.parse(init.body));return fail?Response.json({error:'Còn thao tác phía sau phụ thuộc.'},{status:422}):Response.json({expectedRevision:'r1',eventChanges:[{}],reportImpacts:[]});};

@@ -7,7 +7,7 @@ import {createServer} from 'vite';
 // Actual components and shared toolbar/notification host, synthetic reads only.
 const {JSDOM}=createRequire(import.meta.url)('jsdom');
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'https://synthetic.test',pretendToBeVisual:true});
-for(const name of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLButtonElement','MutationObserver','CustomEvent'])globalThis[name]=dom.window[name];
+for(const name of ['window','document','HTMLElement','Element','HTMLInputElement','HTMLSelectElement','HTMLButtonElement','MutationObserver','CustomEvent','Event'])globalThis[name]=dom.window[name];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
 const vite=await createServer({appType:'custom',configFile:false,resolve:{alias:{'@':fileURLToPath(new URL('..',import.meta.url))}},server:{middlewareMode:true,hmr:false}});
