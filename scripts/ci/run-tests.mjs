@@ -35,7 +35,10 @@ export async function runFile(file, timeoutMs = 180_000) {
 }
 
 export async function main() {
-  const files = readdirSync('tests').filter(file => file.endsWith('.test.mjs')).sort();
+  const shard = Number(process.argv[2] || 1), shards = Number(process.argv[3] || 1);
+  if (!Number.isInteger(shard) || !Number.isInteger(shards) || shard < 1 || shard > shards || shards > 16) throw new Error('Invalid shard index/count');
+  const allFiles = readdirSync('tests').filter(file => file.endsWith('.test.mjs')).sort();
+  const files = allFiles.filter((_, index) => index % shards === shard - 1);
   if (!files.length) throw new Error('No test files found');
   const results = [];
   for (const file of files) {
@@ -46,7 +49,7 @@ export async function main() {
   for (const result of results) for (const key of Object.keys(totals)) totals[key] += result.counts[key] || 0;
   const failed = results.filter(result => result.code !== 0 || result.timedOut);
   const incomplete = results.filter(result => result.counts.tests === undefined).map(result => result.file);
-  console.log('CI SUMMARY: '+JSON.stringify({files:files.length,failedFiles:failed.map(result=>({file:result.file,timeout:result.timedOut})),reportedTestTotals:totals,filesWithoutFinalTestSummary:incomplete}));
+  console.log('CI SUMMARY: '+JSON.stringify({shard,shards,totalFiles:allFiles.length,files:files.length,failedFiles:failed.map(result=>({file:result.file,timeout:result.timedOut})),reportedTestTotals:totals,filesWithoutFinalTestSummary:incomplete}));
   // Totals from terminated files are unknown, never represented as passing.
   process.exitCode = failed.length || incomplete.length ? 1 : 0;
 }

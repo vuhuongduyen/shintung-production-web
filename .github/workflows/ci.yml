@@ -40,9 +40,13 @@ jobs:
         run: npm run typecheck
 
   build-test:
-    name: Build và kiểm thử tự động
+    name: Build và kiểm thử (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Lấy mã nguồn
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -58,4 +62,4 @@ jobs:
       - name: Build để kiểm thử cả Worker đã biên dịch
         run: npm run build
       - name: Chạy tất cả test cấp cao nhất, gồm hồi quy và test kế thừa
-        run: node scripts/ci/run-tests.mjs
+        run: node scripts/ci/run-tests.mjs ${{ matrix.shard }} 3
