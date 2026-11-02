@@ -15,3 +15,5 @@ Các nguyên nhân đã xác minh và thay đổi:
 Không tuyên bố tất cả lỗi còn lại là lỗi sản phẩm hoặc test lỗi thời. Các assertion về UI tìm kiếm, toolbar điều phối, menu Line, số liệu kế hoạch và các nhóm quyền/Final cần đánh giá hợp đồng riêng. Chúng tiếp tục chạy và có thể làm CI thất bại; không xóa, skip hoặc sửa kỳ vọng để tạo kết quả xanh. Chi tiết số lượng và link run cuối được ghi trong PR #4 để gắn đúng commit.
 
 Chưa bao phủ lint hoặc QA trình duyệt thật. Test synthetic/Miniflare không xác nhận quyền thực tế hoặc số liệu production.
+
+Sau lượt CI đầy đủ đầu tiên, bổ sung alias cho site-24hour/website-test-log-details, document JSDOM cho client audit trong cache-session fixture, toolbar.note và state/context hooks của fixture xuất báo cáo. Fixture xuất báo cáo đọc cấu trúc Fragment theo nội dung hiển thị; vẫn giữ kiểm tra không có preview tự phát, export đúng snapshot, reset/đóng và thêm test từ chối quyền không tạo report. Không thay chính sách quyền thực tế.

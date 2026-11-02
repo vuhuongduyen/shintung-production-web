@@ -2,7 +2,7 @@ import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync,readdirSync} from 'node:fs';
-import {createServer} from 'vite';
+import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 import {validClockTime,localDateTimeError} from '../lib/clock-input.mjs';
 import {productionDisplayTime} from '../lib/production-display-time.mjs';
 const {JSDOM}=createRequire(import.meta.url)('jsdom');

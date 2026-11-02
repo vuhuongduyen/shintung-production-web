@@ -2,7 +2,7 @@ import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {createServer} from 'vite';
+import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const vite=await createServer({appType:'custom',configFile:false,root,server:{middlewareMode:true}});

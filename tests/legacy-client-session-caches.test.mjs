@@ -1,3 +1,4 @@
+import {JSDOM} from 'jsdom';
 import nodeTest, {after, beforeEach, afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -20,7 +21,7 @@ const plan = await vite.ssrLoadModule('/components/production-plan.tsx');
 const transit = await vite.ssrLoadModule('/components/in-transit.tsx');
 const {normalizeRow} = await vite.ssrLoadModule('/lib/production-plan.mjs');
 const {clientAuthorizationKey} = await vite.ssrLoadModule('/lib/client-authorization-context.mjs');
-const savedFetch = globalThis.fetch, savedWindow = globalThis.window, savedChannel = globalThis.BroadcastChannel;
+const savedFetch = globalThis.fetch, savedWindow = globalThis.window, savedDocument = globalThis.document, savedChannel = globalThis.BroadcastChannel;
 const week = '2026-10-12';
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((yes,no) => {resolve=yes;reject=no;}); return {promise,resolve,reject}; };
@@ -30,7 +31,10 @@ const planData = label => ({revision:1,rows:[normalizeRow({id:label,sku:label,na
 const transitData = label => ({rows:[{id:label,sku:label,name:label,week,line:'A',status:'DỰ KIẾN'}],history:[]});
 const skuData = label => ({records:[{key:label,payload:{code:label,name:label}}]});
 
+const dom = new JSDOM('<!doctype html><html><body></body></html>', {url:'https://synthetic.test'});
+after(()=>dom.window.close());
 beforeEach(() => {
+  globalThis.document = dom.window.document;
   globalThis.window = Object.assign(new EventTarget(), {location:{origin:'https://synthetic.test'}});
   globalThis.BroadcastChannel = class { postMessage() {} close() {} };
   globalThis.fetch = async input => {throw new Error(`Unexpected synthetic request: ${input}`);};
@@ -39,6 +43,7 @@ beforeEach(() => {
 afterEach(() => {
   sync.clearClientReads();
   globalThis.fetch = savedFetch;
+  if (savedDocument === undefined) delete globalThis.document; else globalThis.document = savedDocument;
   globalThis.BroadcastChannel = savedChannel;
   if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
 });
