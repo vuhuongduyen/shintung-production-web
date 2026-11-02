@@ -1,12 +1,12 @@
 import {trackBrowserChannels} from './helpers/browser-channels.mjs';
 const closeBrowserChannels=trackBrowserChannels();
-import test,{after} from 'node:test';
+import test,{after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 const {JSDOM}=createRequire(import.meta.url)('jsdom');
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'https://synthetic.test',pretendToBeVisual:true});
-for(const k of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','CustomEvent','Node','localStorage','MutationObserver','getComputedStyle','Element','HTMLButtonElement','DocumentFragment'])globalThis[k]=dom.window[k];
+for(const k of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','CustomEvent','Node','localStorage','MutationObserver','getComputedStyle','Element','HTMLButtonElement','DocumentFragment','NodeFilter','HTMLTextAreaElement'])globalThis[k]=dom.window[k];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
 const vite=await createServer({appType:'custom',configFile:false,server:{middlewareMode:true,hmr:false}});
@@ -14,8 +14,10 @@ const {default:Workspace}=await vite.ssrLoadModule('/components/production-alloc
 const {default:Capacity}=await vite.ssrLoadModule('/components/weekly-capacity.tsx');
 const cache=await vite.ssrLoadModule('/lib/capacity-workspace-cache.ts');
 const sync=await vite.ssrLoadModule('/lib/data-sync.ts');
-const originalFetch=globalThis.fetch;
-after(async()=>{globalThis.fetch=originalFetch;await vite.close();closeBrowserChannels();dom.window.close();});
+const originalFetch=globalThis.fetch,originalNow=Date.now;let clockOffset=0;Date.now=()=>originalNow()+clockOffset;
+const expireRead=()=>{clockOffset+=16000;};
+beforeEach(()=>{sync.clearClientReads('session');cache.clearCapacitySnapshots();});
+after(async()=>{globalThis.fetch=originalFetch;Date.now=originalNow;await vite.close();closeBrowserChannels();dom.window.close();});
 const data=(revision=1)=>({revision,readOnly:false,group:'C',sourceLines:['C'],pendingPeople:0,offers:[],candidates:[{id:'C1',name:'Nhân viên kiểm thử',line:'C'}]});
 const settle=async()=>act(async()=>{await new Promise(r=>setTimeout(r,20));});
 const button=(host,label)=>[...host.querySelectorAll('button')].find(n=>n.textContent.trim()===label);
@@ -30,7 +32,7 @@ test('queue shell and edited form retain DOM, dates and draft through refresh, e
  const {host,render,close}=await mount(Workspace,props);
  try{
   const shell=host.querySelector('[aria-label="Điều phối nhân sự"]');assert.ok(shell);assert.equal(shell.getAttribute('aria-busy'),'true');assert.equal(button(host,'Chờ phân bổ (0)').disabled,true);
-  const toolbarButtons=['Chuyển nhân sự','Chờ phân bổ (0)','Hủy chuyển nhân sự','Lịch sử chuyển / hủy','Hướng dẫn'].map(label=>button(host,label));
+  const toolbarButtons=['Chuyển nhân sự','Chờ phân bổ (0)','Hủy chuyển nhân sự','Lịch sử','Hướng dẫn'].map(label=>button(host,label));
   assert.equal(toolbarButtons.every(n=>n&&n.disabled),true,'all five controls exist together before permission/data verification');
   await done(net.reads.shift(),data());assert.equal(host.querySelector('[aria-label="Điều phối nhân sự"]'),shell);
   for(let i=0;i<toolbarButtons.length;i++)assert.equal(button(host,toolbarButtons[i].textContent.trim())===toolbarButtons[i],true,'first verification retains each real toolbar button');assert.doesNotMatch(shell.textContent,/Đang tải|Đang xác minh/);assert.equal(button(host,'Cập nhật dữ liệu'),undefined);
@@ -39,7 +41,7 @@ test('queue shell and edited form retain DOM, dates and draft through refresh, e
   await input(reason,'Giữ bản đang nhập');
   await input(form.querySelector('[aria-label="Đề nghị từ ngày giờ · ngày"]'),'2030-04-02');
   const beforeStart=form.querySelector('[name=offerStart]').value,beforeEnd=form.querySelector('[name=offerEnd]').value;
-  await act(async()=>window.dispatchEvent(new Event('focus')));await settle();
+  expireRead();await act(async()=>window.dispatchEvent(new Event('focus')));await settle();
   assert.equal(host.querySelector('[aria-label="Gửi đề nghị nhân lực"]'),form);assert.equal(form.querySelector('fieldset').disabled,false,'verified data stays usable during a background read');assert.doesNotMatch(shell.textContent,/Đang tải|Đang xác minh/);
   await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));assert.equal(net.posts.length,0);
   await done(net.reads.shift(),{error:'TEST refresh failed'},503);
@@ -47,13 +49,13 @@ test('queue shell and edited form retain DOM, dates and draft through refresh, e
   for(const n of toolbarButtons)assert.equal(button(host,n.textContent.trim())===n,true,'failed read and retry action cannot replace the main controls');
   await click(button(host,'Cập nhật dữ liệu'));await done(net.reads.shift(),data(2));
   assert.equal(host.querySelector('[aria-label="Gửi đề nghị nhân lực"]'),form);assert.equal(form.querySelector('fieldset').disabled,false);
-  await render({...props,planningDate:'2030-04-08',contextReady:false});await settle();
+  expireRead();await render({...props,planningDate:'2030-04-08',contextReady:false});await settle();
   assert.equal(host.querySelector('[aria-label="Điều phối nhân sự"]'),shell);assert.equal(host.querySelector('[aria-label="Gửi đề nghị nhân lực"]'),form);assert.equal(reason.value,'Giữ bản đang nhập');assert.doesNotMatch(shell.textContent,/Đang tải|Đang xác minh/);
   assert.equal(form.querySelector('[name=offerStart]').value,beforeStart);assert.equal(form.querySelector('[name=offerEnd]').value,beforeEnd);
   await done(net.reads.shift(),data(3));assert.equal(form.querySelector('fieldset').disabled,true,'capacity context still unverified');
   await render({...props,planningDate:'2030-04-08',contextReady:true});assert.equal(form.querySelector('fieldset').disabled,false);assert.equal(reason.value,'Giữ bản đang nhập');
-  await render({...props,planningDate:'2030-04-15'});await settle();const old=net.reads.shift();
-  await render({...props,planningDate:'2030-04-22'});await settle();await done(net.reads.shift(),data(4));
+  expireRead();await render({...props,planningDate:'2030-04-15'});await settle();const old=net.reads.shift();
+  sync.clearClientReads('mutation');await render({...props,planningDate:'2030-04-22'});await settle();await done(net.reads.shift(),data(4));
   await done(old,{error:'Stale denial'},403);assert.equal(host.querySelector('[aria-label="Gửi đề nghị nhân lực"]'),form);assert.equal(reason.value,'Giữ bản đang nhập');assert.equal(form.querySelector('fieldset').disabled,false);
   assert.equal(net.posts.length,0);
  }finally{await close();}
@@ -64,10 +66,10 @@ test('denial retains the outer shell, removes restricted data and blocks command
  try{
   const shell=host.querySelector('[aria-label="Điều phối nhân sự"]');await done(net.reads.shift(),data());await click(button(host,'Chuyển nhân sự'));
   await input(host.querySelector('[aria-label="Lý do chuyển nhân sự"]'),'Private old draft');
-  await act(async()=>window.dispatchEvent(new Event('focus')));await settle();await done(net.reads.shift(),{error:'Tài khoản đã ngừng hoạt động.'},403);
+  expireRead();await act(async()=>window.dispatchEvent(new Event('focus')));await settle();await done(net.reads.shift(),{error:'Tài khoản đã ngừng hoạt động.'},403);
   assert.equal(host.querySelector('[aria-label="Điều phối nhân sự"]'),shell);assert.match(host.querySelector('[role=alert]').textContent,/ngừng hoạt động/);assert.equal(host.querySelector('[aria-label="Gửi đề nghị nhân lực"]'),null);
   assert.equal(button(host,'Chờ phân bổ (0)').disabled,true);assert.equal(net.posts.length,0);
-  await render({...props,identity:'second'});await settle();await done(net.reads.shift(),data());await click(button(host,'Chuyển nhân sự'));
+  sync.clearClientReads('session');await render({...props,identity:'second'});await settle();await done(net.reads.shift(),data());await click(button(host,'Chuyển nhân sự'));
   assert.equal(host.querySelector('[aria-label="Lý do chuyển nhân sự"]').value,'');
  }finally{await close();}
 });
@@ -99,14 +101,14 @@ test('Save allocation keeps the same button and edited fields through six refres
    await render({...props,contextReady:false});
    assert.equal(button(host,'Lưu phân bổ (1)')===choose,true,'button must never be replaced by permission refresh');assert.equal(choose.disabled,true);assert.equal(choose.isConnected,true);
    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
-   await act(async()=>window.dispatchEvent(new Event('focus')));await settle();
+   expireRead();await act(async()=>window.dispatchEvent(new Event('focus')));await settle();
    assert.equal(button(host,'Lưu phân bổ (1)')===choose,true);assert.equal(form.querySelector('select'),target);assert.equal(target.value,'B');
    await done(net.reads.shift(),cycle===2?{error:'Temporary read error'}:{...queue,revision:cycle+2},cycle===2?503:200);
    assert.equal(button(host,'Lưu phân bổ (1)')===choose,true);assert.equal(target.value,'B');
    await render({...props,contextReady:true});assert.equal(choose.disabled,cycle===2);
   }
   assert.equal(net.posts.length,0);
-  await act(async()=>window.dispatchEvent(new Event('focus')));await settle();await done(net.reads.shift(),{error:'Quyền đã bị thu hồi.'},403);
+  expireRead();await act(async()=>window.dispatchEvent(new Event('focus')));await settle();await done(net.reads.shift(),{error:'Quyền đã bị thu hồi.'},403);
   assert.equal(button(host,'Lưu phân bổ (1)'),undefined,'real denial removes restricted personnel');
  }finally{await close();}
 });
@@ -140,14 +142,14 @@ test('verified cancellation stays enabled during six background reads; read fail
  const queue={...data(),group:'AB',sourceLines:['A','B'],offers:[{id:'background-offer',sourceLine:'C',sourceGroup:'C',targetGroup:'AB',effectiveAt:entry.effectiveAt,endsAt:entry.endsAt,canAllocate:true,canWithdraw:false,expired:false,people:[{id:'C1',name:'Nguyễn Hữu Lương',pending:[]}],withdrawals:[],allocations:[entry]}]};
  const {host,close}=await mount(Workspace,{identity:'background-manager',planningDate:'2030-04-01',refresh:async()=>true});
  try{
-  await done(net.reads.shift(),queue);await click(button(host,'Hủy chuyển nhân sự'));await click(button(host,'Hủy phân công'));
-  const confirm=button(host,'Xác nhận hủy phân công'),reason=host.querySelector('[aria-label="Lý do hủy phân công"]');await input(reason,'Chọn lại Line');
+  await done(net.reads.shift(),queue);await click(button(host,'Hủy chuyển nhân sự'));const selection=host.querySelector('[aria-label="Chọn phân công đã nhận cần hủy"]');await act(async()=>{selection.value=selection.options[1].value;selection.dispatchEvent(new Event('change',{bubbles:true}));});await click(button(host,'Hủy phân bổ'));
+  const confirm=button(host,'Xác nhận hủy phân bổ'),reason=host.querySelector('[aria-label="Lý do hủy phân bổ"]');await input(reason,'Chọn lại Line');
   for(let i=0;i<6;i++){
-   await act(async()=>window.dispatchEvent(new Event('focus')));await settle();assert.equal(confirm.disabled,false,'background refresh does not revoke a verified context');assert.equal(button(host,'Xác nhận hủy phân công')===confirm,true);assert.equal(reason.value,'Chọn lại Line');
+   expireRead();await act(async()=>window.dispatchEvent(new Event('focus')));await settle();assert.equal(confirm.disabled,false,'background refresh does not revoke a verified context');assert.equal(button(host,'Xác nhận hủy phân bổ')===confirm,true);assert.equal(reason.value,'Chọn lại Line');
    await done(net.reads.shift(),{...queue,revision:i+2});assert.equal(confirm.disabled,false);
   }
-  await act(async()=>window.dispatchEvent(new Event('focus')));await settle();await done(net.reads.shift(),{error:'Mất kết nối kiểm tra quyền.'},503);assert.equal(confirm.disabled,true);assert.equal(reason.value,'Chọn lại Line');
+  expireRead();await act(async()=>window.dispatchEvent(new Event('focus')));await settle();await done(net.reads.shift(),{error:'Mất kết nối kiểm tra quyền.'},503);assert.equal(confirm.disabled,true);assert.equal(reason.value,'Chọn lại Line');
   await click(button(host,'Cập nhật dữ liệu'));await done(net.reads.shift(),queue);assert.equal(confirm.disabled,false);
-  await act(async()=>window.dispatchEvent(new Event('focus')));await settle();await done(net.reads.shift(),{error:'Quyền đã bị thu hồi.'},403);assert.equal(button(host,'Xác nhận hủy phân công'),undefined);assert.equal(net.posts.length,0);
+  expireRead();await act(async()=>window.dispatchEvent(new Event('focus')));await settle();await done(net.reads.shift(),{error:'Quyền đã bị thu hồi.'},403);assert.equal(button(host,'Xác nhận hủy phân bổ'),undefined);assert.equal(net.posts.length,0);
  }finally{await close();}
 });

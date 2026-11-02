@@ -27,7 +27,7 @@ const events=employees.map((p,i)=>({id:`absence-${i}`,kind:'line-absence',absenc
 let requests=[],mutations=[],unexpected=[];
 beforeEach(()=>{
  requests=[];mutations=[];unexpected=[];document.documentElement.lang='vi';window.sessionStorage.clear();sync.clearClientReads('session');
- globalThis.fetch=async(input,init={})=>{const method=(init.method||'GET').toUpperCase();if(method!=='GET')mutations.push(`${method} ${input}`);assert.equal(method,'GET');const path=new URL(String(input),'https://synthetic.test').pathname;requests.push(path);
+ globalThis.fetch=async(input,init={})=>{const method=(init.method||'GET').toUpperCase();if(method!=='GET')mutations.push(`${method} ${input}`);assert.equal(method,'GET');const path=new URL(String(input),'https://synthetic.test').pathname;requests.push(path+new URL(String(input),'https://synthetic.test').search);
  if(path==='/api/production-workflow')return Response.json({orders,reports:[],events:[],employees,actualSchedules:[],approvedSchedules:[],rights:{manager:true,line:null}});
  unexpected.push(path);throw new Error(`Unexpected synthetic read ${path}`);};
 });
@@ -36,7 +36,7 @@ after(async()=>{globalThis.fetch=originalFetch;for(const c of channels)c.close()
 async function mount(component){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(el(React.Fragment,null,component,el(ActionFeedbackHost))));return{host,async close(){await act(async()=>root.unmount());host.remove();}};}
 const toolbar=host=>host.querySelector('[data-standard-toolbar]');
 const button=(host,label)=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===label);
-const body=host=>[...host.querySelectorAll('tbody')].map(b=>b.textContent).join('\n');
+const body=host=>[...host.querySelectorAll('tbody')].filter(b=>!b.closest('[hidden]')).map(b=>b.textContent).join('\n');
 const alert=host=>host.querySelector('[role=alert]')?.textContent||'';
 async function click(b){assert.ok(b);await act(async()=>b.click());}
 async function choose(s,value){assert.ok(s);await act(async()=>{s.value=value;s.dispatchEvent(new window.Event('change',{bubbles:true}));});}
@@ -54,7 +54,7 @@ for(const method of ['click','enter']){
    await change(input,'   ');await search(view.host,method,input);assert.match(alert(view.host),/Nhập nội dung/);assert.doesNotMatch(body(view.host),/LSX-BETA/);
    await choose(category,'');await search(view.host,method,category);assert.match(alert(view.host),/Chọn hạng mục/);assert.doesNotMatch(body(view.host),/LSX-BETA/);
    await choose(category,'SKU');input=toolbar(view.host).querySelector('input');await change(input,'BETA');await search(view.host,method,input);assert.match(body(view.host),/LSX-BETA/);assert.doesNotMatch(body(view.host),/LSX-ALPHA/);
-   assert.equal(requests.length,1);
+   assert.deepEqual(requests,['/api/production-workflow?view=work','/api/production-workflow'],'initial light/full enrichment only; searching must not fetch again');
   }finally{await view.close();}
  });
  test(`ActualWorkSchedule ${method}: blank employee/week/month criteria explain without changing applied results`,async()=>{
@@ -71,7 +71,7 @@ for(const method of ['click','enter']){
   for(const locked of [true,false]){const lines=[],view=await mount(el(ActualWorkSchedule,scheduleProps({locked,setLine:v=>lines.push(v)})));try{
    await click(button(view.host,'Tổng hợp tháng'));const category=toolbar(view.host).querySelector('select');await choose(category,'Line');const line=toolbar(view.host).querySelectorAll('select')[1];assert.equal(line.disabled,locked);
    if(!locked){await choose(line,'B');assert.deepEqual(lines,[]);}
-   await search(view.host,method,category);if(locked){assert.match(alert(view.host),/Line đã được phân quyền/);assert.deepEqual(lines,[]);}else assert.deepEqual(lines,['B']);
+   await search(view.host,method,category);if(locked){assert.match(alert(view.host),/Line đã được phân quyền/);assert.deepEqual(lines,[]);}else {assert.deepEqual(lines,[],'monthly lookup must preserve the editor Line');assert.ok(view.host.querySelector('.actual-month-results [data-no-data]'));assert.doesNotMatch(body(view.host),/NOTE-ALPHA|NOTE-BETA/);}
   }finally{await view.close();}}
  });
 }
@@ -89,7 +89,7 @@ test('ActualWorkSchedule busy/unapproved/nonmanager guards still block saves',as
 
 for(const method of ['click','enter'])test(`ProductionProgressReview ${method}: blank SKU/LSX/name explains and retains applied rows`,async()=>{
  const view=await mount(el(ProductionProgressReview,{orders,reports:[],events:[],employees,manager:true,busy:false,refresh:()=>{},open:()=>{},active:()=>({count:0,employees:[],known:false,running:false}),onReview:async()=>{throw Error('Unexpected review');}}));try{
-  await click(button(view.host,'Tra cứu'));const category=toolbar(view.host).querySelector('select');
+  await click(button(view.host,'Tra cứu'));const category=[...toolbar(view.host).querySelectorAll('select')].find(s=>s.querySelector('option[value=sku]'));
   await choose(category,'sku');let input=toolbar(view.host).querySelector('input');await change(input,'ALPHA');await search(view.host,method,input);assert.match(body(view.host),/LSX-ALPHA/);assert.doesNotMatch(body(view.host),/LSX-BETA/);
   for(const field of ['sku','lsxCode','name']){await choose(category,field);input=toolbar(view.host).querySelector('input');await change(input,'   ');await search(view.host,method,input);assert.match(alert(view.host),/Nhập nội dung/);assert.doesNotMatch(body(view.host),/LSX-BETA/);}
   await change(input,'BETA');await search(view.host,method,input);assert.match(body(view.host),/LSX-BETA/);assert.doesNotMatch(body(view.host),/LSX-ALPHA/);

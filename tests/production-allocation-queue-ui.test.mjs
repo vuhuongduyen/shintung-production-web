@@ -36,13 +36,13 @@ test('scope C permits only C source and target, sender can withdraw pending subw
  const outgoing={...offer,canAllocate:false,canWithdraw:true,people:[{id:'c1',name:'Ngọc',pending:[{effectiveAt:'2026-10-16T03:00:00Z',endsAt:window.endsAt}]}]};
  const incoming={...offer,id:'offer-2',sourceLine:'A',sourceGroup:'AB',targetGroup:'C',people:[{id:'a9',name:'Hà',pending:[window]}]};
  const html=render({view:{...view,group:'C',sourceLines:['C'],offers:[outgoing,incoming]},candidates:[{id:'c2',name:'Cúc',line:'C'},{id:'a2',name:'Không được chọn',line:'A'}]});
- assert.match(html,/Chọn Hà/);assert.match(html,/Rút Ngọc/);assert.match(html,/min="2026-10-16"/);assert.doesNotMatch(html,/Line nhận cho nhân viên đã chọn/);
+ assert.match(html,/Chọn Hà/);assert.match(html,/Hủy chuyển nhiều nhân viên/);assert.match(html,/Ngọc/);assert.match(html,/min="2026-10-16"/);assert.doesNotMatch(html,/Line nhận cho nhân viên đã chọn/);
  assert.doesNotMatch(html,/Phân bổ Ngọc|Rút Hà|Không được chọn|value="A"/);assert.match(html,/Chọn nhân viên/);
 });
 
 test('expired, fully allocated, unrelated and unconfigured scopes offer no mutation controls',()=>{
- const html=render({view:{...view,offers:[{...offer,expired:true},{...offer,id:'done',people:[{id:'done',name:'Đã nhận hết',pending:[]}]},{...offer,id:'wrong',targetGroup:'C',sourceGroup:'C',people:[{id:'wrong',name:'Sai phạm vi',pending:[window]}]}]}});
- assert.match(html,/0 người đang chờ nhận/);assert.match(html,/Chưa có nhân lực chờ nhận/);assert.doesNotMatch(html,/Phân bổ Ngọc|Sai phạm vi/);assert.match(html,/Đã nhận hết/);
+ const props={view:{...view,offers:[{...offer,expired:true},{...offer,id:'done',people:[{id:'done',name:'Đã nhận hết',pending:[]}]},{...offer,id:'wrong',targetGroup:'C',sourceGroup:'C',people:[{id:'wrong',name:'Sai phạm vi',pending:[window]}]}]}};const html=render(props);
+ assert.match(html,/0 người đang chờ nhận/);assert.match(html,/Chưa có nhân lực chờ nhận/);assert.doesNotMatch(html,/Phân bổ Ngọc|Sai phạm vi/);const history=flatten(harness(Queue,{...base,...props}).render()).filter(n=>n.type==='dd').map(n=>renderToStaticMarkup(n)).join('');assert.match(history,/Đã nhận hết/,'completed people remain in history behind the dialog');assert.doesNotMatch(history,/Sai phạm vi/);
  for(const missing of [{...view,group:'unknown'},{...view,sourceLines:[]}]){const text=render({view:missing});assert.match(text,/role="alert"/);assert.match(text,/Chưa được thiết lập phạm vi QLSX/);assert.doesNotMatch(text,/<form/);}
 });
 
@@ -73,9 +73,12 @@ test('allocation submits only one offered person and selected bounded interval; 
 
 test('withdrawal is a selected pending subwindow, never a whole-offer cancellation',async()=>{
  const queue=harness(Queue,{...base,view:{...view,group:'C',sourceLines:['C'],offers:[{...offer,canAllocate:false,canWithdraw:true}]}}).render();
- const child=node(queue,n=>typeof n.type==='function'&&n.props.offer&&n.props.person&&n.props.window);const commands=[];const h=harness(child.type,{...child.props,onCommand:async command=>{commands.push(command);return true;}});
- let tree=h.render();input(tree,'Lý do rút Ngọc').props.onChange({target:{value:'Đổi kế hoạch'}});input(tree,'Từ ngày giờ của Ngọc').props.onChange({target:{value:'2026-10-16T10:00:00'}});input(tree,'Đến ngày giờ của Ngọc').props.onChange({target:{value:'2026-10-16T11:00:00'}});await submit(h.render());
- assert.equal(commands[0].action,'withdraw');assert.equal(commands[0].employeeId,'c1');assert.equal(commands[0].offerId,'offer-1');assert.equal(commands[0].targetLine,undefined);assert.equal(commands[0].endsAt,'2026-10-16T04:00:00.000Z');
+ const child=node(queue,n=>n.type?.name==='WithdrawMany');assert.ok(child);const commands=[];const h=harness(child.type,{...child.props,onCommand:async command=>{commands.push(command);return true;}});
+ let tree=h.render();await submit(tree);assert.equal(commands.length,0,'selection is required');picker(tree).props.onChange(['c1']);tree=h.render();
+ input(tree,'Lý do hủy chuyển nhân sự').props.onChange({target:{value:'Đổi kế hoạch'}});input(tree,'Hủy chuyển từ ngày giờ').props.onChange({target:{value:'2026-10-16T10:00:00'}});input(tree,'Hủy chuyển đến ngày giờ').props.onChange({target:{value:'2026-10-16T14:00:00'}});await submit(h.render());assert.equal(commands.length,0,'out-of-window withdrawal is rejected');
+ input(h.render(),'Hủy chuyển đến ngày giờ').props.onChange({target:{value:'2026-10-16T11:00:00'}});await submit(h.render());
+ assert.equal(commands.length,1);assert.equal(commands[0].action,'withdraw-many');assert.deepEqual(commands[0].selections,[{offerId:'offer-1',employeeId:'c1'}]);assert.equal(commands[0].expectedRevision,7);assert.equal(commands[0].reason,'Đổi kế hoạch');assert.equal(commands[0].targetLine,undefined);assert.equal(commands[0].effectiveAt,'2026-10-16T03:00:00.000Z');assert.equal(commands[0].endsAt,'2026-10-16T04:00:00.000Z');
+
 });
 
 test('component owns no network, global roster, attendance or toolbar implementation',async()=>{
@@ -111,8 +114,11 @@ test('admin sees offers, pending names and setup control without allocation form
 });
 
 test('planning allocations and old actual records remain distinct and unconverted',()=>{
- const html=render({view:{...view,offers:[{...offer,allocations:[{id:'planned',employeeId:'c1',targetLine:'A',...window,planning:true},{id:'old',employeeId:'c1',targetLine:'B',...window}]}]}});
- assert.match(html,/Lịch kế hoạch/);assert.match(html,/Phân bổ thực tế trước đây – giữ nguyên/);
+ const allocations=[{id:'planned',employeeId:'c1',targetLine:'A',...window,planning:true},{id:'old',employeeId:'c1',targetLine:'B',...window}],before=structuredClone(allocations);
+ const tree=harness(Queue,{...base,view:{...view,offers:[{...offer,allocations}]}}).render();
+ const planned=node(tree,n=>n.type==='tr'&&n.key==='aplanned'),actual=node(tree,n=>n.type==='tr'&&n.key==='aold');assert.ok(planned);assert.ok(actual);
+ assert.match(renderToStaticMarkup(planned),/Phân bổ nhân sự \(kế hoạch\)/);assert.match(renderToStaticMarkup(actual),/Phân bổ nhân sự \(thực tế\)/);assert.deepEqual(allocations,before,'rendering history cannot convert old actual records');
+
 });
 
 test('multi-day allocation preserves full reservation; UI explains planned shift intersection',async()=>{

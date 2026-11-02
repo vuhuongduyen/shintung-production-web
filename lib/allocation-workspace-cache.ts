@@ -1,3 +1,4 @@
+import {allocationDenialMessage} from './allocation-denial-message.mjs';
 import {productionApiFetch} from './production-api';
 import {clientSessionGeneration,clientReadGeneration,subscribeClientReadInvalidation} from './data-sync';
 let retained:any=null,pending:Promise<any>|null=null,loadedAt=0,generation=-1;
@@ -9,6 +10,7 @@ export async function readAllocationWorkspace(force=false):Promise<any>{
  const session=clientSessionGeneration(),readGeneration=clientReadGeneration();
  const request=(async()=>{
   const response=await productionApiFetch('/api/production-allocation',{cache:force?'reload':'no-store'});
+  if(response.status===403){retained=null;throw Object.assign(Error(await allocationDenialMessage(response)),{status:403});}
   const result=await response.json().catch(()=>({error:'Không đọc được dữ liệu Điều phối nhân sự.'}));
   if(!response.ok){if([401,403].includes(response.status))retained=null;throw Object.assign(Error(result.error||'Không tải được Điều phối nhân sự.'),{status:response.status});}
   if(!Array.isArray(result.offers)||!Array.isArray(result.candidates)||!Array.isArray(result.sourceLines)||!Number.isInteger(result.revision)||!['C','AB','ADMIN'].includes(result.group))throw Error('Chưa xác minh được dữ liệu Điều phối nhân sự. Vui lòng tải lại.');

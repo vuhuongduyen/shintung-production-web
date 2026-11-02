@@ -123,7 +123,7 @@ async function choose(select,value) {
 async function click(button) {assert.ok(button,'Expected mounted button');await act(async()=>button.click());}
 const button=(host,label)=>[...host.querySelectorAll('button')].find(b=>b.textContent===label);
 const toolbar=host=>host.querySelector('[data-standard-toolbar]');
-const body=host=>[...host.querySelectorAll('tbody')].map(t=>t.textContent).join('\n');
+const body=host=>[...host.querySelectorAll('tbody')].filter(t=>!t.closest('[hidden]')).map(t=>t.textContent).join('\n');
 const never=()=>{throw new Error('Lookup must not invoke unrelated business actions');};
 async function search(host,control,method) {if(method==='click')await click(button(toolbar(host),'Tìm kiếm'));else await key(control);}
 async function openPickerEnter(control) {
@@ -172,7 +172,7 @@ for (const method of ['enter','click']) {
       const month=toolbar(view.host).querySelector('input[type=month]');await change(month,'2026-11');
       assert.match(view.host.querySelector('.payroll-section-title').textContent,/10\/2026/);
       await search(view.host,month,method);assert.match(view.host.querySelector('.payroll-section-title').textContent,/11\/2026/);
-      await click(button(view.host,'Giờ hoàn thành theo LSX'));assert.doesNotMatch(body(view.host),/LSX-BETA/);
+      await click(button(view.host,'Giờ công theo LSX'));assert.doesNotMatch(body(view.host),/LSX-BETA/);
       await choose(toolbar(view.host).querySelector('select'),'line');
       const line=toolbar(view.host).querySelectorAll('select')[1];await choose(line,'B');
       await openPickerEnter(line);assert.doesNotMatch(body(view.host),/LSX-BETA/);
@@ -210,7 +210,7 @@ for (const method of ['enter','click']) {
       const line=[...toolbar(view.host).querySelectorAll('select')].find(s=>s.querySelector('option[value=all]')&&s.querySelector('option[value=A]'));
       await choose(line,'B');await openPickerEnter(line);assert.match(body(view.host),/LSX-ALPHA/);
       await search(view.host,line,method);assert.doesNotMatch(body(view.host),/LSX-ALPHA/);assert.match(body(view.host),/LSX-BETA/);
-      assert.deepEqual(requests,[]);
+      assert.deepEqual(requests,['/api/production-standards'],'loaded standards only; lookup must not refetch or write');
     } finally {await view.close();}
   });
   test(`ProductionCorrections real text and closed Line lookup apply by ${method} without editing`,async()=>{
@@ -229,14 +229,14 @@ for (const method of ['enter','click']) {
   test(`ProductionProgressReview real SKU and closed Line lookup apply by ${method}`,async()=>{
     const view=await mount(el(ProductionProgressReview,{orders,reports:[],events:[],employees,manager:false,busy:false,refresh:never,open:never,active:()=>({known:false,running:false,count:0}),onReview:never}));
     try {
-      await click(button(view.host,'Tra cứu'));await choose(toolbar(view.host).querySelector('select'),'sku');
+      await click(button(view.host,'Tra cứu'));await choose([...toolbar(view.host).querySelectorAll('select')].find(s=>s.querySelector('option[value=sku]')),'sku');
       const input=toolbar(view.host).querySelector('input');await change(input,'SKU-ALPHA');
       assert.match(body(view.host),/LSX-BETA/);await search(view.host,input,method);
       assert.match(body(view.host),/LSX-ALPHA/);assert.doesNotMatch(body(view.host),/LSX-BETA/);
       await change(input,'');await search(view.host,input,method);
       assert.doesNotMatch(body(view.host),/LSX-BETA/,'Existing filter survives an invalid empty SKU search');
       await click(button(view.host,'Xóa lọc'));
-      const line=toolbar(view.host).querySelectorAll('select')[1];await choose(line,'B');await openPickerEnter(line);
+      const line=[...toolbar(view.host).querySelectorAll('select')].find(s=>s.querySelector('option[value=all]')&&s.querySelector('option[value=A]'));await choose(line,'B');await openPickerEnter(line);
       assert.match(body(view.host),/LSX-ALPHA/);await search(view.host,line,method);
       assert.doesNotMatch(body(view.host),/LSX-ALPHA/);assert.match(body(view.host),/LSX-BETA/);assert.deepEqual(requests,[]);
     } finally {await view.close();}
@@ -308,7 +308,7 @@ for(const method of ['enter','click']) {
           assert.match(body(view.host),/LSX-ALPHA/);await search(view.host,dates[1],method);
           assert.doesNotMatch(body(view.host),/LSX-ALPHA/);assert.match(body(view.host),/LSX-BETA/);
         }
-        assert.deepEqual(requests,[]);
+        assert.deepEqual(requests,['/api/production-standards'],'loaded standards only; lookup must not refetch or write');
       } finally {await view.close();}
     });
   }

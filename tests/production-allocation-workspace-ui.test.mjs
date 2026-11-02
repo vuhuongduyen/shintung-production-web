@@ -13,15 +13,29 @@ test('cold workspace displays loading context instead of disappearing',()=>{
 });
 test('403 clears retained queue and uses bounded server diagnosis; unverified or read-only submission remains denied',async()=>{
  const source=await readFile(new URL('../components/production-allocation-workspace.tsx',import.meta.url),'utf8');
- const denied=source.match(/if\(response.status===403\)\{([\s\S]+?)return;\}/)?.[1]||'';
- assert.match(denied,/await allocationDenialMessage\(response\)/);assert.match(denied,/setData\(null\)/);assert.match(denied,/setError\(message\)/);
- assert.match(denied,/current===generation.current&&sequence===loadSequence.current/);
- assert.match(source,/!verified.current\|\|!data\|\|data.readOnly/);assert.match(source,/<ProductionAllocationQueue view=\{data\|\|emptyQueue\}/);
+ const {readAllocationWorkspace,retainedAllocation}=await vite.ssrLoadModule('/lib/allocation-workspace-cache.ts');
+ const {clearClientReads}=await vite.ssrLoadModule('/lib/data-sync.ts');
+ const oldFetch=globalThis.fetch,oldWindow=globalThis.window;
+ globalThis.window={location:{origin:'https://synthetic.test'}};
+ try{
+  for(const reason of ['Chưa được cấu hình phạm vi QLSX cho Chờ phân bổ.','Denied\n'+'x'.repeat(2000)]){
+   clearClientReads('session');
+   globalThis.fetch=async()=>Response.json({revision:1,group:'C',offers:[],candidates:[],sourceLines:['C']});
+   const loaded=await readAllocationWorkspace(true);assert.equal(retainedAllocation(),loaded);
+   globalThis.fetch=async()=>Response.json({error:reason},{status:403});
+   const expected=await allocationDenialMessage(Response.json({error:reason},{status:403}));
+   await assert.rejects(()=>readAllocationWorkspace(true),error=>error.status===403&&error.message===expected);
+   assert.equal(retainedAllocation(),null,'denied response must purge retained private data');
+  }
+ }finally{clearClientReads('session');globalThis.fetch=oldFetch;if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow;}
+ assert.match(source,/!verified.current\|\|!data\|\|data.readOnly/);
+ assert.match(source,/if\(\[401,403\].includes\(\(e as any\)\?\.status\)\)setData\(null\)/);
+ assert.match(source,/<ProductionAllocationQueue view=\{data\|\|emptyQueue\}/);
 });
 test('absent QLSX scope preserves backend reason and adds relevant setup path',async()=>{
  const reason='Chưa được cấu hình phạm vi QLSX cho Chờ phân bổ.';
  const message=await allocationDenialMessage(Response.json({error:reason},{status:403}));
- assert.ok(message.startsWith(reason));assert.match(message,/Admin thiết lập tại Capacity tuần → Lịch làm việc → Điều phối nhân sự → Thiết lập QLSX/);
+ assert.ok(message.startsWith(reason));assert.match(message,/Admin thiết lập tại Capacity tuần → Lịch làm việc dự kiến → Điều phối nhân sự → Thiết lập QLSX/);
 });
 test('inactive account denial is not misdiagnosed as missing scope',async()=>{
  const reason='Tài khoản đã ngừng hoạt động.';

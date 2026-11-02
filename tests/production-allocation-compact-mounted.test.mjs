@@ -6,11 +6,12 @@ import {createRequire} from 'node:module';
 import {createTestServer as createServer} from './helpers/vite-test-server.mjs';
 const {JSDOM}=createRequire(import.meta.url)('jsdom');
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'https://synthetic.test'});
-for(const name of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','CustomEvent','Node','localStorage','MutationObserver','getComputedStyle','Element','HTMLButtonElement','DocumentFragment'])globalThis[name]=dom.window[name];
+for(const name of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','CustomEvent','Node','localStorage','MutationObserver','getComputedStyle','Element','HTMLButtonElement','DocumentFragment','NodeFilter','HTMLTextAreaElement'])globalThis[name]=dom.window[name];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
 const vite=await createServer({appType:'custom',configFile:false,server:{middlewareMode:true,hmr:false}});
 const {default:Queue}=await vite.ssrLoadModule('/components/production-allocation-queue.tsx');
+const {ACTION_FEEDBACK_DURATION}=await vite.ssrLoadModule('/lib/action-feedback.ts');
 const {ActionFeedbackHost}=await vite.ssrLoadModule('/components/action-feedback.tsx');
 const originalFetch=globalThis.fetch;
 after(async()=>{globalThis.fetch=originalFetch;await vite.close();closeBrowserChannels();dom.window.close();});
@@ -85,21 +86,22 @@ test('receiver cancellation opens explicit reason confirmation and retains durab
  const commands=[],v={...base,revision:9,group:'AB',sourceLines:['A','B'],readOnly:false,offers:[offer]};
  const {host,close}=await mount(v,undefined,async command=>{commands.push(command);return true;});
  try{
-  await click(button(host,'Lịch sử chuyển / hủy'));assert.match(host.querySelector('#allocation-history').textContent,/C chưa có việc/);assert.match(host.querySelector('#allocation-history').textContent,/17\/10\/2026 07:00/);
+  await click(button(host,'Lịch sử'));const history=document.querySelector('[role=dialog]');assert.ok(history);await click(history.querySelector('summary'));assert.match(history.textContent,/C chưa có việc/);assert.match(history.textContent,/17\/10\/2026 07:00/);
   assert.equal(host.querySelector('#allocation-outgoing').hidden,true);
-  assert.equal(host.querySelector('#allocation-history [aria-label="Hủy phân công kế hoạch"]'),null);
-  assert.match(button(host,'Hủy chuyển nhân sự').className,/danger/);
-  await click(button(host,'Hủy chuyển nhân sự'));await selectCancellation(host);assert.equal(host.querySelector('#allocation-outgoing').hidden,false);assert.equal(host.querySelector('#allocation-history').hidden,true);assert.match(button(host,'Hủy phân công').className,/danger/);
-  await click(button(host,'Hủy phân công'));assert.equal(commands.length,0);
-  const form=host.querySelector('[aria-label="Hủy phân công kế hoạch"]');
+  assert.equal(history.querySelector('[aria-label="Hủy phân bổ kế hoạch"]'),null);
+  await click(button(history,'Đóng lịch sử'));assert.equal(document.querySelector('[role=dialog]'),null);
+  assert.equal(button(host,'Hủy chuyển nhân sự').getAttribute('aria-expanded'),'false','opening cancellation controls must require an explicit click');
+  await click(button(host,'Hủy chuyển nhân sự'));await selectCancellation(host);assert.equal(host.querySelector('#allocation-outgoing').hidden,false);assert.equal(document.querySelector('[role=dialog]'),null);assert.match(button(host,'Hủy phân bổ').className,/danger/);
+  await click(button(host,'Hủy phân bổ'));assert.equal(commands.length,0);
+  const form=host.querySelector('[aria-label="Hủy phân bổ kế hoạch"]');
   await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));assert.equal(commands.length,0);
-  const reason=host.querySelector('[aria-label="Lý do hủy phân công"]');
+  const reason=host.querySelector('[aria-label="Lý do hủy phân bổ"]');
   await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(reason,'Đổi lịch');reason.dispatchEvent(new Event('input',{bubbles:true}));});
-  await click(button(host,'Xác nhận hủy phân công'));assert.equal(commands.length,1);assert.equal(commands[0].action,'cancel');assert.equal(commands[0].allocationId,'allocation-test');assert.equal(commands[0].reason,'Đổi lịch');assert.equal(commands[0].expectedRevision,9);assert.equal(commands[0].effectiveAt,undefined);
+  await click(button(host,'Xác nhận hủy phân bổ'));assert.equal(commands.length,1);assert.equal(commands[0].action,'cancel');assert.equal(commands[0].allocationId,'allocation-test');assert.equal(commands[0].reason,'Đổi lịch');assert.equal(commands[0].expectedRevision,9);assert.equal(commands[0].effectiveAt,undefined);
  }finally{await close();}
  for(const readOnly of [false,true]){
   const {host,close}=await mount({...v,group:readOnly?'ADMIN':'C',readOnly,offers:[{...offer,allocations:[{...entry,canCancel:readOnly,canceled:!readOnly,canceledBy:'receiver',canceledAt:'2026-10-17T01:00:00Z',cancellationReason:'Đổi lịch'}]}]});
-  try{assert.equal(button(host,'Hủy phân công'),undefined);if(!readOnly){assert.match(host.textContent,/Đã hủy phân công/);assert.match(host.textContent,/Đổi lịch/);}}finally{await close();}
+  try{assert.equal(button(host,'Hủy phân bổ'),undefined);await click(button(host,'Lịch sử'));const history=document.querySelector('[role=dialog]');assert.ok(history);await click(history.querySelector('summary'));if(!readOnly){assert.match(history.textContent,/Hủy phân bổ nhân sự/);assert.match(history.textContent,/Đổi lịch/);}else assert.match(history.textContent,/Phân bổ nhân sự \(kế hoạch\)/);assert.equal(history.querySelector('[aria-label="Hủy phân bổ kế hoạch"]'),null);}finally{await close();}
  }
 });
 
@@ -107,16 +109,16 @@ test('receiver cancellation opens explicit reason confirmation and retains durab
 test('sender cancellation panel uses only existing pending withdrawal and excludes received allocations without cancel permission',async()=>{
  const offer={id:'offer-sender',sourceLine:'C',sourceGroup:'C',targetGroup:'AB',effectiveAt:'2026-10-19T01:00:00Z',endsAt:'2026-10-19T10:00:00Z',canAllocate:false,canWithdraw:true,expired:false,people:[{id:'c1',name:'Synthetic sender',pending:[{effectiveAt:'2026-10-19T01:00:00Z',endsAt:'2026-10-19T10:00:00Z'}]}],withdrawals:[],allocations:[{id:'cannot-cancel',employeeId:'c1',planning:true,canCancel:true}]};
  const {host,close}=await mount({...base,group:'C',sourceLines:['C'],readOnly:false,offers:[offer]});
- try{await click(button(host,'Hủy chuyển nhân sự'));await selectCancellation(host);assert.ok(button(host,'Hủy chuyển (1)'));assert.equal(button(host,'Hủy phân công'),undefined);assert.ok(host.querySelector('[aria-label="Lý do hủy chuyển nhân sự"]'));}finally{await close();}
+ try{await click(button(host,'Hủy chuyển nhân sự'));await selectCancellation(host);assert.ok(button(host,'Hủy chuyển (1)'));assert.equal(button(host,'Hủy phân bổ'),undefined);assert.ok(host.querySelector('[aria-label="Lý do hủy chuyển nhân sự"]'));}finally{await close();}
  const received={...offer,sourceGroup:'AB',targetGroup:'C',canWithdraw:false,people:[],allocations:[{...offer.allocations[0],canCancel:false}]};
  const denied=await mount({...base,group:'C',sourceLines:['C'],readOnly:false,offers:[received]});
- try{await click(button(denied.host,'Hủy chuyển nhân sự'));assert.equal(button(denied.host,'Hủy phân công'),undefined);assert.match(denied.host.querySelector('#allocation-outgoing').textContent,/Không có lượt phân công được phép hủy/);}finally{await denied.close();}
+ try{await click(button(denied.host,'Hủy chuyển nhân sự'));assert.equal(button(denied.host,'Hủy phân bổ'),undefined);assert.match(denied.host.querySelector('#allocation-outgoing').textContent,/Không có lượt phân công được phép hủy/);}finally{await denied.close();}
 });
 
 
-test('allocation error notice expires after four seconds while retry details and verification guards remain',async()=>{
+test('allocation error notice expires after the shared notice duration while retry details and verification guards remain',async()=>{
  const original=window.setTimeout,callbacks=[];let calls=0;
- window.setTimeout=(callback,delay,...args)=>{if(delay===4000){callbacks.push(callback);return 987654;}return original.call(window,callback,delay,...args);};
+ window.setTimeout=(callback,delay,...args)=>{if(delay===ACTION_FEEDBACK_DURATION){callbacks.push(callback);return 987654;}return original.call(window,callback,delay,...args);};
  const {host,close}=await mount({...base,group:'C',sourceLines:['C'],readOnly:false},undefined,async()=>{calls++;return true;},{verified:false,statusError:true,status:'Chưa tải được dữ liệu mới. Thử tải lại.',onReload:async()=>{}});
  try{
   assert.ok(host.querySelector('section[role="alert"]'));assert.equal(callbacks.length,1);
@@ -132,14 +134,14 @@ test('open cancellation confirmation and typed reason survive six verification c
  const offer={id:'stable-offer',sourceLine:'C',sourceGroup:'C',targetGroup:'AB',effectiveAt:entry.effectiveAt,endsAt:entry.endsAt,canAllocate:true,canWithdraw:false,expired:false,people:[{id:'C1',name:'Nguyễn Hữu Lương',pending:[]}],allocations:[entry],withdrawals:[]};
  let calls=0;const {host,render,close}=await mount({...base,group:'AB',sourceLines:['A','B'],readOnly:false,offers:[offer]},undefined,async()=>{calls++;return true;});
  try{
-  await click(button(host,'Hủy chuyển nhân sự'));await selectCancellation(host);await click(button(host,'Hủy phân công'));
-  const confirm=button(host,'Xác nhận hủy phân công'),form=confirm.closest('form'),reason=form.querySelector('input');assert.equal(confirm.disabled,true);
+  await click(button(host,'Hủy chuyển nhân sự'));await selectCancellation(host);await click(button(host,'Hủy phân bổ'));
+  const confirm=button(host,'Xác nhận hủy phân bổ'),form=confirm.closest('form'),reason=form.querySelector('input');assert.equal(confirm.disabled,true);
   await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(reason,'Đổi Line nhận');reason.dispatchEvent(new Event('input',{bubbles:true}));});
   assert.equal(confirm.disabled,false);
   for(let i=0;i<6;i++){
-   await render({verified:false});assert.equal(button(host,'Xác nhận hủy phân công')===confirm,true);assert.equal(confirm.closest('form')===form,true);assert.equal(reason.value,'Đổi Line nhận');assert.equal(confirm.disabled,true);
+   await render({verified:false});assert.equal(button(host,'Xác nhận hủy phân bổ')===confirm,true);assert.equal(confirm.closest('form')===form,true);assert.equal(reason.value,'Đổi Line nhận');assert.equal(confirm.disabled,true);
    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));assert.equal(calls,0);
-   await render({verified:true});assert.equal(button(host,'Xác nhận hủy phân công')===confirm,true);assert.equal(confirm.disabled,false);assert.equal(reason.value,'Đổi Line nhận');
+   await render({verified:true});assert.equal(button(host,'Xác nhận hủy phân bổ')===confirm,true);assert.equal(confirm.disabled,false);assert.equal(reason.value,'Đổi Line nhận');
   }
  }finally{await close();}
 });

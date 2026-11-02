@@ -166,7 +166,7 @@ export default function ProductionAllocationQueue({view,candidates,busy,onComman
  const outgoing=view.offers.filter(offer=>offer.canWithdraw&&(view.group==='ADMIN'||offer.sourceGroup===view.group)&&!offer.expired);
 
  const hasOutgoing=outgoing.some(offer=>offer.people.some(person=>person.pending.some(window=>Date.parse(window.endsAt)>Date.parse(now))));
- const pendingCount=new Set(view.offers.flatMap(offer=>offer.people.filter(person=>person.pending.some(window=>Date.parse(window.endsAt)>Date.parse(now))).map(person=>person.id))).size;
+ const pendingCount=new Set(view.offers.filter(offer=>!offer.expired&&(view.readOnly||view.group==='ADMIN'||offer.sourceGroup===view.group||offer.targetGroup===view.group)).flatMap(offer=>offer.people.filter(person=>person.pending.some(window=>Date.parse(window.endsAt)>Date.parse(now))).map(person=>person.id))).size;
  const history=view.offers.filter(offer=>view.readOnly||view.group==='ADMIN'||offer.sourceGroup===view.group||offer.targetGroup===view.group);
  const inspectOnly=!!view.readOnly||!scopedLines.length;
  const cancelable=history.flatMap(offer=>(view.group==='ADMIN'||offer.targetGroup===view.group)?offer.allocations.filter(entry=>entry.planning&&!entry.canceled&&entry.canCancel&&entry.id).map(entry=>({offer,entry})):[]);
