@@ -1,3 +1,4 @@
+import {assertFinalExitLimit} from '../../lib/production-final-limit.mjs';
 import {workflowReadSnapshot} from '../../worker/read-performance.mjs';
 import {orphanStageAllocation,repairOrphanCarry} from '../../lib/production-orphan-allocation.mjs';
 import {withCorrectionSnapshot} from './production-correction-snapshot.mjs';
@@ -36,6 +37,7 @@ export async function backfillStageWork(db,body,actor,catalog){
  if(closed&&orphan&&validEvents.some(e=>e.stageReporting&&e.sourceId===order.id&&incidentStage(e.stageName)===incidentStage(stage)&&time(e.effectiveAt)===b&&!repairOrphanCarry(e,orphan.people)))fail('Giờ xuất bù trùng một thao tác đã có của công đoạn. Kiểm tra mốc này trước; chưa lưu thay đổi.');
  const quantity=closed?Number(input.quantity):0;
  if(closed&&(!Number.isSafeInteger(quantity)||quantity<=0||quantity>Number(order.lsxQty)-completed))fail(`Số lượng xuất phải từ 1 đến ${Math.max(0,Number(order.lsxQty)-completed)} còn lại của ${stage}.`);
+ if(closed)assertFinalExitLimit(order,state.reports,[{stage,quantity}],stamp(b));
  if(!closed&&completed>=Number(order.lsxQty))fail('Công đoạn đã báo đủ sản lượng.');
  if(!closed&&validEvents.some(e=>e.sourceId===order.id&&e.stageName===stage&&time(e.effectiveAt)>=a&&!(orphan&&time(e.effectiveAt)===a&&['add','transfer'].includes(e.stageAction))))fail('Công đoạn đã có thao tác sau giờ nhập bù. Chọn ghi xuất trạm cùng lúc hoặc điều chỉnh thao tác đã có.');
  if(activeReports.some(r=>r.transitId===order.id&&r.stageName===stage&&time(r.startedAt)<b&&time(r.completedAt)>a))fail('Khoảng bù trùng phiếu báo công đã có của công đoạn. Dùng Sửa thao tác để điều chỉnh.');

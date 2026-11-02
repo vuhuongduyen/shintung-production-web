@@ -1,3 +1,4 @@
+import {assertFinalExitLimit} from '../../lib/production-final-limit.mjs';
 import {activeStaffMovement} from '../../lib/production-attendance.mjs';
 import {stagePersonAvailable} from '../../lib/production-line-assignment.mjs';
 import {importedStageEvents} from '../../lib/production-stage-history.mjs';
@@ -29,6 +30,7 @@ export async function writeStageWork({db,body,actor,state,events,now,commit,effe
  const destinations=body.destinations||{};
  for(const key of Object.values(destinations).filter(Boolean)){const d=current[key];if(!d||state.orders.find(o=>o.id===d.orderId)?.status==='HỦY'||state.orders.find(o=>o.id===d.orderId)?.line!==order.line)fail('Công đoạn nhận phải thuộc cùng Line.');}
  for(const e of chosen)if(body.action==='complete'&&!Number.isSafeInteger(e.quantity))fail('Sản lượng phải là số nguyên dương.');
+ if(body.action==='complete')assertFinalExitLimit(order,state.reports,chosen,effectiveAt);
  const command={orderId:order.id,action:body.action,at:effectiveAt,entries:chosen,confirmed:body.confirmed===true,destinations,reason:String(body.reason||'').slice(0,4000)};
  const next=applyLiveStages(current,command,state.orders),changed=Object.keys(next).filter(k=>JSON.stringify(next[k])!==JSON.stringify(current[k]));
  for(const entry of chosen){const key=stageKey(order.id,entry.stage),s=next[key],prior=current[key];if(!s)continue;s.assignmentAt=Object.fromEntries((s.people||[]).map(id=>[id,prior?.people?.includes(id)?prior.assignmentAt?.[id]||effectiveAt:effectiveAt]));const bindings={};for(const id of s.people||[]){const explicitlySelected=entry.people.includes(id)||(entry.continuePeople||[]).includes(id);const retained=prior?.people?.includes(id)&&stagePersonAvailable(prior,id,order.line,events,Date.parse(effectiveAt));const move=activeStaffMovement(events,id,Date.parse(effectiveAt));if(retained&&prior.lineAssignments?.[id])bindings[id]=prior.lineAssignments[id];else if((!prior?.people?.includes(id)||explicitlySelected)&&move?.kind==='line-movement'&&move.destinationLine===order.line)bindings[id]={movementId:move.id};else if(prior?.lineAssignments?.[id])bindings[id]=prior.lineAssignments[id];}if(Object.keys(bindings).length||prior?.lineAssignments)s.lineAssignments=bindings;}

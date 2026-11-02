@@ -22,9 +22,14 @@ test('workflow API rejects excessive Final without writes and allows partial exi
  const send=(action,h,stage,extra)=>mutateProductionWorkflow(c.db,{action,orderId:'LSX',effectiveAt:`2026-10-29T${h}:00+07:00`,stageEntries:[{stage,...extra}],requestIdempotency:crypto.randomUUID()},actor,catalog);
  await send('start','08:00','A-PACKING',{people:['worker1']});await send('complete','09:00','A-PACKING',{quantity:500});
  const backfill={action:'start',orderId:'LSX',requestIdempotency:crypto.randomUUID(),backfill:{mode:'preview',stage:'A-FINAL',from:'2026-10-29T08:00:00+07:00',to:'2026-10-29T09:00:00+07:00',people:['worker2'],quantity:1000}};
- await assert.rejects(()=>mutateProductionWorkflow(c.db,backfill,actor,catalog),/PACKING đã xuất 500/);
+ const records=async()=>(await c.db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
+ const beforeBackfill=await records();
+ for(const mode of ['preview','save'])await assert.rejects(()=>mutateProductionWorkflow(c.db,{...backfill,requestIdempotency:crypto.randomUUID(),backfill:{...backfill.backfill,mode}},actor,catalog),/PACKING đã xuất 500/);
+ assert.deepEqual(await records(),beforeBackfill,'rejected preview/save must preserve every business record');
  await send('start','08:00','A-FINAL',{people:['worker2']});const before=(await readProductionWorkflow(c.db,actor,catalog)).reports.length;
+ const beforeComplete=await records();
  await assert.rejects(()=>send('complete','09:01','A-FINAL',{quantity:1000}),/PACKING đã xuất 500/);
+ assert.deepEqual(await records(),beforeComplete,'rejected live exit must preserve every business record');
  assert.equal((await readProductionWorkflow(c.db,actor,catalog)).reports.length,before);
  const result=await send('complete','09:01','A-FINAL',{quantity:500});assert.equal(result.reports[0].stageQuantity,500);
  }finally{await c.close();}

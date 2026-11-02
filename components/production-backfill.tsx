@@ -1,4 +1,5 @@
 "use client";
+import {FeedbackActionButton} from './action-feedback';
 import {useEffect,useRef,useState} from 'react';
 import ProductionDateTimeInput from './production-date-time-input';
 import './production-stage-trial.css';
@@ -40,9 +41,9 @@ export default function ProductionBackfill({order,onSaved,onBusy,stageState={}}:
  {inspection&&!inspection.blockingMessage&&<><p>Danh sách theo lịch và phân công đến {display(inspection.checkedThrough)}. Giờ nghỉ, giải lao và thời gian ngoài lịch không tính giờ công.</p><div className="table-wrap" style={{maxHeight:300}}><table className="stage-trial-form"><thead><tr><th>Chọn</th><th>Nhân viên</th><th>Phân công trong khoảng bù</th></tr></thead><tbody>{inspection.candidates.map((p:Row)=><tr key={p.id}><td><input type="checkbox" aria-label={`Chọn ${p.name}`} disabled={!p.eligible} checked={people.includes(p.id)} onChange={e=>{setPeople(old=>e.target.checked?[...old,p.id]:old.filter(x=>x!==p.id));setPreview(null);setConsent(false);}}/></td><td>{p.name}{!p.eligible&&<small style={{display:'block'}}>Không có lịch tại Line {order.line} trong {p.partial?'toàn bộ':'khoảng'} giờ đã chọn</small>}</td><td>{p.assignments.length?<details><summary>{[...new Set(p.assignments.map((a:Row)=>`${a.order} · ${a.stage}`))].join('; ')}</summary>{p.assignments.map((a:Row,i:number)=><p key={i}>{a.order} · {a.stage}: {display(a.from)} – {display(a.to)}</p>)}</details>:'Chờ phân bổ trong khoảng đã chọn'}</td></tr>)}</tbody></table></div><strong>Đã chọn {people.length} người</strong></>}
  {inspection&&!inspection.blockingMessage&&people.length>0&&<div role="region" aria-label="Ghi nhập bù">
  {impacts.length>0&&<><b>Xác nhận chuyển người trong khoảng bù</b>{impacts.map((a:Row,i:number)=><p key={i}>{a.name} · {a.order} · {a.stage}: {display(a.from)} – {display(a.to)} → {stage}</p>)}<p>Các phiếu chưa xác nhận liên quan sẽ được tính lại giờ. Giữ phân công sau giờ xuất bù.</p></>}
- <button type="button" className="primary-button backfill-action" disabled={reading||busy} onClick={()=>void call('save',impacts.length>0)}>{impacts.length?'Đồng ý chuyển và lưu':'Lưu nhập bù'}{closed?' và xuất trạm':''}</button><small style={{display:'block'}}>Giờ công tự tính khi lưu. Phiếu xuất chờ QLSX xác nhận. Hiện chưa hỗ trợ sửa/hủy riêng mốc của lô bù.</small>
+ <FeedbackActionButton type="button" className="primary-button backfill-action" disabled={reading||busy} disabledExplanation="Đang kiểm tra hoặc lưu dữ liệu. Vui lòng chờ hoàn tất." onClick={()=>void call('save',impacts.length>0)}>{impacts.length?'Đồng ý chuyển và lưu':'Lưu nhập bù'}{closed?' và xuất trạm':''}</FeedbackActionButton><small style={{display:'block'}}>Giờ công tự tính khi lưu. Phiếu xuất chờ QLSX xác nhận. Hiện chưa hỗ trợ sửa/hủy riêng mốc của lô bù.</small>
  </div>}
 
- </fieldset>{busy&&<p role="status">Đang xử lý…</p>}{error&&<p role="alert" style={{color:'#b91c1c'}}>{error}<button type="button" className="backfill-action" disabled={busy||uncertain} onClick={()=>{invalidate();setRetry(n=>n+1);}}>Thử lại kiểm tra</button></p>}
+ </fieldset>{busy&&<p role="status">Đang xử lý…</p>}{error&&<p role="alert" style={{color:'#b91c1c'}}>{error}<FeedbackActionButton type="button" className="backfill-action" disabled={busy||uncertain} disabledExplanation={uncertain?"Chưa rõ kết quả lưu. Cập nhật dữ liệu và kiểm tra trước khi thử lại.":"Đang xử lý. Vui lòng chờ hoàn tất."} onClick={()=>{invalidate();setRetry(n=>n+1);}}>Thử lại kiểm tra</FeedbackActionButton></p>}
  </section>;
 }
