@@ -58,4 +58,4 @@ jobs:
       - name: Build để kiểm thử cả Worker đã biên dịch
         run: npm run build
       - name: Chạy tất cả test cấp cao nhất, gồm hồi quy và test kế thừa
-        run: node --test --test-concurrency=1 tests/*.test.mjs
+        run: node scripts/ci/run-tests.mjs
