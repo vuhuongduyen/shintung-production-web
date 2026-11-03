@@ -100,3 +100,11 @@ Hoàn tất nhóm cùng nguyên nhân còn sót:
 - Nhóm ba file business-menu-views, permission-denial-feedback, menu-action-access: **35/35 pass**, không cancel/skip, 18,4 giây. Commit tiếp chỉ tests/tài liệu; CI xác minh bốn mục cũ còn lại và residual, không rerun y nguyên.
 
 Nhóm chưa xử lý sau phần này dự kiến còn Capacity (3), kế hoạch/In Transit (9), menu Line (2), UI/lifecycle (9). Phải đọc kết quả CI cuối để chốt số; tiếp tục truy yêu cầu và tính độc lập trước thay assertion/công thức. Chưa phải 23 lỗi sản phẩm xác nhận. Chưa lint/browser, không merge/deploy/preview.
+
+## Vòng đời nhân viên: ngày ngưng thay Hủy chung
+
+`tests/employee-employment.test.mjs` nguyên trạng từ snapshot c847754 quy định ngày bắt đầu bao gồm/ngày ngưng loại trừ, Hủy master nhân viên phải bị từ chối và chỉ khôi phục tường minh. Hai test cũ còn yêu cầu Hủy nhân viên hoặc prop canCancel đã bỏ.
+
+Sửa fixture basic-master: vẫn giữ toàn bộ kiểm SKU/labor cancellation, thêm Hủy employee bị từ chối và record bất biến; lưu ngày ngưng qua saveEmployee, giữ tên, kiểm history before/after, version tăng, ngày trước ngưng còn làm/ngày ngưng không làm và stale save không ghi. Toolbar kiểm guard Sửa theo allowed/current/cancelled, trường endDate và giải thích ranh giới ngày, giữ load/import/lookup assertions. Cho phép disabledExplanation chen giữa prop nhưng giữ nguyên biểu thức quyền.
+
+Trước: 2 ca lỗi ở hai file. Sau: basic-master + employee toolbar + employment **14/14 pass**, không cancel/skip, 12,3 giây. Chỉ tests/docs, không đổi nghiệp vụ hoặc dữ liệu thật. CI sau push xác minh hai ca cùng residual; chưa lint/browser, không merge/deploy/preview.

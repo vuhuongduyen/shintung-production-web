@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {openDatabase,migrate,root} from '../scripts/local/database.mjs';
+import {saveEmployee} from '../scripts/local/employees.mjs';
+import {employeeActiveOn} from '../lib/employee-employment.mjs';
 import {cancelBasicMaster} from '../scripts/local/basic-master.mjs';
 import {recordRevision} from '../lib/record-revision.mjs';
 import {siteLaborHours} from '../lib/site-labor-hours.mjs';
@@ -28,8 +30,14 @@ test('cancellation retains SKU, labor and employee values and history, excludes 
  const labor=await read(c.db,'labor_hours','ROOT');assert.equal(labor.laborHour,0.136);assert.equal(labor.note,'Original');
  const applied=siteLaborHours([{key:'ROOT',payload:labor}]).find(r=>r.key==='ROOT').payload;assert.equal(applied.laborHour,null);assert.equal(applied.retainedLaborHour,0.136);
  await put(c.db,'employees','NV1',{id:'NV1',name:'Employee',line:'A',active:true,version:1,history:[]});
- await cancelBasicMaster(c.db,{entity:'employees',key:'NV1',expectedVersion:1},actor);
- const employee=await read(c.db,'employees','NV1');assert.equal(employee.active,false);assert.equal(employee.name,'Employee');assert.equal(employee.history.at(-1).action,'Hủy');
+ const before=await read(c.db,'employees','NV1');
+ await assert.rejects(cancelBasicMaster(c.db,{entity:'employees',key:'NV1',expectedVersion:1},actor),/Ngày ngưng/);
+ assert.deepEqual(await read(c.db,'employees','NV1'),before);
+ await saveEmployee(c.db,{...before,startDate:'2026-01-01',endDate:'2026-10-28'},actor);
+ const employee=await read(c.db,'employees','NV1');assert.equal(employee.active,false);assert.equal(employee.name,'Employee');assert.equal(employee.version,2);assert.equal(employee.history.at(-1).before.name,'Employee');assert.equal(employee.history.at(-1).after.endDate,'2026-10-28');
+ assert.equal(employeeActiveOn(employee,'2026-10-27'),true);assert.equal(employeeActiveOn(employee,'2026-10-28'),false);
+ await assert.rejects(saveEmployee(c.db,{...before,endDate:'2026-10-29'},actor),e=>e.status===409);
+ assert.deepEqual(await read(c.db,'employees','NV1'),employee);
  }finally{await c.close();}});
 
 test('Leadtime cancellation atomically stops active and pending versions without restoring legacy values',async()=>{const c=await fixture();try{

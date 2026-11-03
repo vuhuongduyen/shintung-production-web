@@ -45,8 +45,11 @@ test('Clear restores all Line results, with canonical field labels recognized in
 });
 test('load/save/import and permission expressions remain separate from lookup actions',()=>{
  assert.match(source,/useEffect\(\(\)=>\{void load\(\);return\(\)=>loadRequest.current\?\.abort\(\);\},\[dataRevision\]\)/);
- assert.match(source,/toolbar\.action\(\{disabled:busy\|\|!allowed,onClick:/);
- assert.match(source,/toolbar\.action\(\{disabled:busy\|\|!canCancel\|\|!current\|\|isMasterCancelled\(current\)/);
+ assert.match(source,/toolbar\.action\(\{disabled:busy\|\|!allowed, disabledExplanation:[^\n]+onClick:/);
+ assert.match(source,/toolbar\.action\(\{disabled:busy\|\|!allowed\|\|!current\|\|isMasterCancelled\(current\)/);
+ assert.doesNotMatch(source,/canCancel/);
+ assert.match(source,/value=\{draft.endDate\|\|''\}/);
+ assert.match(source,/Ngày ngưng làm việc là ngày đầu tiên không còn làm việc/);
  assert.match(source,/onClick:\(\)=>setAppliedLookup\(\{mode:searchMode,query,line\}\)/);
 });
 test('employee Search-by uses the existing catalog key and resolves actual VI EN Traditional Chinese text',async()=>{
