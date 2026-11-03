@@ -88,3 +88,15 @@ Phần phân loại 49 mục phía trên là mốc chẩn đoán, không phải 
 Một lượt local có Miniflare `fetch failed`/500 trước assertion mục tiêu; các tiến trình đã kết thúc rồi mới chạy lại tuần tự nhóm tác động. Không thay cấu hình DB hay bỏ test vì lỗi này. Kết quả targeted cuối và CI exact head ghi ở PR sau khi kết thúc; không coi local pass là CI pass. Lượt này chỉ sửa tests/helper/tài liệu, không sửa ứng dụng hoặc nghiệp vụ; không merge/deploy/preview.
 
 Kiểm trước push nhóm receipt/UI: 9 file **94 test / 91 pass / 3 fail**, không cancel/skip. Hai fail kế thừa là callback Back Capacity và trường vệ sinh; một fail ở GET quyền do Miniflare fetch failed/500 (ca này đã đạt ở lượt 40 test trước). Kiểm riêng Line sau sửa fixture/AST: **3/3**; delay API/helper **3/3**; Site tổng hợp sau bổ sung lý do cho cả phiếu lịch sử đầu: **1/1**, 39,6 giây. Mounted Back/filter mục tiêu **3/3**, kiểm âm helper **1/1**. Có giao nhau giữa các lượt, không cộng thành tổng test độc lập. Không chạy lại toàn bộ local; CI sau commit nhằm xác minh nhóm vừa sửa và đo residual trên runner, không phải rerun không có thay đổi. TypeScript/build sẽ đọc kết quả exact head từ CI; chưa lint/browser.
+
+## Chốt nhóm receipt và hoàn tất harness quyền
+
+CI head `25a4460cf5de28afede20894476259547ae913ee`, run [41566185983](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41566185983), completed/failure: **1.469 pass / 27 fail / 1.496 test**, đủ 247 file (234 đạt/13 lỗi). TypeScript và ba build đạt; không timeout/cancel/skip/todo/thiếu tổng kết. So với cdc9eab: 22 tên lỗi cũ hết lỗi, không có tên lỗi mới; ba ca kiểm mới đạt. Lỗi Miniflare GET local không xuất hiện trên CI.
+
+Hoàn tất nhóm cùng nguyên nhân còn sót:
+- `business-menu-views`: kiểm từng denied request có đúng receipt, quyền/scopes/business/audit cũ bất biến; GET riêng vẫn hoàn toàn không ghi. 2/2 đạt.
+- `permission-denial-feedback`: dùng `reviewSelected` và confirm trong day-review thực tế thay hàm review đơn đã bỏ. Cả API right và menu right đều bắt buộc; denied không request/refresh; chỉ busy chuyển true/false. Editor work không đổi state hoặc đọc form khi thiếu quyền.
+- Fixture quick-Line mang `quickLinePermissions` như phiên API thật, thay nhãn kind đơn thuần. Không suy quyền manager của Lịch SX thành quyền Báo công: test độc lập `menu-action-access` nguyên trạng trong snapshot và AGENTS 22/10 đã quy định quyền theo từng menu. Kiểm manager vẫn thao tác tại mode schedule nhưng không tự có work. Không đổi grants/source ứng dụng.
+- Nhóm ba file business-menu-views, permission-denial-feedback, menu-action-access: **35/35 pass**, không cancel/skip, 18,4 giây. Commit tiếp chỉ tests/tài liệu; CI xác minh bốn mục cũ còn lại và residual, không rerun y nguyên.
+
+Nhóm chưa xử lý sau phần này dự kiến còn Capacity (3), kế hoạch/In Transit (9), menu Line (2), UI/lifecycle (9). Phải đọc kết quả CI cuối để chốt số; tiếp tục truy yêu cầu và tính độc lập trước thay assertion/công thức. Chưa phải 23 lỗi sản phẩm xác nhận. Chưa lint/browser, không merge/deploy/preview.

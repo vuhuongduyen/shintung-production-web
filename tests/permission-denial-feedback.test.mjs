@@ -1,3 +1,4 @@
+import {quickLinePermissions} from '../lib/user-permission-profiles.mjs';
 import {productionMenuRights,hasMenuPermission,productionMenus} from '../lib/menu-action-access.mjs';
 import {createReviewRunner,submitReviewSelection} from '../lib/production-review-selection.mjs';
 import {actionFeedbackComponentFixture, actionFeedbackHelpers} from './helpers/action-feedback-fixture.mjs';
@@ -57,24 +58,26 @@ test('all three locales have explicit permission text',()=>{
  for(const locale of ['vi','zh','en'])assert.ok(helper.exports.permissionDeniedMessage(locale).length>10);
  assert.equal(new Set(['vi','zh','en'].map(helper.exports.permissionDeniedMessage)).size,3);
 });
-test('QLSX entry points guard before network or editor mutation',()=>{
+test('QLSX entry points guard before network or editor mutation',async()=>{
  const management=read('components/production-management.tsx');
  assert.match(management,/const openWorkAction=.*if\(!canMutateProduction\|\|\(sessionLine&&row\.line!==sessionLine\)\).*denyProduction\(\);return;.*requestToken/);
  assert.match(management,/const ask=async.*if\(!canMutateProduction&&!hrAction\).*return false;.*fetch\(/);
- assert.match(management,/async function review.*if\(!data.rights.confirm\|\|!confirmReportAllowed\).*return false;.*fetch\(/);
+ assert.match(declared(management,'reviewSelected'),/allowed:!!data.rights.confirm&&confirmReportAllowed/);
  const correction=read('components/production-corrections.tsx');assert.match(correction,/const request=async\(apply=false\)=>\{if\(!allowed\)/);
- const progress=read('components/production-progress-review.tsx');assert.match(progress,/if\(!manager\)\{setPermissionError\(permissionDeniedMessage\(locale\)\);return;\}void onReview/);
+ const confirm=declared(read('components/production-report-day-review.tsx'),'confirm');let calls=0;await awaitDeniedConfirm(confirm,()=>calls++);assert.equal(calls,0);
 });
+function awaitDeniedConfirm(expression,onConfirm){return executable(expression,{latch:{current:false},locked:false,manager:false,items:[{}],onConfirm,setChecked:()=>{throw Error('selection changed');},setSubmitting:()=>{throw Error('editor changed');}})();}
 function declared(source,name){const ast=ts.createSourceFile('module.tsx',source,99,true,4);let expression;function visit(n){if(ts.isVariableDeclaration(n)&&n.name.getText(ast)===name)expression=n.initializer.getText(ast);if(ts.isFunctionDeclaration(n)&&n.name?.text===name)expression=n.getText(ast);ts.forEachChild(n,visit);}visit(ast);assert.ok(expression,name);return expression;}
 function executable(expression,scope){const mod={exports:{}};new Function(...Object.keys(scope),'module',compile('module.exports=('+expression+');'))(...Object.values(scope),mod);return mod.exports;}
 test('real production handler bodies deny view-only calls before fetch, editor state or form parsing',async()=>{
  const source=read('components/production-management.tsx');let denied=0,network=0,mutations=0;
- const scope={canMutateProduction:false,data:{rights:{manager:false,confirm:false,hr:false}},confirmReportAllowed:false,denyProduction:()=>denied++,fetch:()=>{network++;throw Error('network');},setBusy:()=>mutations++};
+ const scope={reportingPaused:false,canMutateProduction:false,data:{rights:{manager:false,confirm:false,hr:false}},confirmReportAllowed:false,denyProduction:()=>denied++,fetch:()=>{network++;throw Error('network');},setBusy:()=>mutations++};
  assert.equal(await executable(declared(source,'ask'),scope)({action:'start'}),false);
- assert.equal(await executable(declared(source,'review'),scope)({},true),false);
+ const busy=[];const deniedReview=await executable(declared(source,'reviewSelected'),{...scope,setBusy:v=>busy.push(v),runSelectedReview:createReviewRunner(),submitReviewSelection,load:()=>{throw Error('denied refresh');}})([{report:{id:'TEST-DENIED'}}]);
+ assert.equal(deniedReview.error,'Không có quyền xác nhận');assert.deepEqual(deniedReview.results,[]);assert.deepEqual(busy,[true,false]);
  executable(declared(source,'openWorkAction'),scope)({},'start');
  let prevented=0;executable(declared(source,'saveAction'),scope)({preventDefault(){prevented++},get currentTarget(){throw Error('form read');}});
- assert.equal(prevented,1);assert.equal(denied,4);assert.equal(network,0);assert.equal(mutations,0);
+ assert.equal(prevented,1);assert.equal(denied,3);assert.equal(network,0);assert.equal(mutations,0);
 });
 test('real correction handlers deny editor and preview/apply before state changes or API calls',async()=>{
  const source=read('components/production-corrections.tsx');let alerts=0,network=0;
@@ -97,17 +100,19 @@ test('actual workspace provider preserves inventory import without granting expo
  assert.equal(canUse('WarehouseContent','↑ Tải Excel tồn kho'),true);
  assert.equal(canUse('WarehouseContent','Xuất Excel'),false);
 });
-test('actual production guard preserves Lưu-only, line, and manager access while denying view-only and HR work',async()=>{
+test('actual production guard preserves explicit work grants and quick-Line grants without inheriting schedule manager authority',async()=>{
  const expression=declared(read('components/production-management.tsx'),'canMutateProduction');
  for(const [session,manager,expected] of [
   [{kind:'account',grants:['Quản lý sản xuất / Báo công sản xuất / Lưu']},false,true],
   [{kind:'account',grants:['Quản lý sản xuất / Báo công sản xuất / Sửa']},false,true],
   [{kind:'account',grants:['Quản lý sản xuất / Báo công sản xuất / Xem']},false,false],
   [{kind:'account',grants:['Quản lý sản xuất / Lịch SX thực tế / Ghi vắng mặt']},false,false],
-  [{kind:'line'},false,true],
-  [{kind:'account',grants:[]},true,true],
+  [{kind:'line',grants:quickLinePermissions},false,true],
+  [{kind:'account',grants:[]},true,false],
  ])assert.equal(executable(expression,{mode:'work',data:{rights:{...productionMenuRights(session),manager,hr:hasMenuPermission(session,productionMenus.schedule,['Ghi vắng mặt'])}},canUseProduction:workspacePermission(session)}),expected);
- let network=0;const ask=executable(declared(read('components/production-management.tsx'),'ask'),{canMutateProduction:false,data:{rights:{hr:true}},denyProduction:()=>{throw Error('HR incorrectly denied');},setBusy:()=>{},setMessage:()=>{},fetch:async()=>{network++;throw Error('synthetic endpoint');}});
+ assert.equal(executable(expression,{mode:'schedule',data:{rights:{manager:true,work:false}}}),true);
+ assert.equal(executable(expression,{mode:'work',data:{rights:{manager:true,work:false}}}),false);
+ let network=0;const ask=executable(declared(read('components/production-management.tsx'),'ask'),{canMutateProduction:false,clearMessage:()=>{},data:{rights:{hr:true}},denyProduction:()=>{throw Error('HR incorrectly denied');},setBusy:()=>{},setMessage:()=>{},fetch:async()=>{network++;throw Error('synthetic endpoint');}});
  for(const action of ['line-absence','attendance-override','attendance-correction','attendance-cancel','attendance-edit'])await ask({action});
  assert.equal(network,5);
 });
@@ -161,8 +166,8 @@ test('actual ProPlan toolbar uses exact close/reopen grants and preserves the le
  assert.equal(workspacePermission({kind:'account',login:'TEST',grants:['Kế hoạch sản xuất / In_transit / Hủy xác nhận']})('ProductionPlan','Mở chốt'),false);
 });
 
-// Current batch handler coverage supplements (does not remove) the historical
-// per-report/no-state-change assertions above. Use the real runner and request
+// Current batch handler checks all denied API/menu combinations. Work/editor
+// no-state-change checks above remain independent. Use the real runner and request
 // adapter so a denied call cannot pass through a stubbed authorization result.
 test('actual batch review requires both API confirmation rights and menu confirmation permission before any request',async()=>{
  const expression=declared(read('components/production-management.tsx'),'reviewSelected');

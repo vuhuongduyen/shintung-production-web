@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {assertRejectedRequestAudit,assertSnapshotWithReceipts} from './helpers/rejected-request-audit.mjs';
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -24,8 +25,9 @@ test('business menu views add no mutations, preserve custom/department records a
    const r=await call('/api/auth/login',{login,password:secret},login);assert.equal(r.status,200);cookies[login]=r.headers.get('set-cookie').split(';')[0];
   }
   await put('production_allocation_scope','global',{schemaVersion:1,enabled:true,managers:[{userId:'dhtin',group:'C'},{userId:'cnphuong',group:'AB'}]});
-  const before=await records(c.db);
+  const before=await records(c.db),receipts=[];
   for(const login of ['custom','department','unassigned']){
+   const beforeRead=await records(c.db);
    const actor=await sitePrincipal(new Request('https://test.invalid',{headers:{cookie:cookies[login]}}),{DB:c.db});
    assert.equal(actor.isAdmin,false);assert.equal(actor.role,'USER');
    assert.deepEqual(actor.grants,withBusinessViews(login==='custom'?custom:department));
@@ -35,12 +37,13 @@ test('business menu views add no mutations, preserve custom/department records a
    for(const path of ['/api/records?entity=users','/api/records?entity=permissions','/api/admin-audit','/api/production-allocation-scope'])assert.equal((await call(path,undefined,login)).status,403,path);
    const caps=await(await call('/api/capacity?week=2026-10-12',undefined,login)).json();assert.equal(caps.permissions.view,true);for(const key of ['edit','confirm','factor','review','reopenPast'])assert.equal(caps.permissions[key],false,key);
    const wf=await(await call('/api/production-workflow',undefined,login)).json();for(const key of ['manager','confirm','hr','correct'])assert.equal(wf.rights[key],false,key);
-   for(const [path,body] of [['/api/records',{entity:'warehouse_in',key:'FORGED',payload:{id:'FORGED'},expectedRevision:null}],['/api/inventory-import',{action:'upload',sourceFile:'forged.xlsx',rows:[]}],['/api/forecast-import',{}],['/api/employees',{action:'save'}],['/api/production-workflow',{action:'schedule',line:'A'}],['/api/production-allocation-scope',{groups:{C:['custom'],AB:[]}}]])assert.equal((await call(path,body,login)).status,403,login+path);
+   assert.deepEqual(await records(c.db),beforeRead,'GETs never add receipts or change stored rights/data');
+   for(const [path,body] of [['/api/records',{entity:'warehouse_in',key:'FORGED',payload:{id:'FORGED'},expectedRevision:null}],['/api/inventory-import',{action:'upload',sourceFile:'forged.xlsx',rows:[]}],['/api/forecast-import',{}],['/api/employees',{action:'save'}],['/api/production-workflow',{action:'schedule',line:'A'}],['/api/production-allocation-scope',{groups:{C:['custom'],AB:[]}}]]){const prior=await records(c.db),response=await call(path,body,login);assert.equal(response.status,403,login+path);receipts.push(await assertRejectedRequestAudit({before:prior,after:await records(c.db),response,actorId:login,route:path,body}));}
   }
   assert.deepEqual(await(await call('/api/storage-capability')).json(),{allowed:false});
   const disabled=await sitePrincipal(new Request('https://test.invalid',{headers:{cookie:cookies.disabled}}),{DB:c.db});assert.deepEqual(disabled.grants,[]);
   assert.equal((await call('/api/records?entity=sku',undefined,'disabled')).status,403);
-  assert.deepEqual(await records(c.db),before,'GETs and denied mutations preserve all stored rights, scopes and production records');
+  assertSnapshotWithReceipts(before,await records(c.db),receipts);
  }finally{await c.close();}
 });
 
