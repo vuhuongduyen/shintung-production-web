@@ -8,10 +8,10 @@ import {readProductionWorkflow,mutateProductionWorkflow} from '../scripts/local/
 import {correctProduction} from '../scripts/local/production-corrections.mjs';
 import {projectLiveStages} from '../lib/production-stage-live.mjs';
 const admin={login:'TEST_ADMIN',isAdmin:true},catalog=[{code:'O',processes:['FINAL']}];
-async function fixture(run){const c=await openDatabase(mkdtempSync(join(tmpdir(),'stage-cancel-')));try{const db=c.db;await migrate(db);const put=(entity,id,p)=>db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload').bind(entity,id,JSON.stringify(p),'TEST','2026-09-20').run();
+async function fixture(run,processes=['FINAL']){const catalog=[{code:'O',processes}];const c=await openDatabase(mkdtempSync(join(tmpdir(),'stage-cancel-')));try{const db=c.db;await migrate(db);const put=(entity,id,p)=>db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload').bind(entity,id,JSON.stringify(p),'TEST','2026-09-20').run();
  await put('capacity','2026-09-21',{schemaVersion:1,rows:[{line:'A',status:'Đã xác nhận',reviewStatus:'approved',version:1,input:{workers:1,dailySchedule:Array.from({length:7},(_,i)=>({date:`2026-09-${21+i}`,working:true,ot:false,hcStart:'08:00',hcEnd:'17:00',lunchStart:'12:00',lunchEnd:'13:00',breaks:[],cleaning:[]}))}}]});
  await put('employees','N',{id:'N',name:'TEST ONLY',line:'A',active:true});await put('in_transit','O',{id:'O',planId:'O',lsxCode:'O',sku:'O',line:'A',lsxQty:100,lsxOpenedAt:'2026-09-21',syncStatus:'ĐÃ ĐỒNG BỘ'});
- const send=(action,time)=>mutateProductionWorkflow(db,{action,orderId:'O',effectiveAt:`2026-09-25T${time}:00+07:00`,stageEntries:[{stage:'FINAL',people:['N'],quantity:100}],requestIdempotency:crypto.randomUUID()},admin,catalog);
+ const send=(action,time,stage='FINAL')=>mutateProductionWorkflow(db,{action,orderId:'O',effectiveAt:`2026-09-25T${time}:00+07:00`,stageEntries:[{stage,people:['N'],quantity:100}],requestIdempotency:crypto.randomUUID()},admin,catalog);
  const read=()=>readProductionWorkflow(db,admin,catalog),snapshot=async()=>(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
  const cancel=(eventIds,extra={},actor=admin)=>correctProduction(db,{operation:'cancel-stage',action:'preview',orderId:'O',eventIds,reason:'TEST incorrect action',...extra},actor,catalog);
  const apply=async ids=>{const p=await cancel(ids);return cancel(ids,{action:'apply',expectedRevision:p.expectedRevision});};
@@ -42,3 +42,15 @@ test('concurrent cancellations have one winner; incidents are protected; lightwe
  await put('production_event','incident',{id:'incident',kind:'stage-incident',sourceId:'O',line:'A',stages:['FINAL'],effectiveAt:'2026-09-25T08:30:00+07:00'});await assert.rejects(()=>cancel([start.event.id]),/phía sau/);await put('production_event','incident',{id:'incident',kind:'stage-incident',sourceId:'O',line:'A',stages:['FINAL'],effectiveAt:'2026-09-25T08:30:00+07:00',voided:true});
  const p=await cancel([start.event.id]);const results=await Promise.allSettled([1,2].map(()=>cancel([start.event.id],{action:'apply',expectedRevision:p.expectedRevision})));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal((await db.prepare("SELECT count(*) n FROM app_records WHERE entity='admin_audit'").first()).n,1);
 }));
+
+for(const mode of ['preview','apply'])test(`cancel upstream exit ${mode} cannot leave later Final above supply; cancelling both remains valid`,()=>fixture(async({send,snapshot,cancel,apply,read})=>{
+ await send('start','08:00','PACKING');const packing=await send('complete','08:30','PACKING');
+ await send('start','09:00','FINAL');const final=await send('complete','10:00','FINAL');
+ const before=await snapshot(),both=[packing.event.id,final.event.id],valid=await cancel(both);
+ assert.deepEqual(await snapshot(),before,'preview of valid joint cancellation writes no business records');
+ for(const extra of [{action:mode,expectedRevision:valid.expectedRevision}]){
+  await assert.rejects(()=>cancel([packing.event.id],extra),/FINAL.*PACKING/);
+  assert.deepEqual(await snapshot(),before,'rejected cancellation preserves every business record and audit');
+ }
+ await apply(both);const state=await read();assert.equal(state.reports.filter(r=>r.cancelled).length,2);assert.equal(state.reports.filter(r=>!r.cancelled).length,0);
+},['PACKING','FINAL']));

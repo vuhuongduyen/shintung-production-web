@@ -49,7 +49,7 @@ test('permission/context change during in-flight save stops remaining rows and b
  }finally{await m.close();}});
 test('HR button replaces three tabs, opens separate retained workspace; warehouse/transfer and calendar drafts remain',async()=>{
  const m=await mount(Schedule,{...props,setWeek:()=>{},setLine:()=>{},setDays:()=>{},version:1,approvedSchedules:[],history:[],orders:[],manager:true,hr:true,locked:false,save:async()=>{throw Error('No write on navigation');},openAction:()=>{},refresh:async()=>true});try{
-  assert.deepEqual([...m.host.querySelectorAll('[role=tab]')].map(node=>node.textContent),['Phụ kho','Chuyển Line']);const reason=m.host.querySelector('#actual-reason');await change(reason,'Giữ lý do lịch');
+  assert.deepEqual([...m.host.querySelectorAll('[role=tab]')].map(node=>node.textContent),['Phụ kho','CV khác','Chuyển Line','Thu hồi nhân sự']);const reason=m.host.querySelector('#actual-reason');await change(reason,'Giữ lý do lịch');
   await click(button(m.host,'Ghi nhận chấm công'));const entry=m.host.querySelector('[data-hr-attendance-entry]');assert.doesNotMatch(entry.querySelector('h2').textContent,/Line/);assert.equal(entry.parentElement.hidden,false);assert.equal(m.host.querySelector('[data-standard-toolbar=ActualWorkSchedule]').parentElement.hidden,true);await change(field(entry,1,'Nhân viên'),'NV001');await click(button(entry,'Quay lại'));
   assert.equal(reason.value,'Giữ lý do lịch');await click(button(m.host,'Ghi nhận chấm công'));assert.match(field(m.host.querySelector('[data-hr-attendance-entry]'),1,'Nhân viên').value,/NV001.*Nhân viên thử A/);
  }finally{await m.close();}

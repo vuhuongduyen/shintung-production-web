@@ -16,6 +16,9 @@ test('lookup starts closed, opening/selecting preserves rows, search and Enter a
  await act(async()=>input.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true})));assert.equal(count(),1);assert.ok(host.textContent.includes('ORDER-B'));
  await act(async()=>button('Quay lại').click());assert.equal(count(),1);assert.equal(host.querySelector('select'),null);
  await act(async()=>button('Tra cứu').click());await act(async()=>button('Xóa lọc').click());
- await act(async()=>button('Sửa').click());assert.ok(document.querySelector('.correction-time-entry'));const date=document.querySelector('.production-time-correction-dialog input[type=date]');assert.ok(date);assert.equal(date.disabled,false);
+ await act(async()=>button('Sửa').click());
+ const stage=document.querySelector('.production-time-correction-dialog select');assert.equal(stage.value,'__choose__');assert.equal(document.querySelector('.correction-time-entry'),null,'opening the order must not choose a stage implicitly');
+ assert.ok([...stage.options].some(option=>option.value===''),'legacy whole-order data remains selectable');await act(async()=>{stage.value='';stage.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});
+ assert.ok(document.querySelector('.correction-time-entry'));const date=document.querySelector('.production-time-correction-dialog input[type=date]');assert.ok(date);assert.equal(date.disabled,false);
  await act(async()=>root.unmount());host.remove();
 });

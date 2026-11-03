@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {root,openDatabase,migrate} from '../scripts/local/database.mjs';
+import {recordRevision} from '../lib/record-revision.mjs';
 import {importForecastFile,nextForecastMonth} from '../scripts/local/forecast-import.mjs';
 
 const actor={login:'forecast-test@example.com'},clock=()=>new Date('2026-09-26T07:00:00Z');
@@ -12,7 +13,15 @@ test('September report imports into October from the stored PDF, preserving prev
  assert.equal(nextForecastMonth('12/2026'),'01/2027');
  await db.prepare('INSERT INTO file_objects VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind('PDF-1','base-forecast/PDF-1/report.pdf','report.pdf','application/pdf',100,'base-forecast','09/2026',actor.login,clock().toISOString(),'checksum','ready').run();
  await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('forecast','10/2026',JSON.stringify([{sku:'OLD',month:'10/2026'}]),actor.login,'old').run();
- const saved=await importForecastFile(db,{fileId:'PDF-1',reportMonth:'09/2026',declaredSkuCount:1,rows},actor,clock);
+ const before=await db.prepare("SELECT payload FROM app_records WHERE entity='forecast' AND record_key='10/2026'").first();
+ const expectedRevision=await recordRevision(before.payload);
+ const snapshot=async()=>(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
+ const unchanged=await snapshot();
+ for(const revision of [{},{expectedRevision:null},{expectedRevision:await recordRevision([{sku:'STALE',month:'10/2026'}])}]){
+  await assert.rejects(()=>importForecastFile(db,{fileId:'PDF-1',reportMonth:'09/2026',declaredSkuCount:1,rows,...revision},actor,clock),error=>error.status===409);
+  assert.deepEqual(await snapshot(),unchanged,'missing or stale revision must not change forecast, history or audit');
+ }
+ const saved=await importForecastFile(db,{fileId:'PDF-1',reportMonth:'09/2026',declaredSkuCount:1,rows,expectedRevision},actor,clock);
  assert.equal(saved.month,'10/2026');assert.equal(saved.count,1);
  assert.equal(JSON.parse((await db.prepare("SELECT payload FROM app_records WHERE entity='forecast' AND record_key='10/2026'").first()).payload)[0].sourceFileId,'PDF-1');
  const audit=JSON.parse((await db.prepare("SELECT payload FROM app_records WHERE entity='admin_audit'").first()).payload);

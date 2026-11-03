@@ -129,6 +129,7 @@ test('recall button opens shared 24h form, multi-select submits bounded window w
  await click(button(m.host,'Thu hồi nhân sự'));
  const form=m.host.querySelector('form.actual-line-leave');assert.ok(form);
  assert.equal(form.querySelectorAll('input[type=date]').length,2);
+ const dates=form.querySelectorAll('input[type=date]');await change(dates[0],day.date);await change(dates[1],day.date);
  assert.ok(form.querySelector('[aria-label="Từ giờ 24h"]'));assert.ok(form.querySelector('[aria-label="Đến giờ 24h"]'));
  assert.match(form.textContent,/Line B → C/);
  for(const box of form.querySelectorAll('.cap-employee-picker-options input'))await click(box);

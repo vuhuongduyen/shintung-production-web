@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {assertFinalExitLimit} from '../lib/production-final-limit.mjs';
+import {assertFinalExitLimit,assertFinalSupplyAfterCancellation} from '../lib/production-final-limit.mjs';
 const order={id:'LSX',processes:['A-CUT','A-PACKING','A-FINAL']},at='2026-10-29T09:00:00+07:00';
 const report=(stage,quantity,extra={})=>({transitId:'LSX',stageName:stage,stageQuantity:quantity,completedAt:at,reviewStatus:'Chờ kiểm tra',...extra});
 const run=(reports,quantity,entries=[])=>assertFinalExitLimit(order,reports,[...entries,{stage:'A-FINAL',quantity}],at);
@@ -91,4 +91,15 @@ test('future packing only supplies Final from its own timestamp, including simul
  assert.throws(()=>run([...timeline,report('PACKING',100,{completedAt:'2026-10-29T12:00:00+07:00'})],100),/PACKING đã xuất 500/);
  assert.doesNotThrow(()=>run([...timeline,report('PACKING',100,{completedAt:'2026-10-29T11:00:00+07:00'})],100));
  for(const extra of [{cancelled:true},{voided:true},{reviewStatus:'Cần điều chỉnh'},{reviewStatus:'Đã hủy'},{transitId:'OTHER'}])assert.doesNotThrow(()=>run([report('CUT',1000),report('PACKING',500),report('FINAL',500,{completedAt:'2026-10-29T11:00:00+07:00',...extra})],100));
+});
+
+test('cancellation checks every remaining Final checkpoint without rejecting unchanged historical deficits',()=>{
+ const earlier=report('PACKING',500,{id:'supply'}),late=report('PACKING',100,{id:'late',completedAt:'2026-10-29T12:00:00+07:00'}),final=report('FINAL',500,{id:'final',completedAt:'2026-10-29T11:00:00+07:00'});
+ const before=[report('CUT',1000),earlier,late,final],snapshot=structuredClone(before),cancel=id=>before.map(r=>r.id===id?{...r,cancelled:true}:r);
+ assert.throws(()=>assertFinalSupplyAfterCancellation(order,before,cancel('supply')),/FINAL.*PACKING/,'later supply cannot repair an earlier Final checkpoint');
+ assert.doesNotThrow(()=>assertFinalSupplyAfterCancellation(order,before,cancel('late')));
+ assert.doesNotThrow(()=>assertFinalSupplyAfterCancellation(order,before,cancel('final')));
+ const legacy=[report('CUT',1000),report('PACKING',400),final];assert.doesNotThrow(()=>assertFinalSupplyAfterCancellation(order,legacy,legacy));
+ assert.throws(()=>assertFinalSupplyAfterCancellation(order,legacy,legacy.map(r=>r.stageName==='PACKING'?{...r,cancelled:true}:r)),/FINAL.*PACKING/);
+ assert.deepEqual(before,snapshot,'guard does not mutate historical reports');
 });

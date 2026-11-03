@@ -17,8 +17,9 @@ test('strict ±10% warning only for complete confirmed orders with positive stan
  assert.equal(laborUnitDeviation(.11,.1).warning,false);assert.equal(laborUnitDeviation(.09,.1).warning,false);
  assert.equal(laborUnitDeviation(.111,.1).warning,true);assert.equal(laborUnitDeviation(.089,.1).warning,true);
  assert.deepEqual(laborUnitDeviation(null,.1),{ratio:null,warning:false});assert.equal(laborUnitDeviation(.1,0).ratio,null);
- const order={id:'a',lsxQty:300,actualCompletedAt:'2026-10-07T08:00:00Z'},reports=[{transitId:'a',kind:'completion',reviewStatus:'Đã xác nhận',approvedQuantity:100,hours:{hc:18,ot:0}},{transitId:'a',kind:'completion',reviewStatus:'Đã xác nhận',approvedQuantity:200,hours:{hc:36,ot:0}}];
+ const order={id:'a',lsxQty:300,actualCompletedAt:'2026-10-07T08:00:00Z'},reports=[{transitId:'a',kind:'completion',reviewStatus:'Đã xác nhận',approvedQuantity:100,hours:{hc:18,ot:0,total:18}},{transitId:'a',kind:'completion',reviewStatus:'Đã xác nhận',approvedQuantity:200,hours:{hc:36,ot:0,total:36}}];
  assert.equal(orderLaborOutput(order,reports).unit,.18);
+ assert.equal(orderLaborOutput(order,[reports[0],{...reports[1],hours:{hc:36,ot:0}}]).unit,null,'missing stored total must not invent unit labor from HC/OT');
  assert.equal(orderLaborOutput({...order,actualCompletedAt:null},reports).unit,null);
  assert.equal(orderLaborOutput(order,[reports[0],{...reports[1],reviewStatus:'Chờ kiểm tra',reportedQuantity:200}]).unit,null);
 });

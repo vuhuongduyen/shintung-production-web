@@ -35,7 +35,7 @@ const schedule=rights=>fixture('actual-work-schedule.tsx',{week:'2026-10-12',lin
 const tabNames=f=>f.nodes().filter(n=>n.props?.role==='tab').map(n=>n.props.children);
 
 test('HR uses one entry button; managers and combined/Admin retain warehouse/transfer tabs',()=>{
- for(const [rights,expected] of [[HR,[]],[MANAGER,['Phụ kho','Chuyển Line']],[ADMIN,['Phụ kho','Chuyển Line']]]){const f=schedule(rights);f.commit();assert.deepEqual(tabNames(f),expected);}
+ for(const [rights,expected] of [[HR,[]],[MANAGER,['Phụ kho','CV khác','Chuyển Line','Thu hồi nhân sự']],[ADMIN,['Phụ kho','CV khác','Chuyển Line','Thu hồi nhân sự']]]){const f=schedule(rights);f.commit();assert.deepEqual(tabNames(f),expected);}
  const f=schedule({hr:false,manager:false});f.commit();assert.deepEqual(tabNames(f),[]);assert.equal(f.nodes().some(n=>n.type==='form'),false);
 });
 test('HR lookup choices exclude production actions and rejects a stale/forged lookup value',()=>{
@@ -89,7 +89,7 @@ test('only haquyen keeps HR attendance inputs even with combined management gran
   assert.equal(ui.manager,false);assert.equal(ui.hr,true);assert.equal(ui.confirm,true);assert.equal(original.manager,true,'never mutate actual grants');
   const f=schedule({...original,attendanceManager:ui.manager});f.commit();
   assert.deepEqual(tabNames(f),[]);assert.ok(f.button('Ghi nhận chấm công'));assert.ok(f.button('Lưu thay đổi'),'unrelated schedule manager capability is preserved');
-  for(const absenceType of ['Phụ kho','Chuyển Line'])assert.equal(controls.attendanceInputTypes(ui).includes(absenceType),false);
+  for(const absenceType of ['Phụ kho','CV khác','Chuyển Line','Thu hồi nhân sự'])assert.equal(controls.attendanceInputTypes(ui).includes(absenceType),false);
  }
  for(const login of ['cnphuong','other.manager','admin','haquyen2','Hà Ái Quyên',undefined])assert.equal(controls.attendanceUiRights(login,ADMIN).manager,true);
  assert.equal(controls.attendanceUiRights('haquyen',{hr:false,manager:false}).hr,false,'UI profile cannot grant HR permission');
@@ -116,7 +116,7 @@ test('cnphuong preserves warehouse and transfer inputs with existing combined ri
  const rights=controls.attendanceUiRights('cnphuong',ADMIN);
  assert.equal(rights.manager,true);assert.equal(rights.hr,true);
  const f=schedule({...ADMIN,attendanceManager:rights.manager});f.commit();
- assert.deepEqual(tabNames(f),['Phụ kho','Chuyển Line']);assert.ok(f.button('Ghi nhận chấm công'));
+ assert.deepEqual(tabNames(f),['Phụ kho','CV khác','Chuyển Line','Thu hồi nhân sự']);assert.ok(f.button('Ghi nhận chấm công'));
  f.button('Phụ kho').props.onClick();f.commit();assert.equal(f.find(n=>n.props?.role==='tab'&&n.props['aria-selected']).props.children,'Phụ kho');
  f.button('Chuyển Line').props.onClick();f.commit();assert.ok(f.find(n=>n.props?.['aria-label']==='Line nguồn chuyển người'));
  assert.equal(controls.canEditAttendance({...entry,absenceType:'Phụ kho'},rights),true);

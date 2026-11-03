@@ -1,3 +1,4 @@
+import {assertFinalSupplyAfterCancellation} from '../../lib/production-final-limit.mjs';
 import {withCorrectionSnapshot} from './production-correction-snapshot.mjs';
 import {planExitRestore} from './production-exit-restore.mjs';
 import {productionMenuRights} from '../../lib/menu-action-access.mjs';
@@ -39,6 +40,7 @@ export async function cancelStageWork(db,body,actor,catalog=[]){
  const restoration=planExitRestore({request:body.restore,chosen,state,events,reports,actor,now,reason});
  writes.push(...restoration.writes);eventChanges.push(...restoration.changes);
  const updatedEvents=[...state.events.map(e=>writes.find(w=>w.entity==='production_event'&&w.key===e.id)?.value||e),...writes.filter(w=>w.entity==='production_event'&&!state.events.some(e=>e.id===w.key)).map(w=>w.value)],updatedReports=state.reports.map(r=>writes.find(w=>w.entity==='production_report'&&w.key===r.id)?.value||r);
+ assertFinalSupplyAfterCancellation(order,state.reports,updatedReports);
  // Recalculate only unconfirmed reports on receiving stages; output stays unchanged.
  for(const impact of restoration.impacts.filter(i=>i.orderId!==order.id))for(const old of reports.filter(r=>!r.cancelled&&!r.voided&&r.transitId===impact.orderId&&correctionStage(r)===impact.stage&&Date.parse(r.completedAt)>Date.parse(impact.from))){
   if(writes.some(w=>w.entity==='production_report'&&w.key===old.id))continue;
