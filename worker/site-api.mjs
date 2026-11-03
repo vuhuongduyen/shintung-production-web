@@ -347,7 +347,7 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/capacity')return json(await mutateCapacity(env.DB,body,actor));
   if(path==='/api/employees')return json(body?.action==='import'?await importEmployees(env.DB,body,actor):await saveEmployee(env.DB,body,actor));
   if(path==='/api/production-plan'){
-   const allowed=['save','close','reopen'].includes(body.action)?canPlanAction(actor,body.action):canWrite(actor,'Production Plan');
+   const allowed=['save','close','reopen','split'].includes(body.action)?canPlanAction(actor,body.action==='split'?'save':body.action):canWrite(actor,'Production Plan');
    if(!allowed)return json({error:body.action==='close'?'Không có quyền xác nhận kế hoạch':body.action==='reopen'?'Không có quyền hủy xác nhận kế hoạch':'Không có quyền sửa kế hoạch'},403);
    return json(await mutatePlan(env.DB,body,{...actor,catalog:await loadCatalog(),canEditPlan:canPlanAction(actor,'save')}));
   }
