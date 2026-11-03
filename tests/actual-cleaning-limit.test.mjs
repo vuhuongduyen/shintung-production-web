@@ -44,3 +44,8 @@ test('newly opened day carries last named initial roster without changing approv
  const next={...day,date:'2026-09-26'},ref={...reference,days:[day,next],roster:[{date,hc:['ONE','TWO'],ot:[]},{date:next.date,hc:[],ot:[]}],input:{dailySchedule:[day,{...next,working:false}]}};
  assert.equal(actualCleaningLimit({...options,day:next,reference:ref}).count,2);
 });
+
+test('legacy omitted HC start uses the existing 08:00 schedule default, with actual events at that instant',()=>{
+ const legacy={...day};delete legacy.hcStart;
+ assert.equal(actualCleaningLimit({...options,day:legacy}).count,2);assert.equal(actualCleaningLimit({...options,day:legacy,events:[absence]}).count,1);
+});
