@@ -28,3 +28,11 @@ test('weekly cards deduplicate matching plans and display a carryover-only Line 
  const rows=[{id:'pa',planId:'plana',line:'A',week,status:'DỰ KIẾN',plan:100,laborHour:2},{id:'new',line:'A',week,start:week,end:week,status:'DỰ KIẾN',plan:30,laborHour:1}];
  const cards=remainingPlanWithTransitSummary(rows,capacity,week);assert.equal(cards.find(c=>c.line==='A').totalRequired,90);assert.equal(cards.find(c=>c.line==='C').totalRequired,60);
 });
+
+test('split siblings share business Plan ID but only the transferred row is replaced by its backlog',()=>{
+ const group='GROUP',planId='SHARED',root={id:group,planGroupId:group,groupPlanId:planId,planId,week,line:'A',sku:'SKU',plan:20,laborHour:2,start:week,end:week,status:'ĐÃ CHUYỂN'},child={...root,id:'CHILD',splitFromId:group,plan:30,status:'DỰ KIẾN'};
+ const backlog=planTransitBacklog([order('ROOT-ORDER',{planGroupId:group,planRowId:group,planId,week,planStart:week,planEnd:week,lsxQty:20,completedQty:5})],week,labor);
+ const combined=combinePlanBacklog([root,child],backlog);assert.equal(combined.length,2);assert.equal(combined.find(r=>r.id==='CHILD').plan,30);assert.equal(combined.find(r=>r.backlog).plan,15);
+ const c={week,line:'A',status:'Đã xác nhận',availableHours:1000,...backlogLineSummary(backlog,'A'),backlogRows:backlog.rows};
+ const result=remainingPlanWithTransitSummary([root,child],[c],week)[0];assert.equal(result.required,60);assert.equal(result.backlogHours,30);assert.equal(result.totalRequired,90);
+});

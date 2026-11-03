@@ -18801,6 +18801,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
         if(name==='ProductionManagement' && label.trim()==='Lưu' && session?.kind==='account' && session.grants.some(grant=>normalizedGrant(grant.split('/').slice(0,-1).join('/'))===normalizedGrant('Quản lý sản xuất / Báo công sản xuất') && normalizedGrant(grant.split('/').at(-1)||'')===normalizedGrant('Lưu')))return true;
         if(/cập nhật dữ liệu|tải lại dữ liệu|làm mới/i.test(label))return true;
         let action=/hủy xác nhận/i.test(label)?'Hủy xác nhận':/mở chốt/i.test(label)?'Hủy xác nhận':/xác nhận|chốt/i.test(label)?'Xác nhận':/xóa/i.test(label)&&!/xóa lọc/i.test(label)?'Xóa':/thêm|tạo thay đổi|tải file|tải tệp|nhập file|nhập dữ liệu|chạy engine/i.test(label)?'Thêm':/sửa|lưu|đồng bộ|cập nhật|hủy phiếu|hủy lệnh|đánh dấu|áp dụng/i.test(label)?'Sửa':null;
+        if(name==='ProductionPlan'&&label.trim()==='Tách đơn')action='Sửa';
         if(name==='DemandImageImport' && /lưu/i.test(label))action='Thêm';
         const bomMenu = ['BomLookupView','BomLookupCreate'].includes(name) ? 'Dữ liệu lượng dùng BOM' : name==='BomChangeContent' ? 'Phiếu thay đổi BOM' : null;
         if(bomMenu && ((name==='BomLookupCreate' && /lưu/i.test(label)) || /sửa hàng loạt/i.test(label))) action='Thêm';

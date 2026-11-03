@@ -3,6 +3,7 @@ import {readRecordPages} from './production-record-pages.mjs';
 import {transitStandardLeadtime} from '../../lib/transit-leadtime.mjs';
 import { randomUUID } from "node:crypto";
 import {
+  transitPlanAllocationKey,
   dateISO,
   monday,
   normalized,
@@ -170,7 +171,7 @@ function validatePlanQuantity(row, all) {
     all
       .filter(
         (item) =>
-          item.planId === row.planId &&
+          transitPlanAllocationKey(item) === transitPlanAllocationKey(row) &&
           item.id !== row.id &&
           item.status !== "HỦY",
       )

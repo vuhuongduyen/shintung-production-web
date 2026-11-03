@@ -115,9 +115,11 @@ export function affectedEntities(entity: string): string[] {
 
 const eventName = 'onspa-data-changed';
 let channel: BroadcastChannel | null = null;
-function receive(entity: string) {
+// Optional in-memory owner correlation: cache invalidation and broadcasts still
+// reach all other subscribers. It is never sent to the server or used for auth.
+function receive(entity: string, changeSource?: object) {
   clearClientReads('mutation');
-  window.dispatchEvent(new CustomEvent(eventName, { detail: affectedEntities(entity) }));
+  window.dispatchEvent(Object.assign(new CustomEvent(eventName, { detail: affectedEntities(entity) }),{onspaChangeSource:changeSource}));
 }
 function ensureChannel() {
   try {
@@ -127,9 +129,9 @@ function ensureChannel() {
     };
   } catch { /* Focus and interval refresh still work. */ }
 }
-export function announceDataChange(entity: string) {
+export function announceDataChange(entity: string, changeSource?: object) {
   if (typeof window === 'undefined') return;
-  receive(entity);
+  receive(entity,changeSource);
   ensureChannel();
   channel?.postMessage(entity);
 }
@@ -150,7 +152,7 @@ function subscribeBrowserRefresh(notify:()=>void,poll:boolean,active:()=>boolean
   }
   return ()=>{unsubscribe();if(--refreshSubscribers===0){stopBrowserRefresh?.();stopBrowserRefresh=undefined;}};
 }
-export function useDataRefresh(entities: string[], {poll = true}: {poll?: boolean} = {}): number {
+export function useDataRefresh(entities: string[], {poll = true, ignoreSource}: {poll?: boolean;ignoreSource?:object} = {}): number {
   const [revision, setRevision] = useState(0);
   const active=useContext(WorkspaceActivityContext);
   const activeRef=useRef(active), dirty=useRef(false);activeRef.current=active;
@@ -160,13 +162,14 @@ export function useDataRefresh(entities: string[], {poll = true}: {poll?: boolea
     ensureChannel();
     const refresh=()=>{if(activeRef.current)setRevision(value=>value+1);else dirty.current=true;};
     const onChange = (event: Event) => {
+      if(ignoreSource&&(event as Event & {onspaChangeSource?:object}).onspaChangeSource===ignoreSource)return;
       const changed = (event as CustomEvent<string[]>).detail;
       if (changed?.some(entity => watched.split('|').includes(entity))) refresh();
     };
     window.addEventListener(eventName, onChange);
     const unsubscribe=subscribeBrowserRefresh(refresh,poll,()=>activeRef.current);
     return () => {window.removeEventListener(eventName,onChange);unsubscribe();};
-  }, [watched, poll]);
+  }, [watched, poll, ignoreSource]);
   return revision;
 }
 
@@ -179,7 +182,7 @@ const routeEntities: Record<string, string> = {
   '/api/production-report': 'production_report', '/api/engine-run': 'production_engine',
   '/api/bom-bulk': 'bom_change', '/api/bom-change': 'bom_change', '/api/bom': 'bom', '/api/forecast-import': 'forecast', '/api/inventory-import': 'inventory_snapshot',
 };
-export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export async function apiFetch(input: RequestInfo | URL, init?: RequestInit, changeSource?: object): Promise<Response> {
   const method=(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
   const path = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
       typeof window === 'undefined' ? 'http://localhost' : window.location.origin).pathname;
@@ -189,7 +192,7 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     const path = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
       typeof window === 'undefined' ? 'http://localhost' : window.location.origin).pathname;
     const entity = routeEntities[path];
-    if (entity) announceDataChange(entity);
+    if (entity) announceDataChange(entity,changeSource);
     else if (path === '/api/records' && typeof init?.body === 'string') {
       try {
         const written = JSON.parse(init.body);
