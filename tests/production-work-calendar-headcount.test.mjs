@@ -92,13 +92,20 @@ test('provisional banner leaves LSX staffing, action callbacks and saved report 
  let calls=0;
  const element=React.createElement(ProductionWorkBoardView,{rows:[order],events,reports,active:()=>({known:true,running:true,count:12,assigned:12}),openAction:()=>{calls++;},showDetail:()=>{calls++;},chosen:order,action:'complete',effectiveLocal:`${date}T11:00`,setEffectiveLocal:()=>{calls++;},submit:()=>{calls++;},cancel:()=>{calls++;},busy:false,schedules:[reference],line:'B',employees,page:1,onPageChange:()=>{calls++;}});
  const fetch=globalThis.fetch,previousAct=globalThis.IS_REACT_ACT_ENVIRONMENT,requests=[];globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.fetch=async(_url,init)=>{const body=JSON.parse(init.body);requests.push(body);assert.equal(body.action,'preview-report');return Response.json({hours:null});};
+ let unmountFocus=false;
  const {createRoot}=await import('react-dom/client'),root=createRoot(document.getElementById('root'));
  try{await React.act(async()=>root.render(element));const html=document.body.innerHTML;
- assert.ok(document.querySelector('[role=dialog]'),'assert the real portal rather than SSR output');
+ const dialog=document.querySelector('[role=dialog]');assert.ok(dialog,'assert the real portal rather than SSR output');
+ dialog.addEventListener('focusScope.autoFocusOnUnmount',event=>{assert.ok(event instanceof dom.window.CustomEvent);unmountFocus=true;});
  assert.match(html,/Có mặt tại giờ xuất \/ Phân công/);assert.match(html,/value="12 \/ 12"/);
  assert.match(html,/<dd>24 giờ<\/dd>/);assert.match(html,/Xác nhận xuất trạm/);
  assert.equal(calls,0);assert.equal(JSON.stringify({order,events,reports,reference}),before);assert.ok(requests.every(body=>body.action==='preview-report'));
- }finally{await React.act(async()=>root.unmount());globalThis.fetch=fetch;globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;}
+ }finally{
+  // Radix dispatches its unmount autofocus CustomEvent on a zero-delay timer.
+  // Drain that event while the matching DOM constructors and target still exist.
+  await React.act(async()=>{root.unmount();await new Promise(resolve=>setTimeout(resolve,0));});
+  globalThis.fetch=fetch;globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;assert.equal(unmountFocus,true,'finish the actual Radix unmount event before restoring globals');
+ }
 });
 
 test('display-only employee directory resolves historical transfers without changing action candidates',()=>{

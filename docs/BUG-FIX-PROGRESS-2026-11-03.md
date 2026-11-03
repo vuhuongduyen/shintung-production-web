@@ -170,3 +170,11 @@ Typecheck/build đã exit0. Test UI mới đạt; nhóm guard API/FINAL local đ
 Kiểm cuối nhóm phân bổ lại: UI mounted **2/2 pass**, exit0,3,2giây; API restore/cancel/FINAL **26/26 pass**, không cancel/skip,71,4giây; typecheck/build exit0. Các lượt UI trước đã pass assertion nhưng tiến trình không thoát: preview POST mở BroadcastChannel của Node trong data-sync; JSDOM.close không đóng channel đó. Harness theo dõi native channel do test tạo, đóng chúng và khôi phục global khi cleanup; tắt file watch không cần cho SSR test. Không dùng process.exit/unref hoặc skip để che treo. Đã dừng các tiến trình test sở hữu bị treo; lượt cuối thoát sạch. Đây không phải kiểm browser/responsive.
 
 Bằng chứng yêu cầu mới đã giải quyết phần hợp đồng khôi phục trong danh sách tám ca trước. Bảy ca còn lại (Plan ID rỗng2, Back Capacity1, thứ tự tháng/ngày1, menu Line2, giới hạn UI vệ sinh1) vẫn chưa tự đổi expected/quyền/thứ tự/giới hạn. CI exact head sau push ghi tại PR; chưa merge/deploy/preview.
+
+## Cleanup DOM sau CI phân bổ lại
+
+CI head2fe406b/run41573944402 completed/failure: **1.491 pass/8 fail/1.499 test**,247file,TypeScript/ba build đạt. Ca khôi phục nhân viên đã hết lỗi và file thoát sạch; tuy nhiên phát hiện lỗi mới cấp file headcount: cả11assertion pass rồi asynchronous activity ném `dispatchEvent ... not of type Event` sau test. Không coi đây là giảm lỗi ròng hoặc gán lỗi này thành lỗi nghiệp vụ.
+
+Đối chiếu mã Radix focus-scope đang cài: unmount autofocus dispatch CustomEvent trong timer0. Harness headcount trả global CustomEvent/Event về Node trước khi timer đó chạy, tạo event sai realm cho JSDOM. Sửa thứ tự cleanup: unmount và đợi lượt timer trong act khi DOM constructors còn đúng, rồi mới khôi phục fetch/act/global. Thêm listener/assertion sự kiện `focusScope.autoFocusOnUnmount` đã xảy ra và thuộc đúng DOM trước teardown. Không bắt/nuốt exception, không sleep dài,skip,process.exit hoặc bỏ assertion dữ liệu.
+
+Kiểm hai file headcount+restore cuối **13/13 pass**,exit0,8,1giây,không cancel/skip; lượt trước13/13 cũng đạt trước bổ sung assertion sự kiện. Mã ứng dụng không đổi từ2fe406b đã typecheck/build đạt. CI sau push xác minh cleanup cụ thể và residual,không rerun y nguyên. Chưa browser/preview đúnghead;không merge/deploy.
