@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {assertRejectedRequestAudit,assertSnapshotWithReceipts} from './helpers/rejected-request-audit.mjs';
 import assert from 'node:assert/strict';
 import {mkdtempSync, mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -43,7 +44,7 @@ test('Production Plan matches exact menu and action, including the existing lega
     }
 });
 
-async function fixture(t, {role = 'USER', status = 'ĐÃ CHỐT', priority = 'THƯỜNG'} = {}) {
+async function fixture(t, {role = 'USER', status = 'ĐÃ CHỐT', priority = 'THƯỜNG', login = 'TEST-plan-permissions'} = {}) {
     const base = resolve(root, '.local-data/tests');
     mkdirSync(base, {recursive: true});
     const c = await openDatabase(mkdtempSync(resolve(base, 'plan-permissions-')));
@@ -67,11 +68,21 @@ async function fixture(t, {role = 'USER', status = 'ĐÃ CHỐT', priority = 'TH
     const setGrants = async (permissions, options = {}) => put('permissions', login, {login, active: true, permissions: permissions.join(' · '), ...options});
     const principal = () => sitePrincipal(new Request(`${url}/api/production-plan`, {headers: {cookie}}), env);
     const read = () => siteApi(new Request(`${url}/api/production-plan?week=${week}`, {headers: {cookie}}), env);
-    const mutate = (action, revision = 0, extra = {}, headers = {}) => siteApi(new Request(`${url}/api/production-plan`, {
-        method: 'POST', headers: {cookie, origin: url, 'content-type': 'application/json', ...headers},
-        body: JSON.stringify({action, week, revision, ids: ['one'], ...extra}),
-    }), env);
-    return {...c, env, cookie, put, setGrants, principal, read, mutate};
+    const validatedReceipts=[];
+    const mutate = async (action, revision = 0, extra = {}, headers = {}) => {
+        const body={action, week, revision, ids: ['one'], ...extra};
+        const before=await records(c.db);
+        const response=await siteApi(new Request(`${url}/api/production-plan`, {
+            method:'POST',headers:{cookie,origin:url,'content-type':'application/json',...headers},body:JSON.stringify(body),
+        }),env);
+        if(response.status>=400){
+            const row=await assertRejectedRequestAudit({before,after:await records(c.db),response,actorId:headers.cookie&&headers.cookie!==cookie?'LINE_A':login,route:'/api/production-plan',body,receipt:login!=='vthduyen'&&headers.cookie!==''&&(!headers.origin||headers.origin===url)});
+            if(row)validatedReceipts.push(row);
+        }
+        return response;
+    };
+    const unchanged=async before=>assertSnapshotWithReceipts(before,await records(c.db),validatedReceipts);
+    return {...c, env, cookie, put, setGrants, principal, read, mutate,unchanged};
 }
 
 test('real site principal and plan read expose canonical, inherited and legacy reopen permissions without writing', async t => {
@@ -89,7 +100,7 @@ test('real site principal and plan read expose canonical, inherited and legacy r
         const response = await f.read();
         assert.equal(response.status, 200);
         assert.equal((await response.json()).canReopen, allowed, permission);
-        assert.deepEqual(await records(f.db), before, 'reading permissions must not change any records');
+        assert.deepEqual(await records(f.db),before,'GET permissions must not write any record or receipt');
     }
     await f.put('department_permissions', 'TEST-KHSX', {active: true, permissions: [grant('Xem'), grant('Hủy xác nhận')].join(' · ')});
     await f.setGrants([], {permissionMode: 'DEPARTMENT'});
@@ -98,14 +109,14 @@ test('real site principal and plan read expose canonical, inherited and legacy r
     assert.equal((await f.principal()).canReopenPlan, false, 'inactive personal permissions must not fall back to the department');
 });
 
-test('API reopen denies view/edit/confirm and wrong-menu grants without changing data or audit, then accepts Hủy xác nhận', async t => {
+test('API reopen denies view/edit/confirm and wrong-menu grants with only a denied receipt and no business changes, then accepts Hủy xác nhận', async t => {
     const f = await fixture(t);
     for (const permission of [grant('Xem'), grant('Sửa'), grant('Xác nhận'), 'Kế hoạch sản xuất / In_transit / Hủy xác nhận', 'Quản lý sản xuất / Production_plan / Hủy xác nhận']) {
         await f.setGrants([grant('Xem'), permission]);
         const before = await records(f.db);
         const response = await f.mutate('reopen', 0, {reason: 'TEST reopen'});
         assert.equal(response.status, 403, permission);
-        assert.deepEqual(await records(f.db), before, 'denied reopen must not write plan, transit or audit');
+        await f.unchanged(before);
     }
     await f.setGrants([grant('Xem'), grant('Hủy xác nhận')]);
     const response = await f.mutate('reopen', 0, {reason: 'TEST reopen'});
@@ -133,18 +144,18 @@ test('API separates Xác nhận, Hủy xác nhận and Sửa, and requires Sửa
         await f.setGrants([permission]);
         const before = await records(f.db);
         assert.equal((await f.mutate('close')).status, 403, permission);
-        assert.deepEqual(await records(f.db), before);
+        await f.unchanged(before);
     }
     for (const permission of [grant('Xác nhận'), grant('Hủy xác nhận'), grant('Xem')]) {
         await f.setGrants([permission]);
         const before = await records(f.db);
         assert.equal((await f.mutate('save', 0, {edits: {one: {plan: 90}}})).status, 403, permission);
-        assert.deepEqual(await records(f.db), before);
+        await f.unchanged(before);
     }
     await f.setGrants([grant('Xác nhận')]);
     const before = await records(f.db);
     assert.equal((await f.mutate('close', 0, {edits: {one: {plan: 90}}, canEditPlan: true})).status, 403);
-    assert.deepEqual(await records(f.db), before, 'confirmation alone must not authorize inline edits');
+    await f.unchanged(before);
     const closed = await f.mutate('close');
     assert.equal(closed.status, 200);
     const result = await closed.json();
@@ -167,7 +178,7 @@ test('Xác nhận-only closes unchanged edit envelopes without Sửa, using norm
         const invalid = await f.mutate('close', 0, {edits: {one: {sku: 'TEST-PLAN-SKU'}}});
         assert.equal(invalid.status, 400, 'unchanged values must not expand the editable field allowlist');
         assert.equal((await invalid.json()).error, 'invalidEdit');
-        assert.deepEqual(await records(f.db), invalidBefore);
+        await f.unchanged(invalidBefore);
         const response = await f.mutate('close', 0, {edits});
         assert.equal(response.status, 200);
         const result = await response.json();
@@ -203,7 +214,7 @@ test('Admin retains reopen capability but the transferred-row guard still applie
         const response = await f.mutate('reopen', 0, {reason: 'TEST transferred'});
         assert.equal(response.status, 409);
         assert.equal((await response.json()).error, 'alreadyTransferred');
-        assert.deepEqual(await records(f.db), before);
+        await f.unchanged(before);
     });
 });
 
@@ -213,7 +224,7 @@ test('API preserves authentication, same-origin and quick-Line restrictions', as
     const before = await records(f.db);
     assert.equal((await f.mutate('reopen', 0, {}, {cookie: ''})).status, 401);
     assert.equal((await f.mutate('reopen', 0, {}, {origin: 'https://other.invalid'})).status, 403);
-    assert.deepEqual(await records(f.db), before);
+    await f.unchanged(before);
     await f.put('users', 'LINE_A', {login: 'LINE_A', name: 'Line A', role: 'ADMIN', active: true, authMode: 'quick_line', line: 'A'});
     await f.put('permissions', 'LINE_A', {login: 'LINE_A', active: true, permissions: grant('Hủy xác nhận')});
     await f.db.prepare('INSERT INTO auth_accounts VALUES(?,?,?,?,1,?)').bind('LINE_A', 'QUICK_LINE', 'unused', 100000, at).run();
@@ -227,7 +238,7 @@ test('API preserves authentication, same-origin and quick-Line restrictions', as
     assert.equal((await f.mutate('reopen', 0, {}, {cookie})).status, 403);
     const read = await siteApi(new Request(`${url}/api/production-plan?week=${week}`, {headers: {cookie}}), f.env);
     assert.equal(read.status, 403);
-    assert.deepEqual(await records(f.db), lineBefore);
+    await f.unchanged(lineBefore);
 });
 
 test('close checks normalization-induced priority changes even when submitted row edits are empty',async t=>{
@@ -238,6 +249,17 @@ test('close checks normalization-induced priority changes even when submitted ro
   const response=await f.mutate('close',0,{edits:{one:{}}});
   assert.equal(response.status,canEdit?200:403);
   if(canEdit){const result=await response.json();assert.equal(result.rows[0].status,'ĐÃ CHỐT');assert.equal(result.rows[0].priority,'THƯỜNG');}
-  else assert.deepEqual(await records(f.db),before,'confirm-only cannot normalize a legacy priority or write audit');
+  else await f.unchanged(before);
  });
+});
+
+// Audit exemption is not a business-authorization exemption.
+test('authenticated vthduyen alias remains denied without a receipt or business mutation',async t=>{
+ const f=await fixture(t,{login:'vthduyen'});
+ await f.setGrants([grant('Xem')]);
+ const before=await records(f.db);
+ const response=await f.mutate('reopen',0,{reason:'TEST exempt alias denied'});
+ assert.equal(response.status,403);
+ assert.equal(response.headers.get('X-ONSPA-Action-ID'),null);
+ assert.deepEqual(await records(f.db),before);
 });

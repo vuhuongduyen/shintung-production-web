@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {assertRejectedRequestAudit,assertSnapshotWithReceipts} from './helpers/rejected-request-audit.mjs';
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -34,11 +35,13 @@ test('Site APIs use trusted identity, isolate bindings, retain D1/R2 data and ne
   await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('permissions','viewer@example.test',JSON.stringify({login:'viewer@example.test',active:true,permissions:'Dữ liệu cơ bản / SKU Master / Xem'}),email,'fixture').run();
   assert.equal((await call('/api/records?entity=sku',null,null)).status,401);
   assert.equal((await call('/api/test-session')).status,410);
-  const beforeExamples=await records(c.db);
-  assert.equal((await call('/api/production-examples',{action:'create'})).status,410);
-  assert.equal((await call('/api/production-workflow?examples=1')).status,410);
-  assert.equal((await call('/api/production-workflow?examples=1',{action:'start'})).status,410);
-  assert.deepEqual(await records(c.db),beforeExamples,'retiring examples must not mutate actual records');
+  const beforeExamples=await records(c.db),retiredReceipts=[];
+  for(const [path,body] of [['/api/production-examples',{action:'create'}],['/api/production-workflow?examples=1',undefined],['/api/production-workflow?examples=1',{action:'start'}]]){
+   const before=await records(c.db),response=await call(path,body);assert.equal(response.status,410);
+   if(body)retiredReceipts.push(await assertRejectedRequestAudit({before,after:await records(c.db),response,actorId:email,route:path.split('?')[0],body}));
+   else assert.deepEqual(await records(c.db),before);
+  }
+  assertSnapshotWithReceipts(beforeExamples,await records(c.db),retiredReceipts);
 
   const adminSession=await(await call('/api/site-session')).json();assert.equal(adminSession.user.email,email);assert.equal(adminSession.user.isAdmin,true);
   const emailOnly=new Request('https://test.invalid/api/site-session',{headers:{'oai-authenticated-user-email':email}});
@@ -174,8 +177,14 @@ test('Site APIs use trusted identity, isolate bindings, retain D1/R2 data and ne
   await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('in_transit',lateOrder.id,JSON.stringify(lateOrder),email,'fixture').run();
   const first={...report,id:'LATE-1',transitId:lateOrder.id,lsxCode:'LSX-LATE',reportedQuantity:6,completedAt:'2026-09-26T03:00:00Z'},second={...first,id:'LATE-2',reportedQuantity:4,startedAt:'2026-09-25T01:00:00Z',completedAt:'2026-09-25T03:00:00Z'};
   for(const r of [first,second])await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_report',r.id,JSON.stringify(r),email,'fixture').run();
-  assert.equal((await call('/api/production-report',{action:'review',reportId:first.id,approve:true})).status,200,'partial report can be confirmed without late reason');
-  const missingReason=await call('/api/production-report',{action:'review',reportId:second.id,approve:true});assert.equal(missingReason.status,422);assert.match((await missingReason.json()).error,/LSX-LATE.*trễ 2 ngày.*Lý do trễ/);
+  // Snapshot's production-delay-reason/API tests require a reason for each late
+  // final-product report, including partial quantities; old order reasons cannot substitute.
+  const lateBody={action:'review',reportId:first.id,approve:true},beforeLate=await records(c.db);
+  const latePartial=await call('/api/production-report',lateBody);assert.equal(latePartial.status,422);
+  assert.match((await latePartial.clone().json()).error,/LSX-LATE.*Công đoạn Cuối.*trễ kế hoạch.*Lý do trễ/);
+  await assertRejectedRequestAudit({before:beforeLate,after:await records(c.db),response:latePartial,actorId:email,route:'/api/production-report',body:lateBody});
+  assert.equal((await call('/api/production-report',{...lateBody,delayReason:'Thiếu vật tư lần đầu'})).status,200);
+  const missingReason=await call('/api/production-report',{action:'review',reportId:second.id,approve:true});assert.equal(missingReason.status,422);assert.match((await missingReason.json()).error,/LSX-LATE.*Công đoạn Cuối.*trễ kế hoạch.*Lý do trễ/);
   assert.equal((await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='warehouse_in' AND record_key='SX:LATE-2'").first()).n,0);
   const final=await call('/api/production-report',{action:'review',reportId:second.id,approve:true,delayReason:'Thiếu vật tư'});assert.equal(final.status,200);assert.equal((await final.json()).payload.actualCompletedAt,first.completedAt);
   const merged=await(await call('/api/production-workflow')).json();assert.equal(merged.orders.find(o=>o.id===lateOrder.id).actualCompletedAt,'2026-09-26');assert.equal(merged.orders.find(o=>o.id===lateOrder.id).delayReason,'Thiếu vật tư');
@@ -196,7 +205,7 @@ test('Site APIs use trusted identity, isolate bindings, retain D1/R2 data and ne
   const gapReview=await call('/api/production-report',historyReview(gapReport.id));assert.equal(gapReview.status,409);assert.match((await gapReview.json()).error,/chưa được phân bổ đủ/);
   assert.equal((await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='production_report' AND record_key=?").bind(gapReport.id).first()).n,0);
   assert.equal((await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='warehouse_in' AND record_key=?").bind('SX:'+gapReport.id).first()).n,0);
-  const historyFirst=await call('/api/production-report',historyReview(historyReports[0].id));assert.equal(historyFirst.status,200);assert.equal((await historyFirst.json()).payload.hours.total,6);
+  const historyFirst=await call('/api/production-report',historyReview(historyReports[0].id,{delayReason:'Thiếu vật tư phiếu lịch sử đầu'}));assert.equal(historyFirst.status,200);assert.equal((await historyFirst.json()).payload.hours.total,6);
   let historyState=await(await call('/api/production-workflow')).json();
   assert.equal(historyState.reports.filter(r=>r.transitId===historyOrder.id).length,2);
   assert.equal(historyState.reports.find(r=>r.id===historyReports[0].id).hours.total,6);

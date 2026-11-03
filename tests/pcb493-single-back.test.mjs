@@ -70,9 +70,10 @@ test('disabled or unauthorized current layer never falls back to an outer callba
  assert.equal(selectToolbarBack([blocked,parent]),blocked);
  const html=render(StandardToolbar,{items:[blocked,parent]});assert.match(html,/disabled=""[^>]*>Quay lại<\/button>/);assert.equal((html.match(/<button/g)||[]).length,1);
  const forbidden={...blocked,allowed:false};assert.equal(selectToolbarBack([forbidden,parent]),forbidden);
- assert.doesNotMatch(render(StandardToolbar,{items:[forbidden,parent]}),/<button/);
+ assert.match(render(StandardToolbar,{items:[forbidden,parent]}),/aria-disabled="true"/);
+ assert.doesNotMatch(render(StandardToolbar,{items:[forbidden,parent],permissionFeedback:false}),/<button/);
  const denied=renderToStaticMarkup(React.createElement(ToolbarPermissions.Provider,{value:(_name,label)=>label!=='Detail'},React.createElement(StandardToolbar,{items:[blocked,parent]})));
- assert.doesNotMatch(denied,/<button/);
+ assert.match(denied,/aria-disabled="true"/);assert.equal((denied.match(/<button/g)||[]).length,1);
 });
 test('SKU guarded form/history/detail beats lookup, Capacity panel beats lookup and lookup beats parent',()=>{
  const page=read('app/page.tsx'),capacity=read('components/weekly-capacity.tsx');

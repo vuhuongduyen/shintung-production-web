@@ -90,3 +90,12 @@ test('toolbar native action remains mounted across repeated external verificatio
   }
  }finally{await view.close();}
 });
+
+test('denied detail Back explains without falling through to parent or submitting',async()=>{
+ for(const denyViaProvider of [false,true]){
+  let parent=0,detail=0,submits=0;
+  const items=[toolbar.action({onClick:()=>parent++},'Parent',true,'back','parent'),toolbar.action({onClick:()=>detail++},'Detail',denyViaProvider,'back','detail')];
+  const view=await mount(el('form',{onSubmit:e=>{e.preventDefault();submits++}},el(ToolbarPermissions.Provider,{value:(_name,label)=>!denyViaProvider||label!=='Detail'},el(StandardToolbar,{items}))));
+  try{const buttons=view.host.querySelectorAll('form button');assert.equal(buttons.length,1);assert.equal(buttons[0].getAttribute('aria-disabled'),'true');assert.equal(buttons[0].type,'button');assert.match(buttons[0].textContent,/Quay lại/);await click(buttons[0]);assert.match(alert().textContent,/quyền/);await key(buttons[0],'Enter');await key(buttons[0],' ');assert.deepEqual([parent,detail,submits],[0,0,0]);}finally{await view.close();}
+ }
+});

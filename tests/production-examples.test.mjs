@@ -1,5 +1,6 @@
 import {fakePassword} from './fixtures/review-fixtures.mjs';
 import test from 'node:test';
+import {assertRejectedRequestAudit,assertSnapshotWithReceipts} from './helpers/rejected-request-audit.mjs';
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -16,8 +17,11 @@ test('retired examples routes enforce auth, exact 410 response and no DB/R2 muta
  try{
   await migrate(c.db);
   const cookies={};
+  const receipts=[];
   const call=async(path,body,who)=>{
+   const before=await records(c.db);
    const response=await siteApi(new Request(`https://test.invalid${path}`,{method:body?'POST':'GET',headers:{...(cookies[who]?{Cookie:cookies[who]}:{}),...(body?{origin:'https://test.invalid','content-type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})}),{DB:c.db,FILES:c.bucket});
+   if(body&&cookies[who]&&response.status>=400){const row=await assertRejectedRequestAudit({before,after:await records(c.db),response,actorId:who,route:path.split('?')[0],body});receipts.push(row);}
    return {status:response.status,body:await response.json(),cookie:response.headers.get('set-cookie')};
   };
   for(const [login,role] of [['TEST_USER_016@example.test','Super Admin'],['viewer@example.test','USER']]){
@@ -30,6 +34,7 @@ test('retired examples routes enforce auth, exact 410 response and no DB/R2 muta
   }
   const snapshot=async()=>({rows:await records(c.db),examples:(await c.db.prepare('SELECT * FROM production_example_records ORDER BY entity,record_key').all()).results,objects:(await c.bucket.list()).objects.map(o=>({key:o.key,size:o.size})).sort((a,b)=>a.key.localeCompare(b.key))});
   const before=await snapshot();
+  const unchanged=async()=>{const after=await snapshot();assertSnapshotWithReceipts(before.rows,after.rows,receipts);assert.deepEqual(after.examples,before.examples);assert.deepEqual(after.objects,before.objects);};
   for(const route of ['/api/production-workflow?examples=1','/api/production-report?examples=1','/api/production-correction?examples=1','/api/production-examples']){
    const anonymous=await call(route,null,'anonymous');assert.equal(anonymous.status,401,route);assert.match(anonymous.body.error,/đăng nhập/i);
    const denied=await call(route,null,'viewer@example.test');assert.equal(denied.status,403,route);assert.match(denied.body.error,/admin/);
@@ -41,10 +46,10 @@ test('retired examples routes enforce auth, exact 410 response and no DB/R2 muta
    const denied=await call(route,{action:'create'},'viewer@example.test');assert.equal(denied.status,403);
    const retired=await call(route,{action:'create'},'TEST_USER_016@example.test');assert.equal(retired.status,410);
    assert.deepEqual(retired.body,{error:'Đã ngừng dữ liệu mẫu trong Quản lý sản xuất. Hãy tải lại để xem dữ liệu thực tế.'});
-   assert.deepEqual(await snapshot(),before,`POST ${route} must not write DB/R2`);
+   await unchanged();
   }
   assert.equal((await call('/api/records?entity=users&examples=1',null,'TEST_USER_016@example.test')).status,400);
-  assert.deepEqual(await snapshot(),before);
+  await unchanged();
  }finally{await c.close();}
 });
 

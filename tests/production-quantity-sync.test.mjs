@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {assertRejectedRequestAudit} from './helpers/rejected-request-audit.mjs';
 import assert from 'node:assert/strict';
 import {mkdirSync,mkdtempSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -31,7 +32,7 @@ async function fixture(run){
   let cookie='';
   const call=async(path,body)=>{
    const response=await siteApi(new Request('https://test.invalid'+path,{method:body?'POST':'GET',headers:{cookie,...(body?{'content-type':'application/json',origin:'https://test.invalid'}:{})},...(body?{body:JSON.stringify(body)}:{})}),{DB:c.db,FILES:c.bucket});
-   const value=await response.json();return {status:response.status,body:value,headers:response.headers};
+   const value=await response.json();return {status:response.status,body:value,headers:response.headers,response:Response.json(value,{status:response.status,headers:response.headers})};
   };
   const login=await call('/api/auth/login',{login:actor.login,password:'1234'});
   assert.equal(login.status,200);cookie=login.headers.get('set-cookie').split(';')[0];
@@ -60,7 +61,7 @@ test('confirmed output synchronizes exact LSX cumulatively; pending, repeat and 
  const approved=await call('/api/production-report',review);assert.equal(approved.status,200,JSON.stringify(approved.body));
  order=await quantities(3000,1000);assert.equal(order.pendingReportQty,0);assert.equal(order.actualCompletedAt,'');
  const saved=await records(db);
- assert.equal((await call('/api/production-report',review)).status,409);assert.deepEqual(await records(db),saved);
+ const repeated=await call('/api/production-report',review);assert.equal(repeated.status,409);await assertRejectedRequestAudit({before:saved,after:await records(db),response:repeated.response,actorId:actor.login,route:'/api/production-report',body:review});
  const second=await mutateProductionWorkflow(db,{action:'complete',orderId,quantity:1000,effectiveAt:at('11:00')},actor);
  await quantities(3000,1000);
  const body={action:'review',reportId:second.report.id,expectedVersion:0,approve:true};
@@ -101,7 +102,7 @@ test('rejection and failed confirmation keep quantity unchanged and do not creat
  const output=await mutateProductionWorkflow(db,{action:'complete',orderId,quantity:3000,effectiveAt:at('10:00')},actor);
  const before=await records(db);
  const stale=await call('/api/production-report',{action:'review',reportId:output.report.id,approve:true,expectedVersion:99});
- assert.equal(stale.status,409);assert.deepEqual(await records(db),before);await quantities(0,4000);
+ assert.equal(stale.status,409);await assertRejectedRequestAudit({before,after:await records(db),response:stale.response,actorId:actor.login,route:'/api/production-report',body:{action:'review',reportId:output.report.id,approve:true,expectedVersion:99}});await quantities(0,4000);
  const rejected=await call('/api/production-report',{action:'review',reportId:output.report.id,approve:false,reason:'TEST reject quantity'});
  assert.equal(rejected.status,200);const order=await quantities(0,4000);assert.equal(order.pendingReportQty,0);
  assert.equal((await db.prepare("SELECT count(*) AS count FROM app_records WHERE entity='warehouse_in'").first()).count,0);

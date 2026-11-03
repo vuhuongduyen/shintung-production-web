@@ -1,4 +1,5 @@
 import vm from 'node:vm';
+import {assertRejectedRequestAudit} from './helpers/rejected-request-audit.mjs';
 import ts from 'typescript';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
@@ -62,10 +63,10 @@ test('Line users are explicitly created, persist, stay scoped, and cannot acquir
   }
   const adminView=await(await call('/api/production-workflow',undefined,adminCookie)).json();assert.deepEqual(adminView.orders.map(r=>r.line).sort(),['A','B']);assert.equal(adminView.employees.length,2);
   assert.deepEqual(await records(c.db),beforeReads,'expanded GETs never write business data');
-  for(const path of ['/api/capacity','/api/production-hr-hours','/api/production-report','/api/production-correction','/api/production-standards','/api/employees','/api/records'])assert.equal((await call(path,{action:'save',role:'ADMIN',line:null},cookie)).status,403,path);
-  for(const action of ['schedule','approve-hours','line-absence','attendance-override','line-movement','attendance-edit','attendance-cancel'])assert.equal((await call('/api/production-workflow',{action,line:'A'},cookie)).status,403,action);
-  for(const action of ['start','complete','pause','resume','incident','add','reduce','transfer'])assert.equal((await call('/api/production-workflow',{action,orderId:'TEST_ORDER_B',role:'ADMIN',line:'A'},cookie)).status,403,action);
-  assert.deepEqual(await records(c.db),beforeReads,'denied writes leave every record unchanged');
+  const deniedWrite=async(path,body)=>{const before=await records(c.db);const response=await call(path,body,cookie);assert.equal(response.status,403,path);await assertRejectedRequestAudit({before,after:await records(c.db),response,actorId:'LINE_A',route:path,body});};
+  for(const path of ['/api/capacity','/api/production-hr-hours','/api/production-report','/api/production-correction','/api/production-standards','/api/employees','/api/records'])await deniedWrite(path,{action:'save',role:'ADMIN',line:null});
+  for(const action of ['schedule','approve-hours','line-absence','attendance-override','line-movement','attendance-edit','attendance-cancel'])await deniedWrite('/api/production-workflow',{action,line:'A'});
+  for(const action of ['start','complete','pause','resume','incident','add','reduce','transfer'])await deniedWrite('/api/production-workflow',{action,orderId:'TEST_ORDER_B',role:'ADMIN',line:'A'});
   // Nested projections preserve borrowing context but never disclose foreign orders/reports.
   for(const line of ['A','B'])await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_report','REPORT_'+line,JSON.stringify({id:'REPORT_'+line,transitId:'TEST_ORDER_'+line,line,historicalImport:true,cancelled:true}),'TEST','test').run();
   for(const [id,payload] of [['ADJUST',{kind:'hours-adjustment',line:'A',changes:[{reportId:'REPORT_A',after:{total:1}},{reportId:'REPORT_B',after:{total:999}}]}],['BORROW',{kind:'transfer',line:'B',destinationLine:'A',sourceId:'TEST_ORDER_B',destinationId:'TEST_ORDER_A',planId:'TEST_PLAN_B',lsxCode:'TEST_LSX_B',sku:'TEST_SKU_B',name:'PRIVATE_B_ORDER',reason:'TEST_LSX_B',before:{kind:'line-absence',line:'B',employees:['PRIVATE_EMPLOYEE'],reason:'PRIVATE_REASON'},employees:['PERSON_B'],effectiveAt:'2026-10-01T01:00:00Z',count:1}]])await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_event',id,JSON.stringify({id,...payload}),'TEST','test').run();
@@ -79,8 +80,8 @@ test('Line users are explicitly created, persist, stay scoped, and cannot acquir
   await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_event','ACTIVE_LOAN',JSON.stringify({id:'ACTIVE_LOAN',kind:'line-movement',line:'B',destinationLine:'A',employees:['PERSON_B'],count:1,approved:true,effectiveAt:loanAt,endsAt:new Date(Date.now()+3600000).toISOString()}),'TEST','test').run();
   const loanView=await(await call('/api/production-workflow',undefined,cookie)).json();assert.ok(loanView.employees.some(e=>e.id==='PERSON_B'),'active borrowed person remains selectable on receiving Line');
   const startedAt=new Date(Date.now()-120000).toISOString();await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_event','START_A',JSON.stringify({id:'START_A',kind:'start',sourceId:'TEST_ORDER_A',line:'A',count:1,employees:['PERSON_B'],effectiveAt:startedAt,recordedAt:startedAt}),'TEST','test').run();
-  assert.equal((await call('/api/production-workflow',{action:'preview-report',orderId:'TEST_ORDER_A'},cookie)).status,200,'own-Line reporting preview remains available');
-  const report=await call('/api/production-workflow',{action:'complete',orderId:'TEST_ORDER_A',quantity:1},cookie);assert.equal(report.status,200,JSON.stringify(await report.clone().json()));for(const token of ['TEST_ORDER_B','TEST_PLAN_B','TEST_LSX_B','TEST_SKU_B','PRIVATE_B_ORDER','REPORT_B'])assert.ok(!JSON.stringify(await report.clone().json()).includes(token),token);
+  const ownPreview=await call('/api/production-workflow',{action:'preview-report',orderId:'TEST_ORDER_A',startedAt,effectiveAt:new Date().toISOString()},cookie);assert.equal(ownPreview.status,200,JSON.stringify(await ownPreview.clone().json()));
+  const report=await call('/api/production-workflow',{action:'complete',orderId:'TEST_ORDER_A',quantity:1,startedAt,effectiveAt:new Date().toISOString()},cookie);assert.equal(report.status,200,JSON.stringify(await report.clone().json()));for(const token of ['TEST_ORDER_B','TEST_PLAN_B','TEST_LSX_B','TEST_SKU_B','PRIVATE_B_ORDER','REPORT_B'])assert.ok(!JSON.stringify(await report.clone().json()).includes(token),token);
   assert.equal((await call('/api/auth/admin/line-users',{},cookie)).status,403);
   assert.equal((await call('/api/auth/admin/password',{login:'LINE_A',password:'abcd',passwordConfirm:'abcd'},adminCookie)).status,409);
   assert.equal((await call('/api/production-workflow',{action:'schedule',line:'A'},cookie)).status,403,'cannot act as QLSX');
@@ -117,5 +118,7 @@ test('correction Line filter is locked to session while unrestricted users keep 
  assert.ok(source.includes('sessionLine?<option value={sessionLine}>{sessionLine}</option>:'));
  assert.ok(source.includes(`<option value="all">{t('Tất cả Line')}</option><option>A</option><option>B</option>`));
  const parent=readFileSync(new URL('../components/production-management.tsx',import.meta.url),'utf8');
- assert.ok(parent.includes('<ProductionCorrections sessionLine={viewLine}'));
+ const ast=ts.createSourceFile('parent.tsx',parent,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);let session;
+ function visit(n){if(ts.isJsxSelfClosingElement(n)&&n.tagName.getText(ast)==='ProductionCorrections')session=n.attributes.properties.find(p=>ts.isJsxAttribute(p)&&p.name.getText(ast)==='sessionLine')?.initializer;ts.forEachChild(n,visit);}
+ visit(ast);assert.equal(session?.getText(ast),'{viewLine}');
 });

@@ -38,13 +38,15 @@ test('HR uses one entry button; managers and combined/Admin retain warehouse/tra
  for(const [rights,expected] of [[HR,[]],[MANAGER,['Phụ kho','CV khác','Chuyển Line','Thu hồi nhân sự']],[ADMIN,['Phụ kho','CV khác','Chuyển Line','Thu hồi nhân sự']]]){const f=schedule(rights);f.commit();assert.deepEqual(tabNames(f),expected);}
  const f=schedule({hr:false,manager:false});f.commit();assert.deepEqual(tabNames(f),[]);assert.equal(f.nodes().some(n=>n.type==='form'),false);
 });
-test('HR lookup choices exclude production actions and rejects a stale/forged lookup value',()=>{
- const f=schedule(HR);f.commit();f.button('Tổng hợp tháng').props.onClick();f.commit();
+test('HR can filter historical production types without gaining production actions or unlocked Line',()=>{
+ const f=schedule(HR);f.change({locked:true});f.button('Tổng hợp tháng').props.onClick();f.commit();
+ const line=f.find(n=>n.props?.['aria-label']==='Line tra cứu');assert.equal(line.props.disabled,true);assert.equal(line.props.value,'A');
  f.find(n=>n.type==='select'&&n.props.value==='Tổng hợp tháng').props.onChange({target:{value:'Loại biến động'}});f.commit();
- const select=f.find(n=>n.type==='select'&&n.props.value==='Nghỉ');assert.ok(select);
- assert.deepEqual(descendants(select).filter(n=>n.type==='option').map(n=>n.props.children),['Nghỉ','Đi trễ','Về sớm']);
- select.props.onChange({target:{value:'Phụ kho'}});f.commit();f.button('Tìm kiếm').props.onClick();f.commit();
- assert.equal(f.find(n=>n.props?.role==='tab'&&n.props['aria-selected']),undefined);assert.ok(f.button('Ghi nhận chấm công'));
+ const picker=()=>f.find(n=>n.type==='./labor-kind-filter');assert.ok(picker());assert.equal(picker().props.value,'');
+ picker().props.onChange('Phụ kho|Nghỉ');f.commit();f.button('Tìm kiếm').props.onClick();f.commit();
+ const month=()=>f.find(n=>n.props?.lookupFilters);assert.equal(month().props.lookupFilters.kind,'Phụ kho|Nghỉ');assert.equal(month().props.lookupFilters.line,'A');assert.equal(month().props.manager,false);assert.equal(month().props.hr,true);
+ picker().props.onChange('FORGED');f.commit();f.button('Tìm kiếm').props.onClick();f.commit();assert.equal(month().props.lookupFilters.kind,'Phụ kho|Nghỉ');
+ assert.deepEqual(tabNames(f),[]);assert.ok(f.button('Ghi nhận chấm công'));assert.equal(f.saves.length,0);
 });
 test('changing manager to HR immediately clamps active tab and removes production inputs before effects',()=>{
  const f=schedule(MANAGER);f.commit();f.button('Chuyển Line').props.onClick();f.commit();
