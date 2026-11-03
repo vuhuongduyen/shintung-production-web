@@ -42,3 +42,11 @@ Targeted trước tối ưu99/99; sau tối ưu bộ liên quan126/126 gồm API
 Kiểm gồm lựa chọn0/1/2 dòng, click lặp, readonly/confirmed, exact Sửa và Admin, revision stale/concurrent, lưu/tải lại, đổi Line/ngày/lượng, tổng nhỏ/lớn hơn đề xuất, giữ Engine, capacity không đếm thiếu/trùng, chuyển riêng từng dòng, mở chốt anh em độc lập, LSX thêm chung đúng trần nguồn và hủy LSX không đổi lệnh anh em. Mọi fixture và benchmark là dữ liệu giả local.
 
 Chưa chạy lint hoặc QA trình duyệt thật/responsive/full-app acceptance. Executor cloud hiện không có công cụ Codespaces/port-forward/browser được hỗ trợ, nên chưa có URL preview mới được kiểm chứng; URL lịch sử không phải bằng chứng nhánh này đang chạy. Cần chạy full ONSPA TEST đúng commit bằng Codespaces Private theo quy trình hiện có, bảo toàn DB/FILES và đánh giá adapter hiện trạng trước khi gửi người dùng. Không dùng localhost, mockup hoặc web trial cũ làm link nghiệm thu. Chưa đủ điều kiện merge chỉ dựa trên targeted tests.
+
+## Rà soát phản hồi đến trễ trước nghiệm thu
+
+Full CI đầu tiên của1e98222d2b67873d20f60454c74afaf180a6dc25/run41602971706 đạt1.522/1.522 test trong250file, không timeout/cancel/skip/todo/thiếu tổng kết; TypeScript và ba build đạt. Đây là kết quả của head trước bản bổ sung dưới đây.
+
+Review sau đó tái hiện bằng mounted regression mới: GET revision1 khởi động trước split, trả về sau POST revision2 thì bảng bị lùi từ hai dòng còn một. DB không mất dữ liệu nhưng UI/cache bị cũ; test trước sửa thất bại1≠2. Không nghiệm thu chỉ dựa trên bộ CI cũ.
+
+Sửa tại Pro Plan: load không áp snapshot revision thấp hơn; cache không lùi revision và chỉ nhận lượt force-read mới nhất; split response không ghi đè snapshot đã tải bằng hoặc mới hơn kết quả mutation. Không chặn refresh ngoại lai hoặc bỏ dữ liệu mới; không đổi backend revision/audit. Regression kiểm cả GET cũ trả sau POST mới, cache được dùng lại ở component thứ hai, và POST cũ trả sau GET ngoại lai có lượng mới80 cùng dòng mới khác. Targeted105/105 đạt, không skip/cancel; typecheck/build exit0. CI của commit bổ sung cần đọc riêng theo head mới nhất. Không cập nhật preview hoặc web chính.

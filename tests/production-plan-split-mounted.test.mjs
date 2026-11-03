@@ -14,18 +14,19 @@ const {ToolbarPermissions}=await vite.ssrLoadModule('/components/standard-toolba
 const sync=await vite.ssrLoadModule('/lib/data-sync.ts');
 const originalFetch=globalThis.fetch,OriginalChannel=globalThis.BroadcastChannel,channels=new Set();
 if(OriginalChannel)globalThis.BroadcastChannel=class extends OriginalChannel{constructor(name){super(name);channels.add(this);}};
-const week='2026-11-02';let rows,writes,release,planReads;
+const week='2026-11-02';let rows,writes,release,planReads,holdNextRead,releaseRead;
 const original={id:'ROOT-SYNTHETIC',week,sku:'SYNTHETIC-SKU',name:'Synthetic product',line:'A',start:week,end:week,plan:100,suggested:100,laborHour:0.1,status:'DỰ KIẾN',type:'TUẦN CHÍNH',priority:'THƯỜNG',planId:'SHARED-PLAN',sourceIds:[]};
-beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];release=null;planReads=0;globalThis.fetch=async(input,init={})=>{
+beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];release=null;planReads=0;holdNextRead=false;releaseRead=null;globalThis.fetch=async(input,init={})=>{
  const url=new URL(String(input),'https://synthetic.test');
  if((init.method||'GET')==='GET'){
   if(url.pathname==='/api/capacity')return Response.json({requests:[]});
-  assert.equal(url.pathname,'/api/production-plan');if(url.searchParams.has('capacityOnly'))return Response.json({capacity:[]});planReads++;return Response.json({revision:rows.length,rows,sources:[],capacity:[],transit:[],audit:[],warnings:[],canReopen:false});
+  assert.equal(url.pathname,'/api/production-plan');if(url.searchParams.has('capacityOnly'))return Response.json({capacity:[]});planReads++;const snapshot=structuredClone({revision:rows.length,rows,sources:[],capacity:[],transit:[],audit:[],warnings:[],canReopen:false});if(holdNextRead){holdNextRead=false;return await new Promise(resolve=>releaseRead=()=>resolve(Response.json(snapshot)));}return Response.json(snapshot);
  }
  assert.equal(url.pathname,'/api/production-plan');const body=JSON.parse(init.body);writes.push(body);assert.equal(body.action,'split');assert.deepEqual(body.ids,[original.id]);
- await new Promise(resolve=>release=resolve);
  rows=[{...original,planGroupId:original.id,groupPlanId:original.planId},{...original,id:'CHILD-SYNTHETIC',planGroupId:original.id,groupPlanId:original.planId,splitFromId:original.id,suggested:null,plan:null}];
- return Response.json({revision:2,added:1,existing:0,updated:0,rows});
+ const committedRows=structuredClone(rows);
+ await new Promise(resolve=>release=resolve);
+ return Response.json({revision:2,added:1,existing:0,updated:0,rows:committedRows});
 };});
 after(async()=>{globalThis.fetch=originalFetch;for(const c of channels)c.close();globalThis.BroadcastChannel=OriginalChannel;await vite.close();dom.window.close();});
 async function mount(allowed=true){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(el(ToolbarPermissions.Provider,{value:(_name,label)=>label!=='Tách đơn'||allowed},el(ProductionPlan,{initialWeek:week}))));return{host,async close(){await act(async()=>root.unmount());host.remove();}};}
@@ -58,5 +59,27 @@ test('two selected rows cannot split and no row code appears as a main-table col
   await click(view.host.querySelector('[aria-label="Select SYNTHETIC-SKU"]'));await click(view.host.querySelector('[aria-label="Select OTHER-SKU"]'));
   const split=button(view.host,'Tách đơn');assert.equal(split.disabled,true);await click(split);assert.equal(writes.length,0);
   assert.doesNotMatch(view.host.querySelector('.pp-plan-grid thead').textContent,/Mã dòng/);
+ }finally{await view.close();}
+});
+
+
+test('an older full read finishing after split must not remove the newly created row or regress cache',async()=>{
+ const view=await mount();try{
+  holdNextRead=true;await act(async()=>sync.announceDataChange('production_plan'));assert.equal(typeof releaseRead,'function');
+  await click(view.host.querySelector('[aria-label="Select SYNTHETIC-SKU"]'));await click(button(view.host,'Tách đơn'));await act(async()=>release());
+  assert.equal(view.host.querySelectorAll('.pp-plan-grid tbody>tr').length,2);
+  await act(async()=>releaseRead());assert.equal(view.host.querySelectorAll('.pp-plan-grid tbody>tr').length,2,'older revision cannot replace the split result');
+  holdNextRead=true;const second=await mount();try{assert.equal(second.host.querySelectorAll('.pp-plan-grid tbody>tr').length,2,'older read cannot regress the reusable week cache');await act(async()=>releaseRead());}finally{await second.close();}
+ }finally{await view.close();}
+});
+
+
+test('a delayed split response cannot overwrite a newer foreign snapshot already on screen',async()=>{
+ const view=await mount();try{
+  await click(view.host.querySelector('[aria-label="Select SYNTHETIC-SKU"]'));await click(button(view.host,'Tách đơn'));
+  rows=rows.map(row=>row.id===original.id?{...row,plan:80}:row);rows.push({...original,id:'EXTERNAL',sku:'EXTERNAL-SKU',plan:50});
+  await act(async()=>sync.announceDataChange('production_plan'));assert.equal(view.host.querySelectorAll('.pp-plan-grid tbody>tr').length,3);
+  await act(async()=>release());assert.equal(view.host.querySelectorAll('.pp-plan-grid tbody>tr').length,3);
+  assert.deepEqual([...view.host.querySelectorAll('input[aria-label^="Quantity "]')].map(n=>n.value).sort(),['','50','80']);
  }finally{await view.close();}
 });

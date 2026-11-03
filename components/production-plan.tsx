@@ -89,6 +89,7 @@ async function fetchProductionPlan(week: string, refresh = false): Promise<State
         return planStateCache.get(normalizedWeek)!;
     if (browser && !refresh && planRequestCache.has(normalizedWeek))
         return planRequestCache.get(normalizedWeek)!;
+    if(browser&&refresh)planCacheGeneration.set(normalizedWeek,(planCacheGeneration.get(normalizedWeek)||0)+1);
     const generation = planCacheGeneration.get(normalizedWeek) || 0;
     const request = fetch(`/api/production-plan?week=${normalizedWeek}`, { cache: "no-store" })
         .then(async response => {
@@ -96,7 +97,7 @@ async function fetchProductionPlan(week: string, refresh = false): Promise<State
         if (session !== clientSessionGeneration()) throw new ClientSessionReadCancelled();
         if (!response.ok)
             throw new Error(data.error);
-        if (browser && (planCacheGeneration.get(normalizedWeek) || 0) === generation) planStateCache.set(normalizedWeek, data);
+        if (browser && (planCacheGeneration.get(normalizedWeek) || 0) === generation&&Number(data.revision)>=Number(planStateCache.get(normalizedWeek)?.revision??0)) planStateCache.set(normalizedWeek, data);
         if (browser) latestPlanWeek = normalizedWeek;
         return data;
     })
@@ -247,7 +248,7 @@ export function ProductionPlan({ language = 'vi', initialWeek = '', tracking = f
     }, [tracking, workspaceActive]);
     const generation = useRef(0);
     async function load(w = week, refresh = false, keepVisible = false) { const ticket = ++generation.current; if (!keepVisible)
-        setLoaded(false); const data = await fetchProductionPlan(w, refresh); if (ticket !== generation.current || session !== clientSessionGeneration())
+        setLoaded(false); const data = await fetchProductionPlan(w, refresh); if (ticket !== generation.current || session !== clientSessionGeneration() || data.revision<revisionRef.current)
         return; revisionRef.current = data.revision; serverRowsRef.current=data.rows; pendingRef.current = {}; originalRef.current = {}; setSaveState('idle'); setState(data); setRows(data.rows); setEdits({}); setSelected([]); setSourceKey(data.sources[0]?.key || ''); setSourceIds([]); setLoaded(true); }
     useEffect(() => { const cached = planStateCache.get(week); setSelected([]); pendingRef.current={}; originalRef.current={}; setEdits({}); setSaveState('idle'); setPage(1); setError(''); setNotice(''); setSourceIds([]); setDetail(null); if (cached) {
         revisionRef.current=cached.revision;
@@ -425,6 +426,9 @@ export function ProductionPlan({ language = 'vi', initialWeek = '', tracking = f
                 return;
             }
             committed = true;
+            // A foreign refresh may already include this split and a later edit.
+            // Never replace that snapshot with an older mutation response.
+            if(name==='split'&&result.revision<=revisionRef.current){setSelected([]);setNotice(t('Tách đơn: thành công.','拆單成功。'));return;}
             revisionRef.current=result.revision;
             const mergeResultRows=(current:Row[])=>{const updates=new Map<string,Row>((result.rows||[]).map((row:Row)=>[row.id,row])),known=new Set(current.map(row=>row.id));return [...current.map(row=>updates.get(row.id)||row),...(name==='split'?(result.rows||[]).filter((row:Row)=>!known.has(row.id)):[])];};
             if (Array.isArray(result.rows)) serverRowsRef.current=mergeResultRows(serverRowsRef.current);
