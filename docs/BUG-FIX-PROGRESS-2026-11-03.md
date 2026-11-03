@@ -179,12 +179,24 @@ CI head2fe406b/run41573944402 completed/failure: **1.491 pass/8 fail/1.499 test*
 
 Kiểm hai file headcount+restore cuối **13/13 pass**,exit0,8,1giây,không cancel/skip; lượt trước13/13 cũng đạt trước bổ sung assertion sự kiện. Mã ứng dụng không đổi từ2fe406b đã typecheck/build đạt. CI sau push xác minh cleanup cụ thể và residual,không rerun y nguyên. Chưa browser/preview đúnghead;không merge/deploy.
 
-## Back Capacity: callback cấp cha có sẵn nhưng không được dùng
+## Back Capacity: giả thuyết callback cấp cha — đã thay thế bởi đối chiếu PCB494 bên dưới
 
-Đối chiếu độc lập trong app/page.tsx: màn capacity-calendar truyền onNavigateSummary, callback chuyển activeChild sang capacity-summary. WeeklyCapacity khai báo prop nhưng không còn action gọi nó; test pcb493 đã quy định Back parent/lookup/detail và giữ draft. Đây là thiếu kết nối điều hướng, không phải lựa chọn quyền hay công thức Capacity.
+Đối chiếu độc lập trong app/page.tsx: màn capacity-calendar truyền onNavigateSummary, callback chuyển activeChild sang capacity-summary. WeeklyCapacity khai báo prop nhưng không còn action gọi nó; test pcb493 đã quy định Back parent/lookup/detail và giữ draft. Đây là giả thuyết ban đầu; test PCB494 sau đó chứng minh callback còn lại không đồng nghĩa cần có nút Back cấp cha. Không dùng đoạn lịch sử này làm thiết kế cuối.
 
 Khôi phục duy nhất Back cấp cha khi callback có mặt trong màn calendar. Disable khi busy hoặc dirty, không lưu/xóa draft hoặc submit; lookup Back vẫn được StandardToolbar ưu tiên để đóng tra cứu trước. Không thêm Back cấp cha vào summary hoặc mở menu/quyền ghi.
 
 Kiểm mounted lấy chính biểu thức action từ source, chạy qua StandardToolbar thật: chỉ một Back; sạch gọi parent đúng một lần; dirty/busy không callback/submit; lookup/detail ưu tiên đúng callback và không gọi parent. Đối chiếu app callback trỏ summary. Fingerprint v807 của mọi action cũ giữ nguyên: chỉ loại đúng một navigation action mới có mounted guard test riêng, không regenerate baseline hoặc bỏ kiểm business callbacks/permissions.
 
 Targeted pcb493 + mounted feedback + retained render **39/39 pass**, không cancel/skip,18,6giây; typecheck/build exit0. Đây là kiểm code/mounted toolbar, chưa browser/full-app navigation hoặc responsive QA. Không merge/deploy/preview. Phần mô tả PR được người dùng cho phép cập nhật riêng đã ghi đúng CI mốc fa28e9c; CI của commit mới cần đọc riêng, không gán kết quả mốc cũ cho bản này.
+
+## Đối chiếu cuối Back PCB493/PCB494 và profile quick-Line
+
+CI phát hiện test độc lập PCB494 yêu cầu rõ calendar không có Back cấp cha, lookup có đúng một Back nội bộ. Hợp đồng này đã có trong snapshot v807; các thay đổi trước của file PCB494 chỉ là harness, không đổi assertion. Vì vậy giả thuyết callback cũ bị bỏ sót ở mục trước là sai: không thêm lại nút, trả source WeeklyCapacity/app navigation về đúng fa28e9c. Callback prop cũ được giữ tương thích, không tự xóa API component.
+
+Sửa test PCB493 cũ mâu thuẫn PCB494: giữ kiểm SKU, detail/lookup; kiểm không có toolbar gọi parent callback. Giữ nguyên test PCB494 và fingerprint v807 đầy đủ của mọi action cũ, không cần ngoại lệ navigation nữa. Mounted test lấy hai biểu thức Back lookup/detail từ source thật, chạy StandardToolbar thật: chỉ một Back, chỉ đóng lớp tương ứng, không submit hoặc network. Back riêng dialog vệ sinh không bị trộn với hai lớp toolbar chính.
+
+Profile quick-Line nguyên trạng v807 có nhãn “xem toàn bộ Quản lý sản xuất; chỉ báo công Line của mình”, gồm tám quyền Xem và hai quyền Thêm/Lưu Báo công. Test API Line độc lập đã kiểm session thật đúng mười grants, scope A/B, thiếu manager/hr/confirm/correct và từ chối các ghi khác Line/quyền quản lý. Fixture matrix cũ chỉ gán kind=line và đòi duy nhất SX báo công. Nay dùng profileForUser thật và expected menu đọc của hợp đồng đó, không đổi profile,grants,API hoặc quyền dữ liệu thật. Thêm kiểm đúng hai quyền ghi hiện hữu, các action quản lý vẫn false, không mở menu ngoài production; tài khoản chỉ điều phối mở calendar nhưng không mở summary hoặc các menu báo công.
+
+Kiểm tổng hợp sáu file (PCB493,PCB494,mounted feedback,matrix,menu-action-access,Line API): **64/64 pass**,exit0,76,5giây,không cancel/skip. Mã runtime cuối giống fa28e9c (đã typecheck/build/CI đạt các bước đó); các thử nghiệm điều hướng trước đã được bỏ, không đưa lên web. Không đổi UI về Back ngoài hợp đồng v807. Bốn ca còn thiếu quy tắc: Plan ID rỗng2,thứ tự ngày/tháng sản lượng1,giới hạn người vệ sinh1. Chưa nới assertion để xanh hoặc đổi các quy tắc đó.
+
+Mô tả PR đã được người dùng cho phép cập nhật riêng với mốc fa28e9c1.491/7 và đã đọc lại khớp. Kết quả đó gắn rõ commit, không áp cho commit mới. CI bản mới cần đọc riêng; không merge/approve/deploy/preview.

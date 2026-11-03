@@ -100,17 +100,15 @@ test('denied detail Back explains without falling through to parent or submittin
  }
 });
 
-test('actual Capacity parent Back navigates once, guards dirty/busy and yields to lookup/detail without submit',async()=>{
+test('actual Capacity lookup/detail Back closes only its own layer without navigation, submit or network',async()=>{
  const {readFileSync}=await import('node:fs'),ts=await import('typescript');
  const source=readFileSync(new URL('../components/weekly-capacity.tsx',import.meta.url),'utf8'),ast=ts.createSourceFile('capacity.tsx',source,99,true,4),calls=[];
- function visit(n){if(ts.isCallExpression(n)&&n.expression.getText(ast)==='toolbar.action'&&n.arguments.at(-1)?.getText(ast)==="'parent'"&&n.arguments[0]?.getText(ast).includes('onClick:onNavigateSummary'))calls.push(n);ts.forEachChild(n,visit);}
- visit(ast);assert.equal(calls.length,1);const expression=calls[0].getText(ast);
- const page=readFileSync(new URL('../app/page.tsx',import.meta.url),'utf8');assert.match(page,/onNavigateSummary=\{\(\) => setActiveChild\("capacity-summary"\)\}/);
- for(const [busy,dirty,layer]of [[false,false,'parent'],[false,true,'parent'],[true,false,'parent'],[false,true,'lookup'],[false,true,'detail']]){
-  let parents=0,lookups=0,details=0,submits=0;
-  const action=new Function('toolbar','onNavigateSummary','busy','dirty','t','return '+expression)(toolbar,()=>parents++,busy,dirty,vi=>vi);
-  const items=[action,...(layer!=='parent'?[toolbar.action({onClick:()=>lookups++},'Quay lại',true,'back','lookup')]:[]),...(layer==='detail'?[toolbar.action({onClick:()=>details++},'Quay lại',true,'back','detail')]:[])];
+ function visit(n){if(ts.isCallExpression(n)&&n.expression.getText(ast)==='toolbar.action'&&n.arguments.length===5&&n.arguments[3]?.getText(ast)==="'back'")calls.push(n);ts.forEachChild(n,visit);}
+ visit(ast);assert.deepEqual(calls.map(n=>n.arguments.at(-1).getText(ast)),["'lookup'","'detail'"]);
+ for(const detailOpen of [false,true]){
+  const closed=[];let submits=0,network=0;const original=globalThis.fetch;globalThis.fetch=()=>{network++;throw Error('No request on internal Back');};
+  const items=calls.slice(0,detailOpen?2:1).map(n=>new Function('toolbar','setSearch','setPanel','t','return '+n.getText(ast))(toolbar,v=>closed.push(['lookup',v]),v=>closed.push(['detail',v]),vi=>vi));
   const view=await mount(el('form',{onSubmit:e=>{e.preventDefault();submits++}},el(StandardToolbar,{items})));
-  try{const buttons=view.host.querySelectorAll('form button');assert.equal(buttons.length,1);const blocked=layer==='parent'&&(busy||dirty);assert.equal(buttons[0].disabled,blocked);await click(blocked?buttons[0].parentElement:buttons[0]);assert.deepEqual([parents,lookups,details,submits],blocked?[0,0,0,0]:layer==='parent'?[1,0,0,0]:layer==='lookup'?[0,1,0,0]:[0,0,1,0]);}finally{await view.close();}
+  try{const buttons=view.host.querySelectorAll('form button');assert.equal(buttons.length,1);await click(buttons[0]);assert.deepEqual(closed,detailOpen?[['detail',null]]:[['lookup',false]]);assert.equal(submits,0);assert.equal(network,0);}finally{await view.close();globalThis.fetch=original;}
  }
 });
