@@ -134,3 +134,23 @@ Sửa kiểm thử hai mốc: capture giờ đã duyệt trước sửa; pending
 Việc giữ số hiển thị không mở quyền ghi: chốt lệnh mới khi pending vẫn bị CAS raw-capacity từ chối **409 capacityChanged**; thêm so sánh toàn bộ app_records bất biến sau từ chối. Giữ guard trước lần duyệt đầu tiên capacityUnconfirmed. Không chuyển thành cho phép chốt pending.
 
 Targeted capacity+capacity-accepted **32/32 pass**,không cancel/skip,22,3giây. Chỉ test/docs;CI sau push xác minh3ca cũ và residual. Chưa lint/browser,không merge/deploy/preview.
+
+## Nhập bù: xác nhận đúng hợp đồng quick-save, không hồi phục nút cũ
+
+Mốc CI trước:3957d7d/run41570480854 completed/failure, **1.489 pass/9 fail/1.498 test**,247file(240đạt/7lỗi),không timeout/cancel/skip/todo/thiếu tổng kết; TypeScript/ba build đạt. Ba ca Capacity hết lỗi,không tên lỗi mới.
+
+Đối chiếu `production-backfill.test.mjs` nguyên trạng snapshot c847754: quick save không cần preview riêng, nhưng đòi confirmedAllocations đúng donor và consent; phân công thay đổi hoặc thiếu đồng ý không được ghi. Test DOM cũ đòi nút Kiểm tra nhân viên/Xem ảnh hưởng/Ghi nhập bù đã bỏ, không còn mô tả luồng đó.
+
+Chỉ cập nhật DOM test: auto-inspect và chọn người không gọi mutation; giữ remaining1000/max1000 và người không đủ điều kiện bị khóa. Hiển thị đúng donor LSX/công đoạn/thời gian; nút Đồng ý chuyển và lưu gửi save với resolveAssignments=true, người B và chính xác allocation được hiển thị. Double-click chỉ một save và một callback thành công. Kiểm hai vòng DOM độc lập: thành công và HTML502 khi lưu. Vòng lỗi không gọi onSaved, không lộ JSON parse error, không thể click/retry để gửi save thứ hai khi chưa rõ kết quả. HTML lỗi lúc inspect vẫn có retry an toàn. Không thêm preview/apply vào luồng quick-save hoặc bỏ consent.
+
+Targeted DOM+API backfill **18/18 pass**,không cancel/skip,146,9giây; DOM mới10,3giây. Giữ các test cũ backend stale preview, quyền/Line, giờ ngoài khoảng, donor locked, repair và idempotency. Chỉ test/docs,không đổi ứng dụng,DB hoặc quyền.
+
+Tám ca còn lại cần bằng chứng riêng, không ép expected theo source:
+- Plan ID rỗng(2): test coi như bỏ lọc, UI chặn. Quy tắc repo cấm SKU/LSX/tên rỗng không xác định ngoại lệ Plan ID. Lựa chọn: cho rỗng bỏ lọc hay báo thiếu/giữ kết quả; ảnh hưởng phạm vi tra cứu.
+- Back Capacity(1): test đòi parent callback về summary, component chỉ khai báo Back lookup/detail. Cần xác định chuyển summary bằng Back hay điều hướng menu; ảnh hưởng thoát màn/draft.
+- Thứ tự sản lượng(1): test tăng ngày toàn cục, source tháng mới trước/ngày trong tháng tăng. Chưa có yêu cầu lịch sử độc lập chọn thứ tự. Không đổi dữ liệu productionDate hoặc công thức giờ.
+- Menu Line A/B(2): test chỉ SX báo công, snapshot mở thêm đường đọc. Cần chốt danh sách màn chỉ đọc của Line; hiển thị menu không cấp quyền ghi, backend scope/grants vẫn phải giữ.
+- Vệ sinh(1): selector cũ không có ngày/nhóm, test còn đòi HTMLmax=2; UI mới có nhãn ngày/nhóm và không max. Cần đối chiếu giới hạn theo roster/approved workers/lịch thực tế, không dùng chuỗi khoảng dự kiến làm giới hạn.
+- Khôi phục nhân viên sau hủy xuất(1): picker chỉ render khi restore khác null nhưng mọi nơi khởi tạo/reset đều null. Test và API hỗ trợ chọn continuous/return. Cần xác định phải hiện picker trước hủy, mặc định chọn ai, và liên tục hay quay lại; đây có thể là bug UI nhưng sửa mặc định có thể đổi phân công/giờ, không coi là selector đơn thuần.
+
+Đã thử tìm yêu cầu lịch sử qua Personal Context một lần: dịch vụ trả không khả dụng trong cuộc trò chuyện này. Không thử vòng lặp hoặc suy diễn câu trả lời. Có thể tiếp tục đối chiếu lịch sử/fixture độc lập; chưa có cơ sở tự thay quyền/luồng khôi phục hoặc thứ tự hiển thị. Chưa lint/browser/full-app nghiệm thu;không merge/deploy/preview.
