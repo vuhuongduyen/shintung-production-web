@@ -1,3 +1,5 @@
+import {actionPropsFingerprint} from './helpers/action-props-fingerprint.mjs';
+import {actionFeedbackComponentFixture} from './helpers/action-feedback-fixture.mjs';
 import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -84,12 +86,15 @@ test('existing Back translation remains VI English and Traditional Chinese witho
  const {translateToolbar}=await vite.ssrLoadModule('/components/standard-toolbar/translations.ts');
  assert.equal(translateToolbar('Quay lại','vi'),'Quay lại');assert.equal(translateToolbar('Quay lại','en'),'Back');assert.equal(translateToolbar('Quay lại','zh'),'返回');
 });
-test('all changed menu action callbacks, disabled and permission props retain their original fingerprints',async()=>{
- const {createHash}=await import('node:crypto');const baseline=JSON.parse(read('tests/back-action-props-baseline.json'));assert.equal(baseline.files.length,3);
- for(const {file,count,sha256,jsxCount,jsxSha256}of baseline.files){const s=read(file),ast=ts.createSourceFile(file,s,99,true,4),props=[],jsx=[];
-  function walk(n){if(ts.isJsxAttribute(n)&&['onClick','disabled'].includes(n.name.getText(ast)))jsx.push(n.getText(ast).replace(/\s+/g,' '));if(ts.isCallExpression(n)&&/\.action$/.test(n.expression.getText(ast)))props.push(n.arguments[0]?.getText(ast).replace(/\s+/g,' ')||'');ts.forEachChild(n,walk);}walk(ast);
-  assert.equal(jsx.length,jsxCount,file);assert.equal(createHash('sha256').update(JSON.stringify(jsx.sort())).digest('hex'),jsxSha256,file);assert.equal(props.length,count,file);assert.equal(createHash('sha256').update(JSON.stringify(props.sort())).digest('hex'),sha256,file);
- }
+test('menu callbacks, disabled and permission props retain the approved v807 snapshot fingerprints',()=>{
+ const baseline=JSON.parse(read('tests/back-action-props-baseline.json'));assert.equal(baseline.files.length,3);assert.equal(baseline.baseCommit,'c84775445ed3ef4c09fc583ac06b19881f9ae6d9');
+ for(const {file,...expected}of baseline.files)assert.deepEqual(actionPropsFingerprint(file,read(file)),expected,file);
+});
+test('action fingerprint detects callback, disabled, permission and JSX guard changes while allowing explanation copy',()=>{
+ const source="toolbar.action({disabled:busy||!allowed,onClick:()=>save()},'Save',allowed); const button=<button disabled={busy} onClick={save}/>;";
+ const fingerprint=value=>actionPropsFingerprint('synthetic.tsx',value),before=fingerprint(source);
+ for(const changed of [source.replace('()=>save()','()=>other()'),source.replace('busy||!allowed','busy'),source.replace("'Save',allowed","'Save',true"),source.replace('disabled={busy}','disabled={false}'),source.replace('onClick={save}','onClick={other}')])assert.notDeepEqual(fingerprint(changed),before);
+ assert.deepEqual(fingerprint(source.replace('onClick:()=>save()',"disabledExplanation:'Pending or denied',onClick:()=>save()")),before);
 });
 test('InTransit Back resets UI state then closes lookup without changing reusable reset',()=>{
  const source=read('components/in-transit.tsx'),ast=ts.createSourceFile('in-transit.tsx',source,99,true,4);let reset,back;
@@ -117,6 +122,7 @@ test('Labor history has one whole-screen Back in the foreground; callback and di
   const flatten=items=>items.flatMap(i=>!i?[]:Array.isArray(i)?flatten(i):i.kind==='group'?flatten(i.items):[i]);
   function BackOnlyToolbar({items}){const action=selectToolbarBack(flatten(items).filter(i=>i.kind==='action'));return action?React.createElement('button',action.props,'Quay lại'):null;}
   const req=name=>{
+   if(name.endsWith('action-feedback'))return actionFeedbackComponentFixture;
    if(name==='react')return {...hooks,default:hooks,__esModule:true};
    if(name.endsWith('StandardToolbar'))return {StandardToolbar:BackOnlyToolbar,toolbar};
    if(name.endsWith('UiLabel'))return {UiLabel:({children})=>React.createElement('span',null,children)};

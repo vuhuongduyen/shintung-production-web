@@ -34,3 +34,16 @@ Tái hiện qua `correctProduction` và DB Miniflare tạm: PACKING 100 lúc 08:
 Regression kiểm preview/apply từ chối giữ toàn bộ app_records, gồm audit hiện có; hủy cả PACKING+FINAL vẫn preview không ghi và apply thành công. Các quyền/Line/CAS/phiếu kho/thao tác phụ thuộc tiếp tục được kiểm bằng bộ hủy hiện hữu. Helper kiểm hủy FINAL và hủy nguồn cung dư hợp lệ, thiếu hụt lịch sử không đổi, không đột biến input. Đây bổ sung coverage API-function hủy; chưa bổ sung coverage API chỉnh sửa/remove-self của số lượng. Không suy rộng sang toàn bộ API hoặc audit receipt của HTTP wrapper.
 
 Kết quả nhóm guard cuối: **27/27 pass**, 4 file `production-stage-cancel`, `production-final-limit`, `production-exit-restore`, `production-correction-volume`; không cancel/skip, 73 giây. Typecheck/build chạy lại sau sửa source đều đạt. Nhóm 80 test phía trên có giao nhau với nhóm này, không cộng tổng. Push nhóm có mục đích xác nhận guard mới, bảy ca cũ và residual; không rerun y nguyên.
+
+## CI nhóm đầu ngày 03/11 và baseline Quay lại
+
+[CI 41562320950](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41562320950), head `cbdebea20f64b9de88d529ce608c1542d2e45533`, đã completed/failure: **1.439 pass / 53 fail**, 1.492 test, 246 file (226 đạt / 20 lỗi), không cancel/skip/todo/timeout/thiếu thống kê. TypeScript và ba build đạt. Đối chiếu tên với 252dba8: đúng bảy ca cũ hết lỗi, không có tên lỗi mới; ba regression FINAL/hủy thêm đều đạt.
+
+Nhóm Quay lại được xử lý tiếp, chỉ test/helper/JSON:
+
+- Baseline cũ trỏ commit Site `b1820e3568f3c57841610235f06f168ff660d998`, trước snapshot được duyệt. Lấy fingerprint từ **snapshot nguồn v807 đã được duyệt** `c84775445ed3ef4c09fc583ac06b19881f9ae6d9`, không lấy source đang sửa làm chuẩn. Đối chiếu độc lập source hiện tại của app/page, labor-hours-master và weekly-capacity: callback/disabled/permission khớp snapshot này.
+- Fingerprint chỉ loại `disabledExplanation` (nội dung giải thích), vẫn giữ các prop khác và bổ sung đối số quyền thứ ba của toolbar.action. Giữ kiểm số lượng và hash, thêm negative controls: đổi callback, bỏ điều kiện quyền, đổi đối số allowed, thay JSX disabled/onClick đều phải khác fingerprint. Đổi lời giải thích đơn thuần không làm sai kiểm hành vi. CI không cần checkout commit lịch sử để chạy test.
+- Harness lịch sử Giờ công thiếu export `FeedbackActionButton`, nên đếm sai không có nút Quay lại. Dùng boundary fixture hiện hữu, giữ kiểm một nút, callback đóng, reset danh sách và dirty guard; bộ mounted riêng kiểm hành vi nút thật.
+- Trước nhóm: 7 pass/4 fail trong file Quay lại; sau nhóm cùng mounted feedback: **28 pass/2 fail**, 30 test, không cancel/skip. Hai lỗi giữ nguyên: test muốn ẩn nút bị từ chối thay vì nút giải thích disabled; callback parent của Capacity không còn ở vị trí/cấu trúc cũ. Chưa thay hợp đồng giao diện hoặc quyền để xanh.
+
+Không đổi mã ứng dụng từ cbdebea; typecheck/build và guard hủy/FINAL đã đạt cho source đó. Push phần kiểm thử này nhằm đo hai ca đã sửa và bảo đảm các kiểm âm mới hoạt động; không rerun y nguyên. Các lỗi Capacity/quyền/audit và kế hoạch chưa tự thay expected/công thức.
