@@ -178,3 +178,13 @@ CI head2fe406b/run41573944402 completed/failure: **1.491 pass/8 fail/1.499 test*
 Đối chiếu mã Radix focus-scope đang cài: unmount autofocus dispatch CustomEvent trong timer0. Harness headcount trả global CustomEvent/Event về Node trước khi timer đó chạy, tạo event sai realm cho JSDOM. Sửa thứ tự cleanup: unmount và đợi lượt timer trong act khi DOM constructors còn đúng, rồi mới khôi phục fetch/act/global. Thêm listener/assertion sự kiện `focusScope.autoFocusOnUnmount` đã xảy ra và thuộc đúng DOM trước teardown. Không bắt/nuốt exception, không sleep dài,skip,process.exit hoặc bỏ assertion dữ liệu.
 
 Kiểm hai file headcount+restore cuối **13/13 pass**,exit0,8,1giây,không cancel/skip; lượt trước13/13 cũng đạt trước bổ sung assertion sự kiện. Mã ứng dụng không đổi từ2fe406b đã typecheck/build đạt. CI sau push xác minh cleanup cụ thể và residual,không rerun y nguyên. Chưa browser/preview đúnghead;không merge/deploy.
+
+## Back Capacity: callback cấp cha có sẵn nhưng không được dùng
+
+Đối chiếu độc lập trong app/page.tsx: màn capacity-calendar truyền onNavigateSummary, callback chuyển activeChild sang capacity-summary. WeeklyCapacity khai báo prop nhưng không còn action gọi nó; test pcb493 đã quy định Back parent/lookup/detail và giữ draft. Đây là thiếu kết nối điều hướng, không phải lựa chọn quyền hay công thức Capacity.
+
+Khôi phục duy nhất Back cấp cha khi callback có mặt trong màn calendar. Disable khi busy hoặc dirty, không lưu/xóa draft hoặc submit; lookup Back vẫn được StandardToolbar ưu tiên để đóng tra cứu trước. Không thêm Back cấp cha vào summary hoặc mở menu/quyền ghi.
+
+Kiểm mounted lấy chính biểu thức action từ source, chạy qua StandardToolbar thật: chỉ một Back; sạch gọi parent đúng một lần; dirty/busy không callback/submit; lookup/detail ưu tiên đúng callback và không gọi parent. Đối chiếu app callback trỏ summary. Fingerprint v807 của mọi action cũ giữ nguyên: chỉ loại đúng một navigation action mới có mounted guard test riêng, không regenerate baseline hoặc bỏ kiểm business callbacks/permissions.
+
+Targeted pcb493 + mounted feedback + retained render **39/39 pass**, không cancel/skip,18,6giây; typecheck/build exit0. Đây là kiểm code/mounted toolbar, chưa browser/full-app navigation hoặc responsive QA. Không merge/deploy/preview. Phần mô tả PR được người dùng cho phép cập nhật riêng đã ghi đúng CI mốc fa28e9c; CI của commit mới cần đọc riêng, không gán kết quả mốc cũ cho bản này.

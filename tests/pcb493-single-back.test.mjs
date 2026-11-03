@@ -81,7 +81,7 @@ test('SKU guarded form/history/detail beats lookup, Capacity panel beats lookup 
  assert.match(capacity,/onClick:onNavigateSummary\},t\('Quay lại','返回','Back'\), true, 'back', 'parent'/);
  assert.match(capacity,/onClick:\(\)=>setSearch\(false\)\},'Quay lại',true,'back', 'lookup'/);
  assert.match(capacity,/onClick:\(\)=>setPanel\(null\)\},t\('Quay lại','返回','Back'\), true, 'back', 'detail'/);
- assert.match(capacity,/disabled:dirty,onClick:onNavigateSummary/);
+ assert.match(capacity,/disabled:busy\|\|dirty,onClick:onNavigateSummary/);
 });
 test('existing Back translation remains VI English and Traditional Chinese without new Close labels',async()=>{
  const {translateToolbar}=await vite.ssrLoadModule('/components/standard-toolbar/translations.ts');
@@ -89,7 +89,18 @@ test('existing Back translation remains VI English and Traditional Chinese witho
 });
 test('menu callbacks, disabled and permission props retain the approved v807 snapshot fingerprints',()=>{
  const baseline=JSON.parse(read('tests/back-action-props-baseline.json'));assert.equal(baseline.files.length,3);assert.equal(baseline.baseCommit,'c84775445ed3ef4c09fc583ac06b19881f9ae6d9');
- for(const {file,...expected}of baseline.files)assert.deepEqual(actionPropsFingerprint(file,read(file)),expected,file);
+ for(const {file,...expected}of baseline.files){
+  let source=read(file);
+  if(file==='components/weekly-capacity.tsx'){
+   // The restored navigation action has its own mounted guard test. Keep the
+   // independent v807 fingerprint for every pre-existing business action.
+   const ast=ts.createSourceFile(file,source,99,true,4),navigation=[];
+   function visit(n){if(ts.isCallExpression(n)&&n.expression.getText(ast)==='toolbar.action'&&n.arguments.at(-1)?.getText(ast)==="'parent'"&&n.arguments[0]?.getText(ast).includes('onClick:onNavigateSummary'))navigation.push(n);ts.forEachChild(n,visit);}
+   visit(ast);assert.equal(navigation.length,1);const n=navigation[0];assert.match(n.arguments[0].getText(ast),/disabled:busy\|\|dirty/);assert.equal(n.arguments[2].getText(ast),'true');
+   source=source.slice(0,n.getStart(ast))+'null'+source.slice(n.end);
+  }
+  assert.deepEqual(actionPropsFingerprint(file,source),expected,file);
+ }
 });
 test('action fingerprint detects callback, disabled, permission and JSX guard changes while allowing explanation copy',()=>{
  const source="toolbar.action({disabled:busy||!allowed,onClick:()=>save()},'Save',allowed); const button=<button disabled={busy} onClick={save}/>;";
