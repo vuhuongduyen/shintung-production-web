@@ -1,13 +1,17 @@
 import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
+import {JSDOM} from 'jsdom';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {createServer} from 'vite';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
+const dom=new JSDOM('<div id="root"></div>',{url:'https://synthetic.test',pretendToBeVisual:true});
+const domKeys=['window','document','HTMLElement','Element','Node','Event','CustomEvent','MutationObserver','DocumentFragment','HTMLInputElement','HTMLButtonElement','HTMLTextAreaElement','NodeFilter','getComputedStyle'],domGlobals=new Map(domKeys.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]));
+for(const k of domKeys)globalThis[k]=dom.window[k];
 const root=fileURLToPath(new URL('..',import.meta.url));
 const vite=await createServer({appType:'custom',configFile:false,root,resolve:{alias:{'@':resolve(root)}},server:{middlewareMode:true}});
-after(()=>vite.close());
+after(async()=>{await vite.close();for(const k of domKeys){const descriptor=domGlobals.get(k);if(descriptor)Object.defineProperty(globalThis,k,descriptor);else delete globalThis[k];}dom.window.close();});
 const {WorkCalendarBanner,ProductionWorkBoardView}=await vite.ssrLoadModule('/components/production-work-board.tsx');
 const date='2026-10-19',ids=Array.from({length:10},(_,i)=>`TEST-B${i}`);
 const day={date,working:true,hcStart:'09:00',hcEnd:'17:00',ot:false};
@@ -81,15 +85,20 @@ test('Line scope, empty schedules and unavailable named headcount remain explici
  assert.doesNotMatch(unnamed,/HC: 0 người/);
 });
 
-test('provisional banner leaves LSX staffing, action callbacks and saved report hours unchanged',()=>{
+test('provisional banner leaves LSX staffing, action callbacks and saved report hours unchanged',async()=>{
  const order={id:'TEST-ORDER',line:'B',lsxCode:'TEST-LSX',sku:'TEST-SKU',name:'Sản phẩm giả',lsxQty:100,inTransitQty:50,actualStartedAt:`${date}T09:00:00+07:00`};
  const report={id:'TEST-REPORT',transitId:order.id,reportedQuantity:50,reviewStatus:'Đã xác nhận',hours:{hc:24,ot:0}};
  const events=[move],reports=[report],before=JSON.stringify({order,events,reports,reference});
  let calls=0;
- const html=renderToStaticMarkup(React.createElement(ProductionWorkBoardView,{rows:[order],events,reports,active:()=>({known:true,running:true,count:12,assigned:12}),openAction:()=>{calls++;},showDetail:()=>{calls++;},chosen:order,action:'complete',effectiveLocal:`${date}T11:00`,setEffectiveLocal:()=>{calls++;},submit:()=>{calls++;},cancel:()=>{calls++;},busy:false,schedules:[reference],line:'B',employees,page:1,onPageChange:()=>{calls++;}}));
+ const element=React.createElement(ProductionWorkBoardView,{rows:[order],events,reports,active:()=>({known:true,running:true,count:12,assigned:12}),openAction:()=>{calls++;},showDetail:()=>{calls++;},chosen:order,action:'complete',effectiveLocal:`${date}T11:00`,setEffectiveLocal:()=>{calls++;},submit:()=>{calls++;},cancel:()=>{calls++;},busy:false,schedules:[reference],line:'B',employees,page:1,onPageChange:()=>{calls++;}});
+ const fetch=globalThis.fetch,previousAct=globalThis.IS_REACT_ACT_ENVIRONMENT,requests=[];globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.fetch=async(_url,init)=>{const body=JSON.parse(init.body);requests.push(body);assert.equal(body.action,'preview-report');return Response.json({hours:null});};
+ const {createRoot}=await import('react-dom/client'),root=createRoot(document.getElementById('root'));
+ try{await React.act(async()=>root.render(element));const html=document.body.innerHTML;
+ assert.ok(document.querySelector('[role=dialog]'),'assert the real portal rather than SSR output');
  assert.match(html,/Có mặt tại giờ xuất \/ Phân công/);assert.match(html,/value="12 \/ 12"/);
  assert.match(html,/<dd>24 giờ<\/dd>/);assert.match(html,/Xác nhận xuất trạm/);
- assert.equal(calls,0);assert.equal(JSON.stringify({order,events,reports,reference}),before);
+ assert.equal(calls,0);assert.equal(JSON.stringify({order,events,reports,reference}),before);assert.ok(requests.every(body=>body.action==='preview-report'));
+ }finally{await React.act(async()=>root.unmount());globalThis.fetch=fetch;globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;}
 });
 
 test('display-only employee directory resolves historical transfers without changing action candidates',()=>{

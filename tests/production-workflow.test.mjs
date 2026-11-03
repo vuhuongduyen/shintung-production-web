@@ -25,7 +25,9 @@ test("Capacity forecast does not deduct hours; HR actual absence immediately adj
   const focusedReview=await readProductionWorkflow(db,manager,[],{reviewReportId:completion.report.id});
   assert.deepEqual(focusedReview.reports.find(r=>r.id===completion.report.id),fullReview.reports.find(r=>r.id===completion.report.id),'focused confirmation preserves all derived target report fields');
   assert.deepEqual(focusedReview.progressOrders,fullReview.progressOrders);
-  assert.deepEqual(focusedReview.approvedSchedules,fullReview.approvedSchedules);
+  assert.ok(fullReview.approvedSchedules.length>0,'full workflow retains approved calendar context');
+  for(const key of ['events','employees','payrollEmployees','actualSchedules','approvedSchedules'])assert.deepEqual(focusedReview[key],[],key+' is omitted by the dedicated confirmation contract');
+  assert.deepEqual(focusedReview.rights,fullReview.rights,'focused reads do not alter permissions');
   assert.ok(completion.report.hours.perEmployee.find(person=>person.id==="NV02")?.hc>0,"Capacity planned leave is forecast, not actual absence");
   const hr={login:"hr-forecast@test",grants:["Quản lý sản xuất / Lịch SX thực tế / Ghi vắng mặt"]};
   assert.equal(completion.report.hours.perEmployee.find(person=>person.id==="NV02").hc,

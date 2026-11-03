@@ -47,3 +47,28 @@ Nhóm Quay lại được xử lý tiếp, chỉ test/helper/JSON:
 - Trước nhóm: 7 pass/4 fail trong file Quay lại; sau nhóm cùng mounted feedback: **28 pass/2 fail**, 30 test, không cancel/skip. Hai lỗi giữ nguyên: test muốn ẩn nút bị từ chối thay vì nút giải thích disabled; callback parent của Capacity không còn ở vị trí/cấu trúc cũ. Chưa thay hợp đồng giao diện hoặc quyền để xanh.
 
 Không đổi mã ứng dụng từ cbdebea; typecheck/build và guard hủy/FINAL đã đạt cho source đó. Push phần kiểm thử này nhằm đo hai ca đã sửa và bảo đảm các kiểm âm mới hoạt động; không rerun y nguyên. Các lỗi Capacity/quyền/audit và kế hoạch chưa tự thay expected/công thức.
+
+## CI baseline và hai ca workflow/portal
+
+[CI 41563010554](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41563010554), head `831edd2b3ef8472202474d81b4c9ad1df1822dc4`, completed/failure: **1.442 pass / 51 fail**, 1.493 test, đủ 246 file; 226 đạt / 20 lỗi, không timeout/cancel/skip/todo/thiếu thống kê. TypeScript và ba build đạt. Hai ca Quay lại hết lỗi, negative control mới đạt, không có tên lỗi mới.
+
+Hai ca tiếp theo chỉ sửa fixture:
+
+1. `production-work-calendar-headcount`: test SSR không render portal của dialog xuất trạm. Khởi tạo DOM trước khi nạp Radix, mount component thật, kiểm dialog hiện diện và giữ nguyên count 12/12, 24 giờ đã lưu, không gọi callback thao tác hoặc thay input. Mọi request nếu phát sinh chỉ được là `preview-report` và dùng phản hồi giả. Dọn root/global/fetch sau test. Không dùng DOM này làm bằng chứng browser responsive QA.
+2. `production-workflow`: test đòi approvedSchedules của read theo một report phải giống full read. Hợp đồng chuyên biệt đã được test `production-review-api` của snapshot xác nhận: events/employees/payrollEmployees/actualSchedules/approvedSchedules rỗng vì không cần cho xác nhận. Giữ so sánh toàn bộ report mục tiêu và progressOrders; thêm full read thực sự có lịch và quyền hai read bằng nhau. Các assertion HR/giờ công phía sau được chạy nguyên vẹn. Không sửa source API để tải dữ liệu thừa, không nới guard.
+
+Chạy đủ ba file `production-workflow`, `production-review-api`, `production-work-calendar-headcount`: **40/40 pass**, không cancel/skip, 97,4 giây. Source ứng dụng không đổi từ cbdebea đã typecheck/build đạt. CI sau push xác minh hai ca cụ thể này và residual; chưa coi kết quả local là CI đạt.
+
+## Các hợp đồng còn cần phân định trước khi sửa tiếp
+
+Bảng này phân nhóm 49 mục còn lại sau khi loại hai ca đã đạt targeted khỏi mốc 51; kết quả CI cuối ghi tại PR. Số là mục TAP, không phải số lỗi sản phẩm độc lập. Không tự thay các expected dưới đây để làm xanh.
+
+| Nhóm | Số mục | Expected / actual và hướng xử lý tiếp |
+|---|---:|---|
+| Audit và quyền ghi (gồm một kiểm JSX Line) | 21 | Test đòi toàn bộ records bất biến khi denied; wrapper hiện ghi website_action_audit. Cần chốt receipt denied rồi kiểm chính xác actor/route/status/outcome, mọi business record và audit cũ bất biến; không bỏ audit khỏi so sánh vô điều kiện. Kiểm JSX Line phải đối chiếu menu/ngoại lệ quyền riêng. |
+| Quyền/menu và review | 5 | Test cũ đòi quyền/menu Line và state của review đơn; hiện dùng rights từ API, reviewSelected và busy/runner. Guard mới thiếu quyền đã có kiểm không request/refresh; cần chốt các ngoại lệ và trạng thái UI mong muốn trước thay kiểm cũ. Không cấp quyền mới. |
+| Capacity | 3 | null ↔ 691.125; 674.975 ↔ 673.55; 670.3833333333333 ↔ 676.7166666666667. Cần đối chiếu công thức đã duyệt, không sửa số liệu theo actual. |
+| Tổng kế hoạch/In Transit | 9 | Test cũ đọc bốn chỉ số theo vị trí; card mới có Pro plan, tồn tuần cũ, tồn In Transit, tổng, khả dụng, dư/thiếu. Fixture transit thiếu planStart/planEnd/lsxQty; còn khác hợp đồng partition theo filter. Cần xác định chỉ tiêu và tính fixture bằng tay trước cập nhật, không ánh xạ tùy tiện để giữ tổng xanh. |
+| Tìm kiếm và UI/lifecycle | 11 | Plan ID rỗng (2): test muốn bỏ lọc, helper chặn; Quay lại (2): ẩn nút denied vs disabled explanation, parent Capacity không còn callback cũ; nhập bù (1): preview/apply cũ vs tự kiểm/save; thứ tự ngày sản lượng (1): tăng dần vs tháng mới trước; nhân viên/master-toolbar (2): Hủy/canCancel cũ vs ngày ngưng; HR lookup (1): select chỉ HR vs filter lịch sử nhiều loại; vệ sinh (1): max=2 vs không max; khôi phục nhân viên (1): restore=null khiến panel không mở. Tách yêu cầu hiển thị khỏi quyền, giờ công và vòng đời; không tự phục hồi quy trình cũ. |
+
+Không có thao tác bị từ chối bởi công cụ trong nhóm này. Giới hạn còn lại là bằng chứng/hợp đồng nghiệp vụ và nghiệm thu, không phải thiếu credits. Chưa lint/browser hoặc preview đúng head; source sửa hồi tố/ngày hiệu lực và báo sản lượng ngày không thuộc nhóm này. Không merge/deploy dù đã sang ngày mới.
