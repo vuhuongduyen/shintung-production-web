@@ -2,6 +2,8 @@ import * as backlog from '../lib/plan-transit-backlog.mjs';
 import * as capacityConfirmation from '../lib/plan-capacity-confirmation.mjs';
 import {actionFeedbackComponentFixture, actionFeedbackHelpers} from './helpers/action-feedback-fixture.mjs';
 import test from 'node:test';
+import {newDailyCapacity} from '../lib/capacity.mjs';
+import {assertRequestAudit,assertSnapshotWithReceipts} from './helpers/rejected-request-audit.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -17,15 +19,22 @@ import {passwordRecord} from '../worker/password-auth.mjs';
 import {siteApi} from '../worker/site-api.mjs';
 
 const week='2026-10-12';
+// Independently computed six-card contract: plan + backlog = total; balance = capacity - total.
+const hours=(plan,transit,capacity,old=0)=>[plan,old,transit,plan+transit,capacity,Math.round((capacity-plan-transit)*10000)/10000].map(String);
+function withBacklog(body){
+ if(!Array.isArray(body?.capacity)||!Array.isArray(body?.transit))return body;
+ const capacity=body.capacity.map(c=>{if(Array.isArray(c.backlogRows))return c;const rows=body.transit.filter(r=>r.line===c.line&&r.planEnd>=c.week&&r.planStart<=rules.weekEnd(c.week)&&r.status!=='HỦY').map(r=>({...r,transitId:r.id,start:r.planStart<c.week?c.week:r.planStart,end:r.planEnd,remaining:r.lsxQty-(r.completedQty||0),hours:(r.lsxQty-(r.completedQty||0))*r.laborHour,previousWeek:r.week<c.week}));return {...c,backlogRows:rows,backlogHours:rows.reduce((n,r)=>n+r.hours,0),previousBacklogHours:rows.filter(r=>r.previousWeek).reduce((n,r)=>n+r.hours,0)};});return {...body,capacity};
+}
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const row=(id,status='ĐÃ CHỐT',overrides={})=>rules.normalizeRow({id,sku:id,name:id,status,line:'A',plan:10,laborHour:1,start:week,end:week,...overrides},week);
-const data=(rows)=>({revision:3,rows,sources:[],capacity:[{week,line:'A',status:'Đã xác nhận',availableHours:100,version:1}],transit:rows.filter(r=>r.status==='ĐÃ CHUYỂN').map(r=>({...r,planRowId:r.id})),audit:[],warnings:[],canReopen:true});
+const data=(rows)=>({revision:3,rows,sources:[],capacity:[{week,line:'A',status:'Đã xác nhận',availableHours:100,version:1}],transit:rows.filter(r=>r.status==='ĐÃ CHUYỂN').map(r=>({...r,planRowId:r.id,planStart:r.start,planEnd:r.end,lsxQty:r.plan,completedQty:0})),audit:[],warnings:[],canReopen:true});
 const descendants=node=>!node||typeof node!=='object'?[]:[node,...[node.props?.children,node.props?.items].flat(Infinity).flatMap(descendants)];
-const label=node=>Array.isArray(node)?node.map(label).join(''):node&&typeof node==='object'?label(node.props?.children):String(node??'');
+const label=node=>typeof node==='boolean'?'':Array.isArray(node)?node.map(label).join(''):node&&typeof node==='object'?label(node.props?.children):String(node??'');
 
 // Run the real component's renders, effects and event callbacks with synthetic
 // responses only. No browser session, server, credentials or database is used.
 export function fixture(initial,props={},options={}) {
+ initial=withBacklog(initial);
  const states=[],refs=[],effects=[],pending=[],requests=[],downloads=[];
  let cursor=0,refCursor=0,effectCursor=0,revision=0,invalidations=0;
  const same=(a,b)=>a&&b&&a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));
@@ -70,8 +79,8 @@ export function fixture(initial,props={},options={}) {
  const ids=()=>JSON.parse(table().props['data-report-source']).rows.map(r=>r[1]);
  const selectFilter=(field,value)=>{if(button('Tra cứu')){button('Tra cứu').props.onClick();commit();}find(node=>node.type==='select'&&!node.props['aria-label']).props.onChange({target:{value:field}});commit();input(field==='query'?'Search plan':`Filter ${field}`).props.onChange({target:{value}});commit();};
  const selectStatus=status=>selectFilter('status',status);
- const cards=()=>descendants(render()).filter(node=>node.type==='article'&&node.props.className?.includes('pp-load-card')).map(card=>({line:label(descendants(card).find(node=>node.type==='h3')).split(' ')[1],values:descendants(card).filter(node=>node.type==='dd').map(label),load:label(descendants(card).find(node=>node.type==='b')),warning:card.props.className}));
- const settle=async(request,body,status=200)=>{assert.ok(request);request.resolve(new Response(JSON.stringify(body),{status}));await tick();commit();};
+ const cards=()=>descendants(render()).filter(node=>node.type==='article'&&node.props.className?.includes('pp-load-card')).map(card=>({captions:descendants(card).filter(n=>n.type==='dt').map(label),line:label(descendants(card).find(node=>node.type==='h3')).split(' ')[1],values:descendants(card).filter(node=>node.type==='dd').map(n=>label(n).replace(/Xem lệnh tồn.*$/,'').replace(/▾/g,'').trim()),load:label(descendants(card).find(node=>node.type==='b')),warning:card.props.className}));
+ const settle=async(request,body,status=200)=>{assert.ok(request);request.resolve(new Response(JSON.stringify(withBacklog(body)),{status}));await tick();commit();};
  const start=async()=>{commit();await settle(requests.find(r=>r.url===`/api/production-plan?week=${week}`),initial);for(const request of requests.filter(r=>r.url.includes('capacityOnly')||r.url==='/api/capacity?requests=1'))await settle(request,request.url.includes('capacityOnly')?{capacity:initial.capacity}:{requests:[]});};
  return {render,commit,button,input,find,ids,selectStatus,selectFilter,cards,requests,downloads,settle,start,html:()=>renderToStaticMarkup(render()),invalidations:()=>invalidations,poll(){revision++;commit();},selectAll(){input('Select page').props.onChange({target:{checked:true}});commit();},async transfer(){button('Chuyển sang In Transit').props.onClick();await tick();commit();return requests.at(-1);}};
 }
@@ -82,7 +91,7 @@ test('default working list hides transferred rows in table, report, pagination a
  assert.deepEqual(f.ids(),['CANCELLED','CLOSED','DEFERRED','DRAFT']);
  assert.equal(f.input('Select TRANSFERRED'),undefined);
  assert.equal(f.find(node=>node.type?.name==='ManualPagination').props.total,4);
- assert.deepEqual(f.cards()[0].values,['20','20','100','60'],'list hours exclude transferred/cancelled/deferred; weekly allocation remains committed');
+ assert.deepEqual(f.cards()[0].values,hours(20,20,100),'list hours exclude transferred/cancelled/deferred; weekly allocation remains committed');
  f.button('Xuất Excel (.xml)').props.onClick();const xml=await f.downloads.at(-1).text();
  assert.match(xml,/CLOSED/);assert.doesNotMatch(xml,/TRANSFERRED/);assert.match(xml,/CANCELLED/);assert.match(xml,/DEFERRED/);
  assert.deepEqual(original,before,'display filtering must not mutate source records');
@@ -194,7 +203,7 @@ test('default retains cancelled and deferred rows, visibly marked, after reset a
  for(const reset of [null,'Xóa lọc','Quay lại']){
   if(reset){f.selectStatus('ĐÃ CHUYỂN');f.button(reset).props.onClick();f.commit();}
   assert.deepEqual(f.ids(),['102TC06001','102TC10002','102TC10003','DEFERRED']);
-  assert.deepEqual(f.cards()[0].values,['0','10','100','90']);
+  assert.deepEqual(f.cards()[0].values,hours(0,10,100));
   assert.equal(f.input('Status 102TC06001').props.value,'HỦY');assert.equal(f.input('Status DEFERRED').props.value,'TẠM HOÃN');
   assert.ok(descendants(f.render()).some(node=>node.type==='tr'&&node.props.className==='pp-cancelled'));
   f.selectAll();assert.equal(f.button('Chuyển sang In Transit').props.disabled,true);
@@ -207,20 +216,20 @@ test('22 transferred rows leave zero list hours, retain weekly overload and reap
  const transferred=[...Array.from({length:11},(_,i)=>row(`A-${i}`,'ĐÃ CHUYỂN',{plan:i===10?18.5:50})),...Array.from({length:11},(_,i)=>row(`B-${i}`,'ĐÃ CHUYỂN',{line:'B',plan:i===10?52:50}))];
  const initial={...data(transferred),capacity:[{week,line:'A',status:'Đã xác nhận',availableHours:430.825,version:1},{week,line:'B',status:'Đã xác nhận',availableHours:517.275,version:1}]};
  const f=fixture(initial);await f.start();assert.deepEqual(f.ids(),[]);
- assert.deepEqual(f.cards().map(card=>card.values),[['0','518.5','430.825',String(430.825-518.5)],['0','552','517.275',String(517.275-552)]]);
+ assert.deepEqual(f.cards().map(card=>card.values),[hours(0,518.5,430.825),hours(0,552,517.275)]);
  assert.deepEqual(f.cards().map(card=>card.load),['Tải tuần · 120.4%','Tải tuần · 106.7%']);
  assert.ok(f.cards().every(card=>card.warning.endsWith('overload')));
  f.selectStatus('ĐÃ CHUYỂN');assert.equal(f.ids().length,22);
  assert.equal(f.find(node=>node.type?.name==='ManualPagination').props.total,22);
- assert.deepEqual(f.cards().map(card=>card.values.slice(0,2)),[['518.5','0'],['552','0']]);
+ assert.deepEqual(f.cards().map(card=>card.values.slice(0,2)),[['0','0'],['0','0']]);
  f.find(node=>node.type?.name==='ManualPagination').props.onPageChange(2);f.commit();
- assert.deepEqual(f.cards().map(card=>card.values.slice(0,2)),[['518.5','0'],['552','0']],'summary covers all filtered rows, not just the current page');
+ assert.deepEqual(f.cards().map(card=>card.values.slice(0,2)),[['0','0'],['0','0']],'summary covers all filtered rows, not just the current page');
 });
 
 test('status, SKU and type filters partition workload while weekly capacity, balance and load remain invariant',async()=>{
  const initial=data([row('DRAFT','DỰ KIẾN',{plan:5}),row('MAIN','ĐÃ CHỐT',{plan:10}),row('CARRY','ĐÃ CHỐT',{plan:15,type:'GỐI ĐẦU'}),row('TRANSFERRED','ĐÃ CHUYỂN',{plan:20}),row('CANCELLED','HỦY',{plan:99}),row('DEFERRED','TẠM HOÃN',{plan:99})]);
  const f=fixture(initial);await f.start();
- const check=(visible,outside)=>{const card=f.cards()[0];assert.deepEqual(card.values,[String(visible),String(outside),'100','50']);assert.equal(card.load,'Tải tuần · 50.0%');};
+ const check=(visible,outside)=>{assert.equal(visible+outside,50,'filtered partition still accounts for all original hours');const card=f.cards()[0];assert.deepEqual(card.values,hours(30,20,100),'weekly six-card totals do not repartition with table filters');assert.equal(card.load,'Tải tuần · 50.0%');};
  check(30,20);
  for(const [status,visible,outside] of [['all',50,0],['ĐÃ CHUYỂN',20,30],['ĐÃ CHỐT',25,25],['DỰ KIẾN',5,45],['HỦY',0,50],['TẠM HOÃN',0,50],['active',30,20]]){f.selectStatus(status);check(visible,outside);}
  f.selectFilter('type','GỐI ĐẦU');assert.deepEqual(f.ids(),['CARRY']);check(15,35);
@@ -233,19 +242,19 @@ test('Line filters preserve each whole-line allocation including a completely hi
  const initial=data([row('A-CLOSED'),row('A-TRANSFERRED','ĐÃ CHUYỂN',{plan:20}),row('B-CLOSED','ĐÃ CHỐT',{line:'B',plan:40}),row('C-TRANSFERRED','ĐÃ CHUYỂN',{line:'C',plan:50})]);
  initial.capacity=['A','B','C'].map(line=>({week,line,status:'Đã xác nhận',availableHours:100,version:1}));
  const f=fixture(initial);await f.start();assert.deepEqual(f.cards().map(card=>card.line),['A','B','C']);
- for(const [line,values] of [['A',['10','20','100','70']],['B',['40','0','100','60']],['C',['0','50','100','50']]]){f.selectFilter('line',line);assert.equal(f.cards().length,1);assert.equal(f.cards()[0].line,line);assert.deepEqual(f.cards()[0].values,values);}
+ for(const [line,values] of [['A',hours(10,20,100)],['B',hours(40,0,100)],['C',hours(0,50,100)]]){f.selectFilter('line',line);assert.equal(f.cards().length,1);assert.equal(f.cards()[0].line,line);assert.deepEqual(f.cards()[0].values,values);}
 });
 
 test('switching weeks does not reuse hours from the previous week and cached return keeps the correct partition',async()=>{
  const initial=data([row('W42','ĐÃ CHUYỂN',{plan:40})]),f=fixture(initial);await f.start();
  const next='2026-10-19';f.input('Plan week').props.onChange({target:{value:next}});f.commit();
- const other={...data([row('W43','ĐÃ CHỐT',{week:next,plan:15})]),capacity:[{week:next,line:'A',status:'Đã xác nhận',availableHours:80,version:2}]};
+ const other={...data([row('W43','ĐÃ CHỐT',{week:next,start:next,end:next,plan:15})]),capacity:[{week:next,line:'A',status:'Đã xác nhận',availableHours:80,version:2}]};
  await f.settle(f.requests.find(request=>request.url===`/api/production-plan?week=${next}`),other);
- assert.deepEqual(f.ids(),['W43']);assert.deepEqual(f.cards()[0].values,['15','0','80','65']);
+ assert.deepEqual(f.ids(),['W43']);assert.deepEqual(f.cards()[0].values,hours(15,0,80));
  f.input('Plan week').props.onChange({target:{value:week}});f.commit();
- assert.deepEqual(f.cards()[0].values,['0','40','100','60']);
+ assert.deepEqual(f.cards()[0].values,hours(0,40,100));
  await f.settle(f.requests.filter(request=>request.url===`/api/production-plan?week=${week}`).at(-1),initial);
- assert.deepEqual(f.ids(),[]);assert.deepEqual(f.cards()[0].values,['0','40','100','60']);
+ assert.deepEqual(f.ids(),[]);assert.deepEqual(f.cards()[0].values,hours(0,40,100));
 });
 
 test('null quantities, missing labor, soft-deleted rows and other weeks retain honest independent partitions',()=>{
@@ -267,47 +276,52 @@ test('null quantities, missing labor, soft-deleted rows and other weeks retain h
 test('pending, rejected, uncertain and verified transfers change card partitions only after authoritative readback',async()=>{
  const initial=data([row('SELECTED','ĐÃ CHỐT',{plan:30}),row('OTHER','ĐÃ CHỐT',{plan:20})]),f=fixture(initial);await f.start();
  f.input('Select SELECTED').props.onChange();f.commit();const first=await f.transfer();
- const before=['50','0','100','50'];assert.deepEqual(f.cards()[0].values,before);
+ const before=hours(50,0,100);assert.deepEqual(f.cards()[0].values,before);
  await f.settle(first,{error:'cannotTransfer'},422);assert.deepEqual(f.cards()[0].values,before);
  const next=await f.transfer();await f.settle(next,{revision:4,added:1,updated:1,existing:0});assert.deepEqual(f.cards()[0].values,before);
  await f.settle(f.requests.at(-1),{error:'unavailable'},503);assert.deepEqual(f.cards()[0].values,before);
  f.button('Tải lại dữ liệu').props.onClick();await tick();
  const fresh={...data([row('SELECTED','ĐÃ CHUYỂN',{plan:30}),row('OTHER','ĐÃ CHỐT',{plan:20})]),revision:4};
- await f.settle(f.requests.at(-1),fresh);assert.deepEqual(f.cards()[0].values,['20','30','100','50']);assert.equal(f.cards()[0].load,'Tải tuần · 50.0%');
+ await f.settle(f.requests.at(-1),fresh);assert.deepEqual(f.cards()[0].values,hours(20,30,100));assert.equal(f.cards()[0].load,'Tải tuần · 50.0%');
  f.selectAll();const last=await f.transfer();await f.settle(last,{revision:5,added:1,updated:1,existing:0});
  await f.settle(f.requests.at(-1),{...data(fresh.rows.map(item=>({...item,status:'ĐÃ CHUYỂN'}))),revision:5});
- assert.deepEqual(f.ids(),[]);assert.deepEqual(f.cards()[0].values,['0','50','100','50']);
+ assert.deepEqual(f.ids(),[]);assert.deepEqual(f.cards()[0].values,hours(0,50,100));
 });
 
 test('real API and isolated TEST database: partial transfer updates rendered totals, preserves capacity/history, and retry cannot duplicate',async()=>{
  const base=resolve(root,'.local-data/tests');mkdirSync(base,{recursive:true});const connection=await openDatabase(mkdtempSync(resolve(base,'plan-summary-')));
  const login='plan-summary@example.test';let cookie='';
- const api=(url,body)=>siteApi(new Request(`https://test.invalid${url}`,{method:body?'POST':'GET',headers:{Cookie:cookie,...(body?{'content-type':'application/json',origin:'https://test.invalid'}:{})},...(body?{body:JSON.stringify(body)}:{})}),{DB:connection.db,FILES:connection.bucket});
+ const receipts=[];
+ const api=async(url,body)=>{const before=await records(connection.db);const response=await siteApi(new Request(`https://test.invalid${url}`,{method:body?'POST':'GET',headers:{Cookie:cookie,...(body?{'content-type':'application/json',origin:'https://test.invalid'}:{})},...(body?{body:JSON.stringify(body)}:{})}),{DB:connection.db,FILES:connection.bucket});
+ if(body&&url==='/api/production-plan')receipts.push(await assertRequestAudit({before,after:await records(connection.db),response,actorId:login,route:url,body,mutableEntities:response.status<400?['production_plan','production_plan_audit','in_transit']:[]}));
+ return response;};
  try{
   await migrate(connection.db);const password=await passwordRecord('1234');
   const initial=data([row('SELECTED','ĐÃ CHỐT',{plan:30}),row('OTHER','ĐÃ CHỐT',{plan:20}),row('CANCELLED','HỦY',{plan:99})]);
+  const calendar=newDailyCapacity(week,'A',100);Object.assign(calendar,{status:'Đã xác nhận',reviewStatus:'approved',syncedAt:'TEST',khsxAcceptedAt:'TEST',availableHours:100});calendar.input.workers=20;calendar.input.dailySchedule=calendar.input.dailySchedule.map(d=>({...d,working:d.date===week,hcStart:'08:00',hcEnd:'13:00',breaks:[],cleaning:[]}));
   await connection.db.batch([
    connection.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('users',login,JSON.stringify({login,email:login,role:'Super Admin',active:true}),login,'TEST'),
    connection.db.prepare('INSERT INTO auth_accounts VALUES(?,?,?,?,1,?)').bind(login,password.hash,password.salt,password.iterations,'TEST'),
    connection.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_plan',week,JSON.stringify({schemaVersion:1,week,revision:3,rows:initial.rows}),login,'TEST'),
-   connection.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('capacity',week,JSON.stringify({schemaVersion:1,week,rows:initial.capacity}),login,'TEST'),
+   connection.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('capacity',week,JSON.stringify({schemaVersion:1,week,rows:[calendar]}),login,'TEST'),
   ]);
+  for(const item of initial.rows)await connection.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('labor_hours',item.sku,JSON.stringify({sku:item.sku,laborHour:1,version:1}),login,'TEST').run();
   const signed=await api('/api/auth/login',{login,password:'1234'});assert.equal(signed.status,200);cookie=signed.headers.get('set-cookie').split(';')[0];
   const read=()=>api(`/api/production-plan?week=${week}`);
   const loaded=await read();assert.equal(loaded.status,200);const stored=await loaded.json();
   const untouched=(await records(connection.db)).filter(record=>!['production_plan','production_plan_audit','in_transit'].includes(record.entity));
-  const f=fixture(stored);await f.start();assert.deepEqual(f.cards()[0].values,['50','0','100','50']);assert.ok(f.ids().includes('CANCELLED'));
+  const f=fixture(stored);await f.start();assert.deepEqual(f.cards()[0].values,hours(50,0,100));assert.ok(f.ids().includes('CANCELLED'));
   const rejected=await api('/api/production-plan',{action:'transfer',week,revision:stored.revision,ids:['SELECTED','CANCELLED']});assert.equal(rejected.status,422);
   assert.deepEqual((await(await read()).json()).rows,stored.rows,'mixed rejected batch preserves all plans');
   f.input('Select SELECTED').props.onChange();f.commit();const write=await f.transfer();
   const result=await api(write.url,JSON.parse(write.body));assert.equal(result.status,200);write.resolve(result);await tick();f.commit();
-  assert.deepEqual(f.cards()[0].values,['50','0','100','50'],'successful POST alone does not fabricate verified state');
+  assert.deepEqual(f.cards()[0].values,hours(50,0,100),'successful POST alone does not fabricate verified state');
   const refresh=f.requests.at(-1);refresh.resolve(await api(refresh.url));await tick();f.commit();
-  assert.deepEqual(f.ids(),['CANCELLED','OTHER']);assert.deepEqual(f.cards()[0].values,['20','30','100','50']);
+  assert.deepEqual(f.ids(),['CANCELLED','OTHER']);assert.deepEqual(f.cards()[0].values,hours(20,30,100));
   const after=await(await read()).json();assert.equal(after.transit.length,1);assert.equal(after.audit.length,1);assert.equal(after.rows.length,3);
   const repeated=await api('/api/production-plan',{action:'transfer',week,revision:after.revision,ids:['SELECTED']});assert.equal(repeated.status,200);
   const final=await(await read()).json();assert.equal(final.transit.length,1);assert.equal(final.audit.length,1);assert.deepEqual(final.rows,after.rows);
-  assert.deepEqual((await records(connection.db)).filter(record=>!['production_plan','production_plan_audit','in_transit'].includes(record.entity)),untouched,'capacity and unrelated records stay byte-for-byte unchanged');
+  assertSnapshotWithReceipts(untouched,(await records(connection.db)).filter(record=>!['production_plan','production_plan_audit','in_transit'].includes(record.entity)),receipts);
   assert.deepEqual(rules.summary(stored.rows,stored.capacity,week),rules.summary(final.rows,final.capacity,week),'weekly allocated load survives transfer');
  }finally{await connection.close();}
 });
@@ -325,12 +339,12 @@ test('row status changes cannot finalize a plan; only the explicit close toolbar
  close.props.onClick();close.props.onClick();await tick();f.commit();
  const writes=f.requests.filter(request=>request.method==='POST');assert.equal(writes.length,1);
  assert.equal(JSON.parse(writes[0].body).action,'close');assert.deepEqual(JSON.parse(writes[0].body).ids,['DRAFT']);assert.deepEqual(JSON.parse(writes[0].body).edits,{},'unchanged UI close sends no editable fields');
- assert.equal(JSON.parse(f.find(node=>node.type==='table'&&node.props.className==='pp-plan-grid').props['data-report-source']).rows[0][13],'Dự kiến','wait for server confirmation');
+ assert.ok(descendants(f.render()).some(n=>n.type==='tr'&&label(n).includes('Dự kiến')),'wait for server confirmation');
  const confirmed={...draft,status:'ĐÃ CHỐT',closedAt:'2026-10-16T06:14:48.940Z',closedBy:'TEST'};
  await f.settle(writes[0],{revision:4,rows:[confirmed],updated:1});
  assert.equal(f.input('Status DRAFT'),undefined,'confirmed status is read-only text');
  assert.equal(f.input('Quantity DRAFT').props.disabled,true);
- assert.equal(JSON.parse(f.find(node=>node.type==='table'&&node.props.className==='pp-plan-grid').props['data-report-source']).rows[0][13],'Đã chốt');
+ assert.ok(descendants(f.render()).some(n=>n.type==='tr'&&label(n).includes('Đã chốt')));
  f.input('Select DRAFT').props.onChange();f.commit();
  assert.equal(f.button('Mở chốt').props.disabled,false);
  assert.equal(f.button('Chuyển sang In Transit').props.disabled,false);
@@ -382,4 +396,13 @@ test('reopen disabled reason is localized without an extra banner',async()=>{
   const reopen=f.button(language==='zh'?'解除確認':'Mở chốt');
   assert.equal(reopen.props.disabled,true);assert.equal(reopen.props.title,reason);
  }
+});
+
+test('six named metrics separate old backlog from all backlog and never merge it with plan hours',async()=>{
+ const initial=data([row('NEW','ĐÃ CHỐT',{plan:10})]);
+ initial.transit=[{id:'OLD-LSX',planRowId:'OLD',sku:'OLD',line:'A',week:'2026-10-05',planStart:'2026-10-05',planEnd:week,lsxQty:8,completedQty:0,laborHour:1},{id:'CURRENT-LSX',planRowId:'CURRENT',sku:'CURRENT',line:'A',week,planStart:week,planEnd:week,lsxQty:6,completedQty:0,laborHour:1}];
+ const before=structuredClone(initial),f=fixture(initial);await f.start();
+ assert.deepEqual(f.cards()[0].captions,['Giờ Pro plan trong tuần','Giờ tuần cũ chưa hoàn thành','Giờ tồn In transit trong tuần','Tổng giờ cần xếp trong tuần','Khả dụng tuần','Dư / thiếu tuần']);
+ assert.deepEqual(f.cards()[0].values,['10','8','14','24','100','76']);
+ assert.deepEqual(initial,before);
 });
