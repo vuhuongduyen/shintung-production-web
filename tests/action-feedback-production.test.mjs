@@ -87,17 +87,31 @@ test('ActualWorkSchedule busy/unapproved/nonmanager guards still block saves',as
  }finally{await view.close();}}
 });
 
-for(const method of ['click','enter'])test(`ProductionProgressReview ${method}: blank SKU/LSX/name explains and retains applied rows`,async()=>{
- const view=await mount(el(ProductionProgressReview,{orders,reports:[],events:[],employees,manager:true,busy:false,refresh:()=>{},open:()=>{},active:()=>({count:0,employees:[],known:false,running:false}),onReview:async()=>{throw Error('Unexpected review');}}));try{
+for(const method of ['click','enter'])test(`ProductionProgressReview ${method}: blank SKU/LSX/name/Plan ID explains and retains applied rows`,async()=>{
+ const view=await mount(el(ProductionProgressReview,{orders,reports:[],events:[],employees,manager:true,busy:false,refresh:()=>{},open:()=>{},active:()=>({count:0,employees:[],known:false,running:false}),onConfirm:async()=>{throw Error('Unexpected review');}}));try{
   await click(button(view.host,'Tra cứu'));const category=[...toolbar(view.host).querySelectorAll('select')].find(s=>s.querySelector('option[value=sku]'));
   await choose(category,'sku');let input=toolbar(view.host).querySelector('input');await change(input,'ALPHA');await search(view.host,method,input);assert.match(body(view.host),/LSX-ALPHA/);assert.doesNotMatch(body(view.host),/LSX-BETA/);
   for(const field of ['sku','lsxCode','name']){await choose(category,field);input=toolbar(view.host).querySelector('input');await change(input,'   ');await search(view.host,method,input);assert.match(alert(view.host),/Nhập nội dung/);assert.doesNotMatch(body(view.host),/LSX-BETA/);}
   await change(input,'BETA');await search(view.host,method,input);assert.match(body(view.host),/LSX-BETA/);assert.doesNotMatch(body(view.host),/LSX-ALPHA/);
-  await choose(category,'planId');input=toolbar(view.host).querySelector('input');await search(view.host,method,input);assert.match(body(view.host),/LSX-ALPHA/);assert.match(body(view.host),/LSX-BETA/,'Blank Plan ID remains an allowed search');assert.deepEqual(requests,[]);
+  await choose(category,'planId');input=toolbar(view.host).querySelector('input');
+  for(const value of ['', '   ']){await change(input,value);await search(view.host,method,input);assert.equal(view.host.querySelector('[role=alert] p')?.textContent,'Vui lòng nhập Plan ID');assert.match(body(view.host),/LSX-BETA/);assert.doesNotMatch(body(view.host),/LSX-ALPHA/);}
+  await change(input,'PLAN-ALPHA');await search(view.host,method,input);assert.match(body(view.host),/LSX-ALPHA/);assert.doesNotMatch(body(view.host),/LSX-BETA/);
+  await click(button(view.host,'Xóa lọc'));assert.match(body(view.host),/LSX-ALPHA/);assert.match(body(view.host),/LSX-BETA/);assert.deepEqual(requests,[]);
  }finally{await view.close();}
 });
 test('ActualWorkSchedule busy search explains processing without changing week or Line',async()=>{
  const changes=[],view=await mount(el(ActualWorkSchedule,scheduleProps({busy:true,setWeek:v=>changes.push(v),setLine:v=>changes.push(v)})));try{
   await click(button(view.host,'Tổng hợp tháng'));const searchButton=button(view.host,'Tìm kiếm');assert.equal(searchButton.disabled,true);await click(searchButton.closest('[role=button]'));assert.match(alert(view.host),/Đang xử lý/);assert.deepEqual(changes,[]);assert.deepEqual(requests,[]);
+ }finally{await view.close();}
+});
+
+test('ActualWorkSchedule cleaning cap follows initial actual day/Line; invalid draft remains visible and never saves',async()=>{
+ const saves=[],cleanDay={...days[0],cleaning:[{people:1,start:'16:00',end:'17:00'}]};
+ function Harness(){const [draft,setDraft]=React.useState([cleanDay]);return el(ActualWorkSchedule,scheduleProps({days:draft,setDays:setDraft,approved:{key:`${week}:A`,workers:99,version:3,days:[cleanDay],roster:[{date:week,hc:employees.map(p=>p.id),ot:[]}],input:{dailySchedule:[cleanDay]}},events:[],save:async body=>{saves.push(body);return true;}}));}
+ const view=await mount(el(Harness));try{
+  const people=view.host.querySelector('[aria-label="Số người vệ sinh 12/10/2026 nhóm 1"]');assert.ok(people);assert.equal(people.max,'2');
+  await change(people,'3');await change(view.host.querySelector('#actual-reason'),'Synthetic edit');await click(button(view.host,'Lưu thay đổi'));
+  assert.match(alert(view.host),/vượt số người thực tế đầu ca \(2\)/);assert.equal(people.value,'3');assert.deepEqual(saves,[]);
+  await change(people,'2');await click(button(view.host,'Lưu thay đổi'));assert.equal(saves.length,1);assert.equal(saves[0].days[0].cleaning[0].people,2);assert.equal(saves[0].reason,'Synthetic edit');assert.deepEqual(requests,[]);
  }finally{await view.close();}
 });

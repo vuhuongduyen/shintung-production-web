@@ -641,6 +641,11 @@ test("cancelled In transit orders remain visible with original plan quantity but
 
 test('Saturday actual cleaning can be added, changed and removed without changing approved planning',()=>withDb(async db=>{
  const week='2026-09-21',days=approvedDays();await approveCapacity(db,days);
+ // Cleaning now requires the named initial actual arrangement, not workers:2.
+ const capacity=JSON.parse((await db.prepare("SELECT payload FROM app_records WHERE entity='capacity' AND record_key=?").bind(week).first()).payload);
+ capacity.rows[0].input.dailyRoster=days.map(day=>({date:day.date,hc:['NV01','NV02'],ot:[]}));
+ await db.prepare("UPDATE app_records SET payload=? WHERE entity='capacity' AND record_key=?").bind(JSON.stringify(capacity),week).run();
+ for(const id of ['NV01','NV02'])await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('employees',id,JSON.stringify({id,name:id,line:'A',active:true}),'TEST','fixture').run();
  const changed=structuredClone(days);changed[5].working=true;changed[5].cleaning=[{people:1,start:'16:30',end:'17:00'}];
  const save=(value,version)=>mutateProductionWorkflow(db,{action:'schedule',week,line:'A',version,approvedVersion:1,days:value,reason:'Vệ sinh thứ Bảy thực tế'},manager);
  await save(changed,0);let state=await readProductionWorkflow(db,manager);
@@ -668,4 +673,34 @@ test('close permanent movement after onward loan and directory return without ca
  assert.equal(isPresent({roster:[{date:'2026-10-30',hc:[],ot:[]}]},state.events,'NV01','A','2026-10-30',900),true);
  assert.equal(isPresent({roster:[{date:'2026-11-02',hc:[],ot:[]}]},state.events,'NV01','B','2026-11-02',480),false);
  await assert.rejects(()=>mutateProductionWorkflow(db,{action:'attendance-cancel',attendanceId:edited.id,reason:'Cancel'},manager),e=>e.status===409);
+}));
+
+
+test('schedule cleaning revalidates initial actual staffing before writes, preserving permissions and business records',()=>withDb(async db=>{
+ const week='2026-09-21',days=approvedDays(),date=days[0].date;
+ const input={workers:1,dailySchedule:days,dailyRoster:days.map(day=>({date:day.date,hc:['CLEAN-A','CLEAN-B'],ot:[]}))};
+ await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('capacity',week,JSON.stringify({schemaVersion:1,week,rows:[{line:'A',status:'Đã xác nhận',reviewStatus:'approved',version:1,input}]}),'TEST','fixture').run();
+ for(const id of ['CLEAN-A','CLEAN-B'])await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('employees',id,JSON.stringify({id,name:id,line:'A',active:true}),'TEST','fixture').run();
+ const draft=structuredClone(days);draft[0].cleaning=[{people:2,start:'16:00',end:'17:00'}];
+ const body={action:'schedule',week,line:'A',version:0,approvedVersion:1,days:draft,reason:'Synthetic actual cleaning'};
+ const snapshot=()=>db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all();
+ let before=await snapshot();
+ await assert.rejects(()=>mutateProductionWorkflow(db,{...body,days:draft.map((d,i)=>i?d:{...d,cleaning:[{people:3,start:'16:00',end:'17:00'}]})},manager),e=>e.status===409&&e.message.includes('đầu ca (2)'));
+ assert.deepEqual(await snapshot(),before);
+ await assert.rejects(()=>mutateProductionWorkflow(db,body,worker),e=>e.status===403);assert.deepEqual(await snapshot(),before);
+ // Actual accepted absence arrives after the draft was prepared: fresh save must reject.
+ const absent={id:'clean-absent',kind:'line-absence',line:'A',employees:['CLEAN-A'],absenceType:'Nghỉ',effectiveAt:`${date}T08:00:00+07:00`,endsAt:`${date}T17:00:00+07:00`,approved:true};
+ await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_event',absent.id,JSON.stringify(absent),'TEST','fixture').run();before=await snapshot();
+ await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),e=>e.status===409&&e.message.includes('đầu ca (1)'));assert.deepEqual(await snapshot(),before);
+ // Cancelled actual absence restores two named people, even though Capacity scalar is one.
+ await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_event','cancel-clean',JSON.stringify({id:'cancel-clean',kind:'attendance-cancel',supersedes:absent.id}),'TEST','fixture').run();
+ await mutateProductionWorkflow(db,body,manager);
+ const saved=JSON.parse((await db.prepare("SELECT payload FROM app_records WHERE entity='production_schedule'").first()).payload);
+ assert.equal(saved.days[0].cleaning[0].people,2);assert.equal(saved.version,1);assert.equal(saved.history.length,1);
+ before=await snapshot();await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),e=>e.status===409&&e.message.includes('Lịch vừa được sửa'));assert.deepEqual(await snapshot(),before);
+ // A later directory change must be projected on the schedule date at the next save.
+ await db.prepare("UPDATE app_records SET payload=? WHERE entity='employees' AND record_key='CLEAN-B'").bind(JSON.stringify({id:'CLEAN-B',name:'CLEAN-B',line:'A',employmentDatesManaged:true,endDate:date,active:true})).run();
+ const revised=structuredClone(draft);revised[0].note='Changed after directory update';before=await snapshot();
+ await assert.rejects(()=>mutateProductionWorkflow(db,{...body,version:1,days:revised},manager),e=>e.status===409&&e.message.includes('đầu ca (1)'));assert.deepEqual(await snapshot(),before);
+
 }));

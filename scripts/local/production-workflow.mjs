@@ -1,3 +1,4 @@
+import {cleaningLimitError} from '../../lib/actual-cleaning-limit.mjs';
 import {stageValidationPayload} from './production-stage-read.mjs';
 import {workflowReadSnapshot} from '../../worker/read-performance.mjs';
 import {backfillStageWork} from './production-backfill.mjs';
@@ -666,6 +667,12 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
     const altered = new Set(days.filter((day, index) => JSON.stringify(withoutLine(day)) !== JSON.stringify(withoutLine(existing.days[index]))).map((day) => day.date));
     const reason = String(body.reason || "").trim(); if (!reason) fail("Nhập lý do đổi lịch thực tế.");
     if (!altered.size) return { schedule: calendar.actual.get(existing.key) || existing, unchanged: true };
+    // Re-read the authoritative directory for dated employment, not today's
+    // active-only UI directory or the Capacity scalar. No write before validation.
+    if(days.some(day=>day.cleaning?.some(group=>Number(group.people)>0))){
+      const cleaningEmployees=(await rows(db,'employees')).map(row=>({...row.payload,id:row.key}));
+      for(const day of days){const error=cleaningLimitError({reference:{...existing.reference,key:existing.key,days},events,employees:cleaningEmployees,line,day});if(error)fail(error,409);}
+    }
     const record = { key: existing.key, week, line, days, reference: existing.reference, version: existing.version + 1,
       history: [...existing.history, { before: existing.days, after: days, reason, by: actor.login, byId:productionActorId(actor), at: now }] };
     const old = calendar.actual.get(existing.key);
