@@ -122,3 +122,15 @@ Mốc trước nhóm này: head 0e78c4b, CI 41568475640 đã completed/failure, 
 - Receipt của từng POST được kiểm correlation/actor/route/entity/status/outcome/evidence/input; lỗi giữ mọi business record bất biến. Thành công chỉ cho phép thay ba entity dự kiến (plan, audit plan, transit), mọi audit cũ (kể cả production_plan_audit) vẫn bất biến. So sánh cuối chỉ thêm đúng các receipt đã kiểm, capacity/labor/users/scopes không đổi. Thêm kiểm âm chặn sửa audit cũ hoặc đưa website_action_audit vào mutable allowlist.
 
 Trước: 9 ca lỗi trong file In Transit. Sau: nhóm backlog/receipt ban đầu **31/31**; nhóm năm file gồm quyền plan/business views/helper/backlog/transferred **54/54**, không cancel/skip,48,6 giây. File transferred cuối sau thêm ca tên sáu chỉ tiêu **26/26**,12 giây. Các lượt giao nhau, không cộng tổng. Chỉ tests/helper/docs, không đổi ứng dụng/công thức/quyền. CI sau push xác minh 9 ca cũ, hai ca mới và residual; chưa lint/browser, không merge/deploy/preview.
+
+## Capacity: tách bản đã duyệt khỏi bản đang sửa
+
+CI In Transit e73d292, run41569814022 đã completed/failure: **1.486 pass/12 fail/1.498 test**,247 file(239 đạt/8 lỗi),không timeout/cancel/skip/todo/thiếu tổng kết; TypeScript/ba build đạt. Đúng9tên lỗi cũ hết lỗi,hai regression mới đạt,không tên lỗi mới.
+
+Ba ca Capacity không phải bằng chứng công thức sai: `capacity-accepted.test.mjs`, `capacity-accepted.mjs` và readPlan/mutatePlan đều nguyên trạng snapshot c847754, quy định kế hoạch hiển thị lịch/giờ đã duyệt gần nhất trong khi bản sửa đang chờ. Test cũ đòi null hoặc so với giờ draft chưa duyệt. Không đổi số giờ/công thức nguồn.
+
+Sửa kiểm thử hai mốc: capture giờ đã duyệt trước sửa; pending vẫn bằng giờ đó, retainedApproval=true và khác giờ draft; sau review mới bằng giờ draft được duyệt. Giữ assertions giờ OT, HC, lịch sử thay đổi người/giờ và editCount. Kế hoạch đã chốt giữ nguyên capacityBasis; kế hoạch chốt sau review mới dùng cơ sở mới.
+
+Việc giữ số hiển thị không mở quyền ghi: chốt lệnh mới khi pending vẫn bị CAS raw-capacity từ chối **409 capacityChanged**; thêm so sánh toàn bộ app_records bất biến sau từ chối. Giữ guard trước lần duyệt đầu tiên capacityUnconfirmed. Không chuyển thành cho phép chốt pending.
+
+Targeted capacity+capacity-accepted **32/32 pass**,không cancel/skip,22,3giây. Chỉ test/docs;CI sau push xác minh3ca cũ và residual. Chưa lint/browser,không merge/deploy/preview.

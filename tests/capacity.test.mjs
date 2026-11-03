@@ -139,7 +139,7 @@ test('permission separation, employee without login, removal of overtime with le
  const s=await mutateCapacity(db,{action:'confirm',week,revision:2,lines:['A'],noCleaningAcknowledgedLines:['A']},confirmer);assert.equal(s.rows[0].confirmedBy,'approve');
  assert.equal((await db.prepare("SELECT count(*) n FROM app_records WHERE entity='users'").first()).n,0);
 }));
-test('Plan waits for KHSX, preserves frozen basis, blocks new close while adjusting',()=>isolated(async db=>{
+test('Plan waits for first KHSX approval, retains accepted capacity while adjusting and freezes each close basis',()=>isolated(async db=>{
  await mutate(db,'create',0);await mutate(db,'save',1,{lines:['A'],inputs:{A:input()}});
  const row={id:'test-plan',sku:'TEST',week,line:'A',status:'DỰ KIẾN',plan:1,laborHour:1,start:week,end:'2026-09-22',sequence:1};
  const nextRow={...row,id:'next-plan',sku:'TEST-NEXT',sequence:2};
@@ -151,11 +151,13 @@ test('Plan waits for KHSX, preserves frozen basis, blocks new close while adjust
  let plan=await getPlan(db,week);const basis=structuredClone(plan.rows[0].capacityBasis);assert.equal(basis.version,1);
  assert.equal(summary(plan.rows,plan.capacity,week)[0].available,basis.availableHours);
  await mutate(db,'requestChange',(await readCapacity(db,week,admin)).revision,{lines:['A'],reason:'Line staffing changed'});
- plan=await getPlan(db,week);assert.deepEqual(plan.rows[0].capacityBasis,basis);assert.equal(summary(plan.rows,plan.capacity,week)[0].available,null);assert.equal(plan.capacity[0].status,'Chờ điều chỉnh');
- await assert.rejects(()=>mutatePlan(db,{action:'close',week,revision:plan.revision,ids:[nextRow.id]},admin),e=>e.message==='capacityUnconfirmed');
+ plan=await getPlan(db,week);assert.deepEqual(plan.rows[0].capacityBasis,basis);assert.equal(summary(plan.rows,plan.capacity,week)[0].available,basis.availableHours);assert.equal(plan.capacity[0].status,'Đã xác nhận');assert.equal(plan.capacity[0].retainedApproval,true);
+ const beforeDenied=(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
+ await assert.rejects(()=>mutatePlan(db,{action:'close',week,revision:plan.revision,ids:[nextRow.id]},admin),e=>e.status===409&&e.message==='capacityChanged');
+ assert.deepEqual((await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results,beforeDenied,'retained display never bypasses the capacity revision guard');
  await review(db,'A');assert.equal((await readCapacity(db,week,admin)).rows[0].status,'Nháp');
  const p=input();p.workers=20;p.otWorkers=20;await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:p}});
- plan=await getPlan(db,week);assert.deepEqual(plan.rows[0].capacityBasis,basis);assert.equal(summary(plan.rows,plan.capacity,week)[0].available,null);assert.equal(plan.capacity[0].status,'Chờ điều chỉnh');
+ plan=await getPlan(db,week);assert.deepEqual(plan.rows[0].capacityBasis,basis);assert.equal(summary(plan.rows,plan.capacity,week)[0].available,basis.availableHours);assert.equal(plan.capacity[0].status,'Đã xác nhận');assert.equal(plan.capacity[0].retainedApproval,true);
  await review(db,'A');plan=await getPlan(db,week);assert.notEqual(summary(plan.rows,plan.capacity,week)[0].available,basis.availableHours);assert.equal(plan.capacity[0].status,'Đã xác nhận');
  const newHours=plan.capacity[0].availableHours;await mutatePlan(db,{action:'close',week,revision:plan.revision,ids:[nextRow.id]},admin);
  plan=await getPlan(db,week);assert.equal(plan.rows.find(r=>r.id===nextRow.id).capacityBasis.availableHours,newHours);assert.equal(plan.rows.find(r=>r.id===row.id).capacityBasis.availableHours,basis.availableHours);
@@ -174,10 +176,11 @@ test('aggregate leave saves without employees and retains total changes in confi
  await mutate(db,'create',0);const p={...input(),leaveMode:'aggregate',hcLeaveTotal:10,otLeaveTotal:8.5};
  await mutate(db,'confirm',1,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:p}});
  let s=await readCapacity(db,week,admin);near(s.rows[0].result.otHours,44);assert.equal(s.employees.length,0);
- await review(db,'A');await unlock(db,'A','Adjust total leave');p.otLeaveTotal=7;
+ await review(db,'A');const acceptedHours=(await getPlan(db,week)).capacity[0].availableHours;await unlock(db,'A','Adjust total leave');p.otLeaveTotal=7;
  s=await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:p}});near(s.rows[0].result.otHours,45.5);assert.equal(s.rows[0].editCount,1);
  assert.ok(s.rows[0].history.at(-1).changes.some(c=>c.field==='otLeaveTotal'&&c.old===8.5&&c.new===7));
- const plan=await getPlan(db,week);near(plan.capacity[0].availableHours,s.rows[0].availableHours);
+ let plan=await getPlan(db,week);near(plan.capacity[0].availableHours,acceptedHours);assert.equal(plan.capacity[0].retainedApproval,true);assert.notEqual(plan.capacity[0].availableHours,s.rows[0].availableHours);
+ await review(db,'A');plan=await getPlan(db,week);near(plan.capacity[0].availableHours,s.rows[0].availableHours);
 }));
 
 test('headcount leave: one person Friday and one Saturday, excluding their breaks and cleaning',()=>{
@@ -209,10 +212,11 @@ test('counted leave rows persist, revise with history and update Plan; old total
  const detailed={...p,leaveMode:'counted',hcLeaveMode:'rows',otLeaveMode:'aggregate',hcLeaveRows:[{people:1,from:'2026-09-26',to:'2026-09-26',mode:'full'}],otLeaveRows:[]};
  let s=await mutate(db,'confirm',2,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:detailed}});near(s.rows[0].result.otHours,44);assert.equal(s.employees.length,0);
  assert.equal(s.rows[0].history.at(-1).before.hcLeaveTotal,10);assert.equal(s.rows[0].input.hcLeaveRows[0].people,1);
- await review(db,'A');await unlock(db,'A','More people absent');detailed.hcLeaveRows[0].people=2;
+ await review(db,'A');const acceptedHours=(await getPlan(db,week)).capacity[0].availableHours;await unlock(db,'A','More people absent');detailed.hcLeaveRows[0].people=2;
  s=await mutate(db,'confirm',(await readCapacity(db,week,admin)).revision,{noCleaningAcknowledgedLines:['A'],lines:['A'],inputs:{A:detailed}});assert.equal(s.rows[0].editCount,1);
  assert.ok(s.rows[0].history.at(-1).changes.some(c=>c.field==='hcLeaveRows.0.people'&&c.old===1&&c.new===2));
- near((await getPlan(db,week)).capacity[0].availableHours,s.rows[0].availableHours);
+ near((await getPlan(db,week)).capacity[0].availableHours,acceptedHours);assert.equal((await getPlan(db,week)).capacity[0].retainedApproval,true);assert.notEqual(acceptedHours,s.rows[0].availableHours);
+ await review(db,'A');near((await getPlan(db,week)).capacity[0].availableHours,s.rows[0].availableHours);
 }));
 
 test('daily schedule: overtime, additional staff, Saturday absence/cleaning and training',()=>{
