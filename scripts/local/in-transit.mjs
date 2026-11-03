@@ -1,3 +1,5 @@
+import {stageValidationPayload} from './production-stage-read.mjs';
+import {readRecordPages} from './production-record-pages.mjs';
 import {transitStandardLeadtime} from '../../lib/transit-leadtime.mjs';
 import { randomUUID } from "node:crypto";
 import {
@@ -24,15 +26,7 @@ const parse = (r) => {
     return { ...r, payload: null };
   }
 };
-const read = async (db, entity) =>
-  (
-    await db
-      .prepare(
-        "SELECT record_key,payload,updated_by,updated_at FROM app_records WHERE entity=? ORDER BY updated_at DESC,record_key",
-      )
-      .bind(entity)
-      .all()
-  ).results.map(parse);
+const read = async (db, entity, stageValidation=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:stageValidation?stageValidationPayload(entity):'payload'})).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
 const write = (db, entity, key, payload, actor, now) =>
   db
     .prepare(
@@ -66,7 +60,7 @@ function vietnamDateISO(value = new Date()) {
 export async function getTransit(db, filters = {}, catalog = [], options = {}) {
   const [records, audits, reports, leadtimes, events, historyImports, leadVersions] = await Promise.all(
     ["in_transit", "in_transit_audit", "production_report", "leadtime", "production_event", "production_history_import", "leadtime_versions"].map(
-      (e) => options.planningOnly && ['in_transit_audit','leadtime','leadtime_versions'].includes(e) ? Promise.resolve([]) : read(db, e),
+      (e) => (options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly && ['in_transit_audit','leadtime','leadtime_versions'].includes(e)) ? Promise.resolve([]) : read(db, e,options.stageValidation),
     ),
   );
   const masters = new Map(

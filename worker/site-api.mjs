@@ -1,3 +1,6 @@
+import {reviewSnapshot} from '../lib/production-review-selection.mjs';
+import {readRecordPages} from '../scripts/local/production-record-pages.mjs';
+import {productionUnassignedReminder} from '../scripts/local/production-unassigned-alert.mjs';
 import {cancelReportingDay} from './cancel-reporting-day.mjs';
 import {productionReportingHold,reportingWriteBlocked} from '../lib/production-reporting-hold.mjs';
 import {sheetBridge,sheetSetup} from './warehouse-sheet.mjs';
@@ -76,7 +79,7 @@ export async function sitePrincipal(request,env){
  const permissionSource=personal&&personal.active!==true?null:personal&&personal.permissionMode!=='DEPARTMENT'?personal:departmentPermission;
  const grants=withBusinessViews(String(permissionSource?.permissions||'').split(' · ').filter(Boolean),personal?.active!==false);
  // The existing HR account was explicitly assigned attendance entry by the owner.
- if(String(user.login).toLowerCase()==='sample_user_5'&&personal?.active!==false)for(const grant of hrAttendancePermissions)if(!grants.includes(grant))grants.push(grant);
+ if(String(user.login).toLowerCase()==='haquyen'&&personal?.active!==false)for(const grant of hrAttendancePermissions)if(!grants.includes(grant))grants.push(grant);
  const role=user.role||'USER',isAdmin=isAdminRole(role);
  return {login:user.email||user.login,email:user.email||null,name:user.name||user.login,userId:user.login,permissionLogin:user.login,department,role,isAdmin,grants,line:['A','B'].includes(String(user.line||'').toUpperCase())?String(user.line).toUpperCase():null,isSetupAdmin:user.isSetupAdmin===true,canReopenPlan:canPlanAction({login:user.login,isAdmin,grants},'reopen')};
 }
@@ -110,8 +113,15 @@ const approvalStatus=payload=>String(payload?.confirmation_status||payload?.conf
 export async function siteApi(request,env){
  const path=new URL(request.url).pathname;
  if(request.method!=='GET'||!path.startsWith('/api/')){
-  if(auditRoutes.has(path)&&['POST','PUT','PATCH','DELETE'].includes(request.method)&&request.headers.get('origin')===new URL(request.url).origin){const actor=await sitePrincipal(request,env);if(actor)return auditMutation({request,env,actor,run:()=>handleSiteApi(request,env)});}
-  return handleSiteApi(request,env);
+  const timing=['/api/production-workflow','/api/production-report','/api/production-correction'].includes(path)?observeReadDatabase(env.DB):null;
+  const scoped=timing?{...env,DB:timing.database}:env;
+  const run=async()=>{
+   if(auditRoutes.has(path)&&['POST','PUT','PATCH','DELETE'].includes(request.method)&&request.headers.get('origin')===new URL(request.url).origin){const actor=await sitePrincipal(request,scoped);if(actor)return auditMutation({request,env:scoped,actor,run:()=>handleSiteApi(request,scoped,timing)});}
+   return handleSiteApi(request,scoped,timing);
+  };
+  const response=await run();
+  if(timing&&response){const stats=timing.summary();response.headers.set('Server-Timing',`total;dur=${stats.totalMs.toFixed(1)}, db_sum;dur=${stats.dbMs.toFixed(1)}, db_max;dur=${stats.maxDbMs.toFixed(1)}, db_calls;desc="${stats.calls}"`);if(stats.totalMs>=2000)console.info('ONSPA slow write',JSON.stringify({route:path,status:response.status,...Object.fromEntries(Object.entries(stats).map(([key,value])=>[key,Math.round(value)]))}));}
+  return response;
  }
  const timing=observeReadDatabase(env.DB);
  const response=await handleSiteApi(request,{...env,DB:timing.database},timing);
@@ -181,7 +191,7 @@ async function handleSiteApi(request,env,timing){
   if(examples||path==='/api/production-examples')return json({error:'Đã ngừng dữ liệu mẫu trong Quản lý sản xuất. Hãy tải lại để xem dữ liệu thực tế.'},410);
   const productionDb=examples?exampleDatabase(env.DB):env.DB;
   let catalogPromise;
-  const loadCatalog=()=>examples?Promise.resolve([]):catalogPromise||=(env.DB.prepare("SELECT record_key,payload,updated_by,updated_at FROM app_records WHERE entity='sku'").all()).then(result=>Promise.all(result.results.map(async r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:await recordRevision(r.payload)}))).then(siteCatalog));
+  const loadCatalog=()=>examples?Promise.resolve([]):catalogPromise||=readRecordPages(env.DB,{where:"entity='sku'"}).then(result=>Promise.all(result.map(async r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:await recordRevision(r.payload)}))).then(siteCatalog));
   if(path==='/api/sku-capabilities')return json({canConfirm:await skuCapability(env.DB,actor)});
   if(path==='/api/pending-approvals'&&request.method==='GET'){
    const monitored=Object.keys(approvalDefinitions).filter(entity=>canReadEntity(actor,entity));
@@ -217,7 +227,8 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/production-plan'&&request.method==='GET'){if(!hasGrant(actor,'Kế hoạch sản xuất / Production_plan',['Xem']))return json({error:'Không có quyền xem kế hoạch'},403);return json(url.searchParams.get('capacityDetail')==='1'?await getPlanCapacityDetail(env.DB,url.searchParams.get('week'),url.searchParams.get('line')):url.searchParams.get('capacityOnly')==='1'?{capacity:await getPlanCapacity(env.DB,url.searchParams.get('week'))}:await getPlan(env.DB,url.searchParams.get('week'),actor.canReopenPlan,await loadCatalog()));}
   if(path==='/api/in-transit'&&request.method==='GET'){if(!hasGrant(actor,'Kế hoạch sản xuất / In_transit',['Xem']))return json({error:'Không có quyền xem In Transit'},403);return json(await getTransit(env.DB,Object.fromEntries(url.searchParams),await loadCatalog()));}
   if(path==='/api/production-workflow'&&request.method==='GET'){
-   const workflow=await readProductionWorkflow(workflowReadSnapshot(productionDb),actor,await loadCatalog());
+   const workflow=await readProductionWorkflow(workflowReadSnapshot(productionDb),actor,await loadCatalog(),{includeDerivedHours:url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work'});
+   if(url.searchParams.get('unassignedAlerts')==='1'){if(productionReportingHold(url.hostname))return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,workflow));}
    return json({...workflow,reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
   }
   if(path==='/api/records'&&request.method==='GET'){
@@ -344,6 +355,7 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/production-examples'){if(body.action!=='create')return json({error:'Chọn tạo bộ LSX mẫu.'},400);const skuRows=(await env.DB.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}));
    const reference=await exampleReference(env.DB,siteCatalog(skuRows));return json(await createProductionExamples(exampleDatabase(env.DB),actor,new Date(),reference));}
   if(path==='/api/production-history-import')return json(await productionHistoryImport(productionDb,body,actor,await loadCatalog()));
+  if(path==='/api/production-workflow'&&body.action==='unassigned-reminder'){if(reportingHold)return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,await readProductionWorkflow(productionDb,actor,await loadCatalog(),{includeDerivedHours:false}),body.reminder));}
   if(path==='/api/production-workflow'&&body.action==='incident-create')return json(await createProductionIncident(productionDb,actor,body,await readProductionWorkflow(productionDb,actor,await loadCatalog())));
   if(path==='/api/production-workflow')return json(await mutateProductionWorkflow(productionDb,body,actor,await loadCatalog()));
   if(path==='/api/warehouse-confirm')return json(await confirmSelectedWarehouse(env.DB,body,actor));
@@ -352,37 +364,49 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/production-report'){
    if(!actor.isAdmin&&!hasMenuPermission(actor,productionMenus.progress,['Xác nhận']))return json({error:'Chỉ QLSX được duyệt báo công.'},403);
    if(body.action!=='review'||!body.reportId)return json({error:'Yêu cầu kiểm tra báo công không hợp lệ.'},400);
-   const cursorBefore=await productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first();
-   const stored=await productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(String(body.reportId)).first();
+   const reviewReads=workflowReadSnapshot(productionDb);
+   const [cursorBefore,stored]=await Promise.all([
+    productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first(),
+    productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(String(body.reportId)).first(),
+   ]);
    let historySource=null,workflow=null;
    if(!stored){
     const batches=(await productionDb.prepare("SELECT record_key,payload FROM app_records WHERE entity='production_history_import'").all()).results;
     historySource=batches.find(b=>(JSON.parse(b.payload).reports||[]).some(r=>r.id===body.reportId));
     if(!historySource)return json({error:'Không tìm thấy báo công cần kiểm tra.'},404);
-    workflow=await readProductionWorkflow(productionDb,actor,await loadCatalog());
+    workflow=await readProductionWorkflow(reviewReads,actor,await loadCatalog(),{reviewReportId:String(body.reportId)});
    }
    const report=stored?JSON.parse(stored.payload):workflow.reports.find(r=>r.id===body.reportId);
    if(!report)return json({error:'Không có quyền xem báo công này.'},403);
    if(body.expectedVersion!==undefined&&Number(body.expectedVersion)!==Number(report.version||0))return json({error:'Báo công đã thay đổi. Vui lòng cập nhật dữ liệu và kiểm tra lại.'},409);
    if(actor.line&&actor.line!==report.line)return json({error:'Không được duyệt báo công của Line khác.'},403);
    if(!pendingReportReview(report))return json({error:'Báo công này đã được xử lý trước đó.'},409);
-   const adjustmentRows=(await productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_event' ORDER BY updated_at,record_key").all()).results.map(row=>JSON.parse(row.payload)).filter(e=>!e.voided);
+   // One request-scoped, byte-bounded read per entity, shared with workflow/transit.
+   // Independent reads overlap; the original cursor and payload guards still fence the commit.
+   const [eventRecords,reviewRecords,transitStored,reviewWorkflow]=await Promise.all([
+    readRecordPages(reviewReads,{where:'entity=?',args:['production_event']}),
+    readRecordPages(reviewReads,{where:'entity=?',args:['production_report']}),
+    report.transitId?productionDb.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(String(report.transitId)).first():null,
+    workflow||loadCatalog().then(catalog=>readProductionWorkflow(reviewReads,actor,catalog,{reviewReportId:String(body.reportId)})),
+   ]);
+   workflow=reviewWorkflow;
+   const binary=(a,b)=>a<b?-1:a>b?1:0;
+   const adjustmentRows=eventRecords.sort((a,b)=>binary(a.updated_at,b.updated_at)||binary(a.record_key,b.record_key)).map(row=>JSON.parse(row.payload)).filter(e=>!e.voided);
    if(adjustmentRows.some(event=>event.kind==='absence'&&event.approved===false&&event.sourceId===report.transitId&&
     Date.parse(event.effectiveAt)<Date.parse(report.completedAt)&&Date.parse(event.endsAt)>Date.parse(report.startedAt)&&
     !adjustmentRows.some(next=>next.approvedFrom===event.id)))return json({error:'Có điều chỉnh giờ đang chờ QLSX duyệt; xử lý trước khi xác nhận báo công.'},409);
    const adjustedHours=adjustmentRows.filter(event=>event.kind==='hours-adjustment'&&(!report.correctedAt||event.recordedAt>report.correctedAt)).flatMap(event=>event.changes||[]).filter(change=>change.reportId===body.reportId).at(-1)?.after;
    const approve=body.approve===true,reason=String(body.reason||'').trim();
    if(!approve&&!reason)return json({error:'Vui lòng nhập lý do từ chối.'},422);
-   const reportRows=(await productionDb.prepare("SELECT record_key,payload FROM app_records WHERE entity='production_report'").all()).results.map(row=>({key:row.record_key,payload:JSON.parse(row.payload)}));
+   const reportRows=reviewRecords.map(row=>({key:row.record_key,payload:JSON.parse(row.payload)}));
    const approvedBefore=reportRows.filter(item=>item.key!==body.reportId&&item.payload.kind==='completion'&&item.payload.reviewStatus==='Đã xác nhận'&&(!item.payload.stageReporting||Number(item.payload.approvedQuantity??item.payload.reportedQuantity)>0)&&(report.transitId?item.payload.transitId===report.transitId:item.payload.lsxCode===report.lsxCode)).reduce((sum,item)=>sum+Number(item.payload.approvedQuantity??item.payload.reportedQuantity??0),0);
    const approvedQuantity=approve?Number(report.reportedQuantity||0):0,cumulative=approvedBefore+approvedQuantity,now=new Date().toISOString();
-   const transitStored=report.transitId?await productionDb.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(String(report.transitId)).first():null;
    const transit=transitStored?JSON.parse(transitStored.payload):{};
    if(transit.status==='HỦY'||transit.cancelReason)return json({error:'Lệnh đã hủy tại In transit. Không thể xác nhận hoặc điều chỉnh báo công.'},409);
    if(approve&&cumulative>Number(transit.lsxQty||report.lsxQty||0))return json({error:`LSX ${report.lsxCode}: sản lượng lũy kế vượt số lượng lệnh; kiểm tra các báo công trước khi xác nhận.`},409);
    const completed=Number(transit.lsxQty||report.lsxQty||0)>0&&cumulative>=Number(transit.lsxQty||report.lsxQty||0);
-   workflow ||= await readProductionWorkflow(productionDb,actor,await loadCatalog());
    const current=workflow.reports.find(r=>r.id===report.id);
+   if(body.expectedReview!==undefined){const reviewOrder=(workflow.progressOrders||workflow.orders).find(o=>o.id===report.transitId);if(!current||!reviewOrder||typeof body.expectedReview!=='string'||body.expectedReview!==reviewSnapshot(reviewOrder,current))return json({error:'Dữ liệu báo công, giờ hoặc lệnh đã thay đổi. Tải lại và kiểm tra trước khi chọn xác nhận.'},409);}
    if(report.historicalImport){
     const liveOrder=workflow.orders.find(o=>o.id===report.transitId&&!o.historicalOnly);
     if(!transitStored||!liveOrder||transit.cancelReason||liveOrder.lsxCode!==report.lsxCode||liveOrder.sku!==report.sku||liveOrder.line!==report.line)return json({error:'Lệnh lịch sử không còn khớp In Transit đang hoạt động. Kiểm tra Plan ID và LSX trước khi xác nhận.'},409);
@@ -407,7 +431,7 @@ async function handleSiteApi(request,env,timing){
    const statements=[
     productionDb.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key=? AND payload=?").bind(nextCursor,actor.login,now,cursorKey,cursor.payload),
     historySource?productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'production_report',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_history_import' AND record_key=? AND payload=?) AND EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?) AND NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=?) ON CONFLICT(entity,record_key) DO NOTHING").bind(body.reportId,JSON.stringify(updated),actor.login,now,cursorKey,nextCursor,historySource.record_key,historySource.payload,report.transitId,transitStored.payload,`SX:${body.reportId}`):
-    productionDb.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_report' AND record_key=? AND payload=? AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) AND (?=0 OR NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=?))").bind(JSON.stringify(updated),actor.login,now,body.reportId,stored.payload,cursorKey,nextCursor,approve?1:0,`SX:${body.reportId}`),
+    productionDb.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_report' AND record_key=? AND payload=? AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) AND (?=0 OR NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=?)) AND (? IS NULL OR EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?))").bind(JSON.stringify(updated),actor.login,now,body.reportId,stored.payload,cursorKey,nextCursor,approve?1:0,`SX:${body.reportId}`,transitStored?.payload??null,report.transitId||'',transitStored?.payload??null),
     productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'admin_audit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)").bind(crypto.randomUUID(),JSON.stringify({entity:'production_report',key:body.reportId,before:report,after:updated,actor:actor.login,at:now}),actor.login,now,body.reportId,JSON.stringify(updated))
    ];
    const reviewEvent={id:crypto.randomUUID(),kind:approve?'report-approval':'report-rejection',sourceId:report.transitId,line:report.line,reportId:report.id,effectiveAt:report.completedAt,recordedAt:now,actor:actor.login,actorId:productionActorId(actor),reason:approve?delayReason:reason,before:{quantity:report.approvedQuantity||0,status:report.reviewStatus},after:{quantity:approvedQuantity,status:updated.reviewStatus},employees:report.hours?.perEmployee?.map(p=>p.id)||[]};

@@ -1,3 +1,4 @@
+import {productionCutover} from './production-cutover.mjs';
 import {orderTransfer} from './order-transfer.mjs';
 import {environmentRefresh,refreshGuard} from './environment-refresh.mjs';
 /** Cloudflare Worker entry point for the vinext-starter template. */
@@ -39,6 +40,7 @@ interface ExecutionContext {
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const cutoverResponse=await productionCutover(request,env);if(cutoverResponse)return cutoverResponse;
     const refreshResponse=await environmentRefresh(request,env);if(refreshResponse)return refreshResponse;
     const refreshBusy=await refreshGuard(request,env);if(refreshBusy)return refreshBusy;
     const orderTransferResponse=await orderTransfer(request,env);if(orderTransferResponse)return orderTransferResponse;

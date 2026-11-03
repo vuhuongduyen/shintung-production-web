@@ -1,0 +1,6 @@
+"use client";
+import {useState} from 'react';
+import Queue from '../../components/production-allocation-queue';
+const effectiveAt='2026-10-26T01:00:00Z',endsAt='2026-10-30T10:00:00Z';
+const offer={id:'qa-offer',sourceLine:'C',sourceGroup:'C',targetGroup:'AB',effectiveAt,endsAt,canAllocate:true,canWithdraw:false,expired:false,reason:'Hỗ trợ sản xuất tuần 44',createdBy:'dhtin',createdAt:'2026-10-23T01:00:00Z',people:[{id:'QA1',name:'Nhân viên kiểm thử',pending:[{effectiveAt:'2026-10-29T01:00:00Z',endsAt}]}],withdrawals:[],allocations:[{id:'qa-allocation',employeeId:'QA1',targetLine:'A',effectiveAt,endsAt:'2026-10-28T10:00:00Z',planning:true,canCancel:true,actorId:'cnphuong',recordedAt:'2026-10-23T02:00:00Z'}]};
+export default function QA(){const [sender,setSender]=useState(false);return <main style={{padding:20,fontFamily:'Times New Roman',background:'#fffdf7',minHeight:'100vh'}}><h1>Điều phối nhân sự · Kiểm thử giao diện</h1><button onClick={()=>setSender(!sender)}>Đổi phía {sender?'nhận':'chuyển'}</button><Queue view={{revision:2,group:sender?'C':'AB',sourceLines:sender?['C']:['A','B'],pendingPeople:1,offers:[{...offer,canAllocate:!sender,canWithdraw:sender}]}} candidates={[]} busy={false} now="2026-10-23T03:00:00Z" onCommand={async()=>false}/></main>}

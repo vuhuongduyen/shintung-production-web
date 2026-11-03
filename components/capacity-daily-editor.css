@@ -334,3 +334,15 @@ html body .app-shell.app-shell .cap-calendar-workspace .cap-roster-controls{alig
 html body .app-shell.app-shell .cap-calendar-workspace .cap-roster-controls>label{display:flex;flex-direction:column;gap:4px;min-width:112px;height:auto;margin:0;flex:0 0 auto}
 html body .app-shell.app-shell .cap-calendar-workspace .cap-roster-controls>label>.cap-clock{flex:0 0 auto!important;height:34px!important;min-height:34px!important;max-height:34px!important}
 html body .app-shell.app-shell .cap-calendar-workspace .cap-roster-controls>label>select{height:34px;min-height:34px}
+
+.actual-detail-grid .actual-cleaning-date{display:flex;align-items:center;gap:4px;margin-bottom:4px}
+.actual-detail-grid .actual-cleaning-date input[type=date]{width:140px;font:inherit}
+
+/* Keep HH:mm fully visible beside the clock, including locked calendar controls. */
+html body .app-shell .cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock{flex:0 0 82px!important;width:82px!important;min-width:82px!important;gap:4px}
+html body .app-shell .cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock input[type=text]{flex:0 0 52px!important;width:52px!important;min-width:52px!important;box-sizing:border-box}
+html body .app-shell .cap-calendar-workspace .cap-days-table .cap-time-pair .cap-clock>[data-feedback-button]{flex:none}
+@media(min-width:801px){
+ html body .app-shell .cap-calendar-workspace .cap-days-table .cap-time-pair{min-width:184px}
+ html body .app-shell .cap-calendar-workspace .cap-days-table :is(th,td):nth-child(n+7):nth-child(-n+10){min-width:200px!important;width:200px!important}
+}

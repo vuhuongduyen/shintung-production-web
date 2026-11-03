@@ -1,0 +1,24 @@
+import test,{after} from 'node:test';import assert from 'node:assert/strict';import {createRequire} from 'node:module';import {createServer} from 'vite';
+const {JSDOM}=createRequire(import.meta.url)('jsdom');const dom=new JSDOM('<html><body></body></html>',{url:'https://test.example',pretendToBeVisual:true});
+for(const k of ['window','document','HTMLElement','Element','Node','Event','CustomEvent','MutationObserver','getComputedStyle','DocumentFragment','HTMLInputElement','NodeFilter'])globalThis[k]=dom.window[k];
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');globalThis.React=React;
+const vite=await createServer({appType:'custom',configFile:false,resolve:{alias:{'@':process.cwd()}},esbuild:{jsx:'automatic'},server:{middlewareMode:true,hmr:false}});const {default:C}=await vite.ssrLoadModule('/components/production-correction-orders.tsx');after(async()=>{await vite.close();dom.window.close()});
+test('lookup starts closed, opening/selecting preserves rows, search and Enter apply, back preserves filter',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(React.createElement(C,{orders:[{id:'a',lsxCode:'ORDER-A',sku:'SKU-A'},{id:'b',lsxCode:'ORDER-B',sku:'SKU-B'}],events:[{id:'a1',sourceId:'a',kind:'source-time',sourceTimeLog:true,historicalImport:true,sourceOperation:'BẮT ĐẦU',effectiveAt:'2026-10-20T01:00:00Z'},{id:'b1',sourceId:'b',kind:'start',effectiveAt:'2026-10-20T01:00:00Z'}],reports:[],allowed:true,refresh:async()=>true,showDetail:()=>{}})));
+ const button=s=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===s);const count=()=>host.querySelectorAll('tbody tr').length;
+ assert.ok(button('Tra cứu'));assert.equal(host.querySelector('select'),null);assert.equal(count(),2);
+ await act(async()=>button('Tra cứu').click());assert.equal(count(),2);assert.equal(host.querySelector('select').value,'');
+ await act(async()=>{const el=host.querySelector('select');el.value='sku';el.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});assert.equal(count(),2);
+ const input=host.querySelector('input');await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,'SKU-A');input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});assert.equal(count(),2);
+ await act(async()=>button('Tìm kiếm').click());assert.equal(count(),1);
+ await act(async()=>button('Xóa lọc').click());assert.equal(count(),2);
+ await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,'SKU-B');input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
+ await act(async()=>input.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true})));assert.equal(count(),1);assert.ok(host.textContent.includes('ORDER-B'));
+ await act(async()=>button('Quay lại').click());assert.equal(count(),1);assert.equal(host.querySelector('select'),null);
+ await act(async()=>button('Tra cứu').click());await act(async()=>button('Xóa lọc').click());
+ await act(async()=>button('Sửa').click());
+ const stage=document.querySelector('.production-time-correction-dialog select');assert.equal(stage.value,'__choose__');assert.equal(document.querySelector('.correction-time-entry'),null,'opening the order must not choose a stage implicitly');
+ assert.ok([...stage.options].some(option=>option.value===''),'legacy whole-order data remains selectable');await act(async()=>{stage.value='';stage.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});
+ assert.ok(document.querySelector('.correction-time-entry'));const date=document.querySelector('.production-time-correction-dialog input[type=date]');assert.ok(date);assert.equal(date.disabled,false);
+ await act(async()=>root.unmount());host.remove();
+});

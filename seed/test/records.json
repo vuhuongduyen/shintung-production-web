@@ -1,0 +1,34 @@
+{
+  "format": "ONSPA-TEST-v1",
+  "environment": "TEST",
+  "records": [
+    {
+      "entity": "sku",
+      "record_key": "TEST-SKU-001",
+      "payload": "{\"code\":\"TEST-SKU-001\",\"name\":\"Sản phẩm TEST 001\",\"specification\":\"TEST 100mm\",\"group\":\"TEST\",\"line\":\"Line A\",\"unit\":\"CÁI\",\"mode\":\"Tự sản xuất\",\"processes\":[\"A-ASSY\"],\"moq\":10,\"safetyDays\":3,\"leadTime\":\"5\",\"standardHours\":\"0.1\",\"status\":\"Đang sử dụng\"}",
+      "updated_by": "TEST-SEED",
+      "updated_at": "2026-09-15T00:00:00.000Z"
+    },
+    {
+      "entity": "users",
+      "record_key": "TEST-DELETED",
+      "payload": "{\"login\": \"TEST-DELETED\", \"name\": \"TEST tài khoản đã xóa\", \"active\": false, \"_deleted\": true}",
+      "updated_by": "TEST-SEED",
+      "updated_at": "2026-09-15T00:00:00.000Z"
+    },
+    {
+      "entity": "forecast",
+      "record_key": "09/2026",
+      "payload": "[{\"month\":\"09/2026\",\"group\":\"TEST\",\"sku\":\"TEST-SKU-001\",\"name\":\"Sản phẩm TEST 001\",\"spec\":\"TEST 100mm\",\"line\":\"A\",\"f30\":300,\"f60\":600,\"f90\":900,\"d30\":10,\"d60\":10,\"used\":10,\"d90\":10,\"warning\":\"\"}]",
+      "updated_by": "TEST-SEED",
+      "updated_at": "2026-09-15T00:00:00.000Z"
+    },
+    {
+      "entity": "demand_event",
+      "record_key": "TEST-DE-001",
+      "payload": "{\"id\":\"TEST-DE-001\",\"requestDate\":\"15/09/2026\",\"type\":\"Phát sinh\",\"sku\":\"TEST-SKU-001\",\"name\":\"Sản phẩm TEST 001\",\"spec\":\"TEST 100mm\",\"qty\":20,\"delivery\":\"20/09/2026\",\"priority\":\"Thường\",\"order\":\"TEST\",\"status\":\"Chưa lập kế hoạch\",\"plannedWeek\":\"14/09/2026–20/09/2026\",\"updatedBy\":\"TEST-SEED\",\"updatedAt\":\"15/09/2026 07:00\"}",
+      "updated_by": "TEST-SEED",
+      "updated_at": "2026-09-15T00:00:00.000Z"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {assignmentOverview} from '../lib/production-assignment-overview.mjs';
+const now=Date.parse('2026-10-28T09:00:00+07:00');
+const orders=[{id:'O',lsxCode:'LSX-1',line:'B',lsxQty:10,processes:['ASSY']}];
+const employees=[{id:'1',name:'Test 1',line:'C',active:true},{id:'2',name:'Test 2',line:'B',active:true}];
+const stage=(status='running',people=['1'],effectiveAt='2026-10-27T08:00:00+07:00')=>({id:'s',kind:'stage-work',sourceId:'O',stageName:'ASSY',stageReporting:true,effectiveAt,stageAfter:{status,people,at:effectiveAt}});
+const run=(extra={})=>assignmentOverview({orders,employees,events:[stage()],now,...extra});
+test('retains prior-day unfinished assignments; waiting and line scope stay separate',()=>{const rows=run();assert.equal(rows[0].order,'LSX-1');assert.equal(rows[0].stage,'ASSY');assert.equal(rows[0].line,'B');assert.equal(rows[1].status,'Đang chờ phân bổ');assert.equal(run({line:'C'}).length,0);});
+test('paused, released, cancelled, voided and future assignments',()=>{assert.equal(run({events:[stage('paused') ]})[0].status,'Tạm ngưng');for(const extra of [{events:[stage('done',[])]},{orders:[{...orders[0],status:'HỦY'}]},{events:[{...stage(),voided:true}]},{events:[stage('running',['1'],'2026-10-29T08:00:00+07:00')]}])assert.ok(run(extra).every(r=>r.status==='Đang chờ phân bổ'));});
+test('waiting staff follow active movement rather than original profile line',()=>{const events=[{id:'m',kind:'line-movement',line:'C',destinationLine:'B',employees:['1'],effectiveAt:'2026-10-28T08:00:00+07:00',endsAt:'2026-10-28T17:00:00+07:00'}];assert.equal(run({events,line:'B'}).length,2);assert.equal(run({events,line:'C'})[0].status,'Đang chuyển Line');assert.equal(run({events,now:now+24*3600000,line:'C'}).length,1);});
+test('inactive employees excluded; simultaneous assignments exposed without edits',()=>{const e=stage();const inputs={orders:[...orders,{...orders[0],id:'P',lsxCode:'LSX-2'}],events:[e,{...e,id:'p',sourceId:'P'}],employees:[...employees,{id:'3',line:'B',endDate:'2026-10-27'}]};const before=JSON.stringify(inputs);const rows=run(inputs);assert.equal(rows.filter(r=>r.id==='1').length,2);assert.ok(rows.filter(r=>r.id==='1').every(r=>r.conflict));assert.ok(rows.every(r=>r.id!=='3'));assert.equal(JSON.stringify(inputs),before);});

@@ -2,8 +2,8 @@ import {productionApiFetch} from './production-api';
 import {clientReadGeneration,subscribeClientReadInvalidation} from './data-sync';
 import {createProductionSnapshotCache} from './production-snapshot-cache.mjs';
 
-async function fetchWorkflow(force=false) {
-  const response=await productionApiFetch('/api/production-workflow',{cache:force?'reload':'no-store'});
+async function fetchWorkflow(force=false,profile:'full'|'work'='full') {
+  const response=await productionApiFetch(profile==='work'?'/api/production-workflow?view=work':'/api/production-workflow',{cache:force?'reload':'no-store'});
   const body=await response.json().catch(()=>{
     throw Object.assign(new Error('Không đọc được phản hồi dữ liệu sản xuất.'),{status:response.status});
   });
@@ -18,10 +18,12 @@ async function fetchWorkflow(force=false) {
 }
 
 // Browser-session cache only. SSR reads never enter this module's shared cache.
-const workflow=createProductionSnapshotCache({fetcher:fetchWorkflow,getGeneration:clientReadGeneration});
-subscribeClientReadInvalidation(reason=>{if(reason==='session')workflow.clear();});
-export function productionSnapshot(){return typeof window==='undefined'?null:workflow.snapshot();}
-export function clearProductionSnapshot(){workflow.clear();}
-export function readProductionWorkflow(force=false){
-  return typeof window==='undefined'?fetchWorkflow(force):workflow.read(force);
+const full=createProductionSnapshotCache({fetcher:(force:boolean)=>fetchWorkflow(force,'full'),getGeneration:clientReadGeneration});
+const work=createProductionSnapshotCache({fetcher:(force:boolean)=>fetchWorkflow(force,'work'),getGeneration:clientReadGeneration});
+const cache=(profile:'full'|'work')=>profile==='work'?work:full;
+subscribeClientReadInvalidation(reason=>{if(reason==='session'){full.clear();work.clear();}});
+export function productionSnapshot(profile:'full'|'work'='full'){return typeof window==='undefined'?null:(profile==='work'?full.freshSnapshot():null)||cache(profile).snapshot();}
+export function clearProductionSnapshot(){full.clear();work.clear();}
+export function readProductionWorkflow(force=false,profile:'full'|'work'='full'){
+  return (typeof window==='undefined'?fetchWorkflow(force,profile):(profile==='work'&&!force&&full.freshSnapshot()?Promise.resolve(full.freshSnapshot()):cache(profile).read(force))).catch(error=>{if(error?.status===401||error?.status===403)clearProductionSnapshot();throw error;});
 }

@@ -1,0 +1,44 @@
+import {trackBrowserChannels} from './helpers/browser-channels.mjs';
+const closeBrowserChannels=trackBrowserChannels();
+import test,{after} from 'node:test';
+import assert from 'node:assert/strict';
+import {JSDOM} from 'jsdom';
+import {createServer} from 'vite';
+import {resolve} from 'node:path';
+const dom=new JSDOM('<html><body></body></html>',{url:'http://localhost'});
+for(const key of ['window','document','HTMLElement','HTMLInputElement','Event','CustomEvent','Node','localStorage','sessionStorage'])globalThis[key]=dom.window[key];
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+window.sessionStorage.setItem('onspa-payroll-month','2026-10');
+const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
+const vite=await createServer({appType:'custom',configFile:false,resolve:{alias:{'@':resolve('.')}},server:{middlewareMode:true,hmr:false}});
+const {default:Screen}=await vite.ssrLoadModule('/components/production-payroll.tsx');
+const originalFetch=globalThis.fetch;
+globalThis.fetch=async url=>{assert.equal(String(url),'/api/production-standards');return Response.json({records:[{key:'ONSPA-TEST',payload:{sku:'ONSPA-TEST',laborHour:1}}]});};
+after(async()=>{globalThis.fetch=originalFetch;await vite.close();closeBrowserChannels();dom.window.close();});
+test('mounted monthly totals, staff eligibility, line selection and missing dates follow policy',async()=>{
+ const employees=[{id:'THAO',name:'Quách Chanh Thảo',line:'A',startDate:'2020-01-01'},{id:'TIN',name:'Đoàn Hữu Tín',line:'C',startDate:'2020-01-01'},{id:'VIET',name:'Trần Quốc Việt',line:'B',startDate:'2020-01-01'}];
+ const schedules=['A','B'].map(line=>{const days=Array.from({length:31},(_,i)=>({date:`2026-10-${String(i+1).padStart(2,'0')}`,working:i===0,ot:false}));return {line,days,roster:days.map(d=>({date:d.date,hc:line==='A'?['THAO','TIN']:['VIET'],ot:[]})),input:{dailySchedule:days}};});
+ const orders=['A','B'].map(line=>({id:line,line,sku:'ONSPA-TEST',name:'Sản phẩm kiểm thử'})),reports=['A','B'].map(line=>({id:line,transitId:line,kind:'completion',reviewStatus:'Đã xác nhận',productionDate:'2026-10-01',approvedQuantity:100}));
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const render=async people=>act(async()=>root.render(React.createElement(Screen,{employees:people,orders,reports,schedules,events:[],open:()=>{},refresh:async()=>true})));
+ try{
+  await render(employees);await act(async()=>{await new Promise(r=>setTimeout(r,20));});
+  assert.doesNotMatch(host.textContent,/Chưa đủ dữ liệu tính quỹ/);
+  const fundTable=[...host.querySelectorAll('table')].find(t=>t.textContent.includes('Tiền thực trả'));
+  assert.match(fundTable.textContent,/4\.500\.000/);assert.match(fundTable.textContent,/1\.500\.000/);
+  const button=[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ và tiền từng NV');await act(async()=>button.click());
+  const table=host.querySelector('table.payroll-employees-table');assert.match(table.textContent,/Line C: hoàn quỹ công ty/);assert.match(table.textContent,/Giờ CV khác/);
+  const c=[...table.querySelectorAll('tbody tr')].find(r=>r.textContent.includes('Đoàn Hữu Tín'));
+  assert.ok(c);assert.match(c.textContent,/1\.500\.000/);
+  for(const row of table.querySelectorAll('tbody tr'))assert.equal(row.children.length,table.querySelector('thead tr').children.length);
+  assert.equal([...table.querySelector('tfoot tr').children].reduce((n,c)=>n+(c.colSpan||1),0),table.querySelector('thead tr').children.length);
+  const select=host.querySelector('select[aria-label="Line"]');await act(async()=>{select.value='B';select.dispatchEvent(new Event('change',{bubbles:true}));});assert.match(host.querySelector('.payroll-employees-table').textContent,/Trần Quốc Việt/);
+  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Theo dõi quỹ sản lượng').click());
+  const setMonth=async(label,value)=>act(async()=>{const input=host.querySelector(`input[aria-label="${label}"]`);Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));});
+  await setMonth('Từ tháng','2026-10');await setMonth('Đến tháng','2026-10');
+  assert.match(host.textContent,/Quỹ hoàn lại CTY/);assert.doesNotMatch(host.textContent,/Quỹ công ty — tiền hoàn/);assert.match(host.textContent,/Tổng quỹ còn lại/);assert.match(host.textContent,/Tiền dự tính trả/);assert.match(host.textContent,/1\.500\.000/);assert.match(host.textContent,/1\/1/);
+  const detailButtons=host.querySelectorAll('button[aria-label="Chi tiết quỹ hoàn lại CTY"]');assert.ok(detailButtons.length>=2);
+  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ và tiền từng NV').click());
+  await render(employees.map(e=>e.id==='THAO'?{...e,startDate:''}:e));assert.match(host.textContent,/Thiếu ngày bắt đầu hợp lệ/);assert.match(host.textContent,/Chưa đủ dữ liệu tính quỹ/);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

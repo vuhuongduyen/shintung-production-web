@@ -1,11 +1,11 @@
 /** Add this NEW file to warehouse Apps Script. Do not paste the old SX push file here. */
-const ONSPA_REAL_SHEET = 'SAMPLE_SHEET_ID_NOT_CONFIGURED';
+const ONSPA_REAL_SHEET = '1y5J-G5IoIzEgXsf_2hpqrXOTgvL0RJp5lBjR9bbapk4';
 function ONSPA_caiDatKetNoi() {
  const ui=SpreadsheetApp.getUi(),ss=SpreadsheetApp.getActive();
  const url=ui.prompt('Kết nối ONSPA','Dán địa chỉ web (https://...)',ui.ButtonSet.OK_CANCEL);if(url.getSelectedButton()!==ui.Button.OK)return;
  const base=url.getResponseText().trim().replace(/\/$/,'');
- if(!/^https:\/\/(sanxuat|onspa-thu-nghiem-21102026)\.example-disabled\.chatgpt\.site$/.test(base))throw Error('Địa chỉ web không đúng.');
- if(ss.getId()===ONSPA_REAL_SHEET&&base!=='https://disabled.example.invalid')throw Error('Không nối web thử vào kho thật.');
+ if(!/^https:\/\/(sanxuat|onspa-thu-nghiem-21102026)\.shintung-vn-4458\.chatgpt\.site$/.test(base))throw Error('Địa chỉ web không đúng.');
+ if(ss.getId()===ONSPA_REAL_SHEET&&base!=='https://sanxuat.shintung-vn-4458.chatgpt.site')throw Error('Không nối web thử vào kho thật.');
  const token=ui.prompt('Khóa kết nối','Dán khóa từ nút Kết nối Google Sheet trên web',ui.ButtonSet.OK_CANCEL);if(token.getSelectedButton()!==ui.Button.OK)return;
  PropertiesService.getScriptProperties().setProperties({ONSPA_URL:base,ONSPA_TOKEN:token.getResponseText().trim(),ONSPA_SHEET:ss.getId()});
  ONSPA_khoiPhucKetNoi();
@@ -35,14 +35,19 @@ function ONSPA_dongBoTuDong(){
  if(matches.length>1)throw Error('ID báo công trùng nhiều dòng. Cần đối chiếu, không tự ghi đè.');
  const raw=String(r.sourceCompletedAt||'');const date=new Date(/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?$/.test(raw)?raw+'+07:00':raw);if(!Number.isFinite(date.getTime()))throw Error('Thiếu ngày xuất trạm hợp lệ.');
  let row=matches[0];
- if(row){const v=sh.getRange(row,1,1,21).getValues()[0];if(String(v[2])!==r.sku||String(v[8])!==r.lsxCode||Number(v[4])!==Number(r.proposedQuantity)||v[7]!=='ONSPA_WEB')throw Error('ID đã có nhưng dữ liệu hoặc nguồn khác. Cần đối chiếu phiếu cũ trước khi liên kết.');}
+ if(row){const v=sh.getRange(row,1,1,21).getValues()[0];if(String(v[2])!==r.sku||String(v[8])!==r.lsxCode||v[7]!=='ONSPA_WEB')throw Error('ID đã có nhưng dữ liệu hoặc nguồn khác. Cần đối chiếu phiếu cũ trước khi liên kết.');
+ if(Number(v[4])!==Number(r.proposedQuantity)){
+  if(!r.sheetSync?.correctionRevision||v[12]!=='CHỜ KHO XÁC NHẬN'||v[13]!==''||v[17]!==''||v[18]!=='')throw Error('Phiếu kho đã có dữ liệu nhận hàng hoặc chưa có điều chỉnh hợp lệ; không tự ghi đè.');
+  sh.getRange(row,5).setValue(r.proposedQuantity);
+ }
+}
  else{
  row=Math.max(2,sh.getLastRow()+1);if(row>sh.getMaxRows())sh.insertRowsAfter(sh.getMaxRows(),1);
  sh.getRange(row,1,1,21).setValues([[date,'',ONSPA_text_(r.sku),ONSPA_text_(r.name),r.proposedQuantity,ONSPA_text_(r.spec),'','ONSPA_WEB',ONSPA_text_(r.lsxCode),ONSPA_text_(r.reportId),ONSPA_text_(r.planId),ONSPA_text_(r.line),'CHỜ KHO XÁC NHẬN','','','',new Date(),'','','CHƯA ĐỒNG BỘ WEB','']]);
  sh.getRange(row,1).setNumberFormat('dd/MM/yyyy');sh.getRange(row,17,1,2).setNumberFormat('dd/MM/yyyy HH:mm:ss');
  }
  sh.getRange(row,1).setValue(date).setNumberFormat('dd/MM/yyyy');
- SpreadsheetApp.flush();ONSPA_api_({action:'ack',receiptId:r.id,reportId:r.reportId,sku:r.sku,sourceCompletedAt:r.sourceCompletedAt});
+ SpreadsheetApp.flush();ONSPA_api_({action:'ack',receiptId:r.id,reportId:r.reportId,sku:r.sku,sourceCompletedAt:r.sourceCompletedAt,proposedQuantity:r.proposedQuantity,correctionRevision:r.sheetSync?.correctionRevision||null});
  }catch(e){ONSPA_api_({action:'error',receiptId:r.id,reportId:r.reportId,sku:r.sku,error:String(e.message||e)});}
  }
  const n=sh.getLastRow();if(n>1){const rows=sh.getRange(2,1,n-1,21).getValues();let count=0;rows.forEach((v,i)=>{if(count<50&&v[7]==='ONSPA_WEB'&&['KHO ĐÃ XÁC NHẬN','CÓ CHÊNH LỆCH'].includes(v[12])&&v[19]!=='ĐÃ ĐỒNG BỘ WEB'){count++;ONSPA_guiXacNhan_(sh,i+2);}});}

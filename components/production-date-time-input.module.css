@@ -3,3 +3,5 @@
 .field :global(.cap-clock){display:inline-flex;align-items:center;flex:none;max-width:100%}
 .field :global(.cap-clock) input[type=text]{width:66px!important;min-width:0!important;text-align:center}
 .field :global(.cap-clock) button{min-width:26px}
+
+.field>input[type=text]{width:124px!important;min-width:124px!important;padding-left:8px;padding-right:8px;text-align:center}

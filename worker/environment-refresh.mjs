@@ -1,8 +1,8 @@
 import {sessionUser,isAdminRole} from './password-auth.mjs';
 import {stagedDatabaseSnapshot} from './backup-snapshot.mjs';
 import {createHash} from 'node:crypto';
-export const LIVE='disabled.example.invalid';
-export const TEST='disabled.example.invalid';
+export const LIVE='sanxuat.shintung-vn-4458.chatgpt.site';
+export const TEST='onspa-thu-nghiem-21102026.shintung-vn-4458.chatgpt.site';
 const ROOT='_onspa_environment_refresh/';
 const API='/api/environment-refresh';
 const lockEntity='environment_refresh_lock';

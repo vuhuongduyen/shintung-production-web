@@ -2,15 +2,15 @@ import {prepareDemandOcrAssets} from "./build/demand-ocr-assets.mjs";
 import vinext from "vinext";
 import {sourceSyncSnapshot} from "./build/source-sync-plugin";
 import { defineConfig } from "vite";
-
-
+import hostingConfig from "./.openai/hosting.json";
+import { sites } from "./build/sites-vite-plugin";
 import { configuration } from "./scripts/local/database.mjs";
 import { localTestPlugin } from "./scripts/local/server.mjs";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
-const d1 = "DB", r2 = "FILES";
+const { d1, r2 } = hostingConfig;
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -63,6 +63,7 @@ export default defineConfig(async ({command}) => {
       sourceSyncSnapshot(),
       ...(command === 'serve' ? [localTestPlugin()] : []),
       vinext(),
+      sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,

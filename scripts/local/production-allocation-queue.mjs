@@ -1,3 +1,4 @@
+import {actualAllocationEvents} from '../../lib/production-allocation-actual.mjs';
 import {employeeActiveOn} from '../../lib/employee-employment.mjs';
 import {recallCovers} from '../../lib/production-staff-recall.mjs';
 import {capacityFromRecords} from './capacity.mjs';
@@ -114,8 +115,16 @@ function prepareAllocation(snapshot,body,actor,authority,now){
    }
    const next=new Date(`${week}T00:00:00Z`);next.setUTCDate(next.getUTCDate()+7);date=next.toISOString().slice(0,10);
   }
-  planning=applyCapacityAllocation(calendar,snapshot.records('employees'),offer,allocation,{now,actorId:authority.actorId});
-  allocation.planningSegments=planning.planningSegments;
+  const actual=actualAllocationEvents(snapshot.rows,offer,allocation,{now,actorId:authority.actorId});
+  if(actual){
+   planning={records:[],events:actual};
+   Object.assign(allocation,{planning:false,movementId:actual[0].id,movementIds:actual.map(e=>e.id)});
+   Object.assign(result.result,{planning:false,movementId:actual[0].id});
+   Object.assign(result.state.audit.at(-1),{planning:false,movementId:actual[0].id});
+  }else{
+   planning=applyCapacityAllocation(calendar,snapshot.records('employees'),offer,allocation,{now,actorId:authority.actorId});
+   allocation.planningSegments=planning.planningSegments;
+  }
  }else if(body.action==='cancel'){
   const offer=result.state.offers.find(o=>o.id===body.offerId),allocation=offer.allocations.find(a=>a.id===result.result.allocationId);
   planning=applyCapacityAllocationCancellation(snapshot.rows.filter(r=>r.entity==='capacity').map(r=>({key:r.key,payload:r.payload})),snapshot.records('employees'),offer,allocation,{now,actorId:authority.actorId,reason:allocation.cancellationReason});
@@ -133,18 +142,19 @@ function prepareManyAllocations(snapshot,body,actor,authority,now){
  if(prior){if(prior.actorId!==authority.actorId||prior.fingerprint!==fingerprint)fail('Mã thao tác đã được dùng cho nội dung khác.',409);return {state:snapshot.queue,result:{...prior.result,replayed:true},planning:{records:[]}};}
  if(body.expectedRevision!==snapshot.queue.revision)fail('Danh sách vừa thay đổi. Tải lại trước khi phân bổ.',409);
  let current={...snapshot,rows:[...snapshot.rows]},state=snapshot.queue;
- const records=new Map(),allocations=[];
+ const records=new Map(),allocations=[],events=[];
  for(const [index,item] of selections.entries()){
   let prepared;
   try{prepared=prepareAllocation({...current,queue:state,records:entity=>current.rows.filter(r=>r.entity===entity&&!r.payload._deleted).map(r=>({...r.payload,...(entity==='employees'?{id:r.payload.id||r.key}:{}),key:r.key}))},{action,...item,targetLine:body.targetLine,effectiveAt:body.effectiveAt,endsAt:body.endsAt,...(action==='withdraw'?{reason:body.reason}:{}),expectedRevision:state.revision,requestId:`${body.requestId}-${index}`},actor,authority,now);}
   catch(error){const person=snapshot.records('employees').find(p=>p.id===item.employeeId);throw Object.assign(new Error(`${person?.name||item.employeeId}: ${error.message}`),{status:error.status||409});}
   state=prepared.state;allocations.push(prepared.result);
+  for(const event of prepared.planning.events||[]){events.push(event);current.rows.push({entity:'production_event',key:event.id,payload:event});}
   for(const record of prepared.planning.records){records.set(record.key,record);current.rows=current.rows.filter(r=>!(r.entity==='capacity'&&r.key===record.key));current.rows.push({entity:'capacity',key:record.key,payload:record.payload});}
  }
- const result={action:body.action,allocations,count:allocations.length,planning:action==='allocate'};
+ const result={action:body.action,allocations,count:allocations.length,planning:action==='allocate'&&allocations.every(a=>a.planning)};
  state.receipts.push({requestId:body.requestId,actorId:authority.actorId,fingerprint,result});
  state.audit.push({...result,requestId:body.requestId,actorId:authority.actorId,at:now,targetLine:body.targetLine,...(action==='withdraw'?{reason:body.reason}:{}),window:{effectiveAt:body.effectiveAt,endsAt:body.endsAt},employees:selections.map(s=>({id:s.employeeId,name:snapshot.records('employees').find(p=>p.id===s.employeeId)?.name||s.employeeId}))});
- return {state,result,planning:{records:[...records.values()]}};
+ return {state,result,planning:{records:[...records.values()],events}};
 }
 // Edit is one atomic replacement: validate reversal and new reservation against
 // an in-memory snapshot, then persist both rosters and the queue in the same CAS.
@@ -163,13 +173,13 @@ function prepareAllocationEdit(snapshot,body,actor,authority,now){
  previous.replacedBy=replacement.id;replacement.replaces=previous.id;
  const before={targetLine:original.targetLine,effectiveAt:original.effectiveAt,endsAt:original.endsAt};
  replacement.previousAllocation=before;
- const result={action:'edit',offerId:body.offerId,allocationId:replacement.id,previousAllocationId:original.id,planning:true};
+ const result={action:'edit',offerId:body.offerId,allocationId:replacement.id,previousAllocationId:original.id,planning:accepted.result.planning,...(accepted.result.movementId?{movementId:accepted.result.movementId}:{})};
  // Only the public edit has a replay token/audit action; internal steps never escape.
  accepted.state.revision=snapshot.queue.revision+1;
  accepted.state.receipts=[...snapshot.queue.receipts,{requestId:body.requestId,actorId:authority.actorId,fingerprint,result}];
  accepted.state.audit=[...snapshot.queue.audit,{...accepted.state.audit.at(-1),...result,requestId:body.requestId,before,reason:body.reason}];
  const records=new Map(canceled.planning.records.map(r=>[r.key,r]));for(const r of accepted.planning.records)records.set(r.key,r);
- return {state:accepted.state,result,planning:{records:[...records.values()]}};
+ return {state:accepted.state,result,planning:{records:[...records.values()],events:accepted.planning.events||[]}};
 }
 export async function mutateAllocationQueue(db,body,actor,now=new Date().toISOString()){
  const {snapshot,authority}=await scopedSnapshot(db,actor);
@@ -184,6 +194,7 @@ export async function mutateAllocationQueue(db,body,actor,now=new Date().toISOSt
  const save=(entity,key,payload)=>db.prepare(`INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE ${guard} ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload,updated_by=excluded.updated_by,updated_at=excluded.updated_at`).bind(entity,key,typeof payload==='string'?payload:JSON.stringify(payload),by,now,guardId);
  statements.push(save('production_allocation_queue','global',result.state),save('production_cursor','global',updatedCursor));
  for(const record of planning.records)statements.push(save('capacity',record.key,record.payload));
+ for(const event of planning.events||[])statements.push(save('production_event',event.id,event));
  statements.push(save('admin_audit',`allocation-${body.requestId}`,audit),db.prepare("DELETE FROM app_records WHERE entity='production_allocation_guard' AND record_key=?").bind(guardId));
  const saved=await db.batch(statements);if(saved[0].meta.changes!==1)fail('Dữ liệu nhân lực vừa thay đổi. Tải lại trước khi ghi.',409);
  return result.result;
@@ -192,6 +203,20 @@ export async function mutateAllocationQueue(db,body,actor,now=new Date().toISOSt
 // All legacy station/movement writers must call this before their existing
 // production_cursor CAS. HR changes are deliberately allowed and rechecked on
 // queue acceptance. A queue movement cannot be silently edited/cancelled.
+// Actual bounded onward loans overlay the accepted planning allocation.
+function allocationLoanChain(events,id,allocation){
+ const from=Date.parse(allocation.effectiveAt),to=Date.parse(allocation.endsAt);
+ const moves=effectiveAttendance(events).filter(e=>e.kind==='line-movement'&&e.employees?.includes(id)&&Date.parse(e.effectiveAt)>=from&&Date.parse(e.endsAt)<=to&&Date.parse(e.endsAt)>Date.parse(e.effectiveAt));
+ const accepted=[];let remaining=[...moves],changed=true;
+ while(changed){changed=false;remaining=remaining.filter(e=>{
+  const start=Date.parse(e.effectiveAt),end=Date.parse(e.endsAt);
+  const points=[start,...accepted.flatMap(p=>[Date.parse(p.effectiveAt),Date.parse(p.endsAt)]).filter(t=>t>start&&t<end)];
+  if(points.every(t=>(activeStaffMovement(accepted,id,t)?.destinationLine||allocation.targetLine)===e.line)){
+   accepted.push(e);changed=true;return false;
+  }return true;
+ });}
+ return accepted;
+}
 export async function assertLegacyAllocationWrite(db,events){
  const row=await db.prepare("SELECT payload FROM app_records WHERE entity='production_allocation_queue' AND record_key='global'").first();
  if(!row)return;
@@ -218,7 +243,13 @@ export async function assertLegacyAllocationWrite(db,events){
      const target=event.kind==='transfer'?event.destinationLine:event.line;
      if(event.kind!=='line-movement'&&target===offer.sourceLine&&recallCovers([...history.values()],employee.id,from,allocated.targetLine,offer.sourceLine))continue;
      if(event.kind==='line-movement'&&event.movementType==='recall'&&event.line===allocated.targetLine&&event.destinationLine===offer.sourceLine&&directory.find(p=>p.id===employee.id)?.line===offer.sourceLine)continue;
-     if(event.kind==='line-movement'||target!==allocated.targetLine||from<Date.parse(allocated.effectiveAt)||from>=Date.parse(allocated.endsAt))fail('Nhân viên đã được phân bổ sang Line khác trong khoảng giờ này.',409);
+     const chain=allocationLoanChain([...history.values()],employee.id,allocated);
+     if(event.kind==='line-movement'&&chain.some(e=>e.id===event.id))continue;
+     const owner=activeStaffMovement(chain,employee.id,from)?.destinationLine||allocated.targetLine;
+     if(event.kind!=='line-movement'&&target===owner&&from>=Date.parse(allocated.effectiveAt)&&from<Date.parse(allocated.endsAt))continue;
+     const person=directory.find(p=>p.id===employee.id)?.name||employee.id;
+     const display=value=>new Date(value).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour12:false});
+     fail(`${person}: đang được phân bổ tại Line ${allocated.targetLine}, từ ${display(allocated.effectiveAt)} đến ${display(allocated.endsAt)}. Chỉ chuyển tiếp từ Line đang làm việc và trong khoảng được phân bổ; kiểm tra lại Line nguồn và giờ chuyển.`,409);
     }
    }
   }
@@ -242,6 +273,7 @@ export function assertAllocationTimeline(queue,proposedEvents,directory){
     const people=employeesAt(events,orderId,at);
     if(people&&people.length===state.count&&!people.includes(person.id))continue;
     if(window.targetLine===orderLine)continue;
+    if(window.targetLine&&activeStaffMovement(allocationLoanChain(events,person.id,window),person.id,at)?.destinationLine===orderLine)continue;
     if(window.targetLine&&orderLine===offer.sourceLine&&recallCovers(events,person.id,at,window.targetLine,offer.sourceLine))continue;
     fail('Điều chỉnh làm trùng giờ nhân viên đã dành hoặc đã phân bổ. Xử lý phân bổ trước khi sửa báo công.',409);
    }

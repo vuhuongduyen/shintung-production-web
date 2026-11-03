@@ -1,1 +1,2042 @@
-[]
+[
+  {
+    "sku": "101CTP007",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "101CTP010",
+    "laborHour": 0.063,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "101CTP015",
+    "laborHour": 0.072,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "101CTP016",
+    "laborHour": 0.065,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "101CTP017",
+    "laborHour": 0.077,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "101CTP018",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "101RLD001",
+    "laborHour": 0.012,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "101RLD002",
+    "laborHour": 0.015,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102IC03001",
+    "laborHour": 0.041,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102IC04001",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102IC05001",
+    "laborHour": 0.043,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102IC06001",
+    "laborHour": 0.026,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102IC08001",
+    "laborHour": 0.049,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102MG15001",
+    "laborHour": 0.117,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC06001",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC10001",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC10002",
+    "laborHour": 0.034,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC12001",
+    "laborHour": 0.052,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC12002",
+    "laborHour": 0.044,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC12003",
+    "laborHour": 0.075,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC15001",
+    "laborHour": 0.053,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC15002",
+    "laborHour": 0.064,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC15003",
+    "laborHour": 0.086,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC18001",
+    "laborHour": 0.069,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC18002",
+    "laborHour": 0.147,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC18003",
+    "laborHour": 0.278,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC18004",
+    "laborHour": 0.26,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC20001",
+    "laborHour": 0.071,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC20002",
+    "laborHour": 0.09,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC20003",
+    "laborHour": 0.131,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102TC20004",
+    "laborHour": 0.252,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102VS00003",
+    "laborHour": 0.045,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102VS00004",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102VS000002",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102VS00009",
+    "laborHour": 0.077,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102VS00010",
+    "laborHour": 0.037,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI04502",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI02001",
+    "laborHour": 0.012,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI03001",
+    "laborHour": 0.02,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI04001",
+    "laborHour": 0.021,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI05001",
+    "laborHour": 0.02,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI06001",
+    "laborHour": 0.022,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI08001",
+    "laborHour": 0.026,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI10001",
+    "laborHour": 0.03,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI12001",
+    "laborHour": 0.029,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI15001",
+    "laborHour": 0.06,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI18001",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XI20001",
+    "laborHour": 0.038,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XL04001",
+    "laborHour": 0.038,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XL06001",
+    "laborHour": 0.045,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XL05001",
+    "laborHour": 0.048,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS02001",
+    "laborHour": 0.024,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS03001",
+    "laborHour": 0.02,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS04001",
+    "laborHour": 0.017,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS05001",
+    "laborHour": 0.021,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS06001",
+    "laborHour": 0.018,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS08001",
+    "laborHour": 0.031,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS10001",
+    "laborHour": 0.035,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS12001",
+    "laborHour": 0.05,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS15001",
+    "laborHour": 0.053,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS18001",
+    "laborHour": 0.083,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XS20001",
+    "laborHour": 0.057,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT02001",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT02002",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT03001",
+    "laborHour": 0.017,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT03002",
+    "laborHour": 0.016,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT03004",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT04001",
+    "laborHour": 0.02,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT04002",
+    "laborHour": 0.02,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT04004",
+    "laborHour": 0.031,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT04504",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT05001",
+    "laborHour": 0.019,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT05002",
+    "laborHour": 0.02,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT05004",
+    "laborHour": 0.019,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT06001",
+    "laborHour": 0.022,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT06002",
+    "laborHour": 0.018,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT06004",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT08001",
+    "laborHour": 0.041,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT08002",
+    "laborHour": 0.04,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT08004",
+    "laborHour": 0.045,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT10001",
+    "laborHour": 0.036,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT10002",
+    "laborHour": 0.065,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT10004",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT12001",
+    "laborHour": 0.034,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT12002",
+    "laborHour": 0.046,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT15001",
+    "laborHour": 0.05,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT15002",
+    "laborHour": 0.048,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT18001",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT18002",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT20001",
+    "laborHour": 0.08,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "102XT20002",
+    "laborHour": 0.031,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD00A1",
+    "laborHour": 0.035,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD00A2",
+    "laborHour": 0.035,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD00A4",
+    "laborHour": 0.052,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD01A1",
+    "laborHour": 0.054,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD03A1",
+    "laborHour": 0.047,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD05A1",
+    "laborHour": 0.048,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD06A1",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD09A1",
+    "laborHour": 0.049,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD4BA1",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PDM005",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PDM006",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD09A6",
+    "laborHour": 0.066,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD09A7",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD09A8",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD08A3",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PDM007",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PDM008",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD08A4",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD08A5",
+    "laborHour": 0.116,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD08A6",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PD09A5",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD10A2",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD14A1",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD32A1",
+    "laborHour": 0.017,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD33A1",
+    "laborHour": 0.019,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD38A1",
+    "laborHour": 0.017,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD39A2",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD4GA1",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD39A1",
+    "laborHour": 0.031,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PD4XA1",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S101101",
+    "laborHour": 0.061,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S101201",
+    "laborHour": 0.068,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S101204",
+    "laborHour": 0.083,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S103101",
+    "laborHour": 0.076,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S103201",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S103204",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S110101",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S110102",
+    "laborHour": 0.046,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S110103",
+    "laborHour": 0.102,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S111101",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S111102",
+    "laborHour": 0.103,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S111103",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S112101",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S112102",
+    "laborHour": 0.089,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S112103",
+    "laborHour": 0.049,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S205201",
+    "laborHour": 0.093,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S206201",
+    "laborHour": 0.079,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S209201",
+    "laborHour": 0.067,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S24B201",
+    "laborHour": 0.131,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103SM00013",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S193101",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S194101",
+    "laborHour": 0.108,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S194111",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S194121",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103SM31101",
+    "laborHour": 0.08,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103SM32101",
+    "laborHour": 0.138,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S182204",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S183204",
+    "laborHour": 0.125,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S282201",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S283201",
+    "laborHour": 0.122,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S194201",
+    "laborHour": 0.025,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S194211",
+    "laborHour": 0.02,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S194221",
+    "laborHour": 0.02,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103SM32201",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103SM32204",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103S193201",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VD2021",
+    "laborHour": 0.022,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VD2027",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0001",
+    "laborHour": 0.011,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0002",
+    "laborHour": 0.012,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0003",
+    "laborHour": 0.011,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0004",
+    "laborHour": 0.015,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0005",
+    "laborHour": 0.011,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0006",
+    "laborHour": 0.01,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0007",
+    "laborHour": 0.044,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0008",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0009",
+    "laborHour": 0.028,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0013",
+    "laborHour": 0.04,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0014",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0010",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0015",
+    "laborHour": 0.034,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0016",
+    "laborHour": 0.038,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0017",
+    "laborHour": 0.033,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0018",
+    "laborHour": 0.028,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0021",
+    "laborHour": 0.041,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103VN0022",
+    "laborHour": 0.034,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A14101",
+    "laborHour": 0.06,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A14201",
+    "laborHour": 0.05,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A32201",
+    "laborHour": 0.053,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A33201",
+    "laborHour": 0.072,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A3801",
+    "laborHour": 0.047,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A38203",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A39201",
+    "laborHour": 0.071,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A39202",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4F101",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4F201",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4F202",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4G101",
+    "laborHour": 0.047,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4G201",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4G202",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4X101",
+    "laborHour": 0.057,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4X202",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104A4X201",
+    "laborHour": 0.054,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100051",
+    "laborHour": 0.112,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100053",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100104",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100123",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100154",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100083",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100081",
+    "laborHour": 0.151,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100101",
+    "laborHour": 0.177,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100121",
+    "laborHour": 0.158,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100151",
+    "laborHour": 0.194,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100201",
+    "laborHour": 3.389,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100204",
+    "laborHour": 0.256,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100251",
+    "laborHour": 0.432,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100301",
+    "laborHour": 0.281,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100056",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100106",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100156",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B100206",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B320053",
+    "laborHour": 0.137,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B320083",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B320103",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B320123",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B320153",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B320203",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B600054",
+    "laborHour": 0.305,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B600084",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B600104",
+    "laborHour": 0.314,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B600124",
+    "laborHour": 0.118,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B600154",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B600204",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105B600304",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105K320152",
+    "laborHour": 1.031,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105K320209",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105K320210",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105K320251",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105X60309",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105K320307",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105K320308",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN005",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN006",
+    "laborHour": 0.029,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN06",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN10",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN11",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105BPN003",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105BPN004",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN12",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN13",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN14",
+    "laborHour": 0.021,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN15",
+    "laborHour": 0.03,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN17",
+    "laborHour": 0.01,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN18",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "105PPN19",
+    "laborHour": 0.028,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107TY004",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107BA001",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107BA002",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107BA003",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD021",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD027",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD034",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD042",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD049",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD060",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD076",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD090",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107CD114",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD021",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD027",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD034",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD042",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD049",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD060",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD076",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD090",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107LD114",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107P1021",
+    "laborHour": 0.037,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107P1027",
+    "laborHour": 0.037,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107P1034",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107P1D01",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107P1D02",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107P5121",
+    "laborHour": 0.023,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107P5127",
+    "laborHour": 0.019,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107P5134",
+    "laborHour": 0.021,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HC120",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HC210",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HC310",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HC410",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HT120",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HT210",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HT310",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HT410",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HV5005",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HV5008",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HV5010",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HV5015",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HV5020",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HV5025",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108HV5030",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108XC203",
+    "laborHour": 0.181,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108XC206",
+    "laborHour": 0.224,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108XC209",
+    "laborHour": 0.214,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108XC212",
+    "laborHour": 0.379,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108XC215",
+    "laborHour": 0.319,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "108XC220",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD108",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD110",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD112",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD114",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD120",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD125",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD130",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD132",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD140",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD150",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD208",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD210",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD212",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD216",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD220",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD225",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "109CD232",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PTEX01",
+    "laborHour": 0.018,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PTEX03",
+    "laborHour": 0.007,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PTEX05",
+    "laborHour": 0.026,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "104PTEX06",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "103PMSX01",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "106BA01",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "106BX01",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "106BX02",
+    "laborHour": 0.069,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "106BX03",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "106BX04",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "106CC01",
+    "laborHour": 0.022,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "106CN01",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "106TG01",
+    "laborHour": 0.017,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107KN021",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107KN027",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107KN034",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107NT030",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107NT035",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107NT040",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "107NT050",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "1102L060",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "110CH060",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "110CH061",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "110CH090",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "110TC060",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  },
+  {
+    "sku": "110TC061",
+    "laborHour": 0,
+    "note": "",
+    "source": "FORECAST SX 082026 - GIO_CONG.pdf"
+  }
+]

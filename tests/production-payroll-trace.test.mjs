@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {payrollTrace} from '../lib/production-payroll-trace.mjs';
+import {payrollPreview,allocateLineFunds} from '../lib/production-payroll.mjs';
+const people=[{id:'A1',name:'NV A',line:'A',startDate:'2020-01-01',hc:100,ot:0,helper:10,otherWork:0},{id:'C1',name:'NV C',line:'C',startDate:'2020-01-01',hc:100,ot:0,helper:10,otherWork:0}];
+function rows(earnedA=180){const a=allocateLineFunds(earnedA,180,6000000);return ['A','B'].map((line,i)=>({line,earned:i?180:earnedA,share:a.lines[i],selected:people,rows:[],actual:200,support:20,production:180,result:payrollPreview(i?180:earnedA,people,a.lines[i].allocated,[],'2026-10')}));}
+test('efficiency trace links only selected line exact column inputs and keeps original result',()=>{const data=rows();const t=payrollTrace(data,'A','score',6000000);assert.equal(t.value,100);assert.deepEqual(t.sources.map(s=>[s.line,s.label,s.value]),[['A','Giờ công chuẩn HT',180],['A','Giờ SX',180]]);assert.match(t.equation,/180 ÷ 180 × 100/);});
+test('allocation traces both lines; company return remains separate from payout',()=>{const data=rows();assert.deepEqual(payrollTrace(data,'B','ratio',6000000).sources.map(s=>s.line),['A','B']);const paid=payrollTrace(data,'A','paid',6000000);assert.equal(paid.value,1500000);assert.equal(payrollTrace(data,'A','returned',6000000).value,1500000);assert.equal(paid.contributors.find(p=>p.name.includes('C1')).value,0);});
+test('blocked and zero results are distinct, and coefficient uses unrounded score',()=>{const data=rows(152.982);assert.equal(payrollTrace(data,'A','factor',6000000).value,0);assert.equal(payrollTrace(data,'A','fund',6000000).blocked,false);data[0].result.score=null;data[0].result.issues=['Thiếu lịch'];const t=payrollTrace(data,'A','score',6000000);assert.equal(t.blocked,true);assert.equal(t.equation,'');assert.deepEqual(t.issues,['Thiếu lịch']);});

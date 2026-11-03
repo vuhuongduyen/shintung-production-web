@@ -1,1 +1,5040 @@
-[]
+[
+  {
+    "group": "SOC",
+    "code": "102XS02001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 20cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100051",
+    "name": "BỘ RỬA XE 1021 XANH",
+    "specification": "LĐ 5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100081",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 8m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100101",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 10m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100121",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 12m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100151",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 15m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100201",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 20m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100251",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 25m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100301",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 30m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BORUAXE1021",
+    "code": "105B100501",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 50m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S101101",
+    "name": "BỘ SEN DAY PVC L101",
+    "specification": "LN 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S101201",
+    "name": "BỘ SEN DÂY PVC L101",
+    "specification": "LĐ 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S101204",
+    "name": "BỘ SEN L101 (NỐI ĐỒNG)",
+    "specification": "LĐ 1.5M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S103101",
+    "name": "BỘ SEN DAY PVC L103",
+    "specification": "LN 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S103201",
+    "name": "BỘ SEN DAY PVC L103",
+    "specification": "LĐ 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S103204",
+    "name": "BỘ SEN L103 (NỐI ĐỒNG)",
+    "specification": "LĐ 1.5M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S110101",
+    "name": "BỘ SEN DÂY PVC L100 XÁM",
+    "specification": "1.5M NỐI ĐỒNG",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S110102",
+    "name": "BỘ SEN DÂY PVC L100 XÁM",
+    "specification": "1.5M LN",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S110103",
+    "name": "BỘ SEN DÂY PVC L100 XÁM",
+    "specification": "1.5M LD",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S111101",
+    "name": "BỘ SEN DÂY PVC L100 XD",
+    "specification": "1.5M -NỐI ĐỒNG",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S111102",
+    "name": "BỘ SEN DÂY PVC L100 XD",
+    "specification": "1.5M -LN",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S111103",
+    "name": "BỘ SEN DÂY PVC L100 XD",
+    "specification": "1.5M -LD",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S112101",
+    "name": "BỘ SEN DÂY PVC L100 XL",
+    "specification": "1.5M -NỐI ĐỒNG",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S112102",
+    "name": "BỘ SEN DÂY PVC L100 XL",
+    "specification": "1.5M -LN",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S112103",
+    "name": "BỘ SEN DÂY PVC L100 XL",
+    "specification": "1.5M -LD",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S182204",
+    "name": "BỘ SEN DÂY PVC L1082N",
+    "specification": "nối đồng-1.5M-3 Nấc",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S183204",
+    "name": "BỘ SEN DÂY PVC L1083",
+    "specification": "nối đồng-1.5M-3 Nấc",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S193101",
+    "name": "BỘ SEN DÂY PVC L1093",
+    "specification": "LN, 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S193201",
+    "name": "BỘ SEN DÂY PVC L1093",
+    "specification": "LĐ, 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S194101",
+    "name": "BỘ SEN CAM L1094",
+    "specification": "LN-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S194111",
+    "name": "BỘ SEN XANH L1094",
+    "specification": "LN-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S194121",
+    "name": "BỘ SEN TÍM L1094",
+    "specification": "LN-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S194201",
+    "name": "BỘ SEN CAM L1094",
+    "specification": "LĐ-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S194211",
+    "name": "BỘ SEN XANH L1094",
+    "specification": "LĐ-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S194221",
+    "name": "BỘ SEN TÍM L1094",
+    "specification": "LĐ-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S205201",
+    "name": "BỘ SEN DÂY INOX L105",
+    "specification": "4 NẤC 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S206201",
+    "name": "BỘ SEN DÂY INOX L106",
+    "specification": "1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S209201",
+    "name": "BỘ SEN DÂY INOX L109",
+    "specification": "1 NẤC 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S24B201",
+    "name": "BỘ SEN DÂY INOX L104B",
+    "specification": "3N B 1m5",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S282201",
+    "name": "BỘ SEN DÂY INOX L1082I",
+    "specification": "1.5M - 3 Nấc",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103S283201",
+    "name": "BỘ SEN DÂY INOX L1083I",
+    "specification": "1.5M - 3 Nấc",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103SM00013",
+    "name": "BỘ SEN PS M2",
+    "specification": "1.5M LN, Lõi lọc",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103SM31101",
+    "name": "BỘ SEN PS M3",
+    "specification": "LN-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103SM32101",
+    "name": "BỘ SEN PS M3A",
+    "specification": "LN-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103SM32201",
+    "name": "BỘ SEN PS M3A",
+    "specification": "LĐ-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOSEN",
+    "code": "103SM32204",
+    "name": "BỘ SEN PS M3A",
+    "specification": "Nối đồng-1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A14101",
+    "name": "BỘ XỊT VS - PVC C114",
+    "specification": "LN 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A14201",
+    "name": "BỘ XỊT VS- PVC C114",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A32201",
+    "name": "BỘ XỊT VS- PVC C132",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A33201",
+    "name": "BỘ XỊT VS- INOX C133I",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A3801",
+    "name": "BỘ XỊT VS- PVC C138",
+    "specification": "LN 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A38202",
+    "name": "BỘ XỊT VS- PVC C138",
+    "specification": "LĐ 1m2 nối đồng",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A38203",
+    "name": "BỘ XỊT VS- PVC C138 Sữa",
+    "specification": "LĐ 1m2 nối đồng",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A39201",
+    "name": "BỘ XỊT VS- PVC D139",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A39202",
+    "name": "BỘ XỊT VS- INOX D139I",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4F101",
+    "name": "BỘ XỊT VS- PVC C114F",
+    "specification": "LN 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4F201",
+    "name": "BỘ XỊT VS- PVC C114F",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4F202",
+    "name": "BỘ XỊT VS- INOX C114FI",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4G101",
+    "name": "BỘ XỊT VS - PVC C114G",
+    "specification": "LN 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4G201",
+    "name": "BỘ XỊT VS- PVC C114G",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4G202",
+    "name": "BỘ XỊT VS- INOX C114GI",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4X101",
+    "name": "BỘ XỊT VS- PVC C114X",
+    "specification": "LN 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4X201",
+    "name": "BỘ XỊT VS- PVC C114X",
+    "specification": "LĐ 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BOVESINH",
+    "code": "104A4X202",
+    "name": "BỘ XỊT VS- C114X XI",
+    "specification": "INOX 1m2",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BRX1021-CO3360",
+    "code": "105B100053",
+    "name": "BỘ RỬA XE 1021 XANH",
+    "specification": "LĐ 5m- Nối 3360",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BRX1021-CO3360",
+    "code": "105B100083",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 8m- Nối 3360",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BRX1021-CO3360",
+    "code": "105B100104",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 10m - Nối 3360",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BRX1021-CO3360",
+    "code": "105B100123",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 12m - Nối 3360",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BRX1021-CO3360",
+    "code": "105B100154",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 15m - Nối 3360",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BRX1021-CO3360",
+    "code": "105B100204",
+    "name": "BỘ RX 1021 DÂY XANH",
+    "specification": "LĐ 20m - Nối 3360",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC3200",
+    "code": "105B320053",
+    "name": "BỘ TƯỚI CÂY 3200 CAM",
+    "specification": "5m - co chuyển đổi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC3200",
+    "code": "105B320083",
+    "name": "BỘ TƯỚI CÂY 3200 CAM",
+    "specification": "8m - co chuyển đổi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC3200",
+    "code": "105B320103",
+    "name": "BỘ TƯỚI CÂY 3200 CAM",
+    "specification": "10m - co chuyển dổi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC3200",
+    "code": "105B320123",
+    "name": "BỘ TƯỚI CÂY 3200 CAM",
+    "specification": "12m - co chuyển đổi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC3200",
+    "code": "105B320153",
+    "name": "BỘ TƯỚI CÂY 3200 CAM",
+    "specification": "15m - co chuyển đổi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC3200",
+    "code": "105B320203",
+    "name": "BỘ TƯỚI CÂY 3200 CAM",
+    "specification": "20m - co chuyển đổi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC6030",
+    "code": "105B600054",
+    "name": "BỘ TƯỚI CÂY 6030",
+    "specification": "5m - 6 góc-CAM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC6030",
+    "code": "105B600084",
+    "name": "BỘ TƯỚI CÂY 6030",
+    "specification": "8m - 6 góc-CAM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC6030",
+    "code": "105B600104",
+    "name": "BỘ TƯỚI CÂY 6030",
+    "specification": "10m - 6 góc-CAM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC6030",
+    "code": "105B600124",
+    "name": "BÔ TƯỚI CÂY 6030",
+    "specification": "12m - 6 góc-CAM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC6030",
+    "code": "105B600154",
+    "name": "BỘ TƯỚI CÂY 6030",
+    "specification": "15m - 6 góc-CAM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC6030",
+    "code": "105B600204",
+    "name": "BỘ TƯỚI CÂY 6030",
+    "specification": "20m - 6 góc-CAM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC6030",
+    "code": "105B600254",
+    "name": "BỘ TƯỚI CÂY 6030",
+    "specification": "25m - 6 góc-CAM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTC6030",
+    "code": "105B600304",
+    "name": "BỘ TƯỚI CÂY 6030",
+    "specification": "30m - 6 góc-CAM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTCINOX",
+    "code": "105B100056",
+    "name": "BỘ TC INOX 304",
+    "specification": "5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTCINOX",
+    "code": "105B100086",
+    "name": "BỘ TC INOX 304",
+    "specification": "8m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTCINOX",
+    "code": "105B100106",
+    "name": "BỘ TC INOX 304",
+    "specification": "10m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTCINOX",
+    "code": "105B100156",
+    "name": "BỘ TC INOX 304",
+    "specification": "15m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BTCINOX",
+    "code": "105B100206",
+    "name": "BỘ TC INOX 304",
+    "specification": "20m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102TC18004",
+    "name": "DÂY DẪN ĐA NĂNG",
+    "specification": "1.8m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102TC20004",
+    "name": "DÂY DẪN ĐA NĂNG",
+    "specification": "2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102VS000001",
+    "name": "DÂY VỆ SINH 114",
+    "specification": "LN 1.2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102VS000002",
+    "name": "DÂY VỆ SINH 114",
+    "specification": "LĐ 1.2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102VS00003",
+    "name": "DÂY VỆ SINH 114X",
+    "specification": "LN 1.2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102VS00004",
+    "name": "DÂY VỆ SINH 114X",
+    "specification": "LĐ 1.2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102VS00010",
+    "name": "DÂY DẪN ĐA NĂNG",
+    "specification": "LĐ 1.2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DCMG",
+    "code": "102MG15001",
+    "name": "DÂY CẤP MÁY GIẶT",
+    "specification": "0 XÍCH 1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTINOX",
+    "code": "102TC06001",
+    "name": "DÂY TẮM INOX",
+    "specification": "60cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTINOX",
+    "code": "102TC12003",
+    "name": "DÂY TẮM INOX",
+    "specification": "1.2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTINOX",
+    "code": "102TC15003",
+    "name": "DÂY TẮM INOX",
+    "specification": "1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTINOX",
+    "code": "102TC18003",
+    "name": "DÂY TẮM INOX",
+    "specification": "1.8m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTINOX",
+    "code": "102TC20003",
+    "name": "DÂY TẮM INOX",
+    "specification": "2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLD",
+    "code": "102TC10002",
+    "name": "DAY TẮM PVC",
+    "specification": "LĐ 1m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLD",
+    "code": "102TC12002",
+    "name": "DÂY TẮM PVC",
+    "specification": "LĐ 1.2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLD",
+    "code": "102TC15002",
+    "name": "DÂY TẮM PVC",
+    "specification": "LĐ 1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLD",
+    "code": "102TC18002",
+    "name": "DÂY TẮM PVC",
+    "specification": "LĐ 1.8m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLD",
+    "code": "102TC20002",
+    "name": "DÂY TẮM PVC",
+    "specification": "LĐ 2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLN",
+    "code": "102TC10001",
+    "name": "DÂY TẮM PVC",
+    "specification": "LN 1m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLN",
+    "code": "102TC12001",
+    "name": "DÂY TẮM PVC",
+    "specification": "LN 1.2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLN",
+    "code": "102TC15001",
+    "name": "DÂY TẮM PVC",
+    "specification": "LN 1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLN",
+    "code": "102TC18001",
+    "name": "DÂY TẮM PVC",
+    "specification": "LN 1.8m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DTLN",
+    "code": "102TC20001",
+    "name": "DÂY TẮM PVC",
+    "specification": "LN 2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI02001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "20cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI03001",
+    "name": "DAY XẢ INOX TRẮNG",
+    "specification": "30cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI04001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "40cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI04502",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "45cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI05001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "50cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI06001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "60cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI08001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "80cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI10001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "1m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI12001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "1.2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI15001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102VS00008",
+    "name": "DÂY VỆ SINH PVC 110-113",
+    "specification": "LĐ 1.5M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "DAYDANANG",
+    "code": "102VS00009",
+    "name": "DÂY DẪN ĐA NĂNG",
+    "specification": "LĐ 1.5M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI18001",
+    "name": "DAY XẢ INOX TRẮNG",
+    "specification": "1.8m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "INOX",
+    "code": "102XI20001",
+    "name": "DÂY XẢ INOX TRẮNG",
+    "specification": "2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "KETUOICAY",
+    "code": "105K320152",
+    "name": "KÊ ỐNG JY1302-3200 CAM",
+    "specification": "15m-co chuyen doi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "KETUOICAY",
+    "code": "105K320209",
+    "name": "KÊ ỐNG JY1301-3200 CAM",
+    "specification": "20m-co chuyen doi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "KETUOICAY",
+    "code": "105K320210",
+    "name": "KÊ ỐNG JY1302-3200 CAM",
+    "specification": "20m-co chuyen doi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "KETUOICAY",
+    "code": "105K320251",
+    "name": "KÊ ỐNG JY1302-3200 CAM",
+    "specification": "25m-co chuyen doi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "KETUOICAY",
+    "code": "105K320307",
+    "name": "KÊ ỐNG JY1301-3200 CAM",
+    "specification": "30m-co chuyen doi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "KETUOICAY",
+    "code": "105K320308",
+    "name": "KÊ ỐNG JY1302-3200 CAM",
+    "specification": "30m-co chuyen doi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "LVB",
+    "code": "102XL04001",
+    "name": "DÂY XẢ LAVABO TRẮNG",
+    "specification": "40cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "LVB",
+    "code": "102XL05001",
+    "name": "DÂY XẢ LAVABO TRẮNG",
+    "specification": "50cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "LVB",
+    "code": "102XL06001",
+    "name": "DÂY XẢ LAVABO TRẮNG",
+    "specification": "60cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGHOI-CAOAP/BRX-CAOAP",
+    "code": "108HV5005",
+    "name": "ỐNG HƠI CA CAM 8.5/200KG",
+    "specification": "5M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGHOI-CAOAP/BRX-CAOAP",
+    "code": "108HV5008",
+    "name": "ỐNG HƠI CA CAM 8.5/200KG",
+    "specification": "8M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGHOI-CAOAP/BRX-CAOAP",
+    "code": "108HV5010",
+    "name": "ỐNG HƠI CA CAM 8.5/200KG",
+    "specification": "10M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGHOI-CAOAP/BRX-CAOAP",
+    "code": "108HV5015",
+    "name": "ỐNG HƠI CA CAM 8.5/200KG",
+    "specification": "15M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGHOI-CAOAP/BRX-CAOAP",
+    "code": "108HV5020",
+    "name": "ỐNG HƠI CA CAM 8.5/200KG",
+    "specification": "20M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGHOI-CAOAP/BRX-CAOAP",
+    "code": "108HV5025",
+    "name": "ỐNG HƠI CA CAM 8.5/200KG",
+    "specification": "25M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGHOI-CAOAP/BRX-CAOAP",
+    "code": "108HV5030",
+    "name": "ỐNG HƠI CA CAM 8.5/200KG",
+    "specification": "30M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGHOI_PU",
+    "code": "108HC120",
+    "name": "ỐNG HƠI PU CAM 4x6mm",
+    "specification": "200M",
+    "line": "C",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "C-PREP",
+      "C-PVC"
+    ]
+  },
+  {
+    "group": "ONGHOI_PU",
+    "code": "108HC210",
+    "name": "ỐNG HƠI PU CAM 5x8mm",
+    "specification": "100M",
+    "line": "C",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "C-PREP",
+      "C-PVC"
+    ]
+  },
+  {
+    "group": "ONGHOI_PU",
+    "code": "108HC310",
+    "name": "ỐNGHƠI PU CAM 6.5x10mm",
+    "specification": "100M",
+    "line": "C",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "C-PREP",
+      "C-PVC"
+    ]
+  },
+  {
+    "group": "ONGHOI_PU",
+    "code": "108HC410",
+    "name": "ỐNG HƠI PU CAM 8X12MM",
+    "specification": "100M",
+    "line": "C",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "C-PREP",
+      "C-PVC"
+    ]
+  },
+  {
+    "group": "ONGHOI_PU",
+    "code": "108HT120",
+    "name": "ỐNG HƠI PU TRẮNG",
+    "specification": "200M-4x6mm",
+    "line": "C",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "C-PREP",
+      "C-PVC"
+    ]
+  },
+  {
+    "group": "ONGHOI_PU",
+    "code": "108HT210",
+    "name": "ỐNG HƠI PU TRẮNG",
+    "specification": "100M-5x8mm",
+    "line": "C",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "C-PREP",
+      "C-PVC"
+    ]
+  },
+  {
+    "group": "ONGHOI_PU",
+    "code": "108HT310",
+    "name": "ỐNG HƠI PU TRẮNG",
+    "specification": "100M-6.5x10mm",
+    "line": "C",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "C-PREP",
+      "C-PVC"
+    ]
+  },
+  {
+    "group": "ONGHOI_PU",
+    "code": "108HT410",
+    "name": "ỐNG HƠI PU TRẮNG",
+    "specification": "100M-8x12mm",
+    "line": "C",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "C-PREP",
+      "C-PVC"
+    ]
+  },
+  {
+    "group": "ONGINOX",
+    "code": "102IC03001",
+    "name": "ỐNG INOX",
+    "specification": "1/2\" 30cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGINOX",
+    "code": "102IC04001",
+    "name": "ỐNG INOX",
+    "specification": "1/2\" 40cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGINOX",
+    "code": "102IC05001",
+    "name": "ỐNG INOX",
+    "specification": "1/2\" 50cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGINOX",
+    "code": "102IC06001",
+    "name": "ỐNG INOX",
+    "specification": "1/2\" 60cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGINOX",
+    "code": "102IC08001",
+    "name": "ỐNG INOX",
+    "specification": "1/2\" 80cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVC(2)",
+    "code": "102XT03004",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "ỐC NHỰA 30CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVC(2)",
+    "code": "102XT04004",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "ỐC NHỰA 40CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVC(2)",
+    "code": "102XT04504",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "ỐC NHỰA 45CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVC(2)",
+    "code": "102XT05004",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "ỐC NHỰA 50CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVC(2)",
+    "code": "102XT06004",
+    "name": "DAY XẢ PVC TRẮNG",
+    "specification": "ỐC NHỰA 60CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVC(2)",
+    "code": "102XT08004",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "ỐC NHỰA 80CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVC(2)",
+    "code": "102XT10004",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "ỐC NHỰA 1M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT02002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 20CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT03002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 30CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT04002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 40CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT05002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 50CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT06002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 60CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT08002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 80CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT10002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 1M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT12002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 1.2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT15002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 1.5M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT18002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 1.8M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLD",
+    "code": "102XT20002",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LĐ 2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT02001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 20CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT03001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 30CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT04001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 40CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT05001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 50CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT06001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 60CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT08001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 80CM",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT10001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 1M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT12001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 1.2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT15001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 1.5M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT18001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 1.8M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "PVCLN",
+    "code": "102XT20001",
+    "name": "DÂY XẢ PVC TRẮNG",
+    "specification": "LN 2M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS03001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 30cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS04001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 40cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS05001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 50cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS06001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 60cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS08001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 80cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS10001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 1m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS12001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 1.2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS15001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 1.5m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS18001",
+    "name": "DÂY XẢ INOX SỌC",
+    "specification": "14MM 1.8m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "SOC",
+    "code": "102XS20001",
+    "name": "DAY XẢ INOX SỌC",
+    "specification": "14MM 2m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "XADONG",
+    "code": "102XD04001",
+    "name": "DÂY XẢ ĐỒNG",
+    "specification": "40cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "XADONG",
+    "code": "102XD05001",
+    "name": "DÂY XẢ ĐỒNG",
+    "specification": "50cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "XADONG",
+    "code": "102XD06001",
+    "name": "DÂY XẢ ĐỒNG",
+    "specification": "60cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "XADONG",
+    "code": "102XD08001",
+    "name": "DÂY XẢ ĐỒNG",
+    "specification": "80cm",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "XADONG",
+    "code": "102XD10001",
+    "name": "DÂY XẢ ĐỒNG",
+    "specification": "1m",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "XETUOICAY",
+    "code": "105X60309",
+    "name": "XE ĐẨY ỐNG JY1402-6030P CAM",
+    "specification": "30M-co chuyển đổi",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-CRIMP",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGXOAN",
+    "code": "108XC203",
+    "name": "ỐNG XOẮN PU 5x8MM",
+    "specification": "3M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGXOAN",
+    "code": "108XC206",
+    "name": "ỐNG XOẮN PU 5x8mm",
+    "specification": "6M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGXOAN",
+    "code": "108XC209",
+    "name": "ỐNG XOẮN PU 5x8mm",
+    "specification": "9M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGXOAN",
+    "code": "108XC212",
+    "name": "ỐNG XOẮN PU 5x8mm",
+    "specification": "12M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGXOAN",
+    "code": "108XC215",
+    "name": "ỐNG XOẮN PU 5*8mm",
+    "specification": "15M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "ONGXOAN",
+    "code": "108XC220",
+    "name": "ỐNG XOẮN PU 5x8mm",
+    "specification": "20M",
+    "line": "A",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "A-CUT",
+      "A-ASSY",
+      "A-PACKING",
+      "A-FINAL"
+    ]
+  },
+  {
+    "group": "BRCINOX",
+    "code": "106BX02",
+    "name": "BỘ XẢ RỬA CHÉN ĐƠN",
+    "specification": "inox",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "BRCINOX",
+    "code": "106BX03",
+    "name": "BỘ XẢ RỬA CHÉN ĐÔI",
+    "specification": "inox",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "BRCINOX",
+    "code": "106BX04",
+    "name": "ỐNG XẢ LAVABO",
+    "specification": "inox",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "BXBC",
+    "code": "106BA01",
+    "name": "BANH TI XẢ BỒN CẦU",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "BXBC",
+    "code": "106BX01",
+    "name": "BỘ XẢ BỒN CẦU",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "BXBC",
+    "code": "106CC01",
+    "name": "CÓC CẦU",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "BXBC",
+    "code": "106CN01",
+    "name": "CẤP NƯỚC",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "BXBC",
+    "code": "106OX01",
+    "name": "XẢ NƯỚC",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "BXBC",
+    "code": "106TG01",
+    "name": "TAY GẠT XẢ BỒN CẦU",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "105BPN003",
+    "name": "ĐẦU PHUN NƯỚC CỐ ĐỊNH 1/2\"",
+    "specification": "KIỂU PHUN CAO",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "105BPN004",
+    "name": "ĐẦU PHUN NƯỚC CỐ ĐỊNH 1/2\"",
+    "specification": "KIỂU PHUN NGANG",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "107KN021",
+    "name": "KHỚP NỐI THĂNG 1/2\"",
+    "specification": "1/2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "107KN027",
+    "name": "KHỚP NỐI THẲNG 3/4\"",
+    "specification": "3/4\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "107KN034",
+    "name": "KHỚP NỐI THẲNG 1\"",
+    "specification": "1\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "107NT030",
+    "name": "NỐI THAU RĂNG TRONG NGOÀI",
+    "specification": "30mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "107NT035",
+    "name": "NỐI THAU RĂNG TRONG NGOÀI",
+    "specification": "35mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "107NT040",
+    "name": "NỐI THAU RĂNG TRONG NGOAI",
+    "specification": "40mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "107NT050",
+    "name": "NỐI THAU RĂNG TRONG NGÒAI",
+    "specification": "50mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111G3011",
+    "name": "GIẢM REN TRONG NGOÀI THAU (X)",
+    "specification": "1/4\" x 1/8\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111G3021",
+    "name": "GIẢM REN TRONG NGOÀI THAU (X)",
+    "specification": "3/8\" x 1/8\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111G3022",
+    "name": "GIẢM REN TRONG NGOÀI THAU (X)",
+    "specification": "3/8\" x 1/4\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111G3031",
+    "name": "GIẢM REN TRONG NGOÀI THAU (X)",
+    "specification": "1/2\" x 1/4\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111G3032",
+    "name": "GIẢM REN TRONG NGOÀI THAU (X)",
+    "specification": "1/2\" x 3/8\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111G3041",
+    "name": "GIẢM REN TRONG NGOÀI THAU (X)",
+    "specification": "3/4\" x 3/8\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111G3042",
+    "name": "GIẢM REN TRONG NGOÀI THAU (X)",
+    "specification": "3/4\" x 1/2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111K2011",
+    "name": "KÉP THAU (HN)",
+    "specification": "1/8\" x 1/8\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111K2021",
+    "name": "KÉP THAU (HN)",
+    "specification": "1/4\" x 1/8\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111K2022",
+    "name": "KÉP THAU (HN)",
+    "specification": "1/4\" x 1/4\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111K2031",
+    "name": "KÉP THAU (HN)",
+    "specification": "3/8\" x 1/8\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111K2032",
+    "name": "KÉP THAU (HN)",
+    "specification": "3/8\" x 1/4\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111K2033",
+    "name": "KÉP THAU (HN)",
+    "specification": "3/8\" x 3/8\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111K2043",
+    "name": "KÉP THAU (HN)",
+    "specification": "1/2\" x 1/2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "111K2051",
+    "name": "KÉP THAU (HN)",
+    "specification": "3/4\" x 1/2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "1KH0001",
+    "name": "NOI 8mm",
+    "specification": "dai 44.1mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "CONNECTOR",
+    "code": "1KH0002",
+    "name": "NOI 10mm ngan",
+    "specification": "dai 34.1mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LOCRAC",
+    "code": "1102L060",
+    "name": "LỌC RÁC 2 LỚP 304#",
+    "specification": "2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LOCRAC",
+    "code": "110CH060",
+    "name": "Lọc rác chống hôi",
+    "specification": "2\", 100x100mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LOCRAC",
+    "code": "110CH061",
+    "name": "Lọc rác chống hôi",
+    "specification": "2\", 150x150mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LOCRAC",
+    "code": "110CH090",
+    "name": "Lọc rác chống hôi",
+    "specification": "3\", 150x150mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LOCRAC",
+    "code": "110TC060",
+    "name": "Thoát nước sân thượng tròn",
+    "specification": "2\" - 100x100mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LOCRAC",
+    "code": "110TC061",
+    "name": "Thoát nước sân thượng vuông",
+    "specification": "2\" - 100x100mm",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHAODIEN",
+    "code": "101CTP007",
+    "name": "Phao điện POTENZA",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PHAO",
+      "B-HCT",
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHAODIEN",
+    "code": "101CTP010",
+    "name": "Phao diện ONPAS(C) 2017",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PHAO",
+      "B-HCT",
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHAODIEN",
+    "code": "101CTP015",
+    "name": "PHAO ĐIỆN ONPAS(M) 2015",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PHAO",
+      "B-HCT",
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHAODIEN",
+    "code": "101CTP016",
+    "name": "PHAO ĐIỆN SANPO(M) 2015",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PHAO",
+      "B-HCT",
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHAODIEN",
+    "code": "101CTP017",
+    "name": "Phao điện ONPAS(M)",
+    "specification": "định hình 2015",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PHAO",
+      "B-HCT",
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "YUTA",
+    "code": "101CTP018",
+    "name": "Phao điện YUTA",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PHAO",
+      "B-HCT",
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHAODIEN",
+    "code": "101CTP020",
+    "name": "Phao điện OTOFIL",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PHAO",
+      "B-HCT",
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VANPHAODONG",
+    "code": "107P1021",
+    "name": "VAN PHAO ONPAS (có tanlơ)",
+    "specification": "1/2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VANPHAODONG",
+    "code": "107P1027",
+    "name": "VAN PHAO ONPAS (có tanlơ)",
+    "specification": "3/4\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VANPHAODONG",
+    "code": "107P1034",
+    "name": "VAN PHAO ONPAS (co tanlơ)",
+    "specification": "1\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VANPHAODONG",
+    "code": "107P1D01",
+    "name": "VAN PHAO CS ĐỊNH HÌNH",
+    "specification": "1/2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VANPHAODONG",
+    "code": "107P1D02",
+    "name": "VAN PHAO CS ĐỊNH HÌNH",
+    "specification": "3/4\" BANH LỚN",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VANPHAONHUA",
+    "code": "107P5121",
+    "name": "VAN PHAO NHỰA (ngang) - nội",
+    "specification": "1/2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VANPHAONHUA",
+    "code": "107P5127",
+    "name": "VAN PHAO NHỰA (ngang) - nội",
+    "specification": "3/4\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VANPHAONHUA",
+    "code": "107P5134",
+    "name": "VAN PHAO NHỰA (ngang) - nội",
+    "specification": "1\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOIDONG",
+    "code": "103VD2021",
+    "name": "VÒI ĐỒNG NHỎ",
+    "specification": "1/2\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOIDONG",
+    "code": "103VD2027",
+    "name": "VÒI ĐỒNG NHỎ",
+    "specification": "3/4\"",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0001",
+    "name": "VOI NHUA ST-6300-C",
+    "specification": "MAU CAM",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0005",
+    "name": "VOI NHUA ST 6300-C 27",
+    "specification": "MAU CAM",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0007",
+    "name": "VOI LVB NHUA PL8191W - C",
+    "specification": "MAU CAM",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0008",
+    "name": "VOI LVB XI PL8191C",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0009",
+    "name": "VOI CU DOI NHUA PL6192W - C",
+    "specification": "MAU CAM",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0010",
+    "name": "VOI CU DOI XI PL6192C",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0011",
+    "name": "VOI RC NHUA PL9191W - C",
+    "specification": "nhỏ, MAU CAM",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0013",
+    "name": "VOI RC NHUA PL9391W - C",
+    "specification": "trung, MAU CAM",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0014",
+    "name": "VOI RC XI PL9391C",
+    "specification": "trung",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD01A1",
+    "name": "ĐẦU SEN L101A",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD03A1",
+    "name": "ĐẦU SEN L103A",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD05A1",
+    "name": "ĐẦU SEN 4 NẤC L105A",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD06A1",
+    "name": "ĐẦU SEN XI L106A",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD08A3",
+    "name": "ĐẦU SEN L1082N",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD08A4",
+    "name": "ĐẦU SEN L1082I",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD08A5",
+    "name": "ĐẦU SEN L1083",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD08A6",
+    "name": "ĐẦU SEN L1083I",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD09A1",
+    "name": "ĐẦU SEN 1 NẤC L109A",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD09A4",
+    "name": "ĐẦU SEN L1092",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD09A5",
+    "name": "ĐẦU SEN L1093",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD09A6",
+    "name": "ĐẦU SEN L1094 - CAM",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD09A7",
+    "name": "ĐẦU SEN L1094 - XANH",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD09A8",
+    "name": "ĐẦU SEN L1094 - TÍM",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD4BA1",
+    "name": "ĐẦU SEN 3 NẤC L104B",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PDM005",
+    "name": "ĐẦU SEN PHUN SUONG M1",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PDM006",
+    "name": "ĐẦU SEN PHUN SUONG M1I",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PDM007",
+    "name": "ĐẦU SEN PS M3",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PDM008",
+    "name": "ĐẦU SEN PS M3A",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD10A1",
+    "name": "ĐẦU XỊT VS 110",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD10A2",
+    "name": "ĐẦU XỊT VS 110XI",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD14A1",
+    "name": "ĐẦU XỊT VS 114",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD32A1",
+    "name": "ĐẨU XỊT VS C132",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD33A1",
+    "name": "ĐẨU XỊT VS C133",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD38A1",
+    "name": "ĐẨU XỊT VS C138",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD39A1",
+    "name": "ĐẨU XỊT VS D139",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD39A2",
+    "name": "ĐẨU XỊT VS D139I",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD4FA1",
+    "name": "ĐẦU XỊT VS 114F",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD4GA1",
+    "name": "ĐẨU XỊT VS 114G",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUVESINH",
+    "code": "104PD4XA1",
+    "name": "ĐẦU XỊT VS 114X",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "TECACLOAI",
+    "code": "104PTEX01",
+    "name": "TÊ NHỰA CỐ ĐỊNH",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "TECACLOAI",
+    "code": "104PTEX03",
+    "name": "TÊ NHỰA ĐIỀU CHỈNH",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "TECACLOAI",
+    "code": "104PTEX05",
+    "name": "TÊ THAU ĐIỀU CHỈNH",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHUKIEN",
+    "code": "104PTEX06",
+    "name": "MOC VE SINH 114 114X",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHUKIEN",
+    "code": "104PTEX07",
+    "name": "MOC VE SINH XI",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN005",
+    "name": "ĐẦU XỊT 1021",
+    "specification": "gồm cổ de",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN006",
+    "name": "ĐẦU XỊT 1021",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN06",
+    "name": "ĐẦU 3200",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHUKIEN",
+    "code": "105PPN09",
+    "name": "ĐẦU 3200 GOM 3 CO",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHUKIEN",
+    "code": "105PPN10",
+    "name": "CO 3360",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHUKIEN",
+    "code": "105PPN11",
+    "name": "CO 3140",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHUKIEN",
+    "code": "105PPN12",
+    "name": "CO 3170",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN13",
+    "name": "ĐẦU 7030 CC",
+    "specification": "gồm 2 zoong + 1 nối",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN14",
+    "name": "ĐẦU XỊT 1022",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN15",
+    "name": "ĐẦU XỊT 1023",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN17",
+    "name": "ĐẦU XỊT 1024",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHUKIEN",
+    "code": "105PPN18",
+    "name": "CO 3140+CHUYEN DOI",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN19",
+    "name": "ĐẦU 6030 CAM",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN20",
+    "name": "ĐẦU XỊT 1025",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LẮP RÁP BTP",
+    "code": "3030901",
+    "name": "ĐẦU TRÒN",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LẮP RÁP BTP",
+    "code": "3030902",
+    "name": "ĐẦU MASSAGE",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "LẮP RÁP BTP",
+    "code": "3040101",
+    "name": "ĐẦU TRÒN XI",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "ROLE",
+    "code": "101RLD001",
+    "name": "ROLE STP-72(xám)",
+    "specification": "0.5HP",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "ROLE",
+    "code": "101RLD002",
+    "name": "RƠLE STP-72(XÁM)",
+    "specification": "1HP",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD00A1",
+    "name": "ĐẦU SEN L100XL",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD00A2",
+    "name": "ĐẦU SEN L100XD",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUSEN",
+    "code": "103PD00A4",
+    "name": "ĐẦU SEN L100X",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "PHUKIEN",
+    "code": "103PMSX01",
+    "name": "MÓC SEN NHỰA CỐ ĐỊNH",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0002",
+    "name": "VOI NHUA ST-6300-X",
+    "specification": "MAU XANH",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0003",
+    "name": "VOI NHUA ST-6300-T",
+    "specification": "MAU TRANG",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0004",
+    "name": "VOI NHUA ST 6300-T 27",
+    "specification": "MAU TRANG",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0006",
+    "name": "VOI NHUA ST 6300-X 27",
+    "specification": "MAU XANH",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0015",
+    "name": "VOI LVB NHUA PL8191W - X",
+    "specification": "MAU XANH",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0016",
+    "name": "VOI LVB NHUA PL8191W - T",
+    "specification": "MAU TRANG",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0017",
+    "name": "VOI CU DOI NHUA PL6192W - X",
+    "specification": "MAU XANH",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0018",
+    "name": "VOI CU DOI NHUA PL6192W - T",
+    "specification": "MAU TRANG",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0021",
+    "name": "VOI RC NHUA PL9391W - X",
+    "specification": "trung, MAU XANH",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "VOINHUA",
+    "code": "103VN0022",
+    "name": "VOI RC NHUA PL9391W - T",
+    "specification": "trung, MAU TRANG",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-ASSY",
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  },
+  {
+    "group": "DAUTUOICAY-RUAXE",
+    "code": "105PPN23",
+    "name": "ĐẦU 7010",
+    "specification": "—",
+    "line": "B",
+    "unit": "—",
+    "source": "TP",
+    "processes": [
+      "B-PACKING",
+      "B-FINAL"
+    ]
+  }
+]

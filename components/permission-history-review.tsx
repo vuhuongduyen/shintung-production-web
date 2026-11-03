@@ -59,7 +59,7 @@ export default function PermissionHistoryReview({entries}:{entries:unknown[]}){
     done.push(`${change.key}: đã khôi phục và đọc lại ${change.grantCount} quyền gốc.`);setResults([...done]);
    }
    const check=await recordFetch('/api/production-allocation-scope',{cache:'no-store'}),body=await check.json();if(!check.ok||JSON.stringify(body.configuration)!==JSON.stringify(recovery.scope))throw Error('Phạm vi điều phối đã thay đổi hoặc chưa xác minh được; cần đối chiếu.');
-   setResults([...done,'Đã đọc lại: giữ nguyên phạm vi sample_user_31/C, sample_user_22/A+B. Không thay user Line, vai trò, mẫu bộ phận hoặc credentials.']);setRecovery(null);
+   setResults([...done,'Đã đọc lại: giữ nguyên phạm vi dhtin/C, cnphuong/A+B. Không thay user Line, vai trò, mẫu bộ phận hoặc credentials.']);setRecovery(null);
   }catch(e){setRecovery(null);setResults([...done]);setError(e instanceof Error?e.message:'Chưa hoàn tất khôi phục; kiểm tra từng user đã ghi nhận.');}
   finally{mutation.current=false;setBusy(false);}
  };

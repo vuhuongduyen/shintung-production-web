@@ -1,0 +1,65 @@
+name: Kiểm tra mã nguồn ONSPA
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, source-sync/live-v807-20261102]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  WRANGLER_SEND_METRICS: 'false'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  typecheck:
+    name: Kiểm tra kiểu dữ liệu
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Chuẩn bị Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Cài dependencies theo lockfile
+        run: npm ci --no-audit --no-fund
+      - name: Kiểm tra TypeScript
+        run: npm run typecheck
+
+  build-test:
+    name: Build và kiểm thử (${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Chuẩn bị Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Cài dependencies theo lockfile
+        run: npm ci --no-audit --no-fund
+      - name: Build để kiểm thử cả Worker đã biên dịch
+        run: npm run build
+      - name: Chạy tất cả test cấp cao nhất, gồm hồi quy và test kế thừa
+        run: node scripts/ci/run-tests.mjs ${{ matrix.shard }} 3

@@ -1,0 +1,17 @@
+.production-assignment-overview{width:min(960px,96vw)!important;max-width:96vw!important;max-height:90vh;overflow:auto;background:#fff;color:#23482e;font-family:inherit}
+.production-assignment-overview .table-wrap{max-height:55vh;overflow:auto}
+.production-assignment-overview table{width:100%;border-collapse:collapse;min-width:560px}
+.production-assignment-overview th,.production-assignment-overview td{border:1px solid #b3c9b7;padding:8px;vertical-align:top;text-align:left}
+.production-assignment-overview th{background:#edf5eb;position:sticky;top:0;z-index:1}
+.production-assignment-overview td small{display:block;margin-top:3px;color:#526b59}
+.production-assignment-overview tr:nth-child(even){background:#f5f9f4}
+.production-assignment-overview .assignment-conflict{color:#ac2222}
+
+/* Override wide production-report tables; this dialog has only five columns. */
+html body .production-assignment-overview .table-wrap>table.production-table{width:100%!important;min-width:0!important;table-layout:fixed!important}
+html body .production-assignment-overview .production-table :is(th,td){min-width:0!important;max-width:none!important;width:auto!important;white-space:normal!important;overflow-wrap:anywhere;padding:5px 6px!important}
+html body .production-assignment-overview .production-table :is(th,td):nth-child(2){text-align:center}
+.production-assignment-overview{padding:16px!important;gap:10px!important}
+
+.production-assignment-overview .assignment-moved{color:#956000;font-weight:700}
+.production-assignment-overview .assignment-waiting{color:#a42727;font-weight:700}

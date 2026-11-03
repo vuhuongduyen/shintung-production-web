@@ -1,0 +1,24 @@
+ONSPA - DONG BO SOURCE VA SAO LUU DAY DU - WINDOWS
+1. Giai nen 5 file vao C:\website onspa (giu cac file cung folder).
+2. Tren web: Admin -> Sao luu & Ban giao -> Dong bo source va sao luu day du.
+3. Nhap ten may, bam Tao ma sao luu day du -> Sao chep ma.
+4. Nhan doi Cai-dong-bo.cmd, dan ma va Enter. Bo cai cu can chay lai ban nay.
+5. Kiem tra thong bao SAO LUU DAY DU THANH CONG. Ban trong backups phai co HOAN-TAT.json.
+
+Source: C:\website onspa\source. Tu kiem tra moi 15 phut.
+Sao luu DB, tat ca file R2 va source: C:\website onspa\backups.
+Tu tao 1 ban moi moi ngay khi dang nhap Windows va co mang. Neu may tat thi lam khi mo lai.
+Sao-luu-ngay.cmd: tao them ban sao luu day du ngay.
+Dong-bo-ngay.cmd: kiem tra source va sao luu neu hom nay chua co ban.
+Nhat ky: C:\website onspa\_sync\dong-bo.log.
+Ban source cu: C:\website onspa\versions. Khong tu xoa ban cu hay ban sao luu.
+Ma chi source cu khong duoc doc DB/files. Can Tao ma sao luu day du va cai lai.
+Ma Admin noi bo han 1 nam; ma Admin nhanh het han cung quyen thiet lap.
+Ma het han, doi mat khau, thu hoi, khoa tai khoan: tao ma moi va cai lai.
+Dung tu dong: Windows+R -> shell:startup -> xoa shortcut ONSPA-source-sync-, dang xuat Windows.
+Khong can quyen Administrator. Khong can Git hay kho ben ngoai.
+Dong bo mot chieu WEB -> MAY. Khong sua source: file sua se duoc bao ve, khong ghi de.
+Data backup chua nhan su, tai khoan, hash mat khau, quyen. Giu folder rieng.
+Ma ket noi ma hoa DPAPI cho tai khoan Windows dang cai. Khong gui config.json hay ma cho nguoi khac.
+Day la ban sao luu; khong tu phuc hoi/ghi de web. Huong dan phuc hoi nam trong tung ban.
+Secrets cua moi truong hosting khong nam trong DB/source; can thiet lap rieng khi chuyen moi truong.

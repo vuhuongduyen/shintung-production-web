@@ -1,54 +1,107 @@
-# ONSPA — nền TEST v749, giữ PR #1
+# ONSPA-SKU-Master — phát triển TEST cục bộ
 
-Nguồn: web chính ONSPA, version **749**, commit gốc **f66cb2701613eda59dc3880af5eedcc8b3a9764e**. Đối chiếu metadata Sites và Git ngày 27/10/2026 (GMT+7): version 749 gắn commit này; deployment `succeeded`.
+Folder này là nguồn mã chính thức trong giai đoạn phát triển. Không push, kết nối GitHub/Vercel, tạo Site hoặc xuất bản nếu chưa được yêu cầu. Giữ nguyên `.openai/hosting.json`.
 
-Đây là bản sao đã làm sạch, không phải commit nguyên trạng và không chứa dữ liệu/tài khoản/quyền thực tế. Không có Git remote, CI/CD, cấu hình triển khai Site hay khóa kho thật. Không có thao tác push GitHub hoặc triển khai nào được thực hiện khi xuất gói.
+**Quy trình làm việc cố định:** đọc [PR → link test full ONSPA → nghiệm thu → merge](docs/ONSPA-DEVELOPMENT-WORKFLOW.md) cùng `AGENTS.md` trước mỗi thay đổi. Tài liệu này quy định các điểm kiểm chứng và bàn giao; không thay thế quyền thực hiện từng bước của người dùng.
 
-## Chạy local
+## Môi trường
 
-Cần Node.js >=22.13 và npm, có Internet để tải dependency theo lockfile. Các dependency của Vinext/Cloudflare có executable theo hệ điều hành; hãy chạy `npm ci` trên máy đích, không chép node_modules từ máy khác.
+- Windows 10/11, macOS hoặc Linux; Node.js **22.13 trở lên** kèm npm (đã kiểm tra Node 24).
+- Kết nối npm registry khi cài dependencies. Không cần Bash, tài khoản Cloudflare hoặc token D1 LIVE cho các lệnh bên dưới.
+- Chỉ chạy trên máy cá nhân tin cậy. API TEST không phải hệ thống production.
 
-```sh
+## Cài và chạy trên máy mới
+
+Mở terminal tại folder Project:
+
+```text
 npm ci
 npm run db:init
-npm run test:account
+```
+
+Chọn **một** nguồn dữ liệu:
+
+```text
+npm run db:seed
+```
+
+Lệnh trên nhập bộ dữ liệu giả lập nhỏ từ `seed/test/records.json` (SKU TEST, dấu xóa, forecast, Demand Event). Hoặc, khi nhận folder bàn giao có bản xuất mới nhất:
+
+```text
+npm run db:import -- test-data/latest.json
+```
+
+Import/seed từ chối database đã có bản ghi; không tự ghi đè. Nếu chưa cần dữ liệu, bỏ qua cả hai lệnh.
+
+```text
 npm run dev
 ```
 
-Mở http://127.0.0.1:5173. Lệnh `test:account` hỏi tên và mật khẩu TEST mới; không có mật khẩu mặc định trong gói. DB/FILES local nằm trong `.local-data/`, được Git bỏ qua. `db:init` chỉ tạo/migrate DB local rỗng; không nạp dữ liệu thật. File `.env.example` chỉ có chú thích và giá trị mẫu; không cần khóa cloud để chạy TEST. Không đặt biến DATABASE_URL, CLOUDFLARE_API_TOKEN hoặc khóa production vào môi trường local.
+Mở http://127.0.0.1:5173/. Lần đầu, trang đăng nhập hướng dẫn tạo tài khoản TEST của máy này: tên 3–40 ký tự chữ/số/gạch nối/gạch dưới, mật khẩu đúng 4 chữ số. Không có tài khoản/mật khẩu dùng chung trong seed. Lần sau dùng lại tài khoản này. Đăng nhập nhanh Line chỉ xem giao diện, không cấp quyền lưu TEST.
 
-```sh
-npm run typecheck
-npm run build
+Có thể tạo tài khoản trước bằng `npm run test:account`. Mật khẩu được hỏi trực tiếp, không đưa vào tham số shell; file chỉ lưu salt/hash scrypt. Tài khoản đã tồn tại không bị ghi đè. Danh sách “Quản lý người dùng” trong nghiệp vụ không thay đổi tài khoản đăng nhập TEST này.
+
+## Database và xác nhận TEST
+
+- Endpoint http://127.0.0.1:5173/api/test-environment phải trả `environment: TEST`, `remote: false`, `engine: Miniflare D1`, `database: .local-data/d1`.
+- Preview có nhãn **MÔI TRƯỜNG TEST · Dữ liệu local**.
+- Database thật của preview lưu trên ổ đĩa trong `.local-data/d1`; đóng Codex, Ctrl+C, mở lại máy hoặc khởi động preview không làm mất dữ liệu.
+- Không xóa `.local-data`. Không chạy các script tạm cũ trong `.sites-runtime` để khởi động.
+- Cấu hình TEST nằm tại `config/local-test.json`. Khởi động bị chặn nếu sửa host/remote/database ID/vị trí lưu hoặc có biến môi trường Cloudflare/D1/production nguy hiểm.
+- API TEST chặn origin ngoài local và yêu cầu đăng nhập để ghi. Không có token, remote binding hoặc đường ghi vào D1 LIVE.
+- API nghiệp vụ dùng chung `/api/records` với schema hiện tại. Các thao tác gọi API và nhận thành công được lưu bền vững. Những màn hình chỉ là khung hoặc chỉ đổi React state chưa được coi là chức năng lưu hoàn chỉnh.
+
+## Migration và backup
+
+Schema: `db/schema.ts`. Migration: `drizzle/`, thứ tự trong `drizzle/meta/_journal.json`.
+
+```text
+npm run db:init
+npm run db:export
 ```
 
-`npm run dev` là cách chạy local được hỗ trợ trong gói này. Build tạo output kiểm tra; đưa lên GitHub chỉ lưu source, không tự làm website hoạt động trên GitHub Pages. Muốn hosting ở nơi khác cần thiết kế cấu hình backend D1/SQLite, FILES, xác thực và secrets riêng; chưa có cấu hình triển khai ở đây.
+Khởi tạo chỉ áp dụng migration chưa chạy; checksum chặn thay đổi migration cũ. Migration không chứa seed. Mỗi export tạo JSON có ngày giờ và checksum trong `backups/test/`, giữ nguyên `entity`, `record_key`, chuỗi `payload`, `updated_by`, `updated_at` và `_deleted`.
 
-## Cấu trúc
+Khi chuyển máy: giữ mã nguồn/migration và bản xuất TEST; khởi tạo database mới rồi import. Không mang file SQLite đang chạy hoặc file tài khoản sang máy Sếp.
 
-- `app/`, `components/`, `lib/`, `hooks/`: giao diện và nghiệp vụ.
-- `worker/`, `scripts/local/`: API và môi trường local.
-- `db/schema.ts`, `drizzle/*.sql`, `drizzle/meta/`: schema, lịch sử migration; không phải DB dump. Migration 0006 là quy tắc lịch sử xóa snapshot tồn kho, chỉ chạy trong DB local mới khi làm theo hướng dẫn này.
-- `package.json`, `package-lock.json`: dependency; lockfile giữ nguyên từ commit gốc.
-- `config/local-*.json`: TEST loopback, không remote.
-- `SOURCE-PROVENANCE.json`, `EXPORT-CHANGES.json`, `SHA256SUMS.txt`: nguồn gốc và danh mục kiểm tra.
+## Kiểm tra và chuẩn bị bàn giao
 
-## Những gì đã làm sạch trong bản sao
+```text
+npm test
+npm run typecheck
+npm run build
+npm run test:legacy
+npm run handoff
+```
 
-Dữ liệu JSON nền SKU/BOM/giờ công/tồn kho/nhu cầu và danh sách tài khoản nhúng được làm rỗng. Tên nhân viên, username ngoại lệ, email và mã hàng minh họa được thay bằng giá trị mẫu; các ngoại lệ cá nhân cần cấu hình lại khi thử ở môi trường riêng. Ba tên phụ kho là ba tên mẫu, không phải nhân viên thật. Một số màn hình minh họa tĩnh cũ chứa dữ liệu thật được thay bằng thông báo không có dữ liệu mẫu. Các màn hình nghiệp vụ lấy dữ liệu từ API vẫn có source.
+`handoff` thực hiện đủ kiểm tra, build, export TEST, dựng database kiểm chứng rồi nhập/đối chiếu, quét bí mật và đóng gói. Có lỗi thì dừng với báo cáo BLOCKED; không coi folder dở dang là bản bàn giao.
 
-Bỏ fixture/test lịch sử, báo cáo bàn giao cũ, seed dữ liệu, QA capture, công cụ restore/deploy và gói backup Windows. Bỏ `.openai/hosting.json`; Vite chỉ có binding local mẫu. Plugin snapshot source trả null trong bản xuất, nên chức năng tải bản sao source qua web không hoạt động trong gói này. Tích hợp kho/đồng bộ môi trường dùng địa chỉ `.invalid` và Sheet ID mẫu; không kết nối kho thật.
+Folder hoàn chỉnh nằm trong `handoff/ONSPA-TEST-<ngày giờ>/`, kèm `HANDOFF-REPORT.json`, checksum, số bản ghi và `docs/FUNCTION_STATUS.md`. Gửi **folder đã tạo này**, không gửi nguyên workspace có `.local-data` hoặc `.sites-runtime`.
 
-Giữ mã xử lý nghiệp vụ, không xuất bản ghi từ DB, tài khoản, session, uploads hay bí mật. Không đưa `node_modules`, build output, DB local tạo lúc kiểm tra, `.git`, cache hoặc file môi trường thật vào ZIP. Không nhập lại dữ liệu từ ZIP/backup cũ.
+Không đưa `.git`, node_modules, cache, dist, file database, tài khoản/mật khẩu, token, backup cũ và file tạm vào gói. Dữ liệu TEST có thể chứa thông tin do bạn nhập: kiểm tra nội dung được phép chia sẻ trước khi gửi. Bộ quét tự động không thay thế kiểm tra nội dung thủ công.
 
-## Phạm vi xác minh
+Chi tiết: `docs/HANDOFF.md` và `docs/FUNCTION_STATUS.md`. JSON gốc và một số bảng viết sẵn vẫn có trong mã nguồn; seed TEST không phải bản sao dữ liệu D1 LIVE.
 
-Đã đối chiếu commit; kiểm tra cú pháp/TypeScript và build; chạy migration trên DB TEST mới (0 bản ghi); quét mẫu secret và kiểm tra danh mục ZIP. Đã kiểm tra HTTP local: trang chủ trả 200; API test-environment xác nhận TEST, remote=false và yêu cầu tạo tài khoản mới. Build có cảnh báo chunk lớn của Vite. Không có kiểm thử nghiệp vụ với dữ liệu thật, nghiệm thu mọi màn hình hoặc thử triển khai GitHub/hosting mới. Bộ test lịch sử không nằm trong gói vì có fixture và thông tin nội bộ; không tuyên bố đã chạy toàn bộ bộ test đó trên bản đã làm sạch.
+## Production Plan
 
-Web chính và web thử, DB, tệp, tài khoản và quyền đang chạy không bị sửa bởi việc xuất này.
+Luồng mới dùng `/api/production-plan` trên D1 TEST local. Chọn tuần → nhận bản Engine đã lưu → chọn dòng và sửa → Lưu → Chốt → Chuyển In Transit. Mở chốt cần lý do và tài khoản chủ TEST đã xác thực. Mỗi thao tác lưu cả dữ liệu và lịch sử trong một giao dịch; ghi trực tiếp Plan/In Transit qua API records cũ bị chặn.
+
+Xem `docs/production-plan/IMPLEMENTATION.md` để biết quy tắc chuyển đổi, nguồn GIO_CONG/LINE_CAPACITY còn thiếu và cách nghiệm thu. Migration `0001_production_plan_revision.sql` tự áp dụng khi khởi động; giữ nguyên dữ liệu hiện có.
 
 
-## Cập nhật nền TEST v749
-Giữ menu tiếng Việt “Hệ thống báo công” đã merge tại PR #1. Chỉ cập nhật mã; không có dữ liệu từ DB. `config/local-test.json`, `config/local-files.json`, `.env.example`, Vite local và lockfile giữ nguyên nền TEST. Các tính năng khóa/hủy báo công và chuyển lệnh có source mới, nhưng cổng hostname được đổi thành main.example.invalid / trial.example.invalid: không kích hoạt trên localhost và không kết nối Site thật. Kiểm thử mô phỏng gọi hàm trực tiếp với dữ liệu tổng hợp trên Miniflare local.
+## Forecast/Demand PDF — khôi phục và lưu bền vững
 
-Chạy `npm run test:export` để chạy 11 kiểm thử mục tiêu. Đọc PCB-REVIEW.md, DIFF-SUMMARY.json và UPDATE-FROM-GITHUB-MAIN.patch trước khi cập nhật repo. Đây là bản sao độc lập: chưa push/PR/merge/deploy. Không dùng gói để ghi đè production.
+Database ở `.local-data/d1`; install/build/start không reset hoặc seed. `npm run db:init` áp dụng migration không phá hủy dữ liệu, kiểm tra checksum migration.
+
+- Backup: `npm run db:export`, file ngày giờ trong `backups/test`.
+- Restore trên máy mới/database rỗng: `npm run db:init`, rồi `npm run db:import -- <export.json>`. Không xóa database đang dùng để thử restore; dùng folder bàn giao riêng.
+- Preview: `npm run dev`, mở http://127.0.0.1:5173/. `/api/test-environment` phải có remote=false, database `.local-data/d1` và nhãn TEST.
+- Đã nhập Forecast SX08=302, SX09=304, Demand104 đã lập. Giữ thêm1 Forecast TEST và1 Demand TEST ngoài PDF. Xem `docs/FORECAST-RESTORE-RESULT.md`.
+- Nhập lại đúng bộPDF: Python có pdfplumber chạy `scripts/local/extract-planning-pdfs.py <PDF07> <PDF08> <PDFDemand> .local-data/imports/planning-pdfs.json`; kiểm tra kết quả rồi chạy `node scripts/local/import-planning.mjs`. Tự backup trước nhập; upsert và giữ dòng ngoài PDF. Không chạy tự động khi khởi động.
+- Parser khóa kỳ/số lượng302/304/104 của bộ này. PDF mới cần kiểm tra nguồn trước khi mở rộng điều kiện, không sửa dữ liệu cho khớp bộ đếm. Trình nhập PDF cũ trên web đã ngừng ghi đè kỳ.
+- PDF/JSON nằm ngoài public, trong `.local-data`/`backups`; chặn HTTP, loại khỏi Git. `npm run handoff` xuất TEST mới và quét bí mật khi chuẩn bị folder Sếp.
+
+
+## Sao lưu dữ liệu D1 và tệp R2 local
+
+Đăng nhập Super Admin TEST rồi mở Quản trị hệ thống → Sao lưu & Bàn giao. FILES local lưu bền vững tại `.local-data/r2`, metadata/lịch sử nằm trong D1 hiện có. Có thể xuất bằng `node scripts/local/export-handover.mjs`; chỉ tài khoản được ghi vai trò Super Admin trong D1 mới được phép. ZIP dữ liệu nằm ở `handoff/` và FILES/backups; không đưa vào Git. Hướng dẫn khôi phục có trong ZIP. Xem [giới hạn và báo cáo kiểm thử](docs/STORAGE-HANDOVER.md) trước khi sử dụng: chưa chuyển hết dữ liệu nguồn cũ sang D1 và chưa tích hợp mọi menu upload.

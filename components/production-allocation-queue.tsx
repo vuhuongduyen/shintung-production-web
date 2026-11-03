@@ -118,7 +118,7 @@ function EditAllocation({offer,entry,view,busy,onCommand,now}:{offer:AllocationQ
  const {saving,submit}=useQueueCommand(onCommand),disabled=busy||saving;
  const min=localCeil(new Date(Math.max(Date.parse(now),Date.parse(offer.effectiveAt))).toISOString());
  const valid=validRange(start,end,min,local(offer.endsAt))&&!!reason.trim();
- return <div className={styles.allocationEdit}>{!open?<FeedbackActionButton className={toolbarStyles.button} disabled={disabled} onClick={()=>setOpen(true)}>Sửa phân bổ</FeedbackActionButton>:<form className={styles.form} aria-label="Sửa phân bổ" onInvalid={notifyInvalidAction} onSubmit={async e=>{e.preventDefault();if(disabled||!valid)return;if(await submit({action:'edit',offerId:offer.id,allocationId:entry.id,expectedRevision:view.revision,targetLine:target,effectiveAt:iso(start),endsAt:iso(end),reason:reason.trim()}))setOpen(false);}}>
+ return <div className={styles.allocationEdit}>{!open?<FeedbackActionButton className={toolbarStyles.button} disabled={disabled} disabledExplanation="Đang xử lý. Vui lòng chờ hoàn tất." onClick={()=>setOpen(true)}>Sửa phân bổ</FeedbackActionButton>:<form className={styles.form} aria-label="Sửa phân bổ" onInvalid={notifyInvalidAction} onSubmit={async e=>{e.preventDefault();if(disabled||!valid)return;if(await submit({action:'edit',offerId:offer.id,allocationId:entry.id,expectedRevision:view.revision,targetLine:target,effectiveAt:iso(start),endsAt:iso(end),reason:reason.trim()}))setOpen(false);}}>
  <strong>Sửa phân bổ · {offer.people.find(p=>p.id===entry.employeeId)?.name||entry.employeeId}</strong>
  <p>Hiện tại: Line {entry.targetLine} · {display(entry.effectiveAt!)} – {display(entry.endsAt!)}</p>
  <fieldset disabled={disabled}>
@@ -126,7 +126,7 @@ function EditAllocation({offer,entry,view,busy,onCommand,now}:{offer:AllocationQ
  <label>Từ ngày, giờ<ProductionDateTimeInput label="Sửa phân bổ từ ngày giờ" value={start} onChange={setStart} min={min} max={local(offer.endsAt)}/></label>
  <label>Đến ngày, giờ<ProductionDateTimeInput label="Sửa phân bổ đến ngày giờ" value={end} onChange={setEnd} min={start} max={local(offer.endsAt)}/></label>
  <label>Lý do sửa<input required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>
- </fieldset><div className={styles.confirmActions}><FeedbackActionButton className={styles.submit} type="submit" disabled={disabled||!valid} disabledExplanation="Nhập lý do sửa và khoảng thời gian chưa qua, nằm trong lịch chuyển.">Lưu phân bổ</FeedbackActionButton><FeedbackActionButton type="button" disabled={disabled} onClick={()=>setOpen(false)}>Đóng</FeedbackActionButton></div>
+ </fieldset><div className={styles.confirmActions}><FeedbackActionButton className={styles.submit} type="submit" disabled={disabled||!valid} disabledExplanation="Nhập lý do sửa và khoảng thời gian chưa qua, nằm trong lịch chuyển.">Lưu phân bổ</FeedbackActionButton><FeedbackActionButton type="button" disabled={disabled} disabledExplanation="Đang xử lý. Vui lòng chờ hoàn tất." onClick={()=>setOpen(false)}>Đóng</FeedbackActionButton></div>
  </form>}</div>;
 }
 
@@ -166,7 +166,7 @@ export default function ProductionAllocationQueue({view,candidates,busy,onComman
  const outgoing=view.offers.filter(offer=>offer.canWithdraw&&(view.group==='ADMIN'||offer.sourceGroup===view.group)&&!offer.expired);
 
  const hasOutgoing=outgoing.some(offer=>offer.people.some(person=>person.pending.some(window=>Date.parse(window.endsAt)>Date.parse(now))));
- const pendingCount=new Set(view.offers.flatMap(offer=>offer.people.filter(person=>person.pending.some(window=>Date.parse(window.endsAt)>Date.parse(now))).map(person=>person.id))).size;
+ const pendingCount=new Set(view.offers.filter(offer=>!offer.expired&&(view.readOnly||view.group==='ADMIN'||offer.sourceGroup===view.group||offer.targetGroup===view.group)).flatMap(offer=>offer.people.filter(person=>person.pending.some(window=>Date.parse(window.endsAt)>Date.parse(now))).map(person=>person.id))).size;
  const history=view.offers.filter(offer=>view.readOnly||view.group==='ADMIN'||offer.sourceGroup===view.group||offer.targetGroup===view.group);
  const inspectOnly=!!view.readOnly||!scopedLines.length;
  const cancelable=history.flatMap(offer=>(view.group==='ADMIN'||offer.targetGroup===view.group)?offer.allocations.filter(entry=>entry.planning&&!entry.canceled&&entry.canCancel&&entry.id).map(entry=>({offer,entry})):[]);

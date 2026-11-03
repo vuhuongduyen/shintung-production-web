@@ -1,0 +1,11 @@
+/* Portaled outside the report table: opening never changes row/column geometry. */
+.production-employee-popover{position:fixed;z-index:13000;box-sizing:border-box;overflow:auto;overscroll-behavior:contain;border:1px solid #6e9582;border-radius:5px;background:#fffdf5;box-shadow:0 8px 25px #173b2538;color:#173b25;font:16px/1.45 'Times New Roman',serif;overflow-anchor:none}
+.production-employee-popover>header{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;background:#edf3e8;border-bottom:1px solid #8caa96}
+.production-employee-popover>header button{min-width:44px;min-height:44px;border:1px solid #8caa96;background:white;color:#174f39;font:24px 'Times New Roman',serif;cursor:pointer}
+.production-employee-popover>.production-employee-grid{padding:8px;overflow:auto;max-width:100%;box-sizing:border-box}
+.production-employee-popover .production-employee-table{width:100%;min-width:0!important;border-collapse:collapse;table-layout:auto}
+.production-employee-popover :is(th,td){border:1px solid #b8cfb9;padding:7px;white-space:normal;overflow-wrap:anywhere;text-align:left;vertical-align:top}
+.production-employee-popover th{background:#edf3e8;color:#174f39}
+.production-employee-popover .number{white-space:nowrap;text-align:right}
+.production-employee-popover .production-subtext{display:block}
+.production-employee-popover:focus-visible,.production-employee-popover button:focus-visible{outline:2px solid #bc660b;outline-offset:-3px}

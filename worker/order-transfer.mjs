@@ -1,6 +1,6 @@
 import {sessionUser,isAdminRole} from './password-auth.mjs';
 import {createHash} from 'node:crypto';
-const MAIN='main.example.invalid',TRIAL='trial.example.invalid';
+const MAIN='sanxuat.shintung-vn-4458.chatgpt.site',TRIAL='onspa-thu-nghiem-21102026.shintung-vn-4458.chatgpt.site';
 const entities=['in_transit','in_transit_audit','production_event','production_report','production_history_import'];
 const sqlScope="entity IN ('in_transit','in_transit_audit','production_event','production_report','production_history_import','production_cursor')";
 const digest=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');

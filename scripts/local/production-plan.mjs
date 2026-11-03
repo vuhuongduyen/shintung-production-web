@@ -1,3 +1,4 @@
+import {acceptedCapacity} from '../../lib/capacity-accepted.mjs';
 import {capacityDailyBudgets} from '../../lib/plan-week-load.mjs';
 import {readPlanTransitBacklog} from './plan-transit-backlog.mjs';
 import {backlogLineSummary} from '../../lib/plan-transit-backlog.mjs';
@@ -52,8 +53,9 @@ export async function getPlanCapacity(db, week) {
     return allLines.map(line=>{const row=capacityRows.find(r=>r.line===line)||{line,week,status:'Chưa xác nhận Capacity'};
         const adjusting=['adjust-pending','adjust-approved','adjusting'].includes(row.reviewStatus)||
             row.reviewStatus!=='approved'&&row.version>1&&row.history?.some(event=>event.action==='requestChange'&&event.decision!=='reject');
-        const status=!row.reviewStatus||row.reviewStatus==='approved'?row.status:adjusting?'Chờ điều chỉnh':row.reviewStatus==='await-sync'?'Chờ đồng bộ':row.reviewStatus==='pending'?'Chờ KHSX đồng ý':'Chưa xác nhận Capacity';
-        return {...backlogLineSummary(backlog,row.line),dailyBudgets:calendars.filter(c=>c.line===row.line).flatMap(capacityDailyBudgets),otherPlans:otherPlans.filter(r=>r.line===row.line),week:row.week,line:row.line,status,reviewStatus:row.reviewStatus||'legacy',canViewDaily:row.status==='Đã xác nhận'&&row.reviewStatus==='approved'&&!!row.syncedAt&&!!row.khsxAcceptedAt,version:row.version,updateNumber:row.updateNumber,availableHours:row.availableHours,confirmedAt:row.confirmedAt,khsxAcceptedAt:row.khsxAcceptedAt,lastConfirmed:row.lastConfirmed?{availableHours:row.lastConfirmed.availableHours,version:row.lastConfirmed.version}:undefined};
+        const accepted=acceptedCapacity(row);
+        const status=accepted.retainedApproval?'Đã xác nhận':!row.reviewStatus||row.reviewStatus==='approved'?row.status:adjusting?'Chờ điều chỉnh':row.reviewStatus==='await-sync'?'Chờ đồng bộ':row.reviewStatus==='pending'?'Chờ KHSX đồng ý':'Chưa xác nhận Capacity';
+        return {...backlogLineSummary(backlog,row.line),dailyBudgets:calendars.filter(c=>c.line===row.line).flatMap(capacityDailyBudgets),otherPlans:otherPlans.filter(r=>r.line===row.line),week:row.week,line:row.line,status,reviewStatus:row.reviewStatus||'legacy',canViewDaily:row.status==='Đã xác nhận'&&row.reviewStatus==='approved'&&!!row.syncedAt&&!!row.khsxAcceptedAt,retainedApproval:!!accepted.retainedApproval,version:accepted.version,updateNumber:row.updateNumber,availableHours:accepted.availableHours,confirmedAt:row.confirmedAt,khsxAcceptedAt:row.khsxAcceptedAt,lastConfirmed:row.lastConfirmed?{availableHours:row.lastConfirmed.availableHours,version:row.lastConfirmed.version}:undefined};
     });
 }
 export async function getPlan(db, week, canReopen = false, catalog = null) {

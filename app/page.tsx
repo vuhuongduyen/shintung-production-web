@@ -100,7 +100,9 @@ import { InTransit, prefetchInTransit } from "../components/in-transit";
 import LaborHoursMaster, {
   preloadLaborHours,
 } from "../components/labor-hours-master";
-const ProductionManagement = deferredScreen(() => import("../components/production-management"));
+const loadProductionManagement = () => import("../components/production-management");
+const ProductionManagement = deferredScreen(loadProductionManagement);
+import {readProductionWorkflow as prefetchProductionWorkflow} from '../lib/production-workflow-cache';
 const ProductionAllocationWorkspace = deferredScreen(() => import("../components/production-allocation-workspace"));
 import bomData from "./bom-data.json";
 import skuExtraData from "./sku-extra-data.json";
@@ -1302,7 +1304,48 @@ const saveInventorySnapshot = async (
   inventorySnapshotsCache = null;
 };
 
-const skuDetailOverrides: Record<string, Partial<Sku>> = {};
+const skuDetailOverrides: Record<string, Partial<Sku>> = {
+  "103S110103": {
+    moq: 72,
+    mode: "MTO",
+    safetyDays: 7,
+    leadTime: "3 ngày",
+    standardHours: "0.082 giờ/SP",
+    unit: "Bộ",
+  },
+  "103S111101": {
+    moq: 24,
+    mode: "MTS",
+    safetyDays: 7,
+    leadTime: "4 ngày",
+    standardHours: "0.095 giờ/SP",
+    unit: "Bộ",
+  },
+  "103S205201": {
+    moq: 100,
+    mode: "MTS",
+    safetyDays: 7,
+    leadTime: "5 ngày",
+    standardHours: "0.104 giờ/SP",
+    unit: "Bộ",
+  },
+  "103S209201": {
+    moq: 120,
+    mode: "MTS",
+    safetyDays: 7,
+    leadTime: "5 ngày",
+    standardHours: "0.102 giờ/SP",
+    unit: "Bộ",
+  },
+  "103SM00004": {
+    moq: 1,
+    mode: "MTO",
+    safetyDays: 7,
+    leadTime: "6 ngày",
+    standardHours: "0.115 giờ/SP",
+    unit: "Bộ",
+  },
+};
 
 const originalSkus: Sku[] = (
   skuTpData as Array<{
@@ -1341,8 +1384,25 @@ const originalSkus: Sku[] = (
       : {}),
   };
 });
-const inHouseProcessingSkus = new Set<string>();
-const btpAssemblySkus = new Set<string>();
+const inHouseProcessingSkus = new Set([
+  "3100101",
+  "3100811",
+  "3100812",
+  "3100102",
+  "3100822",
+  "3100103",
+  "3050307B",
+  "3040401B",
+  "3040305B",
+  "3040403B",
+]);
+const btpAssemblySkus = new Set([
+  "102XT06001",
+  "102XX04004",
+  "3030901",
+  "3030902",
+  "3040101",
+]);
 const normalizeSkuGroup = (group: string, code: string) => {
   if (btpAssemblySkus.has(code.toUpperCase())) return "LẮP RÁP BTP";
   const normalized = group
@@ -1434,11 +1494,425 @@ type BomItem = {
   expiry?: string;
 };
 
-const finishedBom: BomItem[] = [];
+const finishedBom: BomItem[] = [
+  {
+    stt: "0010",
+    code: "3020111",
+    name: "ZOONG TAY SEN ABS",
+    spec: "17*2.2mm, NBR-701",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Mua",
+  },
+  {
+    stt: "0020",
+    code: "3030101",
+    name: "DÂY SEN 16mm",
+    spec: "10mm Inner hose",
+    waste: "0.770%",
+    qty: "0.17",
+    unit: "KG",
+    source: "Tự chế",
+  },
+  {
+    stt: "0030",
+    code: "3030204",
+    name: "ĐẦU ABS TRẮNG",
+    spec: "CTY",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Mua",
+  },
+  {
+    stt: "0040",
+    code: "3030303",
+    name: "MÓC PVC TRẮNG",
+    spec: "",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Mua",
+  },
+  {
+    stt: "0050",
+    code: "3030402",
+    name: "6 GÓC HOA SEN (LOGO)",
+    spec: "",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Tự chế",
+  },
+  {
+    stt: "0060",
+    code: "3030602",
+    name: "CHỤP HOA SEN INOX",
+    spec: "",
+    waste: "0.000%",
+    qty: "2",
+    unit: "CÁI",
+    source: "Mua",
+  },
+  {
+    stt: "0070",
+    code: "3030701",
+    name: "ZOONG 2 LỚP ĐL",
+    spec: "",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Mua",
+  },
+  {
+    stt: "0080",
+    code: "3030501",
+    name: "ỐC ĐỒNG 1",
+    spec: "10.7mm",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Tự chế",
+  },
+  {
+    stt: "0090",
+    code: "3030502",
+    name: "ỐC ĐỒNG 2",
+    spec: "18mm",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Tự chế",
+  },
+  {
+    stt: "0100",
+    code: "3030914",
+    name: "ĐẦU PS M3",
+    spec: "",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Mua",
+  },
+  {
+    stt: "0110",
+    code: "3040801",
+    name: "ZOONG 14MM VN",
+    spec: "2mm (PVC màu trắng)",
+    waste: "0.000%",
+    qty: "1",
+    unit: "CÁI",
+    source: "Mua",
+  },
+  {
+    stt: "0120",
+    code: "3990102",
+    name: "O VÊ 3 LY VN",
+    spec: "",
+    waste: "0.000%",
+    qty: "7",
+    unit: "CÁI",
+    source: "Mua",
+  },
+];
 
-const btpBom: Record<string, BomItem[]> = {};
+const btpBom: Record<string, BomItem[]> = {
+  "3030101": [
+    {
+      stt: "0010",
+      code: "202PV016",
+      name: "TRẮNG TRONG ABLO1",
+      spec: "60%",
+      waste: "0.500%",
+      qty: "0.46",
+      unit: "KG",
+      source: "Mua",
+    },
+    {
+      stt: "0020",
+      code: "202PV017",
+      name: "TRẮNG ĐỤC BW01",
+      spec: "55%",
+      waste: "0.500%",
+      qty: "0.56",
+      unit: "KG",
+      source: "Mua",
+    },
+    {
+      stt: "0030",
+      code: "202FL001",
+      name: "CHỈ FILAMENT 630",
+      spec: "",
+      waste: "0.200%",
+      qty: "1",
+      unit: "KG",
+      source: "Mua",
+    },
+    {
+      stt: "0040",
+      code: "203FL006",
+      name: "CHỈ FILAMENT 750",
+      spec: "",
+      waste: "0.200%",
+      qty: "0.02",
+      unit: "KG",
+      source: "Mua",
+    },
+  ],
+  "3030402": [
+    {
+      stt: "0010",
+      code: "3030402B",
+      name: "BTP 6 GÓC HOA SEN",
+      spec: "Chưa xi",
+      waste: "0.000%",
+      qty: "1",
+      unit: "CÁI",
+      source: "Tự chế",
+    },
+  ],
+  "3030501": [
+    {
+      stt: "0010",
+      code: "201TR019",
+      name: "TRÒN Φ16 VN",
+      spec: "ỐC ĐỒNG 9.5",
+      waste: "0.000%",
+      qty: "1",
+      unit: "CÁI",
+      source: "Tự chế",
+    },
+  ],
+  "3030502": [
+    {
+      stt: "0010",
+      code: "201TR020",
+      name: "TRÒN Φ17 VN",
+      spec: "ỐC ĐỒNG HS 1",
+      waste: "0.000%",
+      qty: "1",
+      unit: "CÁI",
+      source: "Tự chế",
+    },
+  ],
+};
 
-function BomView() { return <p>Không có dữ liệu mẫu trong bản xuất source.</p>; }
+function BomView() {
+  const [tab, setTab] = useState<"finished" | "btp">("finished");
+  const [btpCode, setBtpCode] = useState("3030101");
+  const items = tab === "finished" ? finishedBom : (btpBom[btpCode] ?? []);
+  const openBtp = (code: string) => {
+    setBtpCode(code);
+    setTab("btp");
+  };
+  return (
+    <main className="workspace bom-workspace">
+      <div className="page-heading bom-heading">
+        <div>
+          <p className="eyebrow">CẤU TRÚC THÀNH PHẨM / BOM</p>
+          <PageTitle>Định mức BOM</PageTitle>
+          <p>
+            Quản lý vật tư trực tiếp của thành phẩm và BOM riêng cho bán thành
+            phẩm tự chế.
+          </p>
+        </div>
+        <FeedbackActionButton className="primary-button" disabled disabledExplanation="Chức năng này chưa được kết nối thao tác tại màn hình hiện tại.">＋ Tạo BOM</FeedbackActionButton>
+      </div>
+      <div className="bom-tabs">
+        <FeedbackActionButton
+          className={tab === "finished" ? "active" : ""}
+          onClick={() => setTab("finished")}
+        >
+          BOM Thành phẩm
+        </FeedbackActionButton>
+        <FeedbackActionButton
+          className={tab === "btp" ? "active" : ""}
+          onClick={() => setTab("btp")}
+        >
+          BOM BTP
+        </FeedbackActionButton>
+      </div>
+      <section className="bom-summary bom-summary-expanded">
+        <div className="bom-identity">
+          <span>{tab === "finished" ? "THÀNH PHẨM" : "BÁN THÀNH PHẨM"}</span>
+          <strong>{tab === "finished" ? "103SM31201" : btpCode}</strong>
+          <h2>
+            {tab === "finished"
+              ? "BỘ SEN PS M3"
+              : btpCode === "3030101"
+                ? "DÂY SEN 16mm"
+                : finishedBom.find((x) => x.code === btpCode)?.name}
+          </h2>
+          <p>
+            Quy cách:{" "}
+            {tab === "finished"
+              ? "LĐ-1.5m"
+              : btpCode === "3030101"
+                ? "10mm Inner hose"
+                : "—"}
+          </p>
+          <span className="bom-confirmed">● Đã xác nhận</span>
+        </div>
+        <div className="bom-info-grid">
+          <div className="bom-info-group">
+            <h3>Thông tin sản xuất</h3>
+            <dl>
+              <div>
+                <dt>Đơn vị</dt>
+                <dd>{tab === "finished" ? "BỘ" : "CÁI"}</dd>
+              </div>
+              <div>
+                <dt>Đơn vị nhỏ</dt>
+                <dd>—</dd>
+              </div>
+              <div>
+                <dt>Tình trạng</dt>
+                <dd>{tab === "finished" ? "M · Tự chế" : "M · Tự chế"}</dd>
+              </div>
+              <div>
+                <dt>Lượng SX ít nhất</dt>
+                <dd>1</dd>
+              </div>
+              <div>
+                <dt>Lệnh sản xuất</dt>
+                <dd>—</dd>
+              </div>
+              <div>
+                <dt>Ghi chú</dt>
+                <dd>—</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="bom-info-group">
+            <h3>Thiết lập và xác nhận</h3>
+            <dl>
+              <div>
+                <dt>Ngày thay đổi</dt>
+                <dd>—</dd>
+              </div>
+              <div>
+                <dt>Ngày thiết lập</dt>
+                <dd>22/01/2026</dd>
+              </div>
+              <div>
+                <dt>Ngày chỉnh sửa</dt>
+                <dd>22/01/2026</dd>
+              </div>
+              <div>
+                <dt>Ngày xác nhận</dt>
+                <dd>22/01/2026</dd>
+              </div>
+              <div>
+                <dt>Người xác nhận</dt>
+                <dd>vthduyen</dd>
+              </div>
+              <div>
+                <dt>Trạng thái ký duyệt</dt>
+                <dd>Không tiến hành ký duyệt</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="bom-info-group compact">
+            <h3>Phiên bản</h3>
+            <dl>
+              <div>
+                <dt>Phiên bản</dt>
+                <dd>0000</dd>
+              </div>
+              <div>
+                <dt>Số lần in</dt>
+                <dd>0</dd>
+              </div>
+              <div>
+                <dt>Số lần chuyển</dt>
+                <dd>0</dd>
+              </div>
+              <div>
+                <dt>Mã phiếu đổi</dt>
+                <dd>—</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </section>
+      {tab === "btp" && (
+        <div className="btp-picker">
+          <span>Chọn BOM BTP:</span>
+          {Object.keys(btpBom).map((code) => (
+            <FeedbackActionButton
+              className={code === btpCode ? "active" : ""}
+              key={code}
+              onClick={() => setBtpCode(code)}
+            >
+              {code}
+            </FeedbackActionButton>
+          ))}
+        </div>
+      )}
+      <section className="data-card bom-card">
+        <div className="result-bar">
+          <strong>{items.length}</strong> dòng nguyên vật liệu{" "}
+          <span>
+            {tab === "finished"
+              ? "Mã tự chế có thể mở BOM BTP →"
+              : "BOM riêng của bán thành phẩm"}
+          </span>
+        </div>
+        <DataTable className="table-wrap">
+          <table className="bom-table">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>MÃ NVL/BTP</th>
+                <th>TÊN</th>
+                <th>QUY CÁCH</th>
+                <th>HAO HỤT</th>
+                <th>LƯỢNG DÙNG</th>
+                <th>MẪU SỐ</th>
+                <th>NGÀY CÓ HIỆU LỰC</th>
+                <th>NGÀY HẾT HIỆU LỰC</th>
+                <th>ĐƠN VỊ</th>
+                <th>NGUỒN</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr
+                  key={`${item.stt}-${item.code}`}
+                  onDoubleClick={() => {
+                    if (item.source === "Tự chế" && btpBom[item.code])
+                      openBtp(item.code);
+                  }}
+                >
+                  <DataCell kind="number">{item.stt}</DataCell>
+                  <DataCell kind="code">
+                    <FeedbackActionButton className="sku-link" title="Nhấp đúp vào dòng để mở BOM phù hợp.">{item.code}</FeedbackActionButton>
+                  </DataCell>
+                  <DataCell className="product-name">{item.name}</DataCell>
+                  <DataCell>{item.spec || "—"}</DataCell>
+                  <DataCell kind="number">{item.waste}</DataCell>
+                  <DataCell kind="number" className="qty-cell">{item.qty}</DataCell>
+                  <DataCell kind="number">{item.denominator ?? "1"}</DataCell>
+                  <DataCell kind="date">{item.effective ?? "22/01/2026"}</DataCell>
+                  <DataCell kind="date">{item.expiry ?? "—"}</DataCell>
+                  <DataCell kind="code">{item.unit}</DataCell>
+                  <DataCell>
+                    <span
+                      className={`source-badge ${item.source === "Tự chế" ? "make" : "buy"}`}
+                    >
+                      {item.source === "Tự chế" ? "M · Tự chế" : "P · Mua"}
+                    </span>
+                  </DataCell>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DataTable>
+      </section>
+    </main>
+  );
+}
 
 type BomCatalogRecord = {
   sku: string;
@@ -1458,7 +1932,358 @@ type BomCatalogRecord = {
   changeDocument?: string;
   items: BomItem[];
 };
-const legacyBomCatalog: Omit<BomCatalogRecord, "category" | "itemType">[] = [];
+const legacyBomCatalog: Omit<BomCatalogRecord, "category" | "itemType">[] = [
+  {
+    sku: "102XS02001",
+    name: "DÂY XẢ INOX SỌC",
+    spec: "14MM 20cm",
+    unit: "SỢI",
+    version: "2026.01",
+    status: "Đang áp dụng",
+    items: [
+      {
+        stt: ".1",
+        code: "404XX001",
+        name: "TEM BẢO HÀNH 1 NĂM (D)",
+        spec: "",
+        waste: "—",
+        qty: "1",
+        unit: "TỜ",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060301",
+        name: "6 GÓC DÂY XẢ CÓ CHỮ - 37100 NSF",
+        spec: "TN GF00102 & NPF00102",
+        waste: "—",
+        qty: "2",
+        unit: "CÁI",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060501",
+        name: "ỐC ĐỒNG 9.5 (14MM)",
+        spec: "",
+        waste: "—",
+        qty: "2",
+        unit: "CÁI",
+        source: "Tự chế",
+      },
+      {
+        stt: ".1",
+        code: "3060701",
+        name: "Zoong EPDM 2mm (EP-701)",
+        spec: "TN GF00102 & NPF00102",
+        waste: "—",
+        qty: "2",
+        unit: "CÁI",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060105",
+        name: "DÂY SỌC 14MM KG",
+        spec: "",
+        waste: "—",
+        qty: "0,027351",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "3060202",
+        name: "RUỘT DÂY ĐEN 14MM",
+        spec: "10mm Inner hose",
+        waste: "—",
+        qty: "0,01355319",
+        unit: "KG",
+        source: "Tự chế",
+      },
+    ],
+  },
+  {
+    sku: "102XS03001",
+    name: "DÂY XẢ INOX SỌC",
+    spec: "14MM 30cm",
+    unit: "SỢI",
+    version: "2026.01",
+    status: "Đang áp dụng",
+    items: [
+      {
+        stt: ".1",
+        code: "404XX001",
+        name: "TEM BẢO HÀNH 1 NĂM (D)",
+        spec: "",
+        waste: "—",
+        qty: "1",
+        unit: "TỜ",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060301",
+        name: "6 GÓC DÂY XẢ CÓ CHỮ - 37100 NSF",
+        spec: "TN GF00102 & NPF00102",
+        waste: "—",
+        qty: "2",
+        unit: "CÁI",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "407DX001",
+        name: "TÚI 30 (7*44)",
+        spec: "",
+        waste: "—",
+        qty: "0,004",
+        unit: "KG",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060105",
+        name: "DÂY SỌC 14MM KG",
+        spec: "",
+        waste: "—",
+        qty: "0,044572",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "3060202",
+        name: "RUỘT DÂY ĐEN 14MM",
+        spec: "10mm Inner hose",
+        waste: "—",
+        qty: "0,02208668",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "203SS001",
+        name: "INOX ĐL",
+        spec: "",
+        waste: "—",
+        qty: "0,02026464",
+        unit: "KG",
+        source: "Mua",
+      },
+    ],
+  },
+  {
+    sku: "102XS04001",
+    name: "DÂY XẢ INOX SỌC",
+    spec: "14MM 40cm",
+    unit: "SỢI",
+    version: "2026.01",
+    status: "Đang áp dụng",
+    items: [
+      {
+        stt: ".1",
+        code: "404XX001",
+        name: "TEM BẢO HÀNH 1 NĂM (D)",
+        spec: "",
+        waste: "—",
+        qty: "1",
+        unit: "TỜ",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060301",
+        name: "6 GÓC DÂY XẢ CÓ CHỮ - 37100 NSF",
+        spec: "TN GF00102 & NPF00102",
+        waste: "—",
+        qty: "2",
+        unit: "CÁI",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "403DX004",
+        name: "NHÃN DÂY XẢ 40cm",
+        spec: "",
+        waste: "—",
+        qty: "1",
+        unit: "TỜ",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060105",
+        name: "DÂY SỌC 14MM KG",
+        spec: "",
+        waste: "—",
+        qty: "0,06078",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "3060202",
+        name: "RUỘT DÂY ĐEN 14MM",
+        spec: "10mm Inner hose",
+        waste: "—",
+        qty: "0,0301182",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "203SS001",
+        name: "INOX ĐL",
+        spec: "",
+        waste: "—",
+        qty: "0,0276336",
+        unit: "KG",
+        source: "Mua",
+      },
+    ],
+  },
+  {
+    sku: "102XS05001",
+    name: "DÂY XẢ INOX SỌC",
+    spec: "14MM 50cm",
+    unit: "SỢI",
+    version: "2026.01",
+    status: "Đang áp dụng",
+    items: [
+      {
+        stt: ".1",
+        code: "404XX001",
+        name: "TEM BẢO HÀNH 1 NĂM (D)",
+        spec: "",
+        waste: "—",
+        qty: "1",
+        unit: "TỜ",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "407DX003",
+        name: "TÚI 50 (7*62)",
+        spec: "",
+        waste: "—",
+        qty: "0,0057",
+        unit: "KG",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "401DX009",
+        name: "THÙNG DÂY XẢ 60mm 2013",
+        spec: "",
+        waste: "—",
+        qty: "0,005",
+        unit: "CÁI",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060105",
+        name: "DÂY SỌC 14MM KG",
+        spec: "",
+        waste: "—",
+        qty: "0,075975",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "3060202",
+        name: "RUỘT DÂY ĐEN 14MM",
+        spec: "10mm Inner hose",
+        waste: "—",
+        qty: "0,03764775",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "203CU001",
+        name: "CHỈ CU VÀNG",
+        spec: "",
+        waste: "—",
+        qty: "0,003636",
+        unit: "KG",
+        source: "Mua",
+      },
+    ],
+  },
+  {
+    sku: "102XS06001",
+    name: "DÂY XẢ INOX SỌC",
+    spec: "14MM 60cm",
+    unit: "SỢI",
+    version: "2026.01",
+    status: "Đang áp dụng",
+    items: [
+      {
+        stt: ".1",
+        code: "404XX001",
+        name: "TEM BẢO HÀNH 1 NĂM (D)",
+        spec: "",
+        waste: "—",
+        qty: "1",
+        unit: "TỜ",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060301",
+        name: "6 GÓC DÂY XẢ CÓ CHỮ - 37100 NSF",
+        spec: "TN GF00102 & NPF00102",
+        waste: "—",
+        qty: "2",
+        unit: "CÁI",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "407DX004",
+        name: "TÚI 60 (7*72)",
+        spec: "",
+        waste: "—",
+        qty: "0,0071",
+        unit: "KG",
+        source: "Mua",
+      },
+      {
+        stt: ".1",
+        code: "3060105",
+        name: "DÂY SỌC 14MM KG",
+        spec: "",
+        waste: "—",
+        qty: "0,09117",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "3060202",
+        name: "RUỘT DÂY ĐEN 14MM",
+        spec: "10mm Inner hose",
+        waste: "—",
+        qty: "0,0451773",
+        unit: "KG",
+        source: "Tự chế",
+      },
+      {
+        stt: "..2",
+        code: "203SS001",
+        name: "INOX ĐL",
+        spec: "",
+        waste: "—",
+        qty: "0,0414504",
+        unit: "KG",
+        source: "Mua",
+      },
+    ],
+  },
+];
 
 const originalBomCatalog = (bomData as BomCatalogRecord[]).filter(
   (row) => !purchasedSkuCodes.has(row.sku.toUpperCase()),
@@ -1548,7 +2373,7 @@ function BomLookupView({ operator, canReconcile=false }: { operator: string; can
   const [notice, setNotice] = useState("");
   const [noticeIsError,setNoticeIsError]=useState(false);
   const [showMeta, setShowMeta] = useState(true);
-  const [confirmedBy, setConfirmedBy] = useState("sample_user_15");
+  const [confirmedBy, setConfirmedBy] = useState("vthduyen");
   const [suggestRow, setSuggestRow] = useState<number | null>(null);
   const [parentSuggestOpen, setParentSuggestOpen] = useState(false);
   const [parentSkuError, setParentSkuError] = useState("");
@@ -3066,7 +3891,83 @@ function buildProductionEngine(
   };
 }
 
-const proposalRows: PlanRow[] = [];
+const proposalRows: PlanRow[] = [
+  {
+    id: "PL-20260831-001",
+    sku: "102XS04001",
+    name: "DÂY XẢ INOX SỌC",
+    spec: "14MM 40cm",
+    group: "DÂY INOX SỌC",
+    suggested: 2000,
+    plan: 2000,
+    line: "A",
+    start: "31/08/2026",
+    end: "01/09/2026",
+    priority: "Cao – ROP",
+    type: "Tuần chính",
+    status: "Chưa đưa vào kế hoạch",
+  },
+  {
+    id: "PL-20260831-002",
+    sku: "102XT08001",
+    name: "DÂY XẢ PVC TRẮNG",
+    spec: "LN 80CM",
+    group: "DÂY XẢ PVC",
+    suggested: 1500,
+    plan: 1500,
+    line: "A",
+    start: "01/09/2026",
+    end: "02/09/2026",
+    priority: "Cao – Event",
+    type: "Tuần chính",
+    status: "Chưa đưa vào kế hoạch",
+  },
+  {
+    id: "PL-20260831-003",
+    sku: "103SM00102",
+    name: "BỘ SEN PS M1 INOX",
+    spec: "1.5m",
+    group: "BỘ SEN",
+    suggested: 600,
+    plan: 600,
+    line: "A",
+    start: "02/09/2026",
+    end: "03/09/2026",
+    priority: "Bù tải",
+    type: "Gối đầu",
+    status: "Chưa đưa vào kế hoạch",
+  },
+  {
+    id: "PL-20260831-004",
+    sku: "107P5127",
+    name: "VAN PHAO NHỰA (ngang) - nổi",
+    spec: '3/4"',
+    group: "VP TM",
+    suggested: 4800,
+    plan: 4800,
+    line: "B",
+    start: "31/08/2026",
+    end: "03/09/2026",
+    priority: "Khẩn – Event",
+    type: "Tuần chính",
+    status: "Chưa đưa vào kế hoạch",
+  },
+  {
+    id: "PL-20260831-005",
+    sku: "107N03402",
+    name: "VAN NHỰA ONSPA TAY INOX",
+    spec: '1 1/4"',
+    group: "THÀNH PHẨM KHÁC",
+    suggested: 0,
+    plan: 0,
+    line: "B",
+    start: "",
+    end: "",
+    priority: "KHÔNG BỔ SUNG",
+    type: "Tuần chính",
+    status: "Không bổ sung",
+  },
+];
 
 const forecastData: Record<
   string,
@@ -3088,7 +3989,98 @@ const forecastData: Record<
     hours: number;
     warning: string;
   }
-> = {};
+> = {
+  "102XS04001": {
+    f30: 12000,
+    f60: 28000,
+    f90: 40500,
+    d30: 545,
+    d60: 636,
+    d90: 614,
+    used: 636,
+    event: 0,
+    stock: 4000,
+    wip: 2000,
+    lead: 5,
+    safety: 7,
+    moq: 500,
+    rop: 7632,
+    hours: 0.045,
+    warning: "60D tăng 16,7%",
+  },
+  "102XT08001": {
+    f30: 9000,
+    f60: 21600,
+    f90: 31500,
+    d30: 409,
+    d60: 491,
+    d90: 477,
+    used: 491,
+    event: 1500,
+    stock: 2500,
+    wip: 1000,
+    lead: 4,
+    safety: 7,
+    moq: 500,
+    rop: 5401,
+    hours: 0.052,
+    warning: "Có Event 60D",
+  },
+  "103SM00102": {
+    f30: 4800,
+    f60: 9200,
+    f90: 13200,
+    d30: 218,
+    d60: 209,
+    d90: 200,
+    used: 218,
+    event: 600,
+    stock: 2300,
+    wip: 0,
+    lead: 6,
+    safety: 7,
+    moq: 200,
+    rop: 2834,
+    hours: 0.115,
+    warning: "Ổn định",
+  },
+  "107P5127": {
+    f30: 19200,
+    f60: 38400,
+    f90: 57600,
+    d30: 873,
+    d60: 873,
+    d90: 873,
+    used: 873,
+    event: 4800,
+    stock: 6200,
+    wip: 4800,
+    lead: 7,
+    safety: 7,
+    moq: 1200,
+    rop: 12222,
+    hours: 0.028,
+    warning: "Đơn phát sinh gấp",
+  },
+  "107N03402": {
+    f30: 0,
+    f60: 0,
+    f90: 0,
+    d30: 0,
+    d60: 0,
+    d90: 0,
+    used: 0,
+    event: 0,
+    stock: 739,
+    wip: 0,
+    lead: 3,
+    safety: 7,
+    moq: 1,
+    rop: 0,
+    hours: 0.02,
+    warning: "Ổn định",
+  },
+};
 
 function EngineView({
   rows,
@@ -3517,11 +4509,551 @@ function BulkEngineView({
   );
 }
 
-function UserSystemView() { return <p>Không có dữ liệu mẫu trong bản xuất source.</p>; }
+function UserSystemView() {
+  const [logged, setLogged] = useState(false);
+  return (
+    <main className="workspace user-workspace">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">QUẢN TRỊ HỆ THỐNG</p>
+          <PageTitle>Đăng nhập và phân quyền</PageTitle>
+          <p>
+            Mỗi người dùng đăng nhập bằng ID và mật khẩu để hệ thống xác định bộ
+            phận, vai trò và chức năng được phép thao tác.
+          </p>
+        </div>
+      </div>
+      <div className="user-grid">
+        <section className="login-card">
+          <div className="login-mark">👤</div>
+          <h2>{logged ? "Đăng nhập thành công" : "Đăng nhập hệ thống"}</h2>
+          {!logged ? (
+            <>
+              <label>
+                <span>ID NGƯỜI DÙNG</span>
+                <input defaultValue="vthduyen" placeholder="Nhập ID" />
+              </label>
+              <label>
+                <span>MẬT KHẨU</span>
+                <input
+                  type="password"
+                  defaultValue="12345678"
+                  placeholder="Nhập mật khẩu"
+                />
+              </label>
+              <FeedbackActionButton
+                className="primary-button"
+                onClick={() => setLogged(true)}
+              >
+                Đăng nhập
+              </FeedbackActionButton>
+              <small>Dữ liệu mô phỏng – không lưu mật khẩu thật.</small>
+            </>
+          ) : (
+            <div className="login-success">
+              <b>Vũ Thị Hương Duyên</b>
+              <span>ID: vthduyen · Bộ phận KHSX</span>
+              <span>Vai trò: Quản lý kế hoạch</span>
+              <FeedbackActionButton
+                className="outline-button"
+                onClick={() => setLogged(false)}
+              >
+                Đăng xuất
+              </FeedbackActionButton>
+            </div>
+          )}
+        </section>
+        <section className="permission-card">
+          <div className="permission-head">
+            <div>
+              <h2>Quyền theo vai trò</h2>
+              <p>
+                Chức năng hiển thị và thao tác được kiểm soát theo tài khoản.
+              </p>
+            </div>
+            <FeedbackActionButton className="outline-button" disabled disabledExplanation="Chức năng này chưa được kết nối thao tác tại màn hình hiện tại.">＋ Thêm người dùng</FeedbackActionButton>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>VAI TRÒ</th>
+                <th>BỘ PHẬN</th>
+                <th>QUYỀN CHÍNH</th>
+                <th>TRẠNG THÁI</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <DataCell>
+                  <b>KHSX</b>
+                </DataCell>
+                <DataCell>Kế hoạch sản xuất</DataCell>
+                <DataCell>
+                  Xem Forecast · Nhập Demand Event · Chạy 05 · Chỉnh 06 · Mở LSX
+                </DataCell>
+                <DataCell>
+                  <span className="done-badge">Hoạt động</span>
+                </DataCell>
+              </tr>
+              <tr>
+                <DataCell>
+                  <b>Sản xuất</b>
+                </DataCell>
+                <DataCell>SX Line A/B/C</DataCell>
+                <DataCell>Nhận LSX · Báo công · Trả tiến độ · Báo sự cố</DataCell>
+                <DataCell>
+                  <span className="done-badge">Hoạt động</span>
+                </DataCell>
+              </tr>
+              <tr>
+                <DataCell>
+                  <b>Kho</b>
+                </DataCell>
+                <DataCell>Kho TP/BTP/NVL</DataCell>
+                <DataCell>Cập nhật tồn · Nhập kho · Xuất kho · Xác nhận chứng từ</DataCell>
+                <DataCell>
+                  <span className="done-badge">Hoạt động</span>
+                </DataCell>
+              </tr>
+              <tr>
+                <DataCell>
+                  <b>Quản trị</b>
+                </DataCell>
+                <DataCell>Hệ thống</DataCell>
+                <DataCell>Người dùng · Phân quyền · Nhật ký · Thiết lập chung</DataCell>
+                <DataCell>
+                  <span className="done-badge">Hoạt động</span>
+                </DataCell>
+              </tr>
+            </tbody>
+          </table>
+          <div className="security-note">
+            <b>Quy tắc:</b> mật khẩu phải được mã hóa; mọi thao tác ghi nhận ID
+            người dùng, thời gian, giá trị cũ–mới và không cho người dùng thường
+            xóa nhật ký.
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
 
-function DemandEventView() { return <p>Không có dữ liệu mẫu trong bản xuất source.</p>; }
+function DemandEventView() {
+  const [added, setAdded] = useState(false);
+  return (
+    <section className="data-card demand-view">
+      <StandardToolbar name="DemandEventView" items={[toolbarConfig.group([toolbarConfig.note(<strong>Demand Event · Nhu cầu bổ sung của KHSX</strong>),
+toolbarConfig.note(<span>
+            Ghi nhận đơn phát sinh sau Forecast hoặc Bù tải khi Line còn năng
+            lực
+          </span>)]),
+toolbarConfig.action({"onClick": () => setAdded(true)},<>＋ Thêm Demand Event
+        </>, true, "action")]} />
+      {added && (
+        <div className="event-form">
+          <label>
+            <span>LOẠI NHU CẦU</span>
+            <select>
+              <option>Phát sinh</option>
+              <option>Bù tải</option>
+            </select>
+          </label>
+          <label>
+            <span>SKU</span>
+            <input defaultValue="102XT08001" />
+          </label>
+          <label>
+            <span>SỐ LƯỢNG</span>
+            <input type="number" defaultValue="1500" />
+          </label>
+          <label>
+            <span>NGÀY GIAO DỰ KIẾN</span>
+            <input defaultValue="03/09/2026" />
+          </label>
+          <label>
+            <span>MỨC ƯU TIÊN</span>
+            <select>
+              <option>Gấp</option>
+              <option>Thường</option>
+            </select>
+          </label>
+          <label>
+            <span>GHI CHÚ</span>
+            <input defaultValue="Đơn phát sinh sau Forecast" />
+          </label>
+          <FeedbackActionButton className="row-action" onClick={() => setAdded(false)}>
+            Lưu Demand Event
+          </FeedbackActionButton>
+        </div>
+      )}
+      <div className="event-summary">
+        <div>
+          <span>Chưa lập kế hoạch</span>
+          <b>2</b>
+        </div>
+        <div>
+          <span>Phát sinh</span>
+          <b>1.500</b>
+        </div>
+        <div>
+          <span>Bù tải</span>
+          <b>600</b>
+        </div>
+        <div>
+          <span>Đã đưa vào 05</span>
+          <b>3</b>
+        </div>
+      </div>
+      <DataTable className="table-wrap">
+        <table className="event-table">
+          <thead>
+            <tr>
+              <th>NGÀY YÊU CẦU</th>
+              <th>LOẠI</th>
+              <th>SKU</th>
+              <th>TÊN SẢN PHẨM</th>
+              <th>QUY CÁCH</th>
+              <th>SL PHÁT SINH</th>
+              <th>NGÀY GIAO</th>
+              <th>ƯU TIÊN</th>
+              <th>KHÁCH HÀNG/ĐƠN</th>
+              <th>NGƯỜI CẬP NHẬT</th>
+              <th>TRẠNG THÁI</th>
+              <th>TUẦN ĐÃ LẬP KH</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <DataCell>27/08/2026</DataCell>
+              <DataCell>
+                <span className="event-type urgent">Phát sinh</span>
+              </DataCell>
+              <DataCell>
+                <b className="plan-sku">102XT08001</b>
+              </DataCell>
+              <DataCell>
+                <strong>DÂY XẢ PVC TRẮNG</strong>
+              </DataCell>
+              <DataCell>LN 80CM</DataCell>
+              <DataCell kind="number" className="number">1.500</DataCell>
+              <DataCell>03/09/2026</DataCell>
+              <DataCell>Gấp</DataCell>
+              <DataCell>SO-260827-18</DataCell>
+              <DataCell>
+                vthduyen
+                <br />
+                <small>27/08 09:20</small>
+              </DataCell>
+              <DataCell>
+                <span className="pending-badge">Chưa lập kế hoạch</span>
+              </DataCell>
+              <DataCell>—</DataCell>
+            </tr>
+            <tr>
+              <DataCell>27/08/2026</DataCell>
+              <DataCell>
+                <span className="event-type load">Bù tải</span>
+              </DataCell>
+              <DataCell>
+                <b className="plan-sku">103SM00102</b>
+              </DataCell>
+              <DataCell>
+                <strong>BỘ SEN PS M1 INOX</strong>
+              </DataCell>
+              <DataCell>1.5m</DataCell>
+              <DataCell kind="number" className="number">600</DataCell>
+              <DataCell>—</DataCell>
+              <DataCell>Thường</DataCell>
+              <DataCell>—</DataCell>
+              <DataCell>
+                vthduyen
+                <br />
+                <small>27/08 09:25</small>
+              </DataCell>
+              <DataCell>
+                <span className="pending-badge">Chưa lập kế hoạch</span>
+              </DataCell>
+              <DataCell>—</DataCell>
+            </tr>
+            <tr>
+              <DataCell>25/08/2026</DataCell>
+              <DataCell>
+                <span className="event-type urgent">Phát sinh</span>
+              </DataCell>
+              <DataCell>
+                <b className="plan-sku">107P5127</b>
+              </DataCell>
+              <DataCell>
+                <strong>VAN PHAO NHỰA</strong>
+              </DataCell>
+              <DataCell>3/4&quot;</DataCell>
+              <DataCell kind="number" className="number">4.800</DataCell>
+              <DataCell>31/08/2026</DataCell>
+              <DataCell>Gấp</DataCell>
+              <DataCell>SO-260825-06</DataCell>
+              <DataCell>
+                khsx01
+                <br />
+                <small>25/08 15:10</small>
+              </DataCell>
+              <DataCell>
+                <span className="done-badge">Đã lập kế hoạch</span>
+              </DataCell>
+              <DataCell>24/08–30/08</DataCell>
+            </tr>
+          </tbody>
+        </table>
+      </DataTable>
+      <div className="source-note">
+        <b>Chống trùng:</b> Demand Event đã lập kế hoạch sẽ được đánh dấu và
+        Sheet 05 không sử dụng lại trong lần chạy sau.
+      </div>
+    </section>
+  );
+}
 
-function DemandEventViewV2() { return <p>Không có dữ liệu mẫu trong bản xuất source.</p>; }
+function DemandEventViewV2() {
+  const [added, setAdded] = useState(false);
+  const [skuQuery, setSkuQuery] = useState("");
+  const [selectedSku, setSelectedSku] = useState<PlanRow | null>(null);
+  const suggestions =
+    selectedSku || skuQuery.trim().length < 2
+      ? []
+      : proposalRows
+          .filter((row) =>
+            `${row.sku} ${row.name} ${row.spec}`
+              .toLowerCase()
+              .includes(skuQuery.trim().toLowerCase()),
+          )
+          .slice(0, 6);
+  const selectSku = (row: PlanRow) => {
+    setSelectedSku(row);
+    setSkuQuery(row.sku);
+  };
+  useEffect(() => {
+    if (!added) {
+      setSkuQuery("");
+      setSelectedSku(null);
+      return;
+    }
+    document
+      .querySelectorAll<HTMLInputElement>(
+        ".demand-event-form label:not(.sku-autocomplete) input",
+      )
+      .forEach((input) => {
+        input.value = "";
+      });
+  }, [added]);
+  return (
+    <section className="data-card demand-view demand-compact-view">
+      <div className="demand-actionbar">
+        <FeedbackActionButton className="primary-button" onClick={() => setAdded((v) => !v)}>
+          {added ? "× Đóng" : "＋ Thêm Demand Event"}
+        </FeedbackActionButton>
+      </div>
+      {added && (
+        <div className="event-form demand-event-form">
+          <label>
+            <span>LOẠI NHU CẦU</span>
+            <select>
+              <option>Phát sinh</option>
+              <option>Bù tải</option>
+            </select>
+          </label>
+          <label className="sku-autocomplete">
+            <span>SKU</span>
+            <input
+              value={skuQuery}
+              onChange={(e) => {
+                setSkuQuery(e.target.value);
+                setSelectedSku(null);
+              }}
+              placeholder="Nhập mã SKU, ví dụ 102..."
+              autoComplete="off"
+            />
+            {suggestions.length > 0 && (
+              <div className="sku-suggestions">
+                {suggestions.map((row) => (
+                  <FeedbackActionButton
+                    type="button"
+                    key={row.sku}
+                    onClick={() => selectSku(row)}
+                  >
+                    <b>{row.sku}</b>
+                    <span>{row.name}</span>
+                    <small>
+                      {row.spec} · Line {row.line}
+                    </small>
+                  </FeedbackActionButton>
+                ))}
+              </div>
+            )}
+          </label>
+          <label>
+            <span>SỐ LƯỢNG</span>
+            <input type="number" defaultValue="1500" />
+          </label>
+          <label>
+            <span>NGÀY GIAO DỰ KIẾN</span>
+            <input defaultValue="03/09/2026" />
+          </label>
+          <label>
+            <span>MỨC ƯU TIÊN</span>
+            <select>
+              <option>Gấp</option>
+              <option>Thường</option>
+            </select>
+          </label>
+          <label>
+            <span>GHI CHÚ</span>
+            <input defaultValue="Đơn phát sinh sau Forecast" />
+          </label>
+          {selectedSku && (
+            <div className="selected-sku">
+              <span>SKU đã chọn</span>
+              <b>
+                {selectedSku.sku} · {selectedSku.name}
+              </b>
+              <small>
+                {selectedSku.spec} · Nhóm {selectedSku.group} · Line{" "}
+                {selectedSku.line}
+              </small>
+            </div>
+          )}
+          <FeedbackActionButton
+            className="row-action"
+            disabled={!selectedSku} disabledExplanation={"Chọn SKU trước khi lưu Demand Event."}
+            onClick={() => setAdded(false)}
+          >
+            Lưu Demand Event
+          </FeedbackActionButton>
+        </div>
+      )}
+      <div className="event-summary">
+        <div>
+          <span>Chưa lập kế hoạch</span>
+          <b>2</b>
+        </div>
+        <div>
+          <span>Phát sinh</span>
+          <b>1.500</b>
+        </div>
+        <div>
+          <span>Bù tải</span>
+          <b>600</b>
+        </div>
+        <div>
+          <span>Đã đưa vào 05</span>
+          <b>3</b>
+        </div>
+      </div>
+      <DataTable className="table-wrap">
+        <table className="event-table">
+          <thead>
+            <tr>
+              <th>NGÀY YÊU CẦU</th>
+              <th>LOẠI</th>
+              <th>SKU</th>
+              <th>TÊN SẢN PHẨM</th>
+              <th>QUY CÁCH</th>
+              <th>SL PHÁT SINH</th>
+              <th>NGÀY GIAO</th>
+              <th>ƯU TIÊN</th>
+              <th>KHÁCH HÀNG/ĐƠN</th>
+              <th>NGƯỜI CẬP NHẬT</th>
+              <th>TRẠNG THÁI</th>
+              <th>TUẦN ĐÃ LẬP KH</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <DataCell>27/08/2026</DataCell>
+              <DataCell>
+                <span className="event-type urgent">Phát sinh</span>
+              </DataCell>
+              <DataCell>
+                <b className="plan-sku">102XT08001</b>
+              </DataCell>
+              <DataCell>
+                <strong>DÂY XẢ PVC TRẮNG</strong>
+              </DataCell>
+              <DataCell>LN 80CM</DataCell>
+              <DataCell kind="number" className="number">1.500</DataCell>
+              <DataCell>03/09/2026</DataCell>
+              <DataCell>Gấp</DataCell>
+              <DataCell>SO-260827-18</DataCell>
+              <DataCell>
+                vthduyen
+                <br />
+                <small>27/08 09:20</small>
+              </DataCell>
+              <DataCell>
+                <span className="pending-badge">Chưa lập kế hoạch</span>
+              </DataCell>
+              <DataCell>—</DataCell>
+            </tr>
+            <tr>
+              <DataCell>27/08/2026</DataCell>
+              <DataCell>
+                <span className="event-type load">Bù tải</span>
+              </DataCell>
+              <DataCell>
+                <b className="plan-sku">103SM00102</b>
+              </DataCell>
+              <DataCell>
+                <strong>BỘ SEN PS M1 INOX</strong>
+              </DataCell>
+              <DataCell>1.5m</DataCell>
+              <DataCell kind="number" className="number">600</DataCell>
+              <DataCell>—</DataCell>
+              <DataCell>Thường</DataCell>
+              <DataCell>—</DataCell>
+              <DataCell>
+                vthduyen
+                <br />
+                <small>27/08 09:25</small>
+              </DataCell>
+              <DataCell>
+                <span className="pending-badge">Chưa lập kế hoạch</span>
+              </DataCell>
+              <DataCell>—</DataCell>
+            </tr>
+            <tr>
+              <DataCell>25/08/2026</DataCell>
+              <DataCell>
+                <span className="event-type urgent">Phát sinh</span>
+              </DataCell>
+              <DataCell>
+                <b className="plan-sku">107P5127</b>
+              </DataCell>
+              <DataCell>
+                <strong>VAN PHAO NHỰA</strong>
+              </DataCell>
+              <DataCell>3/4&quot;</DataCell>
+              <DataCell kind="number" className="number">4.800</DataCell>
+              <DataCell>31/08/2026</DataCell>
+              <DataCell>Gấp</DataCell>
+              <DataCell>SO-260825-06</DataCell>
+              <DataCell>
+                khsx01
+                <br />
+                <small>25/08 15:10</small>
+              </DataCell>
+              <DataCell>
+                <span className="done-badge">Đã lập kế hoạch</span>
+              </DataCell>
+              <DataCell>24/08–30/08</DataCell>
+            </tr>
+          </tbody>
+        </table>
+      </DataTable>
+      <div className="source-note">
+        <b>Chống trùng:</b> Demand Event đã lập kế hoạch sẽ được đánh dấu và
+        không sử dụng lại trong lần chạy 05 sau.
+      </div>
+    </section>
+  );
+}
 
 type DemandRow = {
   sourceRecordedAt?: string;
@@ -3549,7 +5081,7 @@ let demandEventSessionCache: DemandRow[] | null = null;
 
 function DemandEventViewV3({
   masterRows = skus,
-  operator = "sample_user_15",
+  operator = "vthduyen",
 }: {
   masterRows?: Sku[];
   operator: string;
@@ -3562,7 +5094,56 @@ function DemandEventViewV3({
       []
     ).filter((row) => !(row as DemandRow & { _deleted?: boolean })._deleted),
   );
-  /* Historical fixture omitted from source export. */
+  /* const legacyEvents: DemandRow[] = [
+    {
+      id: "DE-001",
+      requestDate: "27/08/2026",
+      type: "Phát sinh",
+      sku: "102XT08001",
+      name: "DÂY XẢ PVC TRẮNG",
+      spec: "LN 80CM",
+      qty: 1500,
+      delivery: "03/09/2026",
+      priority: "Gấp",
+      order: "SO-260827-18",
+      status: "Chưa lập kế hoạch",
+      plannedWeek: currentWeek,
+      updatedBy: "vthduyen",
+      updatedAt: "27/08 09:20",
+    },
+    {
+      id: "DE-002",
+      requestDate: "27/08/2026",
+      type: "Bù tải",
+      sku: "103SM00102",
+      name: "BỘ SEN PS M1 INOX",
+      spec: "1.5m",
+      qty: 600,
+      delivery: "—",
+      priority: "Thường",
+      order: "—",
+      status: "Chưa lập kế hoạch",
+      plannedWeek: currentWeek,
+      updatedBy: "vthduyen",
+      updatedAt: "27/08 09:25",
+    },
+    {
+      id: "DE-003",
+      requestDate: "25/08/2026",
+      type: "Phát sinh",
+      sku: "107P5127",
+      name: "VAN PHAO NHỰA",
+      spec: '3/4"',
+      qty: 4800,
+      delivery: "31/08/2026",
+      priority: "Gấp",
+      order: "SO-260825-06",
+      status: "Đã lập kế hoạch",
+      plannedWeek: currentWeek,
+      updatedBy: "khsx01",
+      updatedAt: "25/08 15:10",
+    },
+  ]; */
   const [historyImport,setHistoryImport]=useState(false);
   const [added, setAdded] = useState(false);
   const [editingDemand,setEditingDemand] = useState<DemandRow|null>(null);
@@ -6088,7 +7669,280 @@ type SystemUser = {
   mobile: string;
   active: boolean;
 };
-const initialSystemUsers: SystemUser[] = [];
+const initialSystemUsers: SystemUser[] = [
+  {
+    company: "",
+    department: "",
+    login: "gbthanh",
+    name: "Giam Bình Thành",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "",
+    department: "",
+    login: "test003",
+    name: "test003",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "chhoang",
+    name: "Chung Huệ Hoang",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "frank",
+    name: "Frank",
+    role: "SUPER_ADMIN",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "haquyen",
+    name: "Hà Ái Quyên",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "halan",
+    name: "Hồng A Lan",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "lthgam",
+    name: "Lê Thị Hồng Gấm",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "ltthu",
+    name: "Lê Thị Thu",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "ntynhi",
+    name: "Nguyễn Thị Yến Nhi",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "ntythanh",
+    name: "Nguyễn Thị Ý Thanh",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "tsnhi",
+    name: "SƯƠNG NHI TRƯƠNG",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "ttxuan",
+    name: "TANG LE XUAN",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "tctuyet",
+    name: "Trương Cẩm Tuyết",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "ttlai",
+    name: "Trương Tuyết Lai",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "vthduyen",
+    name: "Vũ Thị Hương Duyên",
+    role: "SUPER_ADMIN",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SHINTUNG",
+    login: "admin",
+    name: "系統管理員admin",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "KHO",
+    login: "httai",
+    name: "Hồng Thanh Tài",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "KHO",
+    login: "httung",
+    name: "Hồng Thanh Tùng",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "KHO",
+    login: "ltphong",
+    name: "Lê Thanh Phong",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "KHO",
+    login: "Ttlinh",
+    name: "Linh",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "KHO",
+    login: "tpnhi",
+    name: "Trương Phụng Nhi",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SX",
+    login: "cnphuong",
+    name: "CHIENG NGOC PHUONG",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SX",
+    login: "htndiem",
+    name: "HO THI NGOC DIEM",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SX",
+    login: "ntnphung",
+    name: "NGUYEN THI NGOC PHUNG",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SX",
+    login: "nttvy",
+    name: "NGUYEN THUY THANH VY",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "SX",
+    login: "ncvinh",
+    name: "Ngô Chí Vinh",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "QC",
+    login: "lcnguyen",
+    name: "Lê Chí Nguyên",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "QC",
+    login: "ltloi",
+    name: "Lưu Lâm Thắng Lợi",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "QC",
+    login: "npthao",
+    name: "Nguyễn Phương Thảo",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+  {
+    company: "SHINTUNG",
+    department: "QC",
+    login: "ttnien",
+    name: "Trần Thanh Niên",
+    phone: "",
+    mobile: "",
+    active: true,
+  },
+];
 
 let systemUsersCache: SystemUser[] | null = null;
 let systemUsersPromise: Promise<SystemUser[]> | null = null;
@@ -6406,7 +8260,7 @@ function UserManagementV2() {
         entity: "users",
         key: u.login,
         payload: u,
-        updatedBy: "sample_user_15",
+        updatedBy: "vthduyen",
       }),
     });
     if (!response.ok) {
@@ -6472,7 +8326,7 @@ function UserManagementV2() {
             _deleted: true,
             deletedAt: new Date().toISOString(),
           },
-          updatedBy: "sample_user_15",
+          updatedBy: "vthduyen",
         }),
       });
       setSaving(false);
@@ -6744,7 +8598,7 @@ function temporaryPermissions(user: SystemUser) {
   if (
     isSuperAdminUser(user) ||
     user.login === "admin" ||
-    user.login === "sample_user_15"
+    user.login === "vthduyen"
   )
     return permissionMenuGroups
       .flatMap((group) => make(group.group, group.menus, permissionActions))
@@ -7581,7 +9435,7 @@ function PermissionManagement() {
         entity: "permissions",
         key: record.login,
         payload: record,
-        updatedBy: "sample_user_15",
+        updatedBy: "vthduyen",
       }),
     });
     setSaving(false);
@@ -7626,7 +9480,7 @@ function PermissionManagement() {
           _deleted: true,
           deletedAt: new Date().toISOString(),
         },
-        updatedBy: "sample_user_15",
+        updatedBy: "vthduyen",
       }),
     });
     setSaving(false);
@@ -8199,7 +10053,106 @@ type AdminAuditEntry = {
   target?: string;
   loginMode?: string;
 };
-function AdminAuditView() { return <p>Không có dữ liệu mẫu trong bản xuất source.</p>; }
+function AdminAuditView() {
+  const [reviewPermissions, setReviewPermissions] = useState(false);
+  const [showBusinessAudit,setShowBusinessAudit]=useState(true);
+  const [entries, setEntries] = useState<AdminAuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    recordFetch("/api/admin-audit", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok)
+          throw new Error(data.error || "Không tải được nhật ký.");
+        if (active)
+          setEntries(
+            data.records.map(
+              (record: { payload: AdminAuditEntry }) => record.payload,
+            ),
+          );
+      })
+      .catch((reason) => {
+        if (active) setError(reason.message || "Không tải được nhật ký.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  if(showBusinessAudit)return <WebsiteTestLog language={toolbarLocale()} title="Nhật ký thao tác" onShowAdmin={()=>setShowBusinessAudit(false)} />;
+  const label = (action?: string) =>
+    ({
+      LOGIN: "Đăng nhập",
+      LOGOUT: "Đăng xuất",
+      PASSWORD_SET: "Đặt lại mật khẩu",
+      INITIAL_ADMIN_ACTIVATED: "Kích hoạt quản trị",
+    })[action || ""] ||
+    action ||
+    "Cập nhật dữ liệu";
+  return (
+    <main className="workspace">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">QUẢN TRỊ HỆ THỐNG</p>
+          <PageTitle variant="menu-root">Nhật ký thao tác</PageTitle>
+          <p>Ghi nhận đăng nhập, đăng xuất và các thay đổi quản trị từ D1.</p>
+        </div>
+      </div>
+      <StandardToolbar name="AdminAudit" items={[toolbarConfig.action({onClick:()=>setShowBusinessAudit(true)},'Nhật ký thao tác nghiệp vụ'),toolbarConfig.action({type:'button','aria-expanded':reviewPermissions,onClick:()=>setReviewPermissions(value=>!value)},'Đối chiếu / Khôi phục quyền riêng')]} />
+      {reviewPermissions&&<PermissionHistoryReview entries={entries}/>}
+      <section className="data-card user-content-card">
+        <DataTable className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>THỜI GIAN</th>
+                <th>NGƯỜI THAO TÁC</th>
+                <th>CHỨC NĂNG</th>
+                <th>NỘI DUNG</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr data-no-data="true">
+                  <DataCell colSpan={4}>Đang tải nhật ký…</DataCell>
+                </tr>
+              ) : error ? (
+                <tr data-no-data="true">
+                  <DataCell colSpan={4}>{error}</DataCell>
+                </tr>
+              ) : entries.length ? (
+                entries.map((entry, index) => (
+                  <tr key={`${entry.at || "audit"}-${index}`}>
+                    <DataCell kind="date">{entry.at ? formatDateTimeDisplay(entry.at) : "—"}</DataCell>
+                    <DataCell>{entry.actor || "—"}</DataCell>
+                    <DataCell>{label(entry.action)}</DataCell>
+                    <DataCell>
+                      {entry.loginMode
+                        ? `Chế độ ${entry.loginMode}`
+                        : entry.target
+                          ? `Tài khoản ${entry.target}`
+                          : entry.entity
+                            ? `${entry.entity}${entry.key ? ` · ${entry.key}` : ""}`
+                            : "—"}
+                    </DataCell>
+                  </tr>
+                ))
+              ) : (
+                <tr data-no-data="true">
+                  <DataCell colSpan={4}>Chưa có nhật ký thao tác.</DataCell>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </DataTable>
+      </section>
+    </main>
+  );
+}
 
 function UserContent({ section }: { section: string }) {
   if (section === "feedback") return <FeedbackInbox language={toolbarLocale()} />;
@@ -8287,7 +10240,7 @@ function UserContent({ section }: { section: string }) {
             </label>
             <label>
               <span>Email</span>
-              <input type="email" placeholder="sample@example.invalid" />
+              <input type="email" placeholder="email@onspa.com" />
             </label>
             <label>
               <span>Vai trò</span>
@@ -8347,8 +10300,8 @@ toolbarConfig.note(<span>{saved ? "3" : "2"} người dùng</span>)]} />
               <tr>
                 <DataCell kind="code">SHINTUNG</DataCell>
                 <DataCell>Kế hoạch sản xuất</DataCell>
-                <DataCell>sample_user_15</DataCell>
-                <DataCell>Nhân viên mẫu 104</DataCell>
+                <DataCell>vthduyen</DataCell>
+                <DataCell>Vũ Hương Duyên</DataCell>
                 <DataCell>
                   {section === "permissions"
                     ? "Forecast · Demand Event · 05 · 06 · Mở LSX"
@@ -8615,7 +10568,188 @@ const currentModuleVersions: Array<[string, string, string]> = [
   ["Quản lý sản xuất", "Khôi phục dữ liệu", "REC"],
   ["Quản lý sản xuất", "Capacity tuần", "CAP"],
 ];
-const moduleVersionHistory: ModuleVersion[] = [];
+const moduleVersionHistory: ModuleVersion[] = [
+  ...currentModuleVersions.map(([group, menu, code]) => ({
+    group,
+    menu,
+    code,
+    version:
+      code === "SDR"
+        ? "SDR-20260909-01"
+        : code === "PE"
+          ? "PE-20260909-01"
+          : code === "LT"
+            ? "LT-20260909-01"
+            : code === "BKP"
+              ? "BKP-20260908-02"
+              : code === "STK"
+                ? "STK-20260907-01"
+                : code === "INV"
+                  ? "INV-20260907-03"
+                  : code === "USR"
+                    ? "USR-20260907-02"
+                    : code === "PERM"
+                      ? "PERM-20260907-02"
+                      : `${code}-20260905-01`,
+    date: ["SDR", "PE", "LT"].includes(code)
+      ? "09/09/2026 10:00"
+      : code === "BKP"
+        ? "08/09/2026 16:30"
+        : ["STK", "INV", "USR", "PERM"].includes(code)
+          ? "07/09/2026 17:50"
+          : "05/09/2026 16:25",
+    status: "Đang sử dụng" as const,
+    user: "Vũ Hương Duyên",
+    previous:
+      code === "SDR"
+        ? "SD-20260908-01"
+        : code === "PE"
+          ? "PE-20260907-01"
+          : code === "LT"
+            ? "LT-20260908-01"
+            : code === "BKP"
+              ? "BKP-20260907-01"
+              : "—",
+    change:
+      code === "SDR"
+        ? "Thay Safety Days theo SKU bằng bộ quy tắc có phiên bản, ngày hiệu lực, xác nhận, lịch sử và ba nhóm tính."
+        : code === "PE"
+          ? "Chọn Quy tắc Safety Days theo ngày bắt đầu tuần và lưu snapshot các thành phần tính."
+          : code === "LT"
+            ? "Safety Days chuyển thành dữ liệu tự tính chỉ đọc; chỉ cho sửa Leadtime."
+            : code === "BKP"
+              ? "Bổ sung bộ PowerShell TEST_LOCAL cho F:\\CompanyBackups."
+              : "Giữ nguyên chức năng hiện tại.",
+    impact: ["SDR", "PE", "LT"].includes(code)
+      ? "Kế hoạch cũ giữ snapshot; lần tính mới dùng đúng phiên bản quy tắc có hiệu lực."
+      : "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  })),
+  {
+    group: "Quản lý kho",
+    menu: "Tồn kho ERP",
+    code: "INV",
+    version: "INV-20260907-02",
+    date: "07/09/2026 17:30",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "INV-20260907-01",
+    change:
+      "Bổ sung thanh trạng thái và thao tác chốt tồn tuần phía trên bộ lọc tồn kho ERP.",
+    impact: "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  },
+  {
+    group: "Quản trị hệ thống",
+    menu: "Phân quyền",
+    code: "PERM",
+    version: "PERM-20260907-01",
+    date: "07/09/2026 16:30",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "PERM-20260905-01",
+    change:
+      "Cho phép thêm mới, sửa, xóa và lưu dùng chung dữ liệu phân quyền người dùng.",
+    impact: "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  },
+  {
+    group: "Quản trị hệ thống",
+    menu: "Phân quyền",
+    code: "PERM",
+    version: "PERM-20260905-01",
+    date: "05/09/2026 16:25",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "—",
+    change: "Khởi tạo giao diện phân quyền người dùng.",
+    impact: "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  },
+  {
+    group: "Quản trị hệ thống",
+    menu: "Quản lý người dùng",
+    code: "USR",
+    version: "USR-20260907-01",
+    date: "07/09/2026 15:30",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "USR-20260905-01",
+    change:
+      "Cho phép thêm, sửa và xóa mềm người dùng; dữ liệu được lưu dùng chung sau khi tải lại trang.",
+    impact: "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  },
+  {
+    group: "Quản trị hệ thống",
+    menu: "Quản lý người dùng",
+    code: "USR",
+    version: "USR-20260905-01",
+    date: "05/09/2026 16:25",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "—",
+    change: "Khởi tạo giao diện quản lý người dùng.",
+    impact: "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  },
+  {
+    group: "Quản lý kho",
+    menu: "Tồn kho ERP",
+    code: "INV",
+    version: "INV-20260905-03",
+    date: "05/09/2026 17:15",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "INV-20260905-02",
+    change:
+      "Mở rộng vùng bảng tồn kho theo toàn bộ chiều cao màn hình để hiển thị nhiều dữ liệu hơn.",
+    impact: "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  },
+  {
+    group: "Quản lý kho",
+    menu: "Tồn kho ERP",
+    code: "INV",
+    version: "INV-20260905-02",
+    date: "05/09/2026 17:05",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "INV-20260905-01",
+    change:
+      "Loại bỏ phần giới thiệu và tra cứu tồn theo thời điểm; đưa bộ lọc và dữ liệu tồn kho lên đầu trang.",
+    impact: "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  },
+  {
+    group: "Quản lý kho",
+    menu: "Tồn kho ERP",
+    code: "INV",
+    version: "INV-20260905-01",
+    date: "05/09/2026 16:25",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "—",
+    change: "Khởi tạo giao diện tồn kho ERP.",
+    impact: "Không thay đổi dữ liệu nghiệp vụ hiện có.",
+  },
+  {
+    group: "Kế hoạch sản xuất",
+    menu: "Production_engine",
+    code: "PE",
+    version: "PE-20260905-00",
+    date: "05/09/2026 09:20",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "—",
+    change: "Bổ sung quy tắc tuần giao tháng và thứ tự ưu tiên sản xuất.",
+    impact: "Giữ nguyên dữ liệu các tuần đã lưu.",
+  },
+  {
+    group: "Cấu trúc thành phẩm",
+    menu: "Dữ liệu lượng dùng BOM",
+    code: "BOM",
+    version: "BOM-20260904-01",
+    date: "04/09/2026 15:10",
+    status: "Phiên bản cũ",
+    user: "Vũ Hương Duyên",
+    previous: "—",
+    change: "Khóa chỉnh sửa trực tiếp BOM đã xác nhận; thay đổi qua phiếu.",
+    impact: "BOM đã xác nhận chỉ được xem.",
+  },
+];
 function VersionManagement() {
   const [group, setGroup] = useState("Tất cả nhóm menu");
   const [status, setStatus] = useState("Tất cả trạng thái");
@@ -8918,8 +11052,119 @@ async function readInventoryExcel(file: File): Promise<{
     );
   return { rows, skippedWarehouseRows };
 }
-const stockRows: StockRow[] = [];
-const warehouseTransactions = [] as { id: string; time: string; type: string; from: string; to: string; items: number; qty: number; status: string; user: string; }[];
+const stockRows: StockRow[] = [
+  {
+    sku: "102XS04001",
+    name: "DÂY XẢ INOX SỌC",
+    spec: "14MM 40cm",
+    unit: "SỢI",
+    warehouse: "KHO TP",
+    location: "A01-02",
+    lot: "LOT-260822-01",
+    onHand: 4000,
+    inTransit: 500,
+    updated: "28/08/2026 14:35:18",
+    age: 6,
+  },
+  {
+    sku: "103SM31201",
+    name: "BỘ SEN PS M3",
+    spec: "LĐ-1.5m",
+    unit: "BỘ",
+    warehouse: "KHO TP",
+    location: "A03-01",
+    lot: "LOT-260813-03",
+    onHand: 1440,
+    inTransit: 0,
+    updated: "28/08/2026 13:42:07",
+    age: 15,
+  },
+  {
+    sku: "107P5127",
+    name: "VAN PHAO NHỰA",
+    spec: '3/4"',
+    unit: "CÁI",
+    warehouse: "KHO TP",
+    location: "B02-04",
+    lot: "LOT-260811-02",
+    onHand: 4800,
+    inTransit: 1200,
+    updated: "28/08/2026 11:20:44",
+    age: 17,
+  },
+  {
+    sku: "103S205201",
+    name: "BỘ SEN DÂY INOX L105",
+    spec: "4 NẤC 1m5",
+    unit: "BỘ",
+    warehouse: "KHO KD",
+    location: "KD-01-06",
+    lot: "LOT-260520-01",
+    onHand: 600,
+    inTransit: 0,
+    updated: "28/08/2026 09:15:33",
+    age: 100,
+  },
+  {
+    sku: "104A4X101",
+    name: "BỘ XỊT VS- PVC C114X",
+    spec: "LN 1m2",
+    unit: "BỘ",
+    warehouse: "KHO TP",
+    location: "A05-03",
+    lot: "LOT-260812-01",
+    onHand: 73,
+    inTransit: 0,
+    updated: "28/08/2026 08:48:12",
+    age: 16,
+  },
+];
+const warehouseTransactions = [
+  {
+    id: "ERP-NK-260828-018",
+    time: "28/08/2026 14:35:18",
+    type: "Nhập từ sản xuất",
+    from: "SX Line A",
+    to: "KHO TP",
+    items: 2,
+    qty: 2000,
+    status: "Đã cập nhật kho",
+    user: "httung",
+  },
+  {
+    id: "ERP-CK-260828-006",
+    time: "28/08/2026 13:42:07",
+    type: "Chuyển kho",
+    from: "KHO TP",
+    to: "KHO KD",
+    items: 3,
+    qty: 1200,
+    status: "Chờ kho nhận",
+    user: "ltphong",
+  },
+  {
+    id: "ERP-XK-260828-011",
+    time: "28/08/2026 11:20:44",
+    type: "Xuất kho",
+    from: "KHO TP",
+    to: "Khách hàng",
+    items: 4,
+    qty: 860,
+    status: "Đã cập nhật kho",
+    user: "httai",
+  },
+  {
+    id: "ERP-NK-260828-014",
+    time: "28/08/2026 09:15:33",
+    type: "Nhập ERP",
+    from: "Xưởng",
+    to: "KHO TP",
+    items: 1,
+    qty: 600,
+    status: "Có chênh lệch",
+    user: "Ttlinh",
+  },
+];
 const warehouseStatus = (status: string) => (
   <span
     className={
@@ -10033,17 +12278,18 @@ toolbarConfig.action({"onClick": () => { setShowInventorySearch(false); setInven
                   <DataCell>
                     <FeedbackActionButton
                       className="sku-link"
-                      onClick={() => onOpenSku("SAMPLE-SKU-102")}
+                      onClick={() => onOpenSku("102XS04001")}
                     >
-                       SAMPLE-SKU-102 </FeedbackActionButton>
+                      102XS04001
+                    </FeedbackActionButton>
                   </DataCell>
-                  <DataCell> Dữ liệu mẫu </DataCell>
+                  <DataCell>DÂY XẢ INOX SỌC</DataCell>
                   <DataCell>LOT-260822-01</DataCell>
                   <DataCell>KHO TP</DataCell>
                   <DataCell>Khách hàng</DataCell>
                   <DataCell kind="number" className="number">860</DataCell>
                   <DataCell>{warehouseStatus("Đã cập nhật kho")}</DataCell>
-                  <DataCell>sample_user_17</DataCell>
+                  <DataCell>httai</DataCell>
                 </tr>
                 <tr>
                   <DataCell>ERP-CK-260828-006</DataCell>
@@ -10054,9 +12300,10 @@ toolbarConfig.action({"onClick": () => { setShowInventorySearch(false); setInven
                   <DataCell>
                     <FeedbackActionButton
                       className="sku-link"
-                      onClick={() => onOpenSku("SAMPLE-SKU-392")}
+                      onClick={() => onOpenSku("107P5127")}
                     >
-                       SAMPLE-SKU-392 </FeedbackActionButton>
+                      107P5127
+                    </FeedbackActionButton>
                   </DataCell>
                   <DataCell>VAN PHAO NHỰA</DataCell>
                   <DataCell>LOT-260811-02</DataCell>
@@ -10064,7 +12311,7 @@ toolbarConfig.action({"onClick": () => { setShowInventorySearch(false); setInven
                   <DataCell>KHO KD</DataCell>
                   <DataCell kind="number" className="number">1.200</DataCell>
                   <DataCell>{warehouseStatus("Chờ kho nhận")}</DataCell>
-                  <DataCell>sample_user_19</DataCell>
+                  <DataCell>ltphong</DataCell>
                 </tr>
               </tbody>
             </table>
@@ -10114,7 +12361,7 @@ toolbarConfig.note(<span>{warehouseStatus("Đang chuyển")}</span>)]} />
             </div>
             <div>
               <span>NGƯỜI XÁC NHẬN</span>
-              <b>sample_user_19</b>
+              <b>ltphong</b>
             </div>
             <div>
               <span>GHI CHÚ</span>
@@ -10152,9 +12399,10 @@ toolbarConfig.note(<span>{warehouseStatus("Đang chuyển")}</span>)]} />
                   <DataCell>
                     <FeedbackActionButton
                       className="sku-link"
-                      onClick={() => onOpenSku("SAMPLE-SKU-392")}
+                      onClick={() => onOpenSku("107P5127")}
                     >
-                       SAMPLE-SKU-392 </FeedbackActionButton>
+                      107P5127
+                    </FeedbackActionButton>
                   </DataCell>
                   <DataCell>VAN PHAO NHỰA</DataCell>
                   <DataCell>3/4&quot;</DataCell>
@@ -10277,7 +12525,7 @@ toolbarConfig.note(<span>{warehouseStatus("Đang chuyển")}</span>)]} />
                   <DataCell kind="number" className="number">42</DataCell>
                   <DataCell kind="number" className="number">−2</DataCell>
                   <DataCell>{warehouseStatus("Có chênh lệch")}</DataCell>
-                  <DataCell>sample_user_18</DataCell>
+                  <DataCell>httung</DataCell>
                   <DataCell>
                     <FeedbackActionButton className="calc-button" disabled disabledExplanation="Chức năng này chưa được kết nối thao tác tại màn hình hiện tại.">Xem chi tiết</FeedbackActionButton>
                   </DataCell>
@@ -10411,15 +12659,50 @@ const hydrateBomChangeRecord = ({
   modifiedBy: payload.modifiedBy || updatedBy || payload.createdBy,
   modifiedAt: payload.modifiedAt || updatedAt,
 });
-const bomChangeSkus18092026 = [] as string[];
+const bomChangeSkus18092026 = [
+  "102XS08001",
+  "102XS10001",
+  "102XS12001",
+  "102XS15001",
+  "102XS18001",
+  "102XS20001",
+  "102XI08001",
+  "102XI10001",
+  "102XI12001",
+  "102XI15001",
+  "102XI18001",
+  "102XI20001",
+  "102XT08001",
+  "102XT10001",
+  "102XT12001",
+  "102XT15001",
+  "102XT18001",
+  "102XT20001",
+  "102XT08002",
+  "102XT10002",
+  "102XT12002",
+  "102XT15002",
+  "102XT18002",
+  "102XT20002",
+  "102XD08001",
+  "102XD10001",
+  "102XT08004",
+  "102XT10004",
+  "102VS000001",
+  "102VS000002",
+  "102VS000003",
+  "102VS000004",
+  "102VS000008",
+  "102MG15001",
+];
 const bomChanges18092026: BomChangeHistory[] = bomChangeSkus18092026.map(
   (sku, index) => {
-    const replacementOnly = ["SAMPLE-SKU-78", "SAMPLE-SKU-79"].includes(sku);
-    const oldBagCode = sku === "SAMPLE-SKU-41" ? "SAMPLE-SKU-44" : "SAMPLE-SKU-51";
+    const replacementOnly = ["102XD08001", "102XD10001"].includes(sku);
+    const oldBagCode = sku === "102MG15001" ? "407DX005" : "407HS001";
     const oldBagName =
-      oldBagCode === "SAMPLE-SKU-44"
-        ? "Dữ liệu mẫu"
-        : "Dữ liệu mẫu";
+      oldBagCode === "407DX005"
+        ? "TÚI DÂY CẤP MÁY GIẶT (26*38)"
+        : "TÚI DÂY TẮM (26*34)";
     return {
       id: `BOM-DC-20260918-${String(index + 1).padStart(3, "0")}`,
       sku,
@@ -10427,13 +12710,13 @@ const bomChanges18092026: BomChangeHistory[] = bomChangeSkus18092026.map(
       newVersion: "0001",
       setup: "18/09/2026",
       effective: "—",
-      user: "sample_user_15 (người lập)",
+      user: "vthduyen (người lập)",
       reason: "Thay túi dây dẫn nước theo dữ liệu thay đổi ngày 18/09/2026",
       status: "Chờ xác nhận",
       lines: [
         {
           code: oldBagCode,
-          newCode: "SAMPLE-SKU",
+          newCode: "407DX017",
           name: oldBagName,
           spec: "—",
           action: "Thay đổi",
@@ -10446,9 +12729,9 @@ const bomChanges18092026: BomChangeHistory[] = bomChangeSkus18092026.map(
         ...(!replacementOnly
           ? [
               {
-                code: "SAMPLE-SKU-43",
+                code: "403DT002",
                 newCode: "",
-                name: "Dữ liệu mẫu",
+                name: "NHÃN DÂY DẪN NƯỚC",
                 spec: "—",
                 action: "Ngừng sử dụng",
                 oldQty: "1",
@@ -10463,12 +12746,32 @@ const bomChanges18092026: BomChangeHistory[] = bomChangeSkus18092026.map(
     };
   },
 );
-const bomChangeBathBagSkus18092026 = [] as string[];
+const bomChangeBathBagSkus18092026 = [
+  "102TC10001",
+  "102TC10002",
+  "102TC10003",
+  "102TC12001",
+  "102TC12002",
+  "102TC12003",
+  "102TC15001",
+  "102TC15002",
+  "102TC15003",
+  "102TC18001",
+  "102TC18002",
+  "102TC18003",
+  "102TC18004",
+  "102TC20001",
+  "102TC20002",
+  "102TC20003",
+  "102TC20004",
+  "102VS00009",
+  "102VS00010",
+];
 const bomBathBagChanges18092026: BomChangeHistory[] =
   bomChangeBathBagSkus18092026.map((sku, index) => {
     const source = bomCatalog.find((item) => item.sku === sku);
-    const oldBag = source?.items.find((item) => item.code === "SAMPLE-SKU-51");
-    const oldLabel = source?.items.find((item) => item.code === "SAMPLE-SKU-50");
+    const oldBag = source?.items.find((item) => item.code === "407HS001");
+    const oldLabel = source?.items.find((item) => item.code === "403DT001");
     return {
       id: `BOM-DC-20260918-${String(index + 35).padStart(3, "0")}`,
       sku,
@@ -10476,14 +12779,14 @@ const bomBathBagChanges18092026: BomChangeHistory[] =
       newVersion: String(Number(source?.version || 0) + 1).padStart(4, "0"),
       setup: "18/09/2026",
       effective: "—",
-      user: "sample_user_15 (người lập)",
+      user: "vthduyen (người lập)",
       reason: "Thay túi dây tắm theo dữ liệu thay đổi ngày 18/09/2026",
       status: "Chờ xác nhận",
       lines: [
         {
-          code: "SAMPLE-SKU-51",
-          newCode: "SAMPLE-SKU",
-          name: oldBag?.name || "Dữ liệu mẫu",
+          code: "407HS001",
+          newCode: "407HS004",
+          name: oldBag?.name || "TÚI DÂY TẮM (26*34)",
           spec: oldBag?.spec || "—",
           action: "Thay đổi",
           oldQty: oldBag?.qty || "0,012",
@@ -10493,9 +12796,9 @@ const bomBathBagChanges18092026: BomChangeHistory[] =
           note: "Thay bằng 407HS004 - TÚI DÂY TẮM 27x31cm",
         },
         {
-          code: "SAMPLE-SKU-50",
+          code: "403DT001",
           newCode: "",
-          name: oldLabel?.name || "Dữ liệu mẫu",
+          name: oldLabel?.name || "NHÃN DÂY TẮM",
           spec: oldLabel?.spec || "—",
           action: "Ngừng sử dụng",
           oldQty: oldLabel?.qty || "1",
@@ -10507,7 +12810,33 @@ const bomBathBagChanges18092026: BomChangeHistory[] =
       ],
     };
   });
-let bomChangeHistory: BomChangeHistory[] = [];
+let bomChangeHistory: BomChangeHistory[] = [
+  ...bomChanges18092026,
+  ...bomBathBagChanges18092026,
+  {
+    id: "BOM-DC-20260905-001",
+    sku: "101CTP010",
+    oldVersion: "0000",
+    newVersion: "0001",
+    setup: "05/09/2026",
+    effective: "05/09/2026",
+    user: "vthduyen",
+    reason: "Thiết lập BOM ban đầu",
+    status: "Đã xác nhận",
+    lines: [
+      {
+        code: "3010109",
+        name: "HỘP CÔNG TẮC",
+        spec: "STC-2021",
+        action: "Thêm mới",
+        oldQty: "—",
+        newQty: "1",
+        denominator: "1",
+        note: "Dòng BOM ban đầu",
+      },
+    ],
+  },
+];
 const initialBomChangeHistory = structuredClone(bomChangeHistory);
 
 function BomChangeContent({
@@ -11979,7 +14308,7 @@ function LegacySafetyRulesView() {
   const [notice, setNotice] = useState("");
   const [history, setHistory] = useState(false);
   const [saving, setSaving] = useState(false);
-  const operator = "sample_user_15";
+  const operator = "vthduyen";
   useEffect(() => {
     recordFetch("/api/records?entity=safety_rules")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -12691,7 +15020,7 @@ function SafetyRulesView() {
   useApprovalNavigation(['safety_rules','safety_rule_groups'],()=>{setAction(null);setSelectedId(null);const pending=versions.find(v=>!v._deleted&&v.status==='Chờ xác nhận');if(pending)setTab(pending.group);setInlineSearchField('status');setFilters({code:'',version:'',status:'Chờ xác nhận',from:'',to:'',creator:'',approver:''});},approvalReady);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const operator = "sample_user_15";
+  const operator = "vthduyen";
   const cancellation=useMasterCancellation(()=>{setSelectedId(null);setNotice("Đã Hủy quy tắc. Dữ liệu được giữ lại và ngừng áp dụng.");});
   const noticeIsSuccess = notice.startsWith("Đã ");
   const noticeGuidance = noticeIsSuccess
@@ -13778,7 +16107,7 @@ function SafetyFunctionPanel({
                   ...draft,
                   reason,
                   status: "Chờ xác nhận",
-                  submittedBy: "sample_user_15",
+                  submittedBy: "vthduyen",
                   submittedAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 });
@@ -14035,7 +16364,7 @@ function LeadtimeMasterViewLegacy({ mode }: { mode: "leadtime" | "safety" }) {
         note: String(data.get("note") || "").trim(),
         leadTime: ltProduction + ltQc + ltWarehouse,
         moq: Number(data.get("moq") || 0),
-        updatedBy: "sample_user_15",
+        updatedBy: "vthduyen",
         updatedAt: new Date().toISOString(),
       };
     } else {
@@ -14060,7 +16389,7 @@ function LeadtimeMasterViewLegacy({ mode }: { mode: "leadtime" | "safety" }) {
         entity,
         key: sku,
         payload: row,
-        updatedBy: "sample_user_15",
+        updatedBy: "vthduyen",
       }),
     });
     setSaving(false);
@@ -14094,7 +16423,7 @@ function LeadtimeMasterViewLegacy({ mode }: { mode: "leadtime" | "safety" }) {
       ...deleting,
       _deleted: true,
       deletedAt: new Date().toISOString(),
-      deletedBy: "sample_user_15",
+      deletedBy: "vthduyen",
     };
     const response = await recordFetch("/api/records", {
       method: "POST",
@@ -14103,7 +16432,7 @@ function LeadtimeMasterViewLegacy({ mode }: { mode: "leadtime" | "safety" }) {
         entity,
         key: deleting.sku,
         payload,
-        updatedBy: "sample_user_15",
+        updatedBy: "vthduyen",
       }),
     });
     setSaving(false);
@@ -15760,6 +18089,17 @@ export default function Home() {
   const refreshViewers=useCallback(()=>viewersRefresh.current(),[]);
   const accountKey=workspaceIdentityKey(identity);
   useEffect(()=>{
+    if(!identity.authenticated||!accountKey)return;
+    const workAllowed=['report-work','report-review'].some(section=>canOpenMenu(identity.session,'production',section));
+    const fullAllowed=canOpenMenu(identity.session,'production','report-progress')||canOpenMenu(identity.session,'production','report-dashboard');
+    if(!workAllowed&&!fullAllowed)return;
+    // Prepare both profiles concurrently; menu navigation never starts a waterfall.
+    const warm=()=>{if(document.hidden)return;void loadProductionManagement().catch(()=>{});if(workAllowed)void prefetchProductionWorkflow(false,'work').catch(()=>{});if(fullAllowed)void prefetchProductionWorkflow(false,'full').catch(()=>{});};
+    const timer=window.setTimeout(warm,150),interval=window.setInterval(warm,45000);
+    window.addEventListener('focus',warm);
+    return()=>{window.clearTimeout(timer);window.clearInterval(interval);window.removeEventListener('focus',warm);};
+  },[accountKey,identity.authenticated]);
+  useEffect(()=>{
     if(LOCAL_TEST||!accountKey)return;
     const reader=createBackgroundRefresh({
       visible:()=>!document.hidden,
@@ -16677,8 +19017,8 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
               </FeedbackActionButton>
             )}
             <span>
-              <b data-business-value="true">{session?.name || "Nhân viên mẫu 104"}</b>
-              <small>{session?.detail || "KHSX · sample_user_15"}</small>
+              <b data-business-value="true">{session?.name || "Vũ Hương Duyên"}</b>
+              <small>{session?.detail || "KHSX · vthduyen"}</small>
             </span>
               <FeedbackActionButton
               className="logout-button"
@@ -16807,7 +19147,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
             section={activeChild}
             initialSku={warehouseSku}
             initialSkuRequest={intent?.sequence}
-            operator={session?.name || "sample_user_15"}
+            operator={session?.name || "vthduyen"}
             onOpenSku={(code) => {
               if(canOpenMenu(session,"sku","sku-master"))navigateWorkspace({view:"sku",child:"sku-master",planTab:"base",focusSku:code});
             }}
@@ -16820,7 +19160,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
             preferenceUser={session?.login}
             section={activeChild}
             sessionLine={sessionLine}
-            operator={session?.name || "sample_user_15"}
+            operator={session?.name || "vthduyen"}
             isManager={session?.kind === "account"}
             onNavigateSummary={() => setActiveChild("capacity-summary")}
           />
@@ -16831,7 +19171,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
             <LeadtimeMasterView
               masterSkus={skuRecords}
               skuReadState={skuApproval}
-              operator={session?.name || "sample_user_15"}
+              operator={session?.name || "vthduyen"}
               onOpenSkuMaster={() => setActiveChild("sku-master")}
               language={language}
               onListReset={() => setListResetRevision((value) => value + 1)}
@@ -17530,7 +19870,7 @@ toolbarConfig.action({"onClick": () => {
               operator={
                 session?.kind === "account"
                   ? session.login
-                  : session?.name || "sample_user_15"
+                  : session?.name || "vthduyen"
               }
             />
           ) : (
@@ -17539,7 +19879,7 @@ toolbarConfig.action({"onClick": () => {
               operator={
                 session?.kind === "account"
                   ? session.login
-                  : session?.name || "sample_user_15"
+                  : session?.name || "vthduyen"
               }
             />
           )

@@ -1,0 +1,28 @@
+{
+  "baseCommit": "c84775445ed3ef4c09fc583ac06b19881f9ae6d9",
+  "sourceVersion": "ONSPA v807 approved sanitized source snapshot",
+  "algorithm": "action-props-v2; ignores disabledExplanation only; includes permission argument",
+  "files": [
+    {
+      "file": "app/page.tsx",
+      "count": 110,
+      "sha256": "b61ae0507ac3a2e1af24c9fd3065abdbcb541466e81ac61958d693654ea0d94d",
+      "jsxCount": 325,
+      "jsxSha256": "6a64c2868d0240e0d3672414ff2a2f54ec8950875d08c5b35830b58f151d9a13"
+    },
+    {
+      "file": "components/labor-hours-master.tsx",
+      "count": 9,
+      "sha256": "beb1feb10c27f9121f595295dbe1ee044d49bc295cc825afb5c9f86b41fcb7e5",
+      "jsxCount": 15,
+      "jsxSha256": "c1739a6df78968e62a123eb3c86a5197155183ecbe62b8ec055c946985fe7a6b"
+    },
+    {
+      "file": "components/weekly-capacity.tsx",
+      "count": 17,
+      "sha256": "0cfeaade76b87372139601cb92cf470ddc1b6c71acbbd23b698a2716f0afc4d1",
+      "jsxCount": 44,
+      "jsxSha256": "bef1f1b51912ec359a812a18f0cd5f2e202825b0cbf3aab1268c20cda21ea108"
+    }
+  ]
+}
