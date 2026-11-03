@@ -195,7 +195,8 @@ test('daily output follows productionDate and groups exits per LSX/day; unit lab
  const o={...orders[0],lsxQty:300,actualCompletedAt:'2026-10-02T03:00:00Z'};
  const first={...report,id:'first',reportedQuantity:100,approvedQuantity:100,productionDate:'2026-09-30',completedAt:'2026-10-01T03:00:00Z',hours:{hc:18,ot:0,total:18}},second={...first,id:'second',reportedQuantity:200,approvedQuantity:200,productionDate:'2026-10-02',completedAt:o.actualCompletedAt,hours:{hc:36,ot:0,total:36}};
  const daily=dailyProductionOutput([o],[first,second,{...second,id:'cancelled',cancelled:true}]);
- assert.deepEqual(daily.map(r=>[r.date,r.approved]),[['2026-09-30',100],['2026-10-02',200]]);
+ // User requirement 19/10: newest month first; this fixture has one day per month.
+ assert.deepEqual(daily.map(r=>[r.date,r.approved]),[['2026-10-02',200],['2026-09-30',100]]);
  assert.equal(orderLaborOutput({...o,actualCompletedAt:undefined},[first]).unit,null);
  const closed=orderLaborOutput(o,[first,second]);assert.equal(closed.total,54);assert.equal(closed.qty,300);assert.equal(closed.unit,0.18);
  assert.equal(orderLaborOutput(o,[first,{...second,reviewStatus:'Chờ kiểm tra'}]).unit,null);
@@ -205,6 +206,7 @@ test('daily output follows productionDate and groups exits per LSX/day; unit lab
  const html=renderToStaticMarkup(React.createElement(Output,{orders:[o],reports:[first,second],open:()=>{}}));
  for(const label of ['Tháng 09/2026','Tháng 10/2026','Ngày sản lượng','SL theo ngày','Giờ công theo LSX'])assert.ok(html.includes(label),label);
  assert.ok(!html.includes('GIỜ CÔNG/SP'));assert.ok(html.includes('30/09/2026'));assert.ok(html.includes('02/10/2026'));
+ assert.ok(html.indexOf('Tháng 10/2026')<html.indexOf('Tháng 09/2026'),'newest month appears first');
 });
 
 test('SX work board groups plan weeks like In Transit, preserving within-week sort and unknown weeks',async()=>{
@@ -227,4 +229,19 @@ test('SX week divider repeats on page two without counting it as a production or
   const dom=new JSDOM(html),doc=dom.window.document;
   assert.equal(doc.querySelectorAll('.work-table tbody>tr:not([hidden]):not(.work-week-divider)').length,page===1?10:2);assert.equal(doc.querySelectorAll('.work-week-divider:not([hidden])').length,1);assert.match(doc.querySelector('.work-week-divider:not([hidden])').textContent,/53: 28\/12\/2026 – 03\/01\/2027/);assert.equal(doc.querySelectorAll('.work-mobile-card').length,page===1?10:2);assert.equal(doc.querySelectorAll('.work-table tbody>tr:not(.work-week-divider)').length,12);dom.window.close();
  }
+});
+
+test('output groups months newest first and preserves per-production-date quantities without imposing day order',async()=>{
+ const {dailyProductionOutput}=await import('../lib/production-output-summary.mjs');
+ const order={...orders[0],lsxQty:51};
+ const entries=[['2026-10-03',21],['2026-08-31',8],['2026-10-01',13],['2026-09-30',9]].map(([date,qty],i)=>({...report,id:`MONTH-${i}`,transitId:order.id,productionDate:date,completedAt:'2026-11-03T01:00:00Z',reportedQuantity:qty,approvedQuantity:qty}));
+ const before=JSON.stringify(entries),expected=new Map([['2026-10-03',21],['2026-08-31',8],['2026-10-01',13],['2026-09-30',9]]);
+ for(const input of [entries,[...entries].reverse()]){
+  const rows=dailyProductionOutput([order],input);
+  const months=rows.filter((r,i)=>i===0||r.month!==rows[i-1].month).map(r=>r.month);
+  assert.deepEqual(months,['2026-10','2026-09','2026-08']);
+  assert.deepEqual(new Map(rows.map(r=>[r.date,r.approved])),expected);
+  assert.equal(rows.reduce((n,r)=>n+r.approved,0),51);
+ }
+ assert.equal(JSON.stringify(entries),before);
 });

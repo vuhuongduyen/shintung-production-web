@@ -200,3 +200,13 @@ Profile quick-Line nguyên trạng v807 có nhãn “xem toàn bộ Quản lý s
 Kiểm tổng hợp sáu file (PCB493,PCB494,mounted feedback,matrix,menu-action-access,Line API): **64/64 pass**,exit0,76,5giây,không cancel/skip. Mã runtime cuối giống fa28e9c (đã typecheck/build/CI đạt các bước đó); các thử nghiệm điều hướng trước đã được bỏ, không đưa lên web. Không đổi UI về Back ngoài hợp đồng v807. Bốn ca còn thiếu quy tắc: Plan ID rỗng2,thứ tự ngày/tháng sản lượng1,giới hạn người vệ sinh1. Chưa nới assertion để xanh hoặc đổi các quy tắc đó.
 
 Mô tả PR đã được người dùng cho phép cập nhật riêng với mốc fa28e9c1.491/7 và đã đọc lại khớp. Kết quả đó gắn rõ commit, không áp cho commit mới. CI bản mới cần đọc riêng; không merge/approve/deploy/preview.
+
+## Thứ tự tháng sản lượng: yêu cầu người dùng ngày 19/10
+
+Sau khôi phục môi trường, checkout ban đầu ở main sạch. Đã fetch và trở lại đúng nhánh PR4/head8ec69dd mà không ghi đè thay đổi dở dang. CI của head đó đã hoàn tất:1.496pass/4fail/1.500test,247file; TypeScript/ba build đạt,không timeout/cancel/skip/todo/thiếu tổng kết. Back theo PCB494 và menu quick-Line không còn lỗi.
+
+Bằng chứng mới từ yêu cầu người dùng ngày19/10: menu Sản lượng và giờ công hiển thị tháng từ mới tới cũ, ví dụ10–9–8. Quy tắc này giải quyết mâu thuẫn test đang đòi09 trước10; không cung cấp quy tắc thứ tự ngày trong tháng.
+
+Chỉ sửa test: fixture có một ngày trong mỗi tháng nay kiểm10 trước09; SSR kiểm tiêu đề10 trước09. Thêm ca ba tháng có hai ngày tháng10, đảo đầu vào, kiểm các nhóm tháng liền nhau theo10–9–8, map lượng từng productionDate và tổng51 bất biến. Không khẳng định ngày nào trước ngày nào trong tháng10. Giữ toàn bộ kiểm unit54/300=0,18, thiếu giờ/pending chưa tính unit, canceled không tính và gộp nhiều exit cùng LSX/ngày. Không đổi source UI/helper hoặc công thức để khớp test.
+
+Targeted production-detail+production-output-finished **22/22 pass**,exit0,4,6giây,không cancel/skip. Chỉ test/docs; CI exact head sau push cần đọc riêng. Plan ID trống(2ca) và trần số người vệ sinh(1ca) vẫn chưa có yêu cầu rõ, không tự đổi quy tắc hoặc quyền. Chưa browser/preview/merge/deploy.
