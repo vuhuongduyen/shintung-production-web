@@ -249,3 +249,6 @@ Object.assign(chinese,{"Nhân viên thực tế tiếp tục làm công đoạn"
 
 Object.assign(english,{"Lịch sử phân công": "Assignment history", "Chưa ghi nhận phân công trước": "Previous assignment not recorded", "Thao tác đã hủy": "Cancelled operation", "Thao tác đã thay thế": "Superseded operation", "Chuyển phân công giữa các công đoạn": "Reassigned between stages", "Bắt đầu phân công": "Assignment started", "Tạm ngưng tại công đoạn": "Paused at stage", "Tiếp tục phân công": "Assignment continues", "Phân công theo dữ liệu lịch sử": "Assignment from recorded history"});
 Object.assign(chinese,{"Lịch sử phân công": "分配歷史", "Chưa ghi nhận phân công trước": "未記錄先前分配", "Thao tác đã hủy": "已取消操作", "Thao tác đã thay thế": "已取代操作", "Chuyển phân công giữa các công đoạn": "工序間調動", "Bắt đầu phân công": "開始分配", "Tạm ngưng tại công đoạn": "工序暫停", "Tiếp tục phân công": "繼續分配", "Phân công theo dữ liệu lịch sử": "依歷史記錄分配"});
+
+Object.assign(english,{'Phân bổ lại NV?':'Reassign employees?'});
+Object.assign(chinese,{'Phân bổ lại NV?':'重新分配員工？'});

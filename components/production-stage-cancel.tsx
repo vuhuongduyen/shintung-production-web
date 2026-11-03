@@ -10,10 +10,12 @@ export function useStageCancellation({orderId,reason,allowed,onSaved,onBusyChang
  const pending=useRef(false);
  const restoreKey=JSON.stringify(restore||null);
  const preview=checked&&checked.restore===restoreKey&&checked.reason===reason&&checked.ids===JSON.stringify(selected)&&checked.orderId===orderId?checked.result:null;
+ const invalidate=()=>{setChecked(null);setError('');};
  const reset=()=>{setSelected([]);setChecked(null);setError('');};
  const toggle=(id:string)=>{if(pending.current)return;setSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setChecked(null);setError('');};
  const request=async()=>{
   if(pending.current||!allowed||!orderId||!selected.length||!reason.trim())return;
+  if(restore&&(!Array.isArray(restore.employees)||!restore.employees.length)){setError('Chọn ít nhất một nhân viên để phân bổ lại, hoặc bỏ chọn Phân bổ lại NV.');return;}
   pending.current=true;onBusyChange(true);setError('');
   const action=preview?'apply':'preview';
   try{
@@ -25,5 +27,5 @@ export function useStageCancellation({orderId,reason,allowed,onSaved,onBusyChang
   }catch(e){const message=(e as Error).message;setChecked(null);setError(message);}
   finally{pending.current=false;onBusyChange(false);}
  };
- return {selected,preview,error,toggle,reset,request};
+ return {selected,preview,error,toggle,reset,invalidate,request};
 }

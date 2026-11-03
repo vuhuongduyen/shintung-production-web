@@ -154,3 +154,19 @@ Tám ca còn lại cần bằng chứng riêng, không ép expected theo source:
 - Khôi phục nhân viên sau hủy xuất(1): picker chỉ render khi restore khác null nhưng mọi nơi khởi tạo/reset đều null. Test và API hỗ trợ chọn continuous/return. Cần xác định phải hiện picker trước hủy, mặc định chọn ai, và liên tục hay quay lại; đây có thể là bug UI nhưng sửa mặc định có thể đổi phân công/giờ, không coi là selector đơn thuần.
 
 Đã thử tìm yêu cầu lịch sử qua Personal Context một lần: dịch vụ trả không khả dụng trong cuộc trò chuyện này. Không thử vòng lặp hoặc suy diễn câu trả lời. Có thể tiếp tục đối chiếu lịch sử/fixture độc lập; chưa có cơ sở tự thay quyền/luồng khôi phục hoặc thứ tự hiển thị. Chưa lint/browser/full-app nghiệm thu;không merge/deploy/preview.
+
+## Hủy xuất trạm: lựa chọn phân bổ lại nhân viên theo yêu cầu đã đối chiếu
+
+Bằng chứng người dùng được chuyển trong bàn giao: khi hủy xuất trạm phải hỏi “Phân bổ lại NV?”, có thể chọn người từ lệnh khác như Packing; hủy các thao tác gọn và không bắt nhập lý do riêng. Không tự chọn mặc định làm đổi phân công/giờ.
+
+Xác nhận bug UI: state restore khởi tạo/reset null; picker còn nằm trong nhánh danh sách cũ, trong khi lệnh công đoạn hiện dùng ProductionCorrectionGrid. Vì vậy picker không thể xuất hiện. Sửa bằng một phần lựa chọn chung cho cả hai nhánh khi chỉ hủy một Xuất trạm (đúng giới hạn API), mặc định tắt và không có người chọn sẵn. Bật mới hiện picker continuous/return hiện hữu; chưa chọn ai thì không gửi request. Nhân viên ở Packing vẫn có thể chọn theo lịch/Line hiện hữu; backend giữ xác thực, preview, CAS và tính giờ.
+
+Mọi thay đổi bật/tắt/người/cách khôi phục đều xóa preview, kể cả quay về cùng lựa chọn trước. Bỏ chọn gửi preview không có restore; không tự apply. Khi chọn phân bổ lại dùng luồng cancellation-only đã có thông báo các bản sửa giờ/số lượng chưa lưu không đi cùng lần hủy; tránh lựa chọn restore bị bỏ qua trong batch sửa. Không đổi backend, không tự chuyển nhân viên, không thêm lý do bắt buộc: vẫn dùng lý do mặc định sẵn có, UI không hỏi textarea.
+
+Test mounted kiểm mặc định tắt/không request, bật không người không request, chọn N từ Packing mới gửi preview với restore đúng, chọn lại buộc preview mới, bỏ phân bổ không có restore và không có apply tự động. Giữ test borrowed roster, đổi continuous/return, ngày quay lại, không ghi khi chỉ chọn và dịch Anh/Trung. Sửa selector chọn đúng nút Hủy thao tác thay nút đầu của section. Thêm dịch nhãn mới.
+
+Typecheck/build đã exit0. Test UI mới đạt; nhóm guard API/FINAL local đang kiểm tiếp, kết quả cuối đọc tại PR theo exact head. Chưa browser/responsive hoặc full-app preview đúng commit; không cập nhật runtime/merge/deploy.
+
+Kiểm cuối nhóm phân bổ lại: UI mounted **2/2 pass**, exit0,3,2giây; API restore/cancel/FINAL **26/26 pass**, không cancel/skip,71,4giây; typecheck/build exit0. Các lượt UI trước đã pass assertion nhưng tiến trình không thoát: preview POST mở BroadcastChannel của Node trong data-sync; JSDOM.close không đóng channel đó. Harness theo dõi native channel do test tạo, đóng chúng và khôi phục global khi cleanup; tắt file watch không cần cho SSR test. Không dùng process.exit/unref hoặc skip để che treo. Đã dừng các tiến trình test sở hữu bị treo; lượt cuối thoát sạch. Đây không phải kiểm browser/responsive.
+
+Bằng chứng yêu cầu mới đã giải quyết phần hợp đồng khôi phục trong danh sách tám ca trước. Bảy ca còn lại (Plan ID rỗng2, Back Capacity1, thứ tự tháng/ngày1, menu Line2, giới hạn UI vệ sinh1) vẫn chưa tự đổi expected/quyền/thứ tự/giới hạn. CI exact head sau push ghi tại PR; chưa merge/deploy/preview.
