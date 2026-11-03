@@ -683,7 +683,13 @@ test('schedule cleaning revalidates initial actual staffing before writes, prese
  for(const id of ['CLEAN-A','CLEAN-B'])await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('employees',id,JSON.stringify({id,name:id,line:'A',active:true}),'TEST','fixture').run();
  const draft=structuredClone(days);draft[0].cleaning=[{people:2,start:'16:00',end:'17:00'}];
  const body={action:'schedule',week,line:'A',version:0,approvedVersion:1,days:draft,reason:'Synthetic actual cleaning'};
- const snapshot=()=>db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all();
+ const snapshot=async()=>{
+   const result=await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all();
+   assert.equal(result.success,true);assert.ok(Array.isArray(result.results));
+   // Compare every persisted column of every business/audit record. D1 meta
+   // describes this SELECT (including variable duration), not persisted data.
+   return result.results;
+ };
  let before=await snapshot();
  await assert.rejects(()=>mutateProductionWorkflow(db,{...body,days:draft.map((d,i)=>i?d:{...d,cleaning:[{people:3,start:'16:00',end:'17:00'}]})},manager),e=>e.status===409&&e.message.includes('đầu ca (2)'));
  assert.deepEqual(await snapshot(),before);
