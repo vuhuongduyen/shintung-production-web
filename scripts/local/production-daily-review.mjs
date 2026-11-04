@@ -4,7 +4,7 @@ import {normalizeTransit} from '../../lib/in-transit.mjs';
 import {isDailyOutput,dailyOutputTotals} from '../../lib/production-daily-output.mjs';
 import {pendingReportReview,reportReviewBlocker,reportDelayReasonError} from '../../lib/production-progress-review.mjs';
 import {reviewSnapshot} from '../../lib/production-review-selection.mjs';
-import {readDailyOrderReports} from './production-daily-output.mjs';
+import {readDailyOutputPolicy,readDailyOrderReports} from './production-daily-output.mjs';
 const fail=(message,status=409)=>{throw Object.assign(Error(message),{status});};
 export async function reviewDailyOutput(db,body,actor,{stored,cursorBefore}={}){
  if(!productionMenuRights(actor).confirm)fail('Chỉ QLSX được duyệt sản lượng.',403);
@@ -14,6 +14,7 @@ export async function reviewDailyOutput(db,body,actor,{stored,cursorBefore}={}){
  if(actor.line&&actor.line!==report.line)fail('Không được duyệt sản lượng của Line khác.',403);
  if(!pendingReportReview(report)||body.expectedVersion!==undefined&&Number(body.expectedVersion)!==Number(report.version||0))fail('Phiếu đã thay đổi hoặc đã được xử lý. Tải lại và kiểm tra.');
  const blocker=reportReviewBlocker(report);if(blocker)fail(blocker,422);
+ const activation=await readDailyOutputPolicy(db);if(!activation.policy?.active)fail(activation.policy?.blockedReason||'Báo sản lượng ngày không còn hoạt động; tải lại trước khi xác nhận.');
  const orderRow=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(report.transitId).first();if(!orderRow)fail('Không còn LSX đang hoạt động để đối chiếu.');
  const raw=JSON.parse(orderRow.payload),order=normalizeTransit({...raw,id:report.transitId});
  if(['line','sku','lsxCode'].some(k=>raw[k]!==report[k]))fail('Lệnh đã đổi Line/SKU/LSX so với phiếu sản lượng. Đối chiếu lại trước khi xác nhận.');
@@ -34,7 +35,8 @@ export async function reviewDailyOutput(db,body,actor,{stored,cursorBefore}={}){
  await db.prepare("INSERT INTO app_records VALUES('production_cursor','global',?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(initial,actor.login,now).run();
  const cursor=await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first();if(cursor.payload!==(before?.payload||initial))fail('Dữ liệu SX vừa thay đổi; tải lại trước khi xác nhận.');
  const nextCursor=JSON.stringify({version:Number(JSON.parse(cursor.payload).version||0)+1,token:crypto.randomUUID()}),warehouseKey=`SX:${report.id}`;
- const guards=[{sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)",args:[report.id,reportRow.payload]},{sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?)",args:[report.transitId,orderRow.payload]},{sql:"NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND (record_key=? OR json_extract(payload,'$.reportId')=?))",args:[warehouseKey,report.id]},...context.guards];
+ const policyGuard=(entity,key,raw)=>({sql:"EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)",args:[entity,key,raw]});
+ const guards=[policyGuard('production_reporting_policy','global',activation.raw),policyGuard('production_legacy_manifest',activation.manifestKey,activation.manifestRaw),{sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)",args:[report.id,reportRow.payload]},{sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?)",args:[report.transitId,orderRow.payload]},{sql:"NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND (record_key=? OR json_extract(payload,'$.reportId')=?))",args:[warehouseKey,report.id]},...context.guards];
  const gate="EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key='global' AND payload=?)";
  const statements=[db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key='global' AND payload=? AND ${guards.map(g=>g.sql).join(' AND ')}`).bind(nextCursor,actor.login,now,cursor.payload,...guards.flatMap(g=>g.args)),db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_report' AND record_key=? AND ${gate}`).bind(JSON.stringify(updated),actor.login,now,report.id,nextCursor)];
  const transit={...raw,completedQty:cumulative,productionState:updated.productionState,actualStartedAt:startedAt,actualCompletedAt:finalAt,delayReason:delayReason||raw.delayReason||'',updatedAt:now,updatedBy:actor.login};

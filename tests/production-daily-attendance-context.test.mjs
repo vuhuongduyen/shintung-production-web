@@ -18,6 +18,6 @@ test('actual Worker preserves observed legacy display and raw records after acti
   const {legacyPresentationFields}=await import('../lib/production-legacy-earned-basis.mjs');
   for(const original of before.reports){const next=after.body.reports.find(r=>r.id===original.id);assert.ok(next);for(const key of legacyPresentationFields)assert.deepEqual(next[key],original[key],`${original.id}.${key}`);}
   assert.deepEqual(protectedRows(await records(c.db)).filter(r=>r.entity!=='labor_hours'),raw.filter(r=>r.entity!=='labor_hours'));
-  await c.db.prepare("DELETE FROM app_records WHERE entity='production_legacy_manifest'").run();const blocked=await call('/api/production-workflow');assert.equal(blocked.body.dailyOutputPolicy.active,false);assert.match(blocked.body.dailyOutputPolicy.blockedReason,/bảo toàn/);
+  await c.db.prepare("DELETE FROM app_records WHERE entity='production_legacy_manifest'").run();const blocked=await call('/api/production-workflow');assert.equal(blocked.status,503);assert.equal(blocked.body.dailyOutputPolicy.active,false);assert.equal(blocked.body.reports,undefined);assert.match(blocked.body.dailyOutputPolicy.blockedReason,/bảo toàn/);
  }finally{await c.close();}
 });

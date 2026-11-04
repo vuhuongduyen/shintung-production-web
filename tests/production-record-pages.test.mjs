@@ -13,7 +13,8 @@ test('large key windows keep byte-bounded payload pages complete and reduce data
   const expected=Array.from({length:1500},(_,i)=>({entity:'production_event',record_key:String(i).padStart(5,'0'),payload:JSON.stringify({id:i,note:'x'.repeat(1024)})}));
   await c.db.batch(expected.map(r=>c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(r.entity,r.record_key,r.payload,'TEST','2026-10-31')));
   let calls=0,pages=0,active=0,maxActive=0;
-  const db={prepare(sql){const statement=c.db.prepare(sql);return {bind(...args){const bound=statement.bind(...args);return {async all(){calls++;const r=await bound.all();if(!sql.includes('length(CAST')){active++;maxActive=Math.max(maxActive,active);await new Promise(resolve=>setTimeout(resolve,5));active--;pages++;assert.ok(r.results.reduce((n,row)=>n+Buffer.byteLength(row.payload),0)<=512*1024);}return r;}};}};}};
+  // Count requests in flight, not completions overlapping an arbitrary 5 ms timer.
+  const db={prepare(sql){const statement=c.db.prepare(sql);return {bind(...args){const bound=statement.bind(...args);return {async all(){calls++;const payloadPage=!sql.includes('length(CAST');if(payloadPage){active++;maxActive=Math.max(maxActive,active);}try{const r=await bound.all();if(payloadPage){pages++;assert.ok(r.results.reduce((n,row)=>n+Buffer.byteLength(row.payload),0)<=512*1024);}return r;}finally{if(payloadPage)active--;}}};}};}};
   const rows=await readRecordPages(db,{where:'entity=?',args:['production_event']});
   assert.deepEqual(rows.map(({entity,record_key,payload})=>({entity,record_key,payload})),expected);
   assert.equal(calls,5);assert.ok(pages>=3);assert.ok(maxActive>1&&maxActive<=3);

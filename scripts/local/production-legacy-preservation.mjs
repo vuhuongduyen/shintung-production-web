@@ -8,5 +8,5 @@ export async function readLegacyPreservation(db,policy,actor,{full=true}={}){
  return {snapshotId,basis:basis.filter(b=>!actor.line||b.line===actor.line),monthly:monthly.map(m=>({...m,lines:actor.line?{[actor.line]:m.lines[actor.line]}:m.lines})),orders,required:full,historyProtection:{requiredBeforeMonth:policy.effectiveFrom.slice(0,7),snapshotId}};
 }
 export function preservationManifestValid(manifest,policy){
- return manifest?.kind===preservationModel&&manifest.status==='complete'&&manifest.cutoverDate===policy.effectiveFrom&&['earned','reportPresentation','monthlyAttendance','orderMetadata'].every(k=>manifest.scope?.[k]===true);
+ return manifest?.id===policy.legacySnapshotId&&manifest?.kind===preservationModel&&manifest.status==='complete'&&manifest.cutoverDate===policy.effectiveFrom&&['earned','reportPresentation','monthlyAttendance','orderMetadata'].every(k=>manifest.scope?.[k]===true);
 }

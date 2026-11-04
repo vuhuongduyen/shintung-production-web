@@ -357,7 +357,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   };
   if(legacyPreservation){
    const rawReports=[...historyRecords.flatMap(r=>r.payload.reports||[]),...reportRecords.map(r=>({...r.payload,id:r.key}))];
-   return {...result,reports:attachLegacyEarnedBasis(result.reports,legacyPreservation.basis,{required:legacyPreservation.required,rawReports}),payrollBaselines:legacyPreservation.monthly,payrollHistoryProtection:legacyPreservation.historyProtection};
+   return {...result,reports:await attachLegacyEarnedBasis(result.reports,legacyPreservation.basis,{required:legacyPreservation.required,rawReports}),payrollBaselines:legacyPreservation.monthly,payrollHistoryProtection:legacyPreservation.historyProtection};
   }
   return result;
 }
@@ -399,7 +399,8 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   if(requestId && !/^[a-zA-Z0-9-]{16,80}$/.test(requestId)) fail("Mã thao tác không hợp lệ.");
   if(action==='daily-output'){const result=await writeDailyOutput(db,body,actor,commitEvents);responseScope.committedDaily=true;return result;}
   const activation=await readDailyOutputPolicy(db);
-  if(activation.policy?.active&&(['start','extra','complete','pause','resume','transfer','add','reduce','preview-report','approve-hours','recalculate-attendance-hours'].includes(action)||body.stageEntries||body.backfill))fail('Đã chuyển sang báo sản lượng thành phẩm theo ngày. Lịch sử công đoạn chỉ để tra cứu; không ghi hoặc tính lại giờ theo lệnh.',409);
+  if(activation.policy?.cutoverReached&&!activation.policy.active)fail(activation.policy.blockedReason||'Thiếu mốc bảo toàn lịch sử, chưa cho phép ghi.',409);
+  if(activation.policy?.cutoverReached&&(['start','extra','complete','pause','resume','transfer','add','reduce','preview-report','approve-hours','recalculate-attendance-hours'].includes(action)||body.stageEntries||body.backfill))fail('Đã chuyển sang báo sản lượng thành phẩm theo ngày. Lịch sử công đoạn chỉ để tra cứu; không ghi hoặc tính lại giờ theo lệnh.',409);
   if(requestId&&(!body.backfill||['apply','save'].includes(body.backfill.mode))){const match=await db.prepare("SELECT payload FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(requestId).first();const existing=match?{payload:JSON.parse(match.payload)}:null;
     if(existing){if(personalHrEvent(existing.payload)&&(!canHr(actor)||actor.line))fail("Không có quyền đọc lại dữ liệu HR theo nhân viên.",403);if(existing.payload.actor!==actor.login)fail("Mã thao tác thuộc người khác.",409);return {event:existing.payload,replayed:true,...(existing.payload.kind==='staff-recall-request'?{pendingRecall:true,requestId:existing.payload.requestId}:{})};}}
   if(body.backfill){if(action!=='start'||!canWork(actor)||!canManage(actor)&&!actor.line)fail('Nhập trạm bù yêu cầu quyền báo công của Line hoặc QLSX/Admin.',403);if(!requestId)fail('Thiếu mã thao tác nhập bù.');return backfillStageWork(db,body,actor,catalog);}

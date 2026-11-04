@@ -16,14 +16,14 @@ const calculate=(w,extra={})=>payrollMonth({orders:w.orders,reports:w.reports,em
 test('past month preserves every person/hour/payment/quantity after current master and calendar changes',async()=>{
  const w=fixture(),raw=structuredClone(w),before=calculate(w),p=await captureLegacyPreservation({workflow:w,standards:new Map([['SKU-A',.1],['SKU-B',.1]]),snapshotId,observedAt:'2026-11-04T01:00:00Z',cutoverDate:'2026-11-04'});
  assert.ok(before.every(r=>r.result.issues.length===0),JSON.stringify(before.map(r=>r.result.issues)));assert.ok(before[0].result.paid>0);assert.equal(before[0].support,1);
- const changed={...w,orders:w.orders.map(o=>({...o,sku:'NEW',line:o.line==='A'?'B':'A',name:'New name',spec:'New spec'})),employees:w.employees.map(e=>({...e,line:'C',name:'New employee name',startDate:'2027-01-01',active:false})),approvedSchedules:[],events:[],reports:attachLegacyEarnedBasis(w.reports,p.basis,{required:true})};
+ const changed={...w,orders:w.orders.map(o=>({...o,sku:'NEW',line:o.line==='A'?'B':'A',name:'New name',spec:'New spec'})),employees:w.employees.map(e=>({...e,line:'C',name:'New employee name',startDate:'2027-01-01',active:false})),approvedSchedules:[],events:[],reports:await attachLegacyEarnedBasis(w.reports,p.basis,{required:true})};
  const after=calculate(changed,{standards:new Map([['NEW',9]]),attendanceBaselines:p.monthly,historyProtection:{requiredBeforeMonth:'2026-11',snapshotId}});
  // Order display also has a separately guarded snapshot; compare all calculation values and preserved labels.
  for(let i=0;i<before.length;i++){for(const key of ['people','selected','earned','share','result','actual','support','production','quantity','missing'])assert.deepEqual(after[i][key],before[i][key],key);assert.equal(after[i].rows[0].order.name,before[i].rows[0].order.name);assert.equal(after[i].rows[0].earned,before[i].rows[0].earned);}
  assert.deepEqual(w,raw,'capture and calculation never write original data');
 });
 test('journal final marker/rate/cumulative hours and known missing metadata do not follow later master changes',async()=>{
- const w=fixture(),p=await captureLegacyPreservation({workflow:w,standards:new Map([['SKU-A',.1],['SKU-B',.1]]),snapshotId,observedAt:'2026-11-04T01:00:00Z',cutoverDate:'2026-11-04'}),attached=attachLegacyEarnedBasis(w.reports,p.basis,{required:true}),changed=w.orders.map(o=>({...o,processes:['PACKING']}));
+ const w=fixture(),p=await captureLegacyPreservation({workflow:w,standards:new Map([['SKU-A',.1],['SKU-B',.1]]),snapshotId,observedAt:'2026-11-04T01:00:00Z',cutoverDate:'2026-11-04'}),attached=await attachLegacyEarnedBasis(w.reports,p.basis,{required:true}),changed=w.orders.map(o=>({...o,processes:['PACKING']}));
  assert.equal(finalReportIds(attached,changed).size,0);assert.equal(preservedJournalFinalIds(attached,finalReportIds(attached,changed)).size,2);
  const view=preservedJournalPresentation(attached[0]);assert.equal(view.standardUnitHours,.1);assert.equal(view.standardLaborHours,20);assert.equal(view.orderCumulativeHours,8);assert.equal(view.standardUnit,.1);
  const basis=p.orders[0];assert.equal(preservedOrderMetadata(w.orders[0],basis).standardLeadtime,2);assert.equal(preservedOrderMetadata({...w.orders[0],standardLeadtime:3},basis).standardLeadtime,undefined,'explicit source edit is not overridden');
