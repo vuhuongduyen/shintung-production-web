@@ -2,6 +2,18 @@
 
 Đây là checklist chuẩn bị, không phải lệnh chạy hoặc quyền kích hoạt. Source hiện chỉ có driver kích hoạt trong `tests/helpers/activate-prepared-daily-policy.mjs`; chưa có adapter production. Không dùng helper TEST trên DB thật, không tạo marker TEST trên production. Giữ quy trình [PR → kiểm thử → nghiệm thu → merge → phát hành riêng](ONSPA-DEVELOPMENT-WORKFLOW.md).
 
+## Phần adapter đã chuẩn bị độc lập
+
+`scripts/local/production-activation-readiness.mjs` cung cấp `inspectDailyActivation` nội bộ, **chỉ đọc**; chưa được nối vào HTTP, CLI hoặc lúc khởi động. Driver ghi vẫn chỉ ở tests/helpers. Actor/build phải đến từ ngữ cảnh máy chủ đáng tin khi có adapter được duyệt; kết quả không phải quyền ghi hoặc giấy duyệt triển khai.
+
+- Hai SELECT với snapshot hoàn tất: đọc manifest có cap 256 KiB, rồi kiểm đồng thời manifest còn nguyên, nguồn/copy đủ, anchor còn khớp và chưa có policy/activation. Không đọc full workflow, tạo snapshot mới, ghi audit/policy hoặc trả raw payload nhân sự/định mức trong chẩn đoán.
+- Từ chối trước DB nếu thiếu quyền Admin toàn cục, sai snapshotId hoặc thiếu sourceId máy chủ. Manifest sai build/ngày GMT+7/capability/cấu trúc lô/budget phải báo chưa đủ điều kiện. Record lỗi hoặc nguồn thay đổi không tự sửa để cho qua.
+- `technicalChecksPassed=true` chỉ mô tả lần đọc đó. `mayActivate=false`, `productionActivationAvailable=false`, `requiresAtomicRevalidation=true` luôn giữ nguyên. Kết quả cũ không dùng được thay guard trong transaction; TEST driver vẫn kiểm lại độc lập.
+- Các blocker chỉ là mã kỹ thuật, ví dụ `source-changed`, `anchors-changed`, `source-copy-incomplete`, `activation-already-exists`; không bao gồm dữ liệu cá nhân hoặc payload thật. Đã có policy/activation thì cần đọc lại đúng lượt, không ghi đè qua đường preflight.
+- TEST tổng hợp preflight → thiếu marker bị chặn → kích hoạt cô lập bằng driver cũ → preflight không còn cho là chưa kích hoạt. Bổ sung race ngay trước SELECT cuối, malformed/staging/oversize/wrong build, qua ngày, nguồn thay sau preflight; so mọi record trước–sau và chặn mọi SQL ngoài SELECT ở inspector.
+
+Đây là phần kiểm tra đầu vào của adapter, **chưa phải adapter ghi production hoàn chỉnh**. Hai SELECT là số truy vấn đã kiểm, không phải chứng nhận độ trễ/tải dữ liệu thật. Không tự tạo đường ghi production để làm đầy checklist khi còn thiếu quyết định, nghiệm thu và quyền triển khai.
+
 ## Checkpoint đã kiểm
 
 - `b5c822e6d0e05982217a84d25b4b66e3e77eb312`: [CI 41885732618](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41885732618) đạt 1.750/1.750 trong 288 file, TypeScript và ba build đạt. Không dùng kết quả này thay CI của commit bổ sung sau đó.
