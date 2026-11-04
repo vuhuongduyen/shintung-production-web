@@ -36,7 +36,7 @@ function ONSPA_dongBoTuDong(){
  const fresh=indexedLastRow>1?sh.getRange(2,10,indexedLastRow-1,1).createTextFinder(String(r.reportId)).matchEntireCell(true).matchCase(true).useRegularExpression(false).findAll().map(cell=>cell.getRow()):[];
  if(fresh.length!==matches.length||fresh.some((row,i)=>row!==matches[i]))throw Error('ID hoặc vị trí phiếu vừa thay đổi trong Sheet. Cần tải lại và đối chiếu, không tự ghi đè.');
  if(matches.length>1)throw Error('ID báo công trùng nhiều dòng. Cần đối chiếu, không tự ghi đè.');
- if(r.sheetSync?.command){ONSPA_xuLyThuHoi_(sh,r,matches[0]);continue;}
+ if(r.sheetSync?.command){if(['daily-pending-edit','daily-pending-cancel'].includes(r.sheetSync.command.kind))ONSPA_xuLyDieuChinhChoNhan_(sh,r,matches[0]);else ONSPA_xuLyThuHoi_(sh,r,matches[0]);continue;}
  const raw=String(r.sourceCompletedAt||'');const date=new Date(/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?$/.test(raw)?raw+'+07:00':raw);if(!Number.isFinite(date.getTime()))throw Error('Thiếu ngày xuất trạm hợp lệ.');
  let row=matches[0];
  if(row){const v=sh.getRange(row,1,1,21).getValues()[0];if(String(v[9])!==String(r.reportId)||String(v[2])!==r.sku||String(v[8])!==r.lsxCode||v[7]!=='ONSPA_WEB')throw Error('ID đã có nhưng dữ liệu hoặc nguồn khác. Cần đối chiếu phiếu cũ trước khi liên kết.');
@@ -53,14 +53,19 @@ function ONSPA_dongBoTuDong(){
  }
  sh.getRange(row,1).setValue(date).setNumberFormat('dd/MM/yyyy');
  SpreadsheetApp.flush();ONSPA_api_({action:'ack',receiptId:r.id,reportId:r.reportId,sku:r.sku,sourceCompletedAt:r.sourceCompletedAt,proposedQuantity:r.proposedQuantity,correctionRevision:r.sheetSync?.correctionRevision||null});
- }catch(e){const found=reportRows.get(String(r.reportId))||[];if(r.sheetSync?.command&&found.length===1&&String(sh.getRange(found[0],10).getValue())===String(r.reportId))sh.getRange(found[0],20,1,2).setValues([['LỖI THU HỒI',ONSPA_text_(e.message||e)]]);ONSPA_api_({action:'error',receiptId:r.id,reportId:r.reportId,sku:r.sku,error:String(e.message||e)});}
+ }catch(e){const found=reportRows.get(String(r.reportId))||[];if(r.sheetSync?.command&&found.length===1&&String(sh.getRange(found[0],10).getValue())===String(r.reportId))sh.getRange(found[0],20,1,2).setValues([[String(r.sheetSync.command.kind).startsWith('daily-pending-')?'LỖI ĐỐI SOÁT ĐIỀU CHỈNH':'LỖI THU HỒI',ONSPA_text_(e.message||e)]]);ONSPA_api_({action:'error',receiptId:r.id,reportId:r.reportId,sku:r.sku,error:String(e.message||e)});}
  }
- const n=sh.getLastRow();if(n>1){const rows=sh.getRange(2,1,n-1,21).getValues();let count=0;rows.forEach((v,i)=>{if(count<50&&v[7]==='ONSPA_WEB'&&['KHO ĐÃ XÁC NHẬN','CÓ CHÊNH LỆCH'].includes(v[12])&&v[19]!=='ĐÃ ĐỒNG BỘ WEB'){count++;ONSPA_guiXacNhan_(sh,i+2);}else if(count<50&&v[7]==='ONSPA_WEB'&&v[12]==='ĐÃ HỦY THEO YÊU CẦU SX'&&v[19]!=='ĐÃ ĐỒNG BỘ WEB'){count++;try{ONSPA_guiXacNhanThuHoi_(sh,i+2);}catch(e){/* Helper records an error only on the same verified original row. */}}});}
+ const n=sh.getLastRow();if(n>1){const rows=sh.getRange(2,1,n-1,21).getValues();let count=0;rows.forEach((v,i)=>{const change=['LỖI ĐỐI SOÁT ĐIỀU CHỈNH','CHỜ ĐỐI SOÁT ĐIỀU CHỈNH'].includes(v[19])?ONSPA_docDieuChinhChoNhan_(sh,i+2):null;if(count<50&&change&&['applied','acknowledged'].includes(change.phase)&&v[19]!=='ĐÃ ĐỒNG BỘ WEB'){count++;try{ONSPA_guiDieuChinhChoNhan_(sh,i+2,change);}catch(e){/* Keep original command and row for reconciliation. */}}else if(count<50&&v[7]==='ONSPA_WEB'&&['KHO ĐÃ XÁC NHẬN','CÓ CHÊNH LỆCH'].includes(v[12])&&v[19]!=='ĐÃ ĐỒNG BỘ WEB'){count++;try{ONSPA_guiXacNhan_(sh,i+2);}catch(e){/* Ambiguous/moved IDs are not stamped or acknowledged; continue other rows. */}}else if(count<50&&v[7]==='ONSPA_WEB'&&v[12]==='ĐÃ HỦY THEO YÊU CẦU SX'&&v[19]!=='ĐÃ ĐỒNG BỘ WEB'){count++;try{ONSPA_guiXacNhanThuHoi_(sh,i+2);}catch(e){/* Helper records an error only on the same verified original row. */}}});}
  }finally{lock.releaseLock();}
 }
 function ONSPA_text_(v){const s=String(v||'');return /^[=+@-]/.test(s)?"'"+s:s;}
+function ONSPA_kiemTraDongDuyNhat_(sh,row,reportId){
+ const id=String(reportId||''),last=sh.getLastRow();if(!id||last<2)throw Error('Thiếu ID báo công để đối chiếu dòng gốc.');
+ const found=sh.getRange(2,10,last-1,1).createTextFinder(id).matchEntireCell(true).matchCase(true).useRegularExpression(false).findAll();
+ if(found.length!==1||found[0].getRow()!==row||String(sh.getRange(row,10).getValue())!==id)throw Error('ID báo công bị trùng hoặc dòng đã di chuyển; cần dòng gốc duy nhất trước khi gửi lại.');
+}
 function ONSPA_guiXacNhan_(sh,row){
- const v=sh.getRange(row,1,1,21).getValues()[0];if(v[7]!=='ONSPA_WEB')return false;
+ const v=sh.getRange(row,1,1,21).getValues()[0];if(v[7]!=='ONSPA_WEB')return false;ONSPA_kiemTraDongDuyNhat_(sh,row,v[9]);
  try{
  if(!(v[17] instanceof Date)||!Number.isFinite(v[17].getTime()))throw Error('Thiếu thời gian kho xác nhận.');
  ONSPA_api_({action:'confirm',receiptId:'SX:'+String(v[9]),reportId:String(v[9]),sku:String(v[2]),proposedQuantity:Number(v[4]),receivedQuantity:Number(v[13]),differenceReason:String(v[15]||''),confirmedAt:v[17].toISOString(),confirmedBy:String(v[18]||'')});
@@ -85,6 +90,7 @@ function ONSPA_noteThuHoi_(cell,command,receiptId,created,reportId){
 function ONSPA_guiXacNhanThuHoi_(sh,row){
  const v=sh.getRange(row,1,1,26).getValues()[0],prefix='ONSPA_WITHDRAWAL:';let marker=null;
  for(const line of (sh.getRange(row,23).getNote()||'').split('\n'))if(line.startsWith(prefix)){try{marker=JSON.parse(line.slice(prefix.length));}catch(e){}}
+ ONSPA_kiemTraDongDuyNhat_(sh,row,v[9]);
  if(v[7]!=='ONSPA_WEB'||v[12]!=='ĐÃ HỦY THEO YÊU CẦU SX'||v[21]!=='KHO ĐỒNG Ý HỦY'||!marker||marker.reportId!==String(v[9])||marker.commandId!==String(v[22])||!(v[23] instanceof Date)||!Number.isFinite(v[23].getTime())||!v[24])throw Error('Chưa có đủ thông tin thu hồi trên dòng gốc.');
  try{ONSPA_kiemTraTonThuHoi_(sh,String(v[2]));
  const result=ONSPA_api_({action:'withdrawal-ack',receiptId:marker.receiptId,reportId:String(v[9]),sku:String(v[2]),commandId:marker.commandId,commandRevision:marker.commandRevision,sheetRow:row,stockExcluded:true,originalRowRetained:true,rowCreatedForHistory:marker.rowCreatedForHistory,originalProposedQuantity:Number(v[4]),originalReceivedQuantity:Number(v[13]),withdrawnAt:v[23].toISOString(),withdrawnBy:String(v[24])});
@@ -152,3 +158,30 @@ function ONSPA_quyetDinhThuHoiDongDangChon_(approve){
 }
 function ONSPA_dongYThuHoiDongDangChon(){return ONSPA_quyetDinhThuHoiDongDangChon_(true);}
 function ONSPA_tuChoiThuHoiDongDangChon(){return ONSPA_quyetDinhThuHoiDongDangChon_(false);}
+
+
+function ONSPA_docDieuChinhChoNhan_(sh,row){let found=null;for(const line of (sh.getRange(row,23).getNote()||'').split('\n'))if(line.startsWith('ONSPA_PENDING_CORRECTION:')){try{found=JSON.parse(line.slice('ONSPA_PENDING_CORRECTION:'.length));}catch(e){}}return found;}
+function ONSPA_ghiDieuChinhChoNhan_(sh,row,marker){const cell=sh.getRange(row,23),note=cell.getNote()||'';cell.setNote(note+(note?'\n':'')+'ONSPA_PENDING_CORRECTION:'+JSON.stringify(marker));}
+function ONSPA_ngayDieuChinh_(value){if(value instanceof Date&&Number.isFinite(value.getTime()))return new Date(value.getTime()+25200000).toISOString().slice(0,10);return String(value||'').slice(0,10);}
+function ONSPA_choPhepXacNhanKho_(sh,row){const marker=ONSPA_docDieuChinhChoNhan_(sh,row);if(marker&&marker.phase!=='acknowledged')throw Error('Phiếu đang đối soát điều chỉnh; chờ đồng bộ Web trước khi xác nhận Kho.');}
+function ONSPA_guiDieuChinhChoNhan_(sh,row,marker){
+ ONSPA_kiemTraDongDuyNhat_(sh,row,marker.reportId);const v=sh.getRange(row,1,1,26).getValues()[0],cancel=marker.operation==='daily-output-cancel';
+ if(v[7]!=='ONSPA_WEB'||String(v[2])!==marker.sku||String(v[8])!==marker.lsxCode||String(v[9])!==marker.reportId||v[13]!==''||v[17]!==''||v[18]!==''||Number(v[4])!==marker.finalQuantity||ONSPA_ngayDieuChinh_(v[0])!==marker.productionDate||v[12]!== (cancel?'ĐÃ HỦY THEO YÊU CẦU SX':'CHỜ KHO XÁC NHẬN'))throw Error('Dòng điều chỉnh đã thay đổi hoặc có nhận hàng; chưa gửi ACK.');
+ if(cancel)ONSPA_kiemTraTonThuHoi_(sh,marker.sku);
+ try{const result=ONSPA_api_({action:'pending-correction-ack',receiptId:marker.receiptId,reportId:marker.reportId,sku:marker.sku,commandId:marker.id,commandRevision:marker.revision,sheetRow:row,pendingNoReceipt:true,originalRowRetained:true,originalProposedQuantity:marker.originalQuantity,finalProposedQuantity:marker.finalQuantity,finalProductionDate:marker.productionDate,stockExcluded:cancel,appliedAt:marker.appliedAt});ONSPA_ghiDieuChinhChoNhan_(sh,row,{...marker,phase:'acknowledged'});sh.getRange(row,20,1,2).setValues([['ĐÃ ĐỒNG BỘ WEB','']]);return result;}
+ catch(e){if(String(sh.getRange(row,10).getValue())===marker.reportId)sh.getRange(row,20,1,2).setValues([['LỖI ĐỐI SOÁT ĐIỀU CHỈNH',ONSPA_text_(e.message||e)]]);throw e;}
+}
+function ONSPA_xuLyDieuChinhChoNhan_(sh,r,row){
+ const command=r.sheetSync.command,change=r.pendingCorrection,cancel=command.kind==='daily-pending-cancel';if(!row)throw Error('Chưa có dòng gốc đã đồng bộ; không tự tạo dòng thay thế.');
+ if(!change||change.id!==command.id||change.status!=='pending'||command.revision!==1||change.operation!==(cancel?'daily-output-cancel':'daily-output-edit'))throw Error('Lệnh sửa/hủy phiếu chờ nhận không khớp.');
+ ONSPA_kiemTraDongDuyNhat_(sh,row,r.reportId);const v=sh.getRange(row,1,1,26).getValues()[0];if(v[7]!=='ONSPA_WEB'||String(v[9])!==String(r.reportId)||String(v[2])!==r.sku||String(v[8])!==r.lsxCode||sh.getRange(row,5).getFormula()||sh.getRange(row,14).getFormula())throw Error('Dòng gốc khác nguồn hoặc lượng chứa công thức.');
+ let marker=ONSPA_docDieuChinhChoNhan_(sh,row);if(marker&&marker.id!==command.id&&marker.phase!=='acknowledged')throw Error('Dòng còn lượt điều chỉnh chưa đối soát.');
+ if(v[13]!==''||v[17]!==''||v[18]!==''||['KHO ĐÃ XÁC NHẬN','CÓ CHÊNH LỆCH'].includes(v[12])){if(marker?.id===command.id)throw Error('Đã có nhận hàng trong lúc đối soát; cần kiểm tra, không ghi đè.');if(!ONSPA_guiXacNhan_(sh,row))throw Error('Kho có thông tin nhận hàng chưa đối soát.');return {ok:true,correctionBlocked:true};}
+ if(!marker||marker.id!==command.id){
+  if(v[12]!=='CHỜ KHO XÁC NHẬN'||Number(v[4])!==Number(r.proposedQuantity)||ONSPA_ngayDieuChinh_(v[0])!==String(r.sourceProductionDate||r.sourceCompletedAt).slice(0,10))throw Error('Số/ngày phiếu gốc khác bản đã đối chiếu.');
+  marker={id:command.id,revision:1,phase:'prepared',operation:change.operation,receiptId:r.id,reportId:String(r.reportId),sku:r.sku,lsxCode:r.lsxCode,originalQuantity:Number(r.proposedQuantity),originalProductionDate:ONSPA_ngayDieuChinh_(v[0]),finalQuantity:cancel?Number(r.proposedQuantity):Number(change.quantity),productionDate:change.productionDate,appliedAt:new Date().toISOString()};
+  if(!Number.isSafeInteger(marker.finalQuantity)||marker.finalQuantity<=0||!/^\d{4}-\d{2}-\d{2}$/.test(marker.productionDate))throw Error('Thiếu lượng/ngày điều chỉnh hợp lệ.');if(cancel)ONSPA_kiemTraTonThuHoi_(sh,r.sku);ONSPA_ghiDieuChinhChoNhan_(sh,row,marker);
+ }else if(marker.operation!==change.operation||marker.finalQuantity!==(cancel?Number(r.proposedQuantity):Number(change.quantity))||marker.productionDate!==change.productionDate||![marker.originalQuantity,marker.finalQuantity].includes(Number(v[4]))||![marker.originalProductionDate,marker.productionDate].includes(ONSPA_ngayDieuChinh_(v[0])))throw Error('Nội dung khác lượt điều chỉnh đã chuẩn bị.');
+ if(marker.phase==='prepared'){if(cancel)ONSPA_kiemTraTonThuHoi_(sh,r.sku);if(!cancel)sh.getRange(row,5).setValue(marker.finalQuantity);sh.getRange(row,1).setValue(new Date(marker.productionDate+'T00:00:00+07:00'));sh.getRange(row,13).setValue(cancel?'ĐÃ HỦY THEO YÊU CẦU SX':'CHỜ KHO XÁC NHẬN');sh.getRange(row,20,1,2).setValues([['CHỜ ĐỐI SOÁT ĐIỀU CHỈNH','']]);SpreadsheetApp.flush();marker={...marker,phase:'applied'};ONSPA_ghiDieuChinhChoNhan_(sh,row,marker);}
+ return ONSPA_guiDieuChinhChoNhan_(sh,row,marker);
+}

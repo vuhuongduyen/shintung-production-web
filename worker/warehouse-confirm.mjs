@@ -6,7 +6,7 @@ export async function confirmSelectedWarehouse(db,body,actor){
  if(!ids.length||ids.length>500||ids.some(id=>typeof id!=='string'||!id))throw Object.assign(Error('Chọn từ 1 đến 500 phiếu chờ xác nhận.'),{status:422});
  const all=(await db.prepare("SELECT record_key,payload FROM app_records WHERE entity='warehouse_in' ORDER BY record_key").all()).results;
  const selected=all.filter(r=>ids.includes(r.record_key));
- if(selected.length!==ids.length||selected.some(r=>{const p=JSON.parse(r.payload);return p._deleted||p.cancelled||p.voided||p.source!=='Sản xuất'||(p.confirmation_status||p.confirmationStatus||p.status)!=='Chờ xác nhận';}))throw Object.assign(Error('Có phiếu không còn chờ xác nhận hoặc đã bị hủy. Cập nhật danh sách rồi chọn lại.'),{status:409});
+ if(selected.length!==ids.length||selected.some(r=>{const p=JSON.parse(r.payload);return p._deleted||p.cancelled||p.voided||p.pendingCorrection?.status==='pending'||p.source!=='Sản xuất'||(p.confirmation_status||p.confirmationStatus||p.status)!=='Chờ xác nhận';}))throw Object.assign(Error('Có phiếu không còn chờ xác nhận hoặc đã bị hủy. Cập nhật danh sách rồi chọn lại.'),{status:409});
  if(selected.some(r=>{const n=Number(JSON.parse(r.payload).proposedQuantity);return !Number.isFinite(n)||n<=0;}))throw Object.assign(Error('Có phiếu thiếu số lượng đề nghị hợp lệ. Kiểm tra báo công nguồn trước khi xác nhận.'),{status:422});
  const revision=await hash(selected);
  const receipts=selected.map(r=>({...JSON.parse(r.payload),id:r.record_key}));
@@ -21,6 +21,7 @@ export async function confirmWarehouse(db,body,actor){
  if(!actor.isAdmin||actor.line)throw Object.assign(Error('Chỉ Admin toàn quyền được xác nhận hàng loạt.'),{status:403});
  const rows=(await db.prepare("SELECT record_key,payload FROM app_records WHERE entity='warehouse_in' ORDER BY record_key").all()).results;
  const pending=rows.filter(r=>{const p=JSON.parse(r.payload);return !p._deleted&&!p.cancelled&&!p.voided&&p.source==='Sản xuất'&&(p.confirmation_status||p.confirmationStatus||p.status)==='Chờ xác nhận';});
+ if(pending.some(r=>JSON.parse(r.payload).pendingCorrection?.status==='pending'))throw Object.assign(Error('Có phiếu đang chờ đối soát điều chỉnh; chưa được xác nhận nhận hàng.'),{status:409});
  const revision=await hash(pending);
  if(body.action==='confirm-preview')return {revision,count:pending.length};
  if(body.action!=='confirm'||body.receivedAsProposed!==true||body.revision!==revision)throw Object.assign(Error('Dữ liệu thay đổi hoặc chưa xác nhận số lượng. Kiểm tra lại danh sách.'),{status:409});

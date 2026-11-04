@@ -36,3 +36,9 @@ Phần dưới là hợp đồng bản phát triển PR #7, không phải hướ
 - Giữ nguyên dòng, lượng đề xuất E, lượng nhận N, người/thời điểm nhận R/S. Trạng thái và lịch sử quyết định được ghi riêng; ghi chú W giữ mã đối soát cùng ghi chú cũ. Không xóa dòng, đặt lượng bằng 0 hoặc tạo dòng thay thế cho dòng gốc bị mất.
 - Web chỉ coi thu hồi hoàn tất sau bằng chứng đúng phiên bản từ Sheet. Trong lúc chờ, số lượng cũ còn hiệu lực. Lỗi hoặc mất phản hồi giữ mã lượt cũ; thử lại không tạo quyết định/thu hồi thứ hai. Nếu ID trùng, dữ liệu gốc khác, thiếu dòng/công thức, xử lý đối soát riêng, không sửa tay để vượt kiểm tra.
 - TEST phải dùng Sheet sao chép cô lập và khóa TEST hiện có. Kiểm cả nhận thiếu/0, từ chối, quyền, mất phản hồi sau ghi, di chuyển dòng, công thức chưa cập nhật và dữ liệu thay đổi đồng thời trước mọi nghiệm thu thật.
+
+### Source sửa/hủy trước Kho nhận (PR #7, chưa triển khai)
+
+QLSX dùng Sửa / hủy trước Kho nhận; không dùng menu thu hồi của Kho. Web giữ lượng cũ và báo chờ đối soát, Sheet kiểm đúng dòng chưa có N/R/S rồi áp đề xuất/ngày hoặc vô hiệu hủy. Ghi chú W lưu marker và lượng/ngày gốc; không xóa ghi chú này khi còn chờ. Kho chưa được xác nhận nhận hàng nếu marker chưa acknowledged. Nếu đã nhận trước, script gửi sự thật nhận hàng về Web và không áp thay đổi đề xuất; sau đó dùng quy trình thu hồi.
+
+Cần cập nhật cả KHO_TP_XAC_NHAN, ONSPA_KHO_WEB và helper công thức bằng một kế hoạch được nghiệm thu. Thiếu helper thì chặn, không tự bỏ guard. Phiếu gốc chưa xuất lần đầu: chờ đồng bộ rồi sửa/hủy; không tạo dòng thay thế để vượt lỗi. ACK từ dòng luôn kiểm ID duy nhất toàn cột, kể cả retry khi Web không còn trả lệnh trong pull.

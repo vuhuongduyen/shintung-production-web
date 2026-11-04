@@ -163,3 +163,30 @@ Test thực tế qua reader In Transit xác nhận Leadtime đang hiển thị c
 Nhóm snapshot/giữ lịch sử/Leadtime/GET recovery/lifecycle nhân viên **14/14** đạt. Gồm đổi live master, phiên bản tương lai tới hiệu lực, endDate qua ngày, raw nguồn bất biến, preview không publish/activation. Đây là bảo vệ thời điểm cho snapshot chuẩn bị; chưa phải hoàn tất ngày hiệu lực Engine/Safety/BOM hoặc triển khai snapshot production. Không có thao tác DB/Sheet thật.
 
 CI UI [41827063274](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41827063274) đúng `2f532eca4b3d2b83e1babc3c4e069cf56c6003d6` completed/success: TypeScript, ba build, **1.665/1.665 test, 276 file**, không fail/cancel/skip/timeout, đủ summary; shard 558/557/550. Bản sửa thời điểm snapshot phía trên có TypeScript/build local đạt, 7/7 snapshot cuối deepEqual toàn package preview qua mốc thời gian; CI commit mới phải kiểm riêng.
+
+## Sửa/hủy trước Kho nhận và rà lại ACK từ dòng Sheet
+
+Bổ sung theo quyết định đã chốt: QLSX được sửa/hủy phiếu đã QLSX xác nhận **khi Kho chưa nhận**, không cần Kho duyệt thu hồi. Ghi intent cùng ID ổn định và preview; lượng/tiền hiện tại vẫn dùng phiếu cũ đến khi ACK. Phần tăng được giữ chỗ trên phiếu để lệnh khác/lượt báo thêm không vượt trần. Không lấy số giữ chỗ làm sản lượng hoặc tiền đã hoàn thành. Sheet chỉ sửa lượng đề xuất/ngày của dòng chưa nhận; hủy giữ dòng và lượng gốc nhưng vô hiệu trạng thái. Trước/sau và người quyết định giữ trong request/event riêng.
+
+- Chặn xác nhận Web và ghi đè generic records trong lúc đang đối soát. Nếu Sheet đã nhận trước khi sửa, ghi nhận đúng số/người/thời điểm nhận, hủy intent sửa, giải phóng giữ chỗ và báo phải thu hồi; không áp số mới lên hàng đã nhận. Audit `confirm` của Kho vẫn được ghi.
+- CAS kiểm report, receipt, LSX, policy/manifest, scope báo cáo và kết nối đã đối chiếu; ACK đúng request/revision/ngày/lượng/Sheet. LSX giảm trần trong lúc chờ thì không hoàn tất edit vượt trần. Hai intent cùng lúc hoặc Kho nhận ngay trước batch chỉ một nhánh thắng, không có request/event/giữ chỗ mồ côi.
+- Script lưu marker prepared/applied/acknowledged và giờ áp dụng đầu tiên. Mất phản hồi sau commit không tạo command/phiếu mới; thử lại từ marker của dòng gốc. Chặn Kho xác nhận giữa lúc Sheet đã sửa và Web chưa ACK. Không đổi quyền/tạo token.
+- **Giới hạn rõ:** cần kết nối đang hoạt động và phiếu gốc đã đồng bộ trước; nếu lần xuất ban đầu chưa xong, báo chờ và chưa ghi intent. Dòng gốc mất hoặc nhận hàng sau một lượt Sheet chưa rõ kết quả phải đối soát, không tạo dòng thay thế/ghi đè. Chưa có kiểm Google Sheets/browser thật; cần triển khai đồng bộ bộ script và công thức đã nghiệm thu, không chỉ Worker.
+
+Rà soát độc lập ACK đã được tái hiện bằng VM: duplicate sau mất phản hồi vẫn gửi ACK, còn di chuyển một dòng duy nhất phải được nhận đúng. Trước sửa 2 fail/1 pass; sau kiểm ID duy nhất toàn cột J trước cả ACK xác nhận và ACK thu hồi. Dòng ambiguous không được gửi/stamp; giữ retry dòng duy nhất di chuyển, cùng proof và timestamp. Footer tiếp tục các dòng khác, không đọc ghi chú cho toàn bộ N dòng khi tìm pending correction: fixture 1.000 dòng khác chỉ đọc note đúng dòng cần đối soát.
+
+**Lỗi đọc gọn được tìm thêm:** `json_extract(true)` đưa boolean thành số 1 trong `json_object`, làm predicate strict của phiếu ngày không nhận đúng loại; có thể lấy lại lượng đã báo làm baseline legacy. Sửa cách dựng JSON boolean tại SQL, không nới predicate hoặc quyền. Test Worker 200 đã xác nhận + 300 mới phải có baseline 0 và hoàn thành 500. Khi thay chính phiếu đang sửa, giữ một placeholder đã hủy để không hồi sinh cache completedQty của phiếu đó. Giữ baseline legacy thực sự đã có căn cứ.
+
+Kiểm local trước bước cuối: nhóm rộng daily/kho/nhật ký/In Transit **154/154**; nhóm pending quyền/receipt/CAS/audit cuối **10/10**; nhóm Sheet/nhật ký cuối **29/29**, có giao nhau, không cộng thành tổng. TypeScript/build mốc trước cuối đạt; phải kiểm lại sau các guard/metadata cuối. Chưa có CI của source bổ sung tại thời điểm ghi mục này.
+
+Benchmark có script tái lập `node --test scripts/bench/daily-matched-scope.mjs`, TEST Miniflare, một mẫu/quy mô, không tải build song song trong phép đo. **Bổ sung kiểm baseline 0 và lũy kế = phiếu cũ + 200**; phép đo trước 1c29 chỉ kiểm lượng phiếu trả về/số bản ghi nên không đủ chứng minh ngữ nghĩa baseline. Không dùng số trước đó làm so sánh cải thiện:
+
+| Phiếu cùng LSX | Đọc scope | Summary | Lưu tăng 200 | SELECT/batch |
+| --- | --- | --- | --- | --- |
+| 0 | 19,60 ms | 2 byte | 142,61 ms | 9 / 1 |
+| 100 | 25,46 ms | 68.491 byte | 140,31 ms | 9 / 1 |
+| 1.000 | 87,09 ms | 685.891 byte | 200,09 ms | 9 / 1 |
+
+Đây là handler trực tiếp và DB local, không gồm HTTP/auth wrapper, mạng/Sheet, p95/CPU/peak memory hoặc trên 1.000 phiếu cùng LSX. Không suy ra production hết quá tải. Source vẫn chưa đủ phát hành: còn hoàn thiện publish/activation snapshot trong TEST, ngày hiệu lực toàn web, browser/Worker và đối soát Sheet thực tế.
+
+Kiểm cuối source bổ sung: **45/45** pending API/UI/Sheet/nhật ký đạt; có giao nhau với nhóm rộng 154, không cộng gộp. TypeScript/build cuối đạt; GS/TXT byte-equal và diff whitespace sạch. CI đúng head mới sẽ ghi riêng sau push. Không có browser/Sheet thật được chạy.

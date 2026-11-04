@@ -1,3 +1,4 @@
+import {acknowledgePendingDailyCorrection,reconcilePendingReceiptConfirmation} from '../scripts/local/production-daily-pending-correction.mjs';
 import {decideDailyWithdrawalFromSheet,acknowledgeDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
 import {isDailyOutput} from '../lib/production-report-model.mjs';
 const productionTime=report=>isDailyOutput(report)?report.productionDate:report?.completedAt;
@@ -54,6 +55,7 @@ export async function sheetBridge(request,env){
  if(!stored)fail('Không tìm thấy phiếu nhập kho trên web.',404);
  const p=JSON.parse(stored.payload);
  if(!p.sheetSync||p.source!=='Sản xuất'||p.reportId!==b.reportId||p.sku!==b.sku||p._deleted)fail('Phiếu không thuộc kết nối này.',409);
+ if(b.action==='pending-correction-ack')return reply(await acknowledgePendingDailyCorrection(db,b,{verified:true,spreadsheetId:config.spreadsheetId}));
  if(b.action==='withdrawal-ack')return reply(await acknowledgeDailyWithdrawal(db,b,{verified:true,spreadsheetId:config.spreadsheetId}));
  if(['withdrawal-preview','withdrawal-approve','withdrawal-reject'].includes(b.action)){if(!p.withdrawalRequest?.id||p.withdrawalRequest.id!==b.commandId)fail('Yêu cầu thu hồi không khớp dòng Kho.',409);return reply(await decideDailyWithdrawalFromSheet(db,{...b,withdrawalId:p.withdrawalRequest.id},{verified:true,spreadsheetId:config.spreadsheetId,receiptId:key}));}
  if(p.cancelled||p.voided)fail('Phiếu đã hủy.',409);
@@ -88,6 +90,7 @@ export async function sheetBridge(request,env){
   if((p.confirmation_status||p.status)!=='Chờ xác nhận')fail('Phiếu đã được xác nhận bằng thông tin khác. Cần đối chiếu trước khi sửa.',409);
   next={...p,receivedQuantity:qty,difference,differenceReason:reason,status:'Đã xác nhận',confirmation_status:'Đã xác nhận',confirmationStatus:'Đã xác nhận',confirmedAt:at,confirmedBy:by,confirmationBasis:'Kho xác nhận tại Google Sheet',sheetConfirmationHash:eventHash,updatedAt:now,updatedBy:by,sheetSync:{...p.sheetSync,status:'sent',at:now,error:''}};
  }else fail('Thao tác không hợp lệ');
+ if(b.action==='confirm'&&p.pendingCorrection?.status==='pending')return reply(await reconcilePendingReceiptConfirmation(db,{receiptId:key,receipt:next,expectedReceiptRaw:stored.payload},{verified:true,spreadsheetId:config.spreadsheetId}));
  const result=await db.batch([
  db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='warehouse_in' AND record_key=? AND payload=?").bind(JSON.stringify(next),next.updatedBy||'Google Sheet kho',now,key,stored.payload),
  db.prepare("INSERT INTO app_records SELECT 'warehouse_sheet_audit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=? AND payload=?)").bind(crypto.randomUUID(),JSON.stringify({action:b.action,receiptId:key,at:now,confirmedBy:next.confirmedBy,receivedQuantity:next.receivedQuantity,error:next.sheetSync.error}),next.updatedBy||'Google Sheet kho',now,key,JSON.stringify(next))]);

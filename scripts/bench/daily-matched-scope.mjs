@@ -1,0 +1,14 @@
+// TEST only. Run: node --test scripts/bench/daily-matched-scope.mjs
+// One sample per size, no p95/production CPU or memory claims. Each fixture opens a fresh isolated DB.
+import test from 'node:test';import assert from 'node:assert/strict';
+import {dailyFixture,actor} from '../../tests/helpers/daily-output-fixture.mjs';
+import {readDailyOrderReports} from '../../scripts/local/production-daily-output.mjs';
+import {mutateProductionWorkflow} from '../../scripts/local/production-workflow.mjs';
+import {recordRevision} from '../../lib/record-revision.mjs';
+test('isolated synthetic matching-LSX read/write scope measurement',async t=>{for(const count of [0,100,1000])await dailyFixture(async c=>{
+ const order={...c.order,lsxQty:20000};await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='in_transit' AND record_key=?").bind(JSON.stringify(order),order.id).run();
+ for(let offset=0;offset<count;offset+=100)await c.db.batch(Array.from({length:Math.min(100,count-offset)},(_,j)=>{const id='SYNTHETIC-MATCH-'+(offset+j),p={id,kind:'completion',reportingModel:'daily-finished-v1',quantityOnly:true,legacyCompletedBaseline:0,transitId:order.id,lsxCode:order.lsxCode,line:order.line,sku:order.sku,productionDate:'2026-11-02',reportedQuantity:1,approvedQuantity:1,reviewStatus:'Đã xác nhận',orderSnapshot:order,note:'SYNTHETIC '.repeat(50)};return c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('production_report',id,JSON.stringify(p),'SYNTHETIC','2026-11-02');}));
+ let start=performance.now();const scope=await readDailyOrderReports(c.db,order),readMs=performance.now()-start;assert.equal(scope.reports.length,count);
+ let selects=0,batches=0;const db=new Proxy(c.db,{get(target,key){if(key==='prepare')return sql=>{if(/^\s*SELECT/i.test(sql))selects++;return target.prepare(sql);};if(key==='batch')return statements=>{batches++;return target.batch(statements);};const value=target[key];return typeof value==='function'?value.bind(target):value;}});start=performance.now();const result=await mutateProductionWorkflow(db,c.body({expectedOrderRevision:await recordRevision(JSON.stringify(order)),quantity:200}),actor),writeMs=performance.now()-start;assert.equal(result.report.reportedQuantity,200);assert.equal(result.report.legacyCompletedBaseline,0);const {dailyOutputTotals}=await import('../../lib/production-daily-output.mjs'),after=await readDailyOrderReports(c.db,order);assert.equal(dailyOutputTotals(order,after.reports).reported,count+200);assert.equal((await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='production_report'").first()).n,count+1);
+ t.diagnostic(JSON.stringify({matchingReports:count,readMs:Math.round(readMs*100)/100,summaryBytes:Buffer.byteLength(JSON.stringify(scope.reports)),writeMs:Math.round(writeMs*100)/100,selects,batches}));
+ });});
