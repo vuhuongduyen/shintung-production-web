@@ -252,3 +252,6 @@ Object.assign(chinese,{"Lịch sử phân công": "分配歷史", "Chưa ghi nh�
 
 Object.assign(english,{'Phân bổ lại NV?':'Reassign employees?'});
 Object.assign(chinese,{'Phân bổ lại NV?':'重新分配員工？'});
+
+Object.assign(english,{'Tách đơn':'Split order'});
+Object.assign(chinese,{'Tách đơn':'拆單'});

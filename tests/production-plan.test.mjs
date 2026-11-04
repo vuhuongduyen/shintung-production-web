@@ -1,10 +1,13 @@
+import {newDailyCapacity,calculateCapacity} from '../lib/capacity.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { root, openDatabase, migrate, records, importBackup } from '../scripts/local/database.mjs';
+import {mutateTransit} from '../scripts/local/in-transit.mjs';
 import { getTransit } from '../scripts/local/in-transit.mjs';
 import { getPlan, mutatePlan } from '../scripts/local/production-plan.mjs';
+import {remainingPlanWithTransitSummary} from '../lib/plan-transit-backlog.mjs';
 import { monday, summary, rebasePlanEdits, plannedLaborHours, rowWarnings } from '../lib/production-plan.mjs';
 const week = '2026-09-07', actor = { login: 'TEST-owner', canReopenPlan: true };
 async function dbRun(fn) { mkdirSync(resolve(root, '.local-data/tests'), { recursive: true }); const path = mkdtempSync(resolve(root, '.local-data/tests/plan-')); let c = await openDatabase(path); try {
@@ -468,4 +471,55 @@ test('In transit carryover reduces daily capacity, appears in weekly card and in
  await put('in_transit','old',{...old,completedQty:60});let latest;
  await assert.rejects(()=>mutatePlan(db,{...body,dailyCapacityAck:warning.token},actor),e=>{latest=JSON.parse(e.details[0].reason);assert.notEqual(latest.token,warning.token);assert.equal(latest.warnings.find(w=>w.id==='new').over,30);return true;});
  assert.equal((await getPlan(db,week)).revision,1);const saved=await mutatePlan(db,{...body,dailyCapacityAck:latest.token},actor);assert.equal(saved.revision,2);
+}));
+
+
+test('split persists independent plan rows, protects permissions/revisions and survives Engine refresh and transfers',()=>dbRun(async({db})=>{
+ await seed(db);
+ const calendar={schemaVersion:1,week,rows:['A','B','C'].map(line=>{const row=newDailyCapacity(week,line,100);row.input.workers=10;return {...row,status:'Đã xác nhận',reviewStatus:'approved',version:1,syncedAt:'fixture',khsxAcceptedAt:'fixture',availableHours:calculateCapacity(row.input,week).availableHours};})};
+ await db.prepare("UPDATE app_records SET payload=? WHERE entity='capacity' AND record_key=?").bind(JSON.stringify(calendar),week).run();
+ await db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('labor_hours','TEST-ONE',JSON.stringify({sku:'TEST-ONE',laborHour:0.1}),actor.login,'fixture').run();
+ const editor={...actor,grants:['Kế hoạch sản xuất / Production_plan / Sửa']};
+ await mutatePlan(db,request('receive',0,['one'],{sourceKey:'test-source'}),actor);
+ const original=(await getPlan(db,week)).rows[0],id=original.id;
+ const snapshot=async()=>(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
+ for(const [who,ids,status] of [[actor,[id],403],[editor,[],422],[editor,[id,id],422]]){const before=await snapshot();await assert.rejects(()=>mutatePlan(db,request('split',1,ids),who),e=>e.status===status);assert.deepEqual(await snapshot(),before);}
+ const simultaneous=await Promise.allSettled([mutatePlan(db,request('split',1,[id]),editor),mutatePlan(db,request('split',1,[id]),editor)]);assert.equal(simultaneous.filter(r=>r.status==='fulfilled').length,1);assert.equal(simultaneous.find(r=>r.status==='rejected').reason.status,409);
+ let state=await getPlan(db,week),child=state.rows.find(r=>r.id!==id);
+ assert.deepEqual(state.warnings,[]);assert.equal(state.rows.length,2);assert.equal(state.rows.find(r=>r.id===id).plan,100);assert.equal(child.plan,null);assert.equal(child.suggested,null);assert.equal(child.planId,original.planId);assert.equal(child.planGroupId,id);
+ const snapshotAfterSplit=await snapshot();await assert.rejects(()=>mutatePlan(db,request('split',1,[id]),editor),e=>e.status===409);assert.deepEqual(await snapshot(),snapshotAfterSplit);
+ // Saving Line/dates while quantity is still blank is a valid draft, never zero or a subtraction.
+ await mutatePlan(db,request('save',2,[child.id],{edits:{[child.id]:{line:'B',start:week,end:week}}}),actor);
+ await mutatePlan(db,request('save',3,[id,child.id],{edits:{[id]:{plan:20,start:week,end:week},[child.id]:{plan:30}}}),actor);
+ state=await getPlan(db,week);assert.equal(state.rows.reduce((n,r)=>n+r.plan,0),50);assert.equal(state.rows.find(r=>r.id===id).suggested,100);
+ await mutatePlan(db,request('save',4,[child.id],{edits:{[child.id]:{plan:150}}}),actor);
+ state=await getPlan(db,week);assert.equal(state.rows.reduce((n,r)=>n+r.plan,0),170);assert.equal(state.rows.find(r=>r.id===child.id).planId,original.planId);
+ assert.equal(summary(state.rows,state.capacity,week).find(r=>r.line==='A').required,2);assert.equal(summary(state.rows,state.capacity,week).find(r=>r.line==='B').required,15);
+ await mutatePlan(db,request('receive',5,['one'],{sourceKey:'test-source'}),actor);state=await getPlan(db,week);
+ assert.equal(state.rows.length,2);assert.equal(state.rows.find(r=>r.id===id).plan,20);assert.equal(state.rows.find(r=>r.id===child.id).plan,150);assert.equal(state.rows.find(r=>r.id===child.id).line,'B');assert.equal(state.rows.find(r=>r.id===child.id).suggested,null);
+ await mutatePlan(db,request('close',6,[id,child.id]),actor);
+ const closedBefore=await snapshot();await assert.rejects(()=>mutatePlan(db,request('split',7,[id]),editor),e=>e.status===409);assert.deepEqual(await snapshot(),closedBefore);
+ await mutatePlan(db,request('transfer',7,[id]),actor);
+ state=await getPlan(db,week);const loads=remainingPlanWithTransitSummary(state.rows,state.capacity,week);assert.equal(loads.reduce((n,row)=>n+row.totalRequired,0),17,'transferred root plus pending sibling each count exactly once');
+ // A sibling transfer must not block this distinct row's reopen/close.
+ await mutatePlan(db,request('reopen',8,[child.id]),actor);await mutatePlan(db,request('close',9,[child.id]),actor);
+ await mutatePlan(db,request('transfer',10,[child.id]),actor);
+ state=await getPlan(db,week);assert.equal(state.rows.length,2);assert.ok(state.rows.every(r=>r.status==='ĐÃ CHUYỂN'));assert.deepEqual(state.warnings,[]);
+ let transit=(await getTransit(db)).rows;assert.equal(transit.length,2);assert.equal(new Set(transit.map(r=>r.id)).size,2);assert.equal(new Set(transit.map(r=>r.planRowId)).size,2);assert.equal(new Set(transit.map(r=>r.planId)).size,1);
+ for(const row of transit){const qty=row.planRowId===id?20:150;await mutateTransit(db,{action:'draft-lsx',id:row.id,expectedRevision:row.revision,changes:{lsxCode:`SPLIT-${row.planRowId===id?'A':'B'}`,lsxQty:qty,lsxOpenedAt:week}},actor);}
+ transit=(await getTransit(db)).rows;assert.equal(transit.find(r=>r.planRowId===id).lsxQty,20);assert.equal(transit.find(r=>r.planRowId===child.id).lsxQty,150);
+ const beforeOver=await snapshot(),row=transit.find(r=>r.planRowId===child.id);
+ await assert.rejects(()=>mutateTransit(db,{action:'draft-lsx',id:row.id,expectedRevision:row.revision,changes:{lsxQty:151}},actor),e=>e.message==='lsxExceedsPlan');assert.deepEqual(await snapshot(),beforeOver);
+ const transferredBefore=await snapshot();await assert.rejects(()=>mutatePlan(db,request('split',11,[id]),editor),e=>e.status===409);assert.deepEqual(await snapshot(),transferredBefore);
+ // Additional LSX share only their own split row's budget, not the sibling's.
+ const base=(await getTransit(db)).rows.find(r=>r.planRowId===child.id);
+ await mutateTransit(db,{action:'draft-lsx',id:base.id,expectedRevision:base.revision,changes:{lsxQty:100}},actor);
+ const extra=(await mutateTransit(db,{action:'add-lsx',id:base.id,planStart:week,planEnd:week,line:'B',priority:'THƯỜNG',sequence:2},actor)).row;
+ let latest=(await getTransit(db)).rows.find(r=>r.id===extra.id);
+ await mutateTransit(db,{action:'draft-lsx',id:extra.id,expectedRevision:latest.revision,changes:{lsxCode:'SPLIT-B-EXTRA',lsxQty:50,lsxOpenedAt:week}},actor);
+ latest=(await getTransit(db)).rows.find(r=>r.id===extra.id);const beforeAdditional=await snapshot();
+ await assert.rejects(()=>mutateTransit(db,{action:'draft-lsx',id:extra.id,expectedRevision:latest.revision,changes:{lsxQty:51}},actor),e=>e.message==='lsxExceedsPlan');assert.deepEqual(await snapshot(),beforeAdditional);
+ const rootOrder=(await getTransit(db)).rows.find(r=>r.planRowId===id);latest=(await getTransit(db)).rows.find(r=>r.id===extra.id);
+ await mutateTransit(db,{action:'cancel',id:extra.id,expectedRevision:latest.revision,reason:'Synthetic cancellation'},actor);const afterCancel=(await getTransit(db)).rows;assert.equal(afterCancel.find(r=>r.id===extra.id).status,'HỦY');assert.deepEqual(afterCancel.find(r=>r.id===rootOrder.id),rootOrder,'cancelling child LSX must preserve the sibling order');
+
 }));

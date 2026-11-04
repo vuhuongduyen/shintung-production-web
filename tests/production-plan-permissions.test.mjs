@@ -263,3 +263,17 @@ test('authenticated vthduyen alias remains denied without a receipt or business 
  assert.equal(response.headers.get('X-ONSPA-Action-ID'),null);
  assert.deepEqual(await records(f.db),before);
 });
+
+test('Tách đơn uses the existing exact Sửa permission, never Xem/Thêm/Xác nhận or sibling menu rights',async t=>{
+ const f=await fixture(t,{status:'DỰ KIẾN'});
+ for(const permission of ['Xem','Thêm','Xác nhận','Hủy xác nhận']){
+  await f.setGrants([grant(permission)]);const before=await records(f.db);const response=await f.mutate('split');assert.equal(response.status,403,permission);await f.unchanged(before);
+ }
+ await f.setGrants(['Kế hoạch sản xuất / In_transit / Sửa']);let before=await records(f.db);assert.equal((await f.mutate('split')).status,403);await f.unchanged(before);
+ await f.setGrants([grant('Sửa')]);const response=await f.mutate('split');assert.equal(response.status,200);const plans=(await records(f.db)).filter(r=>r.entity==='production_plan');assert.equal(JSON.parse(plans[0].payload).rows.length,2);
+ before=await records(f.db);assert.equal((await f.mutate('split')).status,409);await f.unchanged(before);
+});
+
+test('authenticated Admin retains Tách đơn under the existing Admin rule without adding grants',async t=>{
+ const f=await fixture(t,{status:'DỰ KIẾN',role:'ADMIN'});await f.setGrants([]);assert.equal((await f.mutate('split')).status,200);
+});

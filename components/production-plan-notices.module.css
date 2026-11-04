@@ -1,0 +1,20 @@
+/* The slot stays the same size even when no notice is needed. No banner row. */
+.slot{position:relative;display:inline-flex;align-items:center;inline-size:156px;max-inline-size:100%;block-size:36px;flex:0 0 156px;vertical-align:bottom}
+.slot .trigger{box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:6px;inline-size:100%;block-size:100%;min-inline-size:0;padding:0 8px;border:1px solid #b8cfb9;border-radius:4px;background:#fffef8;color:#286440;font:inherit;white-space:nowrap;cursor:pointer}
+.label{min-inline-size:0;overflow:hidden;text-overflow:ellipsis}
+.slot .warning{background:#fff3dc;border-color:#dfb366;color:#774900}
+.slot .error{background:#fff0e5;border-color:#ce8888;color:#922626}
+.trigger:focus-visible,.panel button:focus-visible{outline:2px solid #286440;outline-offset:2px}
+.panel{box-sizing:border-box;z-index:30!important;width:min(600px,calc(100vw - 24px))!important;max-width:calc(100vw - 24px);max-height:min(60dvh,var(--radix-popover-content-available-height));overflow:auto;overscroll-behavior:contain;background:#fffdf7;color:#174f31;border:1px solid #b8cfb9;border-radius:6px;padding:12px;font:inherit;overflow-wrap:anywhere;animation:none!important}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.header strong{flex:1;min-width:0}
+.panel button{font:inherit;color:inherit;border:1px solid #b8cfb9;border-radius:4px;background:white;min-height:36px;padding:4px 10px;cursor:pointer}
+.header button{min-width:36px;font-size:20px;flex-shrink:0}
+.list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.list li{border-left:3px solid #dfb366;padding:6px 10px;background:#fff3dc}
+.list li[data-severity=error]{border-color:#ce8888;background:#fff0e5}
+.list li[data-severity=info]{border-color:#b8cfb9;background:#edf7f2}
+.list p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.list button{margin-top:8px}
+.srOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+@media(max-width:640px){.slot{block-size:44px}.panel button{min-height:44px}.header button{min-width:44px}}

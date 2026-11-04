@@ -1,3 +1,4 @@
+import {canPlanAction} from '../../lib/production-plan-permissions.mjs';
 import {acceptedCapacity} from '../../lib/capacity-accepted.mjs';
 import {capacityDailyBudgets} from '../../lib/plan-week-load.mjs';
 import {readPlanTransitBacklog} from './plan-transit-backlog.mjs';
@@ -8,7 +9,7 @@ import {engineDemandMatches} from '../../lib/engine-demand.mjs';
 import {usableSku, confirmationStatus} from '../../lib/sku-state.mjs';
 import {siteLaborHours} from '../../lib/site-labor-hours.mjs';
 import { randomUUID } from 'node:crypto';
-import { monday, weekEnd, normalizeRow, matchKey, text, normalized, numberOrNull, dateISO, lineOf, planId, planTypes, priorities, rowWarnings, sortedRows } from '../../lib/production-plan.mjs';
+import { monday, weekEnd, normalizeRow, matchKey, text, normalized, numberOrNull, dateISO, lineOf, planId, planTypes, priorities, rowWarnings, sortedRows,validPlanGroups,primaryPlanRow,transitMatchesPlan,planCoveredByTransit } from '../../lib/production-plan.mjs';
 export class PlanError extends Error {
     constructor(message, status = 400, details = []) { super(message); this.status = status; this.details = details; }
 }
@@ -47,7 +48,7 @@ export async function getPlanCapacity(db, week) {
     const backlog=await readPlanTransitBacklog(db,week);
     const [calendarRecords,planRecords,laborRecords]=await Promise.all(['capacity','production_plan','labor_hours'].map(e=>read(db,e)));
     const calendars=unpack(calendarRecords),standards=new Map(siteLaborHours(laborRecords.map(r=>({key:r.key,payload:r.payload,updatedAt:r.updatedAt}))).map(r=>[text(r.payload.sku).toUpperCase(),numberOrNull(r.payload.laborHour)]));
-    const otherPlans=unpack(planRecords.filter(r=>r.key!==week)).filter(r=>dateISO(r.start)&&dateISO(r.end)&&r.start<=weekEnd(week)&&!['ĐÃ CHUYỂN','HỦY','TẠM HOÃN'].includes(r.status)&&!backlog.coveredRowIds.includes(r.id)&&!backlog.coveredPlanIds.includes(r.planId)).map(r=>{const labor=standards.get(text(r.sku).toUpperCase());return {...r,laborHour:r.status!=='ĐÃ CHỐT'&&labor!==undefined?labor:r.laborHour};});
+    const otherPlans=unpack(planRecords.filter(r=>r.key!==week)).filter(r=>dateISO(r.start)&&dateISO(r.end)&&r.start<=weekEnd(week)&&!['ĐÃ CHUYỂN','HỦY','TẠM HOÃN'].includes(r.status)&&!planCoveredByTransit(r,backlog)).map(r=>{const labor=standards.get(text(r.sku).toUpperCase());return {...r,laborHour:r.status!=='ĐÃ CHỐT'&&labor!==undefined?labor:r.laborHour};});
     const capacityRows=envelope?.schemaVersion===1&&Array.isArray(envelope.rows)?envelope.rows:[];
     const allLines=[...new Set(['A','B',...capacityRows.map(r=>r.line),...backlog.rows.map(r=>r.line)])];
     return allLines.map(line=>{const row=capacityRows.find(r=>r.line===line)||{line,week,status:'Chưa xác nhận Capacity'};
@@ -80,7 +81,7 @@ export async function getPlan(db, week, canReopen = false, catalog = null) {
         const current= laborBySku.get(text(row.sku).toUpperCase());
         return !['ĐÃ CHỐT','ĐÃ CHUYỂN'].includes(row.status)&&current!==undefined?{...row,laborHour:current}:row;
     });
-    const ambiguous = candidates.length > 1 || new Set(rows.map(r => matchKey(week, r.sku))).size !== rows.length;
+    const ambiguous = candidates.length > 1 || !validPlanGroups(rows);
     return { week, revision: Number(envelope?.revision) || 0, rows: sortedRows(rows), sources, capacity, labor: effectiveLabor,
         transit: unpack(transit).filter(r => monday(r.week) === week).map(withMasterGroup), audit: audits.filter(r => active(r) && r.payload.week === week).map(r => r.payload), canReopen,
         envelope: envelope || {}, deletedRows, warnings: [...(ambiguous ? ['legacyConflict'] : []), ...(plans.some(r => r.invalid) ? ['invalidLegacy'] : [])], legacyKey: current?.key || candidates[0]?.key || null };
@@ -90,8 +91,9 @@ export async function mutatePlan(db, body, actor) {
     if (!actor?.login)
         fail('loginRequired', 401);
     const { week, action } = body;
-    if (!['receive', 'save', 'close', 'reopen', 'transfer'].includes(action))
+    if (!['receive', 'save', 'close', 'reopen', 'transfer', 'split'].includes(action))
         fail('invalidAction');
+    if(action==='split'&&!canPlanAction(actor,'save'))fail('permissionDenied',403);
     const state = await getPlan(db, week, !!actor.canReopenPlan, actor.catalog);
     if (state.warnings.length || state.legacyKey && state.legacyKey !== week)
         fail('legacyConflict', 409);
@@ -101,6 +103,7 @@ export async function mutatePlan(db, body, actor) {
     let next = structuredClone(before), added = 0, existing = 0, updated = 0;
     const extra = [];
     const details = [];
+    let splitRowIds=[];
     if (action === 'receive') {
         const storedEngine = (await read(db, 'production_engine')).find(r => r.key === body.sourceKey)?.payload;
         if (Array.isArray(storedEngine?.metrics) && !engineDemandMatches(storedEngine, (await read(db, 'demand_event')).map(r => r.payload)))
@@ -120,7 +123,7 @@ export async function mutatePlan(db, body, actor) {
             }
             const master = masters.find(m => text(m.payload?.code).toUpperCase() === text(r.sku).toUpperCase());
             if(!usableSku(master?.payload)){const p=master?.payload;details.push({id,sku:r.sku,reason:!p?'skuMissing':p.cancelled||p._deleted||confirmationStatus(p)==='Đã hủy'?'skuCancelled':confirmationStatus(p)!=='Đã xác nhận'?'skuPending':'skuInactive'});continue;}
-            const key = matchKey(week, r.sku), old = next.find(p => matchKey(week, p.sku) === key);
+            const key = matchKey(week, r.sku), old = next.find(p => matchKey(week, p.sku) === key&&primaryPlanRow(p));
             if (state.deletedRows.some(p => matchKey(week, p.sku) === key)) {
                 details.push({ id, sku:r.sku, reason: 'deletedConflict' });
                 continue;
@@ -144,6 +147,21 @@ export async function mutatePlan(db, body, actor) {
         if (details.length)
             fail('batchRejected', 422, details);
     }
+    else if(action==='split') {
+        if(!Array.isArray(body.ids)||body.ids.length!==1)fail('Chọn đúng một dòng để tách đơn.',422);
+        const row=next.find(row=>row.id===body.ids[0]);
+        if(!row)fail('missingRow',404);
+        if(!['DỰ KIẾN','TẠM HOÃN','HỦY'].includes(row.status))fail('Chỉ tách dòng còn được sửa. Mở lại dòng đã chốt theo quy trình hiện có.',409);
+        const linked=(await read(db,'in_transit')).filter(record=>record.payload&&(transitMatchesPlan(row,record.payload)||!row.planGroupId&&(record.payload.planId===row.planId||matchKey(record.payload.week,record.payload.sku)===matchKey(week,row.sku))));
+        if(row.transferredAt||linked.length)fail('alreadyTransferred',409);
+        const root=next.find(item=>item.id===(row.planGroupId||row.id));
+        if(!root)fail('legacyConflict',409);
+        const groupPlanId=root.groupPlanId||root.planId;
+        if(!row.planGroupId)Object.assign(root,{planGroupId:root.id,groupPlanId});
+        const copy=normalizeRow(Object.fromEntries(['sku','name','spec','group','week','line','start','end','priority','type','sequence','laborHour','enginePriority','source','sourceIds'].map(key=>[key,row[key]])),week);
+        Object.assign(copy,{id:randomUUID(),planGroupId:root.id,groupPlanId,planId:groupPlanId,splitFromId:row.id,plan:null,suggested:null,status:row.status,createdAt:now,createdBy:actor.login,updatedAt:now,updatedBy:actor.login});
+        next.push(copy);splitRowIds=[root.id,copy.id];added=1;
+    }
     else {
         const transits = ['transfer', 'reopen'].includes(action) ? await read(db, 'in_transit') : [];
         if (!Array.isArray(body.ids) || !body.ids.length || body.ids.length > 3000 || new Set(body.ids).size !== body.ids.length)
@@ -160,7 +178,7 @@ export async function mutatePlan(db, body, actor) {
                 if (!edit || Object.keys(edit).some(k => !['plan', 'line', 'start', 'end', 'priority', 'sequence', 'type', 'status'].includes(k)))
                     fail('invalidEdit');
                 const changed = { ...row, ...edit };
-                if (numberOrNull(changed.plan) === null || numberOrNull(changed.plan) < 0 || !['', 'A', 'B', 'C'].includes(lineOf(changed.line)) || !planTypes.includes(changed.type) || !priorities.includes(changed.priority) || !['DỰ KIẾN', 'TẠM HOÃN', 'HỦY'].includes(changed.status))
+                if ((numberOrNull(changed.plan) === null&&!(row.planGroupId&&!primaryPlanRow(row)&&[null,'',undefined].includes(changed.plan))) || numberOrNull(changed.plan) < 0 || !['', 'A', 'B', 'C'].includes(lineOf(changed.line)) || !planTypes.includes(changed.type) || !priorities.includes(changed.priority) || !['DỰ KIẾN', 'TẠM HOÃN', 'HỦY'].includes(changed.status))
                     fail('invalidEdit');
                 if ((changed.start && !dateISO(changed.start)) || (changed.end && !dateISO(changed.end)) || (changed.start && changed.end && changed.end < changed.start))
                     fail('dateOrder');
@@ -190,7 +208,7 @@ export async function mutatePlan(db, body, actor) {
             else if (action === 'reopen') {
                 if (!actor.canReopenPlan)
                     fail('reopenForbidden', 403);
-                if (row.status === 'ĐÃ CHUYỂN' || row.transferredAt || transits.some(record => record.payload && (record.payload.planRowId === id || record.payload.planId === row.planId || matchKey(record.payload.week, record.payload.sku) === matchKey(week, row.sku))))
+                if (row.status === 'ĐÃ CHUYỂN' || row.transferredAt || transits.some(record => record.payload && (transitMatchesPlan(row,record.payload)||!row.planGroupId&&(record.payload.planId===row.planId||matchKey(record.payload.week,record.payload.sku)===matchKey(week,row.sku)))))
                     fail('alreadyTransferred', 409, [{ id, reason: 'alreadyTransferred' }]);
                 if (row.status !== 'ĐÃ CHỐT')
                     fail('invalidStatus');
@@ -206,7 +224,8 @@ export async function mutatePlan(db, body, actor) {
                 }
                 if (row.status !== 'ĐÃ CHỐT' || rowWarnings(row).some(x => x !== 'missingLabor') || normalized(row.enginePriority) === 'KHONG BO SUNG')
                     fail('cannotTransfer', 422);
-                const matches = transits.filter(r => r.payload && typeof r.payload === 'object' && (r.payload.planRowId === id || r.payload.planId === row.planId || matchKey(r.payload.week, r.payload.sku) === matchKey(week, row.sku)));
+                if(!row.planGroupId&&transits.some(r=>r.payload?.planRowId&&r.payload.planRowId!==id&&(r.payload.planId===row.planId||matchKey(r.payload.week,r.payload.sku)===matchKey(week,row.sku))))fail('legacyConflict',409);
+                const matches = transits.filter(r => r.payload && typeof r.payload === 'object' && transitMatchesPlan(row,r.payload));
                 if (matches.length > 1)
                     fail('legacyConflict', 409);
                 const old = matches[0];
@@ -229,7 +248,7 @@ export async function mutatePlan(db, body, actor) {
                     columns[29] = normalized(columns[29]) === 'CHUA DONG BO' ? 'CHƯA ĐỒNG BỘ' : 'CÓ THAY ĐỔI';
                     columns[32] = actor.login;
                 }
-                const target = { ...old?.payload, planRowId: id, planId: row.planId, week, sku: row.sku, name: row.name, spec: row.spec, line: row.line, group: row.group, plan: row.plan, start: row.start, end: row.end, priority: row.priority, sequence: row.sequence, columns, status: old?.payload.status || 'CHƯA MỞ LSX', syncStatus: columns[29], transferredAt: now, transferredBy: actor.login };
+                const target = { ...old?.payload, planRowId: id, ...(row.planGroupId?{planGroupId:row.planGroupId}:{}), planId: row.planId, week, sku: row.sku, name: row.name, spec: row.spec, line: row.line, group: row.group, plan: row.plan, start: row.start, end: row.end, priority: row.priority, sequence: row.sequence, columns, status: old?.payload.status || 'CHƯA MỞ LSX', syncStatus: columns[29], transferredAt: now, transferredBy: actor.login };
                 extra.push(write(db, 'in_transit', old?.key || `plan:${id}`, target, actor.login, now));
                 row.status = 'ĐÃ CHUYỂN';
                 row.transferredAt = now;
@@ -265,5 +284,5 @@ export async function mutatePlan(db, body, actor) {
             fail('conflict', 409);
         throw error;
     }
-    return { added, existing, updated, errors: 0, revision: envelope.revision, ...(dailyCapacityCheck?{dailyCapacityCheck}:{}), ...(['save', 'close', 'reopen'].includes(action) ? { rows: next.filter(row => body.ids.includes(row.id)), audit } : {}) };
+    return { added, existing, updated, errors: 0, revision: envelope.revision, ...(dailyCapacityCheck?{dailyCapacityCheck}:{}), ...(action==='split'?{rows:next.filter(row=>splitRowIds.includes(row.id)),audit}:['save', 'close', 'reopen'].includes(action) ? { rows: next.filter(row => body.ids.includes(row.id)), audit } : {}) };
 }
