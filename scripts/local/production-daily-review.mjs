@@ -1,0 +1,45 @@
+import {productionMenuRights} from '../../lib/menu-action-access.mjs';
+import {productionActorId} from '../../lib/production-actor.mjs';
+import {normalizeTransit} from '../../lib/in-transit.mjs';
+import {isDailyOutput,dailyOutputTotals} from '../../lib/production-daily-output.mjs';
+import {pendingReportReview,reportReviewBlocker,reportDelayReasonError} from '../../lib/production-progress-review.mjs';
+import {reviewSnapshot} from '../../lib/production-review-selection.mjs';
+import {readDailyOrderReports} from './production-daily-output.mjs';
+const fail=(message,status=409)=>{throw Object.assign(Error(message),{status});};
+export async function reviewDailyOutput(db,body,actor,{stored,cursorBefore}={}){
+ if(!productionMenuRights(actor).confirm)fail('Chỉ QLSX được duyệt sản lượng.',403);
+ if(body.action!=='review'||!body.reportId)fail('Yêu cầu kiểm tra sản lượng không hợp lệ.',400);
+ const reportRow=stored||await db.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(String(body.reportId)).first(),report=reportRow?JSON.parse(reportRow.payload):null;
+ if(!isDailyOutput(report))fail('Không tìm thấy phiếu sản lượng ngày.',404);
+ if(actor.line&&actor.line!==report.line)fail('Không được duyệt sản lượng của Line khác.',403);
+ if(!pendingReportReview(report)||body.expectedVersion!==undefined&&Number(body.expectedVersion)!==Number(report.version||0))fail('Phiếu đã thay đổi hoặc đã được xử lý. Tải lại và kiểm tra.');
+ const blocker=reportReviewBlocker(report);if(blocker)fail(blocker,422);
+ const orderRow=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(report.transitId).first();if(!orderRow)fail('Không còn LSX đang hoạt động để đối chiếu.');
+ const raw=JSON.parse(orderRow.payload),order=normalizeTransit({...raw,id:report.transitId});
+ if(['line','sku','lsxCode'].some(k=>raw[k]!==report[k]))fail('Lệnh đã đổi Line/SKU/LSX so với phiếu sản lượng. Đối chiếu lại trước khi xác nhận.');
+ if(raw.status==='HỦY'||raw.cancelReason)fail('Lệnh đã hủy tại In Transit. Không xác nhận sản lượng.');
+ if(body.expectedReview!==undefined&&(typeof body.expectedReview!=='string'||body.expectedReview!==reviewSnapshot(order,report)))fail('Dữ liệu phiếu hoặc lệnh đã thay đổi. Tải lại và kiểm tra trước khi chọn xác nhận.');
+ const approve=body.approve===true,reason=String(body.reason||'').trim(),delayReason=String(body.delayReason||'').trim();if(!approve&&!reason)fail('Vui lòng nhập lý do từ chối.',422);
+ const delayError=approve?reportDelayReasonError(order,report,delayReason):'';if(delayError)fail(delayError,422);
+ const context=await readDailyOrderReports(db,{...raw,id:report.transitId}),others=context.reports.filter(r=>r.id!==report.id),approvedBefore=dailyOutputTotals({...raw,id:report.transitId},others).approved,approvedQuantity=approve?Number(report.reportedQuantity):0,cumulative=approvedBefore+approvedQuantity;
+ if(approve&&cumulative>Number(raw.lsxQty||0))fail('Sản lượng lũy kế vượt số lượng lệnh; kiểm tra các phiếu trước khi xác nhận.');
+ const completed=Number(raw.lsxQty)>0&&cumulative>=Number(raw.lsxQty),now=new Date().toISOString();
+ const completionTime=r=>isDailyOutput(r)?r.productionAt||r.productionDate:r.completedAt||r.actualCompletedAt;
+ const approved=[...others.filter(r=>r.reviewStatus==='Đã xác nhận'&&!r.cancelled&&!r.voided&&Number(r.approvedQuantity??r.reportedQuantity)>0),...(approve?[report]:[])];
+ const finalAt=completed?[...approved.map(completionTime),raw.actualCompletedAt].filter(v=>v&&Number.isFinite(Date.parse(v))).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1)||report.productionDate:'';
+ const startedAt=[raw.actualStartedAt,...context.reports.filter(r=>!r.cancelled&&!r.voided).map(r=>isDailyOutput(r)?r.productionAt||r.productionDate:r.actualStartedAt||r.startedAt)].filter(v=>v&&Number.isFinite(Date.parse(v))).sort((a,b)=>Date.parse(a)-Date.parse(b))[0]||report.productionDate;
+ const updated={...report,version:Number(report.version||0)+1,hourStatus:approve?'Không áp dụng giờ theo lệnh':report.hourStatus,confirmationBasis:approve?{at:now,by:actor.login,productionDate:report.productionDate,quantity:approvedQuantity,rateBasis:report.rateBasis,rateStatus:report.rateStatus}:report.confirmationBasis,delayReason,reviewStatus:approve?'Đã xác nhận':'Cần điều chỉnh',approvedQuantity,completedQty:cumulative,productionState:completed?'Hoàn thành sản xuất':'Đang sản xuất',actualStartedAt:startedAt,actualCompletedAt:finalAt,reviewedBy:actor.login,reviewedById:productionActorId(actor),reviewedAt:now,rejectionReason:reason,warehouseStatus:approve?'Chờ Kho xác nhận':'Chưa tạo phiếu',updatedAt:now,updatedBy:actor.login};
+ const event={id:crypto.randomUUID(),kind:approve?'report-approval':'report-rejection',sourceId:report.transitId,line:report.line,reportId:report.id,reportingModel:report.reportingModel,quantityOnly:true,productionDate:report.productionDate,productionAt:report.productionAt,effectiveAt:now,recordedAt:now,actor:actor.login,actorId:productionActorId(actor),reason:approve?delayReason:reason,before:{quantity:report.approvedQuantity||0,status:report.reviewStatus},after:{quantity:approvedQuantity,status:updated.reviewStatus},employees:[]};
+ const initial=JSON.stringify({version:0,token:''}),before=cursorBefore===undefined?await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first():cursorBefore;
+ await db.prepare("INSERT INTO app_records VALUES('production_cursor','global',?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(initial,actor.login,now).run();
+ const cursor=await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first();if(cursor.payload!==(before?.payload||initial))fail('Dữ liệu SX vừa thay đổi; tải lại trước khi xác nhận.');
+ const nextCursor=JSON.stringify({version:Number(JSON.parse(cursor.payload).version||0)+1,token:crypto.randomUUID()}),warehouseKey=`SX:${report.id}`;
+ const guards=[{sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)",args:[report.id,reportRow.payload]},{sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?)",args:[report.transitId,orderRow.payload]},{sql:"NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND (record_key=? OR json_extract(payload,'$.reportId')=?))",args:[warehouseKey,report.id]},...context.guards];
+ const gate="EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key='global' AND payload=?)";
+ const statements=[db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key='global' AND payload=? AND ${guards.map(g=>g.sql).join(' AND ')}`).bind(nextCursor,actor.login,now,cursor.payload,...guards.flatMap(g=>g.args)),db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_report' AND record_key=? AND ${gate}`).bind(JSON.stringify(updated),actor.login,now,report.id,nextCursor)];
+ const transit={...raw,completedQty:cumulative,productionState:updated.productionState,actualStartedAt:startedAt,actualCompletedAt:finalAt,delayReason:delayReason||raw.delayReason||'',updatedAt:now,updatedBy:actor.login};
+ statements.push(db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND ${gate}`).bind(JSON.stringify(transit),actor.login,now,report.transitId,nextCursor));
+ statements.push(db.prepare(`INSERT INTO app_records SELECT 'production_event',?,?,?,? WHERE ${gate}`).bind(event.id,JSON.stringify(event),actor.login,now,nextCursor));
+ if(approve){const warehouse={id:warehouseKey,source:'Sản xuất',reportId:report.id,planId:report.planId,lsxCode:report.lsxCode,sku:report.sku,name:report.name,spec:report.spec,line:report.line,proposedQuantity:approvedQuantity,receivedQuantity:null,status:'Chờ xác nhận',sourceCompletedAt:report.productionDate,sourceProductionDate:report.productionDate,sheetSync:{status:'pending'},createdBy:actor.login,createdAt:now};statements.push(db.prepare(`INSERT INTO app_records SELECT 'warehouse_in',?,?,?,? WHERE ${gate}`).bind(warehouseKey,JSON.stringify(warehouse),actor.login,now,nextCursor));}
+ const result=await db.batch(statements);if(result.some(r=>r.meta.changes!==1))fail('Phiếu vừa được xử lý đồng thời; tải lại và kiểm tra.');return {ok:true,payload:updated};
+}

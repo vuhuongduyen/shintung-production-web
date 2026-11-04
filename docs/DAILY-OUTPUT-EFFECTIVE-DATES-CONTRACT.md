@@ -69,3 +69,10 @@ Bản triển khai hiện tại chỉ cho sửa/hủy phiếu sản lượng **c
 Các version định mức mới có ngày hiệu lực do người có quyền nhập, giữ audit before/after. Không dùng thời gian tải PDF hoặc configuredAt để tự dựng lịch sử. Cùng ngày đã có version thì báo xung đột, không ghi đè version. Cập nhật phiếu cùng ngày giữ cả snapshot thiếu căn cứ; đổi ngày sản xuất thì đối chiếu version ngày mới. Chưa có thao tác tự điền lại căn cứ thiếu vào các phiếu đã ghi.
 
 **Chưa đủ điều kiện phát hành:** cơ chế bảo toàn kết quả payroll legacy chưa có snapshot và các inventory Leadtime/Safety/BOM/nhân sự trên toàn web vẫn cần regression/triển khai tiếp. Không gọi việc thêm version cho phiếu mới là đã giải quyết hồi tố toàn web. Không thay current-only của payroll legacy bằng mức LSX tùy tiện, vì có thể làm đổi ngay kết quả cũ. Cần chốt và kiểm kế hoạch anchor bảo toàn kết quả đang biết, ghi rõ đó không phải lịch sử mức đã chứng minh.
+
+## Làm rõ kho và bảo toàn — quyết định bổ sung
+
+- Kho chưa xác nhận: QLSX được sửa/hủy trực tiếp bằng quyền điều chỉnh hiện có, đồng bộ đúng đề xuất chờ kho và giữ audit. Không áp khóa chỉ vì QLSX đã xác nhận phiếu.
+- Kho đã xác nhận: thu hồi trước, luôn giữ lịch sử thu hồi. Sheet giữ dòng và lượng gốc, đánh dấu vô hiệu để công thức tồn không ghi nhận lượng; không xóa hoặc chỉ ẩn dòng.
+- Hai mục trên chưa hoàn tất trong source tại mốc bổ sung này; phải kiểm race/version/replay và lỗi ack trước phát hành. Không thay Sheet production trong quá trình phát triển.
+- Anchor kết quả legacy là giá trị current-only đã quan sát, không có ý nghĩa xác nhận đó là định mức đúng lịch sử. Thiếu căn cứ phải thể hiện thiếu; không tự điền giá trị. Chốt snapshot và kích hoạt production là bước riêng sau nghiệm thu, không tự thực thi bởi source mới.

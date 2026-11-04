@@ -1,3 +1,4 @@
+import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
 import {stageValidationPayload} from './production-stage-read.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {transitStandardLeadtime} from '../../lib/transit-leadtime.mjs';
@@ -88,6 +89,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
     // Pending history contributes a status only. Keep its timestamps/hours in the workflow source.
     .filter(report => ['Chờ kiểm tra','Lịch sử chờ đối chiếu'].includes(report.reviewStatus))
     .map(({id,transitId,kind,reviewStatus,reportedQuantity,voided,cancelled}) => ({id,transitId,kind,reviewStatus,reportedQuantity,voided,cancelled})));
+  const preserved=new Map((options.preservedOrders||[]).map(b=>[b.orderId,b]));
   const rows = await Promise.all(records
     .filter((r) => r.payload && !r.payload._deleted)
     .map(async (r) => {
@@ -100,16 +102,17 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
       );
       return {...normalizeTransit({
         ...merged,
-        group: masterValues.group || merged.group,
-        name: masterValues.name || merged.name,
-        spec: masterValues.spec || merged.spec,
-        unit: masterValues.unit || merged.unit,
-        line: merged.line || masterValues.line,
+        group: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.group ?? (masterValues.group || merged.group),
+        name: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.name ?? (masterValues.name || merged.name ),
+        spec: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.spec ?? (masterValues.spec || merged.spec ),
+        unit: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.unit ?? (masterValues.unit || merged.unit ),
+        line: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.line ?? (merged.line || masterValues.line ),
       }), revision:options.planningOnly ? undefined : await recordRevision(r.rawPayload),updatedBy:r.updated_by};
     }));
   const withLeadtime = rows
     .map((row) => {
-      const standardLeadtime = options.planningOnly ? null : transitStandardLeadtime(row,
+      const frozenLead=preservedOrderMetadata(row,preserved.get(row.id));
+      const standardLeadtime = options.planningOnly ? null : Object.hasOwn(frozenLead||{},'standardLeadtime') ? frozenLead.standardLeadtime : transitStandardLeadtime(row,
         leadtimes.flatMap(r=>Array.isArray(r.payload?.rows)?r.payload.rows:[{...r.payload,sku:r.payload?.sku||r.record_key}]),
         leadVersions.map(r=>r.payload).filter(Boolean));
       return {

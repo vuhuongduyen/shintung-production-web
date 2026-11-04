@@ -1,3 +1,4 @@
+import {preservationManifestValid} from './production-legacy-preservation.mjs';
 import {normalized} from '../../lib/production-plan.mjs';
 import {recordRevision} from '../../lib/record-revision.mjs';
 import {productionActorId} from '../../lib/production-actor.mjs';
@@ -8,9 +9,11 @@ export const dailyToday=()=>new Date(Date.now()+7*3600000).toISOString().slice(0
 export async function readDailyOutputPolicy(db){
  const row=await db.prepare("SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global'").first();
  const p=row?JSON.parse(row.payload):null,approved=p?.mode===dailyOutputModel&&p.approved===true&&validBusinessDate(p.effectiveFrom);
- return {raw:row?.payload??null,policy:approved?{mode:dailyOutputModel,effectiveFrom:p.effectiveFrom,revision:p.revision??1,active:p.effectiveFrom<=dailyToday()}:null};
+ const manifestRow=approved&&p.legacySnapshotId?await db.prepare("SELECT payload FROM app_records WHERE entity='production_legacy_manifest' AND record_key=?").bind(p.legacySnapshotId).first():null;
+ const manifest=manifestRow?JSON.parse(manifestRow.payload):null,protectedHistory=approved&&preservationManifestValid(manifest,p);
+ return {raw:row?.payload??null,manifestRaw:manifestRow?.payload??null,manifestKey:p?.legacySnapshotId||null,policy:approved?{mode:dailyOutputModel,effectiveFrom:p.effectiveFrom,revision:p.revision??1,legacySnapshotId:p.legacySnapshotId||null,active:protectedHistory&&p.effectiveFrom<=dailyToday(),...(!protectedHistory?{blockedReason:'Chưa có mốc bảo toàn kết quả lịch sử được kiểm chứng; chưa bật báo sản lượng ngày.'}:{})}:null};
 }
-const fields=['reportingModel','quantityOnly','legacyCompletedBaseline','orderCode','mo','reportedAt','updatedAt','eventAt','completedAt','productionDate','actualStartedAt','actualCompletedAt','productionState','status','transitId','lsxCode','planId','kind','reviewStatus','reportedQuantity','approvedQuantity','completedQty','quantityCompleted','cancelled','voided','replacedByStageBatch','stageReporting'];
+const fields=['reportingModel','quantityOnly','legacyCompletedBaseline','orderCode','mo','reportedAt','updatedAt','eventAt','startedAt','productionAt','completedAt','productionDate','actualStartedAt','actualCompletedAt','productionState','status','transitId','lsxCode','planId','kind','reviewStatus','reportedQuantity','approvedQuantity','completedQty','quantityCompleted','cancelled','voided','replacedByStageBatch','stageReporting'];
 const summary=(value,id)=>`json_object('id',${id},${fields.flatMap(key=>[`'${key}'`,`json_extract(${value},'$.${key}')`]).join(',')})`;
 const sourceCode=value=>`CAST(coalesce(nullif(nullif(json_extract(${value},'$.lsxCode'),''),0),nullif(nullif(json_extract(${value},'$.orderCode'),''),0),nullif(nullif(json_extract(${value},'$.mo'),''),0),'') AS TEXT)`;
 const complexSql=value=>`(${value} GLOB '*[^ -~]*' OR instr(${value},'  ')>0)`;
@@ -48,7 +51,7 @@ export async function writeDailyOutput(db,body,actor,commitEvents){
  report.sourceOrderRevision=body.expectedOrderRevision;
  const event={id:crypto.randomUUID(),kind:'daily-output',reportingModel:dailyOutputModel,quantityOnly:true,sourceId:order.id,line:order.line,planId:order.planId,lsxCode:order.lsxCode,sku:order.sku,reportId:report.id,quantity:report.reportedQuantity,productionDate:report.productionDate,productionLocalDateTime:report.productionLocalDateTime,productionAt:report.productionAt,effectiveAt:now,recordedAt:now,actor:actor.login,requestIdempotency:token,requestFingerprint:fingerprint};
  const rawGuard=(entity,key,raw)=>({sql:raw===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)":"EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)",args:raw===null?[entity,key]:[entity,key,raw]});
- const guards=[rawGuard('in_transit',order.id,orderRow.payload),rawGuard('production_reporting_policy','global',activation.raw),rawGuard('labor_hours',String(order.sku||'').trim().toUpperCase(),rateRow?.payload??null),...queries.map((q,i)=>({sql:`((${q.sql})=?)`,args:[...q.args,i===0?stored.payload:history.payload]}))];
+ const guards=[rawGuard('in_transit',order.id,orderRow.payload),rawGuard('production_reporting_policy','global',activation.raw),...(activation.manifestKey?[rawGuard('production_legacy_manifest',activation.manifestKey,activation.manifestRaw)]:[]),rawGuard('labor_hours',String(order.sku||'').trim().toUpperCase(),rateRow?.payload??null),...queries.map((q,i)=>({sql:`((${q.sql})=?)`,args:[...q.args,i===0?stored.payload:history.payload]}))];
  await commitEvents(db,actor,now,[event],report,null,cursorRaw,[],guards);
  return {event:{...event,actorId:productionActorId(actor)},report:{...report,actorId:productionActorId(actor),reportedById:productionActorId(actor)}};
 }

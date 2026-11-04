@@ -53,3 +53,30 @@ Test độc lập đã tái hiện: đổi Line hiện tại của LSX từ A sa
 Sáu test API bảo vệ mã viết thường/khoảng trắng, alias `orderCode`/`mo`, chuẩn hóa Unicode và import xảy ra giữa đọc/commit. Trước sửa năm tình huống mã legacy bị bỏ sót (không chặn vượt lượng); sau sửa sáu tình huống đều đạt. SQL lọc chặt mã ASCII; các ứng viên Unicode/khoảng trắng phức tạp chỉ đọc summary gọn rồi dùng normalizer chung, giữ guard trước commit. Guard này có thể phải đọc thêm ứng viên legacy phức tạp; không tuyên bố mọi tập lịch sử có cùng chi phí.
 
 Đo lại sau bổ sung snapshot/guard: cùng 500 lệnh/10.000 phiếu, UI quét 116,285–131,544 ms so với index 20,575–23,450 ms; lưu 147,593–164,899 ms (8 SELECT + 1 batch), replay 19,195–41,823 ms, full read không giờ dẫn xuất 1.700,955 ms; Node heap cuối 58,91 MiB. Đây là lượt local khác với bảng mốc đầu, có biến động tải; không dùng chênh lệch thời gian giữa hai lượt để gọi là tối ưu backend. Giữ toàn bộ kiểm tra consistency, không bỏ guard để lấy số nhanh.
+
+## Mốc tiếp theo: Nhật ký, hot path và bảo toàn kết quả đã biết
+
+Các thay đổi sau mốc `cd30214` đang được kiểm tra, chưa phải nghiệm thu/phát hành:
+
+- Nhật ký có hạng mục Sản lượng ngày riêng, ngày sản xuất và thời điểm ghi audit tách biệt, không cột công đoạn/giờ nhân công và không tải định mức hiện hành cho hạng mục này. Điều chỉnh hiển thị lượng/ngày giờ trước–sau. Lịch sử công đoạn vẫn tra cứu riêng.
+- Xác nhận phiếu ngày chỉ đọc phiếu/lệnh, summary sản lượng liên quan và cursor; không tải nhân viên, Capacity, định mức hay toàn bộ workflow. Giữ kiểm quyền, snapshot đã chọn, lý do trễ, trần sản lượng và CAS chống xác nhận hai lần.
+- Khi mô hình mới hoạt động, lưu HR/phụ kho giữ kiểm lịch/roster/overlap/quyền và CAS nhưng không đọc hoặc tính lại báo công công đoạn cũ. Test đối chiếu raw records trước–sau và replay/concurrent.
+- Thêm lớp anchor ghi nhận **kết quả đang biết tại thời điểm chuẩn bị**, không giả tạo lịch sử hiệu lực. Bảo toàn giá trị hiển thị giờ/chuẩn/cumulative trong Nhật ký, mức và earned legacy; tháng trước tháng chuyển đổi dùng attendance/nhân sự đã quan sát. Đổi danh mục hiện tại không đổi các kết quả này trong fixture. Bất kỳ sửa bản ghi legacy nào làm anchor stale; không lấy mức hiện tại thay thế. Thiếu baseline tháng thì chặn tiền, không tính bằng số 0.
+- Policy mới phải tham chiếu manifest bảo toàn hợp lệ; thiếu manifest thì chưa bật luồng mới. **Chưa có công cụ chuẩn bị/chốt snapshot production nhất quán hoặc thao tác kích hoạt.** Helper tạo snapshot hiện chỉ dùng trong TEST giả; không được dùng nó để seed production.
+- Chưa hoàn tất hiệu lực nhân sự cho các tháng đóng sau chuyển đổi, bảo toàn khi lệnh legacy đổi Line hoặc biến mất, chủ động điều chỉnh tháng đã anchor, và inventory Engine/Safety/BOM/Leadtime toàn web. Test bảo toàn hiện có là bằng chứng phạm vi cụ thể, không bảo đảm toàn bộ lịch sử production.
+
+Kiểm thử local ở mốc này: nhóm rộng 93/93 đạt; sau bổ sung guard thay đổi mọi trường legacy, nhóm bảo toàn/Worker/HR 9/9 đạt. TypeScript đạt trước lần thêm helper journal (sẽ kiểm lại cùng build); không cộng hai nhóm có giao nhau. CI được xác minh gần nhất vẫn là **cd30214, run 41798333999, 1.592/1.592 trong 263 file**, ba build và typecheck đạt; không áp kết quả đó cho thay đổi mới chưa push.
+
+Đo xác nhận phiếu (Node24, Miniflare local, request qua Worker, dữ liệu giả; trước là cd30214): 0/1.000/10.000 phiếu không liên quan, trước lần lượt 466–724 / 613–721 / 1.535–2.672 ms; sau 204–233 / 193–235 / 349–385 ms. SELECT trước 36/42/96, sau 10 ở cả ba cỡ; một batch, đúng một đề xuất kho. Chưa gồm network/browser hoặc CPU/memory production. Script tái lập `scripts/bench/daily-review.mjs`.
+
+### Quy tắc kho Duyên đã chốt sau bản đầu
+
+1. Kho **chưa xác nhận**: QLSX tự sửa/hủy theo quyền hiện có; cập nhật đề xuất chờ kho và audit. Không bắt thu hồi chỉ vì QLSX đã xác nhận sản lượng.
+2. Kho **đã xác nhận**: phải qua thu hồi, vẫn giữ sự kiện thu hồi, người/thời điểm và dữ liệu gốc; không tự đảo tồn.
+3. Dòng Google Sheet vẫn còn khi thu hồi, giữ lượng gốc nhưng phải vô hiệu hóa để công thức tồn không cộng lượng. Không chỉ ẩn/tô màu, không xóa dòng.
+
+**Chưa triển khai xong ba bước này.** Bản source hiện vẫn khóa sửa/hủy khi đã xác nhận hoặc liên kết kho; đây là blocker phát hành, không phải yêu cầu chưa được Duyên quyết định. Rà Sheet chỉ đọc header và công thức mẫu đã thấy SUMIF theo SKU/cột lượng đề xuất không lọc hủy: đổi trạng thái đơn thuần chưa đủ. Chưa ghi Sheet, chưa tuyên bố toàn workbook được kiểm. Cần giao thức version/ack chống race giữa web–Sheet, kiểm tombstone/thu hồi, công thức loại trừ đúng phạm vi và kiểm không đổi số cũ trước khi nghiệm thu.
+
+Kết quả kiểm mốc tiếp theo: TypeScript, build local và `git diff --check` đạt. Nhóm rộng 93/93 và nhóm bổ sung signature/Worker/bảo toàn 9/9 đạt (có giao nhau, không cộng thành full suite). Chưa có browser QA hoặc CI của mốc mới tại thời điểm ghi.
+
+Đo HR/phụ kho theo mô hình mới: `node scripts/bench/daily-attendance-context.mjs /path/to/baseline/scripts/local/production-workflow.mjs`, baseline cd30214. Mỗi cỡ có 2 DB mới/mỗi thao tác/mỗi phiên bản, snapshot chuẩn bị ngoài vùng đo; 4 nhân viên, 1 tuần Capacity và 2 event mỗi lệnh. 80 lệnh/phiếu: HR trước 364,854–367,139 ms, sau 203,165–258,607 ms; phụ kho trước 361,099–393,592 ms, sau 176,406–221,784 ms; SELECT 28 → 15. 2.000 lệnh/phiếu: HR 2.293,867–2.370,521 → 408,100–453,773 ms; phụ kho 2.583,219–3.456,821 → 473,484–803,926 ms; SELECT 51 → 25. Tất cả lưu 1 batch. Mẫu ít và có test/build chạy cùng máy trong một phần phép đo, nên chỉ là dấu hiệu local, không phải benchmark cô lập hoặc cam kết production. Không bỏ kiểm quyền/roster/overlap/consistency để đạt số đo. Không đo browser/network hoặc CPU/memory Worker.
