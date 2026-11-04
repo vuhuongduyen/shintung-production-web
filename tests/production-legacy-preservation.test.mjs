@@ -40,3 +40,18 @@ test('monthly fund history preserves every total and company-return detail after
  const after=payrollFundHistory({from:month,to:month,calculate:()=>calculate(changed,options)});assert.deepEqual(after,before,'include all line/company totals, cumulative values, names, hours, reasons and per-person return details');assert.deepEqual(w,original,'read/report calculation never changes source data');
  const missing=payrollFundHistory({from:month,to:month,calculate:()=>calculate(changed,{...options,attendanceBaselines:[]})});assert.equal(missing.completeMonths,0);for(const key of ['paid','returned','retained','remaining'])assert.equal(missing.totals[key],null,key);assert.equal(missing.companyRows[0].returned,null);assert.equal(missing.companyRows[0].cumulative,null);assert.match(missing.rows[0].issues.join(),/Thiếu mốc bảo toàn/);
 });
+test('an undated approved legacy report keeps the same payroll block after its LSX leaves live input',async()=>{
+ const w=fixture();w.reports.push({...w.reports[0],id:'SYNTHETIC-UNDATED',productionDate:'',completedAt:''});
+ const original=structuredClone(w),before=calculate(w);assert.ok(before.every(r=>r.result.fund===null));assert.match(before[0].result.issues.join(),/Báo công đã xác nhận thiếu ngày sản lượng/);
+ const p=await captureLegacyPreservation({workflow:w,standards:new Map([['SKU-A',.1],['SKU-B',.1]]),snapshotId,observedAt:'2026-11-04T01:00:00Z',cutoverDate:'2026-11-04'}),changed={...w,orders:[],reports:await attachLegacyEarnedBasis(w.reports,p.basis,{required:true})};
+ for(const orders of [[],w.orders.map(o=>({...o,line:'C',sku:'LATER'}))]){const after=calculate({...changed,orders},{attendanceBaselines:p.monthly,historyProtection:{requiredBeforeMonth:'2026-11',snapshotId}});
+ for(let i=0;i<before.length;i++){assert.deepEqual(after[i].result,before[i].result,'missing/moved live LSX must not silently unblock money for an undated report');assert.deepEqual(after[i].people,before[i].people);}}
+ assert.deepEqual(w,original);
+});
+
+test('undated blocker retains existing unanchored scope and ignores cancelled/voided reports',()=>{
+ const w=fixture(),undated={...w.reports[0],id:'SYNTHETIC-UNDATED',productionDate:'',completedAt:''};
+ for(const extra of [{cancelled:true},{voided:true},{reviewStatus:'Chờ kiểm tra'}]){const result=calculate({...w,reports:[...w.reports,{...undated,...extra}]});assert.ok(result.every(r=>r.result.issues.length===0));}
+ const outside={...w,orders:w.orders.map(o=>({...o,line:'C'})),reports:[undated]};assert.doesNotMatch(calculate(outside)[0].result.issues.join(),/thiếu ngày sản lượng/);
+ assert.doesNotMatch(calculate({...w,orders:[],reports:[undated]})[0].result.issues.join(),/thiếu ngày sản lượng/,'unanchored display Line alone is not a proven historical LSX');
+});

@@ -347,3 +347,23 @@ Thêm script tái lập `node --test scripts/bench/legacy-fund-history.mjs`, **1
 CPU tiến trình Node lần lượt 13,15–41,12/6,18–11,67 ms và 626,18–840,31/378,72–452,97 ms. Mọi mẫu so chính xác cùng kết quả và dữ liệu gốc bất biến. Đây là **hai dạng đầu vào khác nhau cho cùng kết quả**, không phải số đo tăng tốc API trước/sau. Không DB/HTTP/Worker CPU/Google/browser/mạng/peak memory/p95, không stress production hoặc chứng nhận tải thật. Script benchmark nằm ngoài danh sách test cấp cao nhất của CI.
 
 Tra cứu quyết định Leadtime/kế hoạch nhiều mốc bằng Personal Context trả “Personal context is unavailable for this conversation.” Không đổi ngày nghiệp vụ hoặc tự suy ra phân bổ lượng; giữ các câu hỏi đã liệt kê ở trên để xem xét sau. Không có browser được hỗ trợ trong phiên này, nên chưa đủ điều kiện gửi link nghiệm thu hay phát hành. Không merge/triển khai/ghi DB hoặc Sheet thật. Commit tài liệu/kiểm thử bổ sung sẽ có CI riêng; không gán số 1.735 của checkpoint trước cho head mới.
+
+## Phiếu legacy thiếu ngày không tự mất điều kiện chặn khi LSX rời đầu vào
+
+Checkpoint `9cc828e55dbe3aa18465c48e7cb7128b8ed881d0` đạt [CI 41867701873](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41867701873): **1.736/1.736 trong 285 file** (709 + 536 + 491), TypeScript/ba build đạt; không fail/cancel/skip/todo, timeout hoặc thiếu summary.
+
+Rà tiếp tái hiện lỗi kỹ thuật bằng fixture: một phiếu đã duyệt thiếu ngày khiến quỹ chưa được tính; sau capture/attach anchor và bỏ LSX khỏi đầu vào hiện tại, guard chỉ tìm trong live orders nên mất cảnh báo. Trước sửa test fail: fund null trở thành 3.000.000 và issues rỗng. Source nay dùng Line từ căn cứ lịch sử đã lưu cho phiếu có anchor; phiếu legacy chưa có anchor vẫn theo scope live-order cũ, không suy lịch sử từ nhãn Line trên phiếu. Phiếu hủy/voided/chưa duyệt không tạo blocker này. Không tự tạo ngày, sửa phiếu hoặc thay công thức/quyền.
+
+Bổ sung kiểm cả LSX mất và LSX hiện tại chuyển Line C/SKU khác; toàn result/people bằng trước. Nhóm payroll/preservation/fund/cutover **39/39** local đạt. Guard lập Map LSX một lần và kiểm thiếu ngày trước lookup thay vì tìm orders.some cho từng report đã có ngày; không thêm fetch/SQL/write.
+
+Benchmark tái lập `node --test scripts/bench/payroll-undated-scope.mjs`, Node v24.19.0, so source thực của baseline 9cc828e với bản sửa, 3 mẫu đảo thứ tự trước/sau. 50 LSX/1.000 phiếu: 4,01–8,91 ms trước, 3,76–6,69 ms sau; 500 LSX/10.000 phiếu: 43,25–68,81 ms trước, 33,60–35,74 ms sau. CPU tiến trình tương ứng quy mô lớn 44,43–69,48 và 33,73–36,06 ms. Mọi trường đầu ra deep-equal, input bất biến; fixture cố ý không có nhân sự/lịch nên giữ nguyên các cảnh báo thiếu giờ, không tuyên bố đã đo chia tiền đầy đủ. Pure payrollMonth, không API/Worker CPU/browser/network/peak-memory/p95 hoặc cam kết production. **1/1** đạt, nằm ngoài CI tests cấp cao nhất.
+
+Đã chuẩn bị [các ví dụ/lựa chọn cần Duyên xem](DAILY-OUTPUT-DECISIONS-TO-REVIEW.md), không tự chốt HR sửa ngược, ngày Leadtime hoặc chia lượng kế hoạch qua hai mức. Hai tài liệu thiết kế 23/09 được AGENTS nhắc không có trong snapshot này; tiếp tục theo source, quyết định hiện có và ghi rõ khoảng thiếu bằng chứng, không tuyên bố đã đọc chúng.
+
+## Harness QA full app trên cloud khác, chỉ loopback
+
+Theo yêu cầu chuẩn bị cho workspace có Chromium: [hướng dẫn](DAILY-OUTPUT-LOOPBACK-QA.md), script `scripts/verification/daily-output-loopback.mjs`. Dùng Worker/assets thật từ build, Miniflare DB/R2 volatile mới, migrate/seed tường minh chỉ trong fixture. Bind 127.0.0.1, external Worker fetch bị chặn, không credential/Sheet/binding cloud hoặc proxy fake-Admin. Tài khoản password giả được tạo riêng mỗi lần chạy, đăng nhập/session/quick-Line qua API hiện hành. Không gỡ Secure, không đổi auth hay cấu hình app.
+
+HTTP smoke **1/1** đạt: full HTML/login/assets trả 200, anonymous không đăng nhập, password Admin/HR/QLSX/Kho và quick-Line có session đúng/không nâng Admin, Line A chỉ nhận A; hai phiếu mới 200 đã duyệt/300 chờ, sibling chung Plan ID, lịch A/B và phiếu cũ có basis. Có một tên dùng quy tắc phụ kho cố định trong source với ID giả; không sao chép hồ sơ thật. Đây là HTTP qua loopback, chưa phải browser QA. Source JSON baseline tương thích trong build vẫn được giữ nguyên; không gọi tất cả danh mục trong app là dữ liệu giả.
+
+TypeScript/build cuối đã đạt. Gói source đúng commit/manifest được chuẩn bị sau commit để môi trường Chromium build lại; không mang DB/FILES/session/node_modules/dist vào gói. Không chạy preview public hoặc cập nhật preview của Duyên. CI commit mới và bàn giao Library ghi riêng trong PR/kết quả; không lấy checkpoint trước làm kết quả head mới.
