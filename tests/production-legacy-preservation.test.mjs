@@ -3,6 +3,7 @@ import {captureLegacyPreservation,preservedOrderMetadata} from '../lib/productio
 import {attachLegacyEarnedBasis,preservedJournalFinalIds,preservedJournalPresentation} from '../lib/production-legacy-earned-basis.mjs';
 import {payrollMonth} from '../lib/production-payroll-month.mjs';
 import {finalReportIds} from '../lib/production-report-order.mjs';
+import {payrollFundHistory} from '../lib/production-fund-history.mjs';
 const month='2026-10',day='2026-10-01',snapshotId='SYNTHETIC-HISTORY';
 function fixture(){
  const days=Array.from({length:31},(_,i)=>({date:`2026-10-${String(i+1).padStart(2,'0')}`,working:i===0,hcStart:'08:00',hcEnd:'17:00',lunchStart:'12:00',lunchEnd:'13:00',ot:false}));
@@ -31,4 +32,11 @@ test('journal final marker/rate/cumulative hours and known missing metadata do n
  assert.deepEqual(preservedOrderMetadata(structuredClone(w.orders[0]),basis).processes,['PACKING','FINAL'],'equal arrays survive serialization');assert.equal(preservedOrderMetadata({...w.orders[0],processes:['NEW']},basis).processes,undefined,'explicit source process edit invalidates only the old process projection');
  w.orders[0].processes.push('LATER');assert.deepEqual(basis.sourceFields.processes,['PACKING','FINAL']);assert.deepEqual(basis.display.processes,['PACKING','FINAL'],'capture does not alias mutable process arrays');
  const missing=calculate(w,{attendanceBaselines:[],historyProtection:{requiredBeforeMonth:'2026-11',snapshotId}});assert.ok(missing.every(r=>r.result.fund===null));assert.match(missing[0].result.issues.join(),/Thiếu mốc bảo toàn/);
+});
+test('monthly fund history preserves every total and company-return detail after master changes and missing live LSX',async()=>{
+ const w=fixture();w.employees.push({id:'NV-C',name:'Synthetic company-return employee',line:'C',active:true,startDate:'2026-01-01'});w.events.push({id:'SYNTHETIC-C-LOAN',kind:'line-movement',line:'C',destinationLine:'A',employees:['NV-C'],approved:true,effectiveAt:day+'T08:00:00+07:00',endsAt:day+'T17:00:00+07:00'});
+ const original=structuredClone(w),before=payrollFundHistory({from:month,to:month,calculate:()=>calculate(w)});assert.equal(before.completeMonths,1);assert.ok(before.totals.returned>0);assert.ok(before.rows.find(r=>r.line==='A').returnDetails.some(r=>r.id==='NV-C'));
+ const p=await captureLegacyPreservation({workflow:w,standards:new Map([['SKU-A',.1],['SKU-B',.1]]),snapshotId,observedAt:'2026-11-04T01:00:00Z',cutoverDate:'2026-11-04'}),changed={...w,orders:[],employees:w.employees.map(e=>({...e,line:'C',startDate:'2027-01-01',name:'Later current name',active:false})),events:[],approvedSchedules:[],reports:await attachLegacyEarnedBasis(w.reports,p.basis,{required:true})},options={standards:new Map([['NEW',9]]),attendanceBaselines:p.monthly,historyProtection:{requiredBeforeMonth:'2026-11',snapshotId}};
+ const after=payrollFundHistory({from:month,to:month,calculate:()=>calculate(changed,options)});assert.deepEqual(after,before,'include all line/company totals, cumulative values, names, hours, reasons and per-person return details');assert.deepEqual(w,original,'read/report calculation never changes source data');
+ const missing=payrollFundHistory({from:month,to:month,calculate:()=>calculate(changed,{...options,attendanceBaselines:[]})});assert.equal(missing.completeMonths,0);for(const key of ['paid','returned','retained','remaining'])assert.equal(missing.totals[key],null,key);assert.equal(missing.companyRows[0].returned,null);assert.equal(missing.companyRows[0].cumulative,null);assert.match(missing.rows[0].issues.join(),/Thiếu mốc bảo toàn/);
 });

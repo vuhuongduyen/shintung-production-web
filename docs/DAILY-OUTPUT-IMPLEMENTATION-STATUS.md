@@ -330,3 +330,20 @@ Source sửa profile theo mọi mode, không chỉ work. Gắn bằng chứng fu
 Đây là kiểm component/cache với fetch giả, không phải browser + Worker/network QA. Không thay API, công thức tiền, quyền hay source lịch sử. TypeScript/build của nhóm này đạt; kiểm regression rộng và CI của commit mới ghi riêng khi xong. Giới hạn nghiệm thu browser/Sheet và các câu hỏi ngày nghiệp vụ còn giữ nguyên.
 
 Kiểm cuối profile: **54/54** trong nhóm client loading/render, daily board/projection, detail và mounted transition đạt (gồm bốn ca trên), TypeScript/build đạt, không log React/DOM exception sau khi bổ sung Element đúng cho harness JSDOM. Không lấy thời gian chạy test làm benchmark render. CI đúng head mới sẽ đọc sau push; các checkpoint trước vẫn được giữ riêng.
+
+## Kiểm tiếp toàn bộ quỹ tháng và chi tiết hoàn công ty
+
+Checkpoint client `3e1a43b0b379eeeca3b199c39467bfd4374161ac`, CI [41863820549](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41863820549), đã **đạt 1.735/1.735 trong 285 file** (709 + 536 + 490), không fail/cancel/skip/todo hoặc file thiếu summary. TypeScript và ba build đạt. Không tạo run thay thế trong thời gian chờ; các bước test đã hoàn tất và run kết thúc success.
+
+Bổ sung hồi quy chỉ đọc: so **deep-equal toàn bộ** kết quả `payrollFundHistory` trước–sau thay đổi danh mục, gồm tổng từng Line/công ty, lũy kế, chi tiết từng người hoàn quỹ, tên/Line nhà/Line làm việc/giờ/lý do/số tiền. Fixture có khoản thực trả và hoàn công ty dương, không chỉ so các tổng bằng 0. Sau capture, xóa LSX khỏi đầu vào hiện hành, đổi tên/Line/ngày bắt đầu/trạng thái nhân viên, bỏ lịch/sự kiện đang dùng và đổi mức hiện tại; kết quả quan sát cũ vẫn giữ nguyên và raw fixture không bị ghi lại. Nếu thiếu anchor giờ, các tổng tiền phải thiếu căn cứ/null cùng lý do, không âm thầm dùng mức hiện hành hay trả 0. Nhóm preservation/fund-history **10/10** đạt local; đây là bằng chứng pure helper, không phải nghiệm thu Worker/browser hoặc dữ liệu thật.
+
+Thêm script tái lập `node --test scripts/bench/legacy-fund-history.mjs`, **1/1** đạt trên Node v24.19.0, dữ liệu giả, 17 người và khoản mượn người xuyên Line. Hai quy mô: 50 LSX/1.000 phiếu/1 tháng và 500 LSX/10.000 phiếu/12 tháng. Ba mẫu mỗi dạng đầu vào, chạy riêng:
+
+| Quy mô | Capture một lần | Tính từ đầu vào cũ (wall) | Tính từ anchor sau đổi master (wall) |
+| --- | --- | --- | --- |
+| 50/1.000/1 | 219,66 ms | 11,53–21,66 ms | 5,28–8,74 ms |
+| 500/10.000/12 | 1.666,36 ms | 609,56–715,32 ms | 365,44–422,39 ms |
+
+CPU tiến trình Node lần lượt 13,15–41,12/6,18–11,67 ms và 626,18–840,31/378,72–452,97 ms. Mọi mẫu so chính xác cùng kết quả và dữ liệu gốc bất biến. Đây là **hai dạng đầu vào khác nhau cho cùng kết quả**, không phải số đo tăng tốc API trước/sau. Không DB/HTTP/Worker CPU/Google/browser/mạng/peak memory/p95, không stress production hoặc chứng nhận tải thật. Script benchmark nằm ngoài danh sách test cấp cao nhất của CI.
+
+Tra cứu quyết định Leadtime/kế hoạch nhiều mốc bằng Personal Context trả “Personal context is unavailable for this conversation.” Không đổi ngày nghiệp vụ hoặc tự suy ra phân bổ lượng; giữ các câu hỏi đã liệt kê ở trên để xem xét sau. Không có browser được hỗ trợ trong phiên này, nên chưa đủ điều kiện gửi link nghiệm thu hay phát hành. Không merge/triển khai/ghi DB hoặc Sheet thật. Commit tài liệu/kiểm thử bổ sung sẽ có CI riêng; không gán số 1.735 của checkpoint trước cho head mới.
