@@ -25,3 +25,9 @@ Các kiểm DOM/CSS trên xác minh cấu trúc và ràng buộc kích thước,
 Đã thử Chromium154 local với Pro Plan thật và handler thật trên DB Miniflare mới chỉ chứa dữ liệu giả; không dùng DB/FILES đang có hoặc Site. Lượt harness đầu vướng cache React dùng chung, đã tách cache. Sau đó CLI browser không xuất được DOM/screenshot, kể cả trang HTML tối giản; chưa thu được kết quả đo vị trí bảng ở1440/390/360. Một lượt test đồng thời bị dừng do tài nguyên; khi chạy riêng, component4/4 đạt. Không coi các lần khởi động browser là QA đạt.
 
 Đã dừng harness QA riêng. Preview Duyên đang dùng không bị đổi source, restart, thay cổng hay dữ liệu. Chưa gửi URL test mới. Cần kiểm bằng phiên browser được hỗ trợ trước nghiệm thu: tách dòng, sửa SL và chờ autosave, cho hai cảnh báo xuất hiện rồi hết, mở/đóng panel bằng chuột/bàn phím, so sánh vị trí bảng/độ rộng cột/scroll trước-sau ởdesktop và mobile, kiểm chữ/nút/scroll dễ đọc. Chỉ cập nhật preview khi Duyên xác nhận sẵn sàng; không merge/deploy.
+
+## Kiểm CI và nút giữ chỗ
+
+CI12726ac877438c7d394fc4cdc25fc969005acfaa/run41755976858 hoàn tất:1.528 đạt/1 thất bại/1.529 test trong251file; không timeout/cancel/skip/todo/thiếu tổng kết. TypeScript và ba build đạt. Lỗi duy nhất: quy chuẩn native disabled button trong global-action-feedback yêu cầu giải thích nhưng nút giữ chỗ rỗng đang dùng disabled.
+
+Nút này vốn ẩn hoàn toàn, aria-hidden và tabIndex=-1; disabled không cần thiết và không có một thao tác “bị khóa” nào để giải thích. Bỏ thuộc tính đó, giữ nguyên ẩn/focus và thêm guard onOpenChange chỉ cho mở khi workspace active và có thông báo. Test click chương trình vào placeholder rỗng, sau đó thêm cảnh báo, kiểm panel vẫn đóng; không có bất kỳ hành động lưu nào. Không sửa/miễn quy chuẩn test chung. Unit component+global feedback12/12 đạt, typecheck/build exit0. CI của commit bổ sung đọc riêng; browser QA vẫn chưa hoàn tất, không gửi link nghiệm thu.
