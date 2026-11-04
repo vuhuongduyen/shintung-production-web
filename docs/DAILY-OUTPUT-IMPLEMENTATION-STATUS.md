@@ -312,3 +312,21 @@ Kiểm thêm các rủi ro cùng view:
 - Giữ nguyên hợp đồng **nguồn SKU hiện hành** của live lookup, kể cả dòng ngưng đã lưu. Sửa này chỉ bảo vệ bộ đơn vị/mẫu số/hao hụt của dòng lịch sử dựng lại, không tự thay toàn bộ live-source projection hay lượng dùng Engine.
 
 Ghi chú căn cứ nằm ở ô hiện có (title/tên truy cập), không thêm banner/cột hoặc thay bố cục. **9/9** ca projection từ source và **28/28** nhóm BOM/source/bulk/lifecycle/hierarchy/reconciliation đạt; có giao nhau, không cộng gộp. TypeScript/build cuối đạt. Dữ liệu giả và VM, chưa browser desktop/mobile. Không có route/lượt fetch/write mới; không đo hoặc tuyên bố tốc độ render được cải thiện. DB/save/confirmation/undo/permissions không sửa; raw before-image và dòng phiếu được test bất biến. CI đúng commit bổ sung sẽ kiểm sau push.
+
+## Chặn dùng bản tải gọn khi chuyển sang Payroll/nhật ký/điều chỉnh
+
+CI BOM `56e6b0c4d6359188501ecc6b9d0a369c925db58f` [41860127276](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41860127276) đã **đạt 1.731/1.731 trong 284 file** (691 + 519 + 521), không fail/cancel/skip/todo hoặc file thiếu summary; TypeScript/ba build đạt. Đây là checkpoint trước phần client dưới đây.
+
+Mounted test tái hiện chuyển **cùng instance** ProductionManagement từ work sang payroll: profile vẫn work, số request full **0**, trong khi Payroll đã hiện. Work profile không chứa đầy đủ anchor báo công/payroll. Đây là đường có thể đi vào phép tính current-only; bằng chứng trước sửa xác nhận sai profile/Payroll hiện sớm, không tuyên bố đã chứng minh ghi sai tiền hoặc API bypass trên production.
+
+Source sửa profile theo mọi mode, không chỉ work. Gắn bằng chứng full/work riêng trong WeakMap theo response thực sự đọc/cache; không thêm cờ client vào DB/JSON hay quyền mới. Màn cần full không dựng business view từ response work trong lúc chờ/lỗi. Cờ full không bị hạ xuống work nếu dùng lại cùng object full trong cache. Bản merge chỉ từ write đã được server ACK giữ profile của dữ liệu đầu vào; không ép remount toàn component hoặc đổi sở hữu bản nháp. Reader vẫn hoãn đọc khi hidden/đang giữ form, loại phản hồi cũ bằng revision và dùng cache còn mới.
+
+**4/4 mounted JSDOM** đã đạt:
+1. Work → Payroll yêu cầu đúng một full read; trong lúc chờ không dựng Payroll/không gọi `/api/production-standards` để fallback về mức hiện tại. Sau full hiển thị 0,1 đã bảo toàn, không 9 của master giả.
+2. Full 503/non-JSON hiện lỗi/thử lại, không lấy light data làm Payroll. Thử lại đọc full, không lén gọi current standards.
+3. Full trả trễ sau khi quay lại work không ghi đè bảng đang mở.
+4. Full cache còn mới dùng lại qua work/Payroll với **một HTTP workflow read tổng**, không hạ profile hoặc tạo lượt fetch lặp.
+
+Đây là kiểm component/cache với fetch giả, không phải browser + Worker/network QA. Không thay API, công thức tiền, quyền hay source lịch sử. TypeScript/build của nhóm này đạt; kiểm regression rộng và CI của commit mới ghi riêng khi xong. Giới hạn nghiệm thu browser/Sheet và các câu hỏi ngày nghiệp vụ còn giữ nguyên.
+
+Kiểm cuối profile: **54/54** trong nhóm client loading/render, daily board/projection, detail và mounted transition đạt (gồm bốn ca trên), TypeScript/build đạt, không log React/DOM exception sau khi bổ sung Element đúng cho harness JSDOM. Không lấy thời gian chạy test làm benchmark render. CI đúng head mới sẽ đọc sau push; các checkpoint trước vẫn được giữ riêng.

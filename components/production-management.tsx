@@ -77,14 +77,20 @@ export default function ProductionManagement({ mode, sessionLine, preferenceUser
   const [stageRequest,setStageRequest]=useState<{order:Row;action:string}|null>(null),[stageState,setStageState]=useState<Record<string,Row>>({});
   const requestToken=useRef<string>("");
   const workspaceActive=useContext(WorkspaceActivityContext);
-  const readProfile=useRef<'full'|'work'>((mode==='work'||mode==='schedule')?'work':'full');
-  const [reader]=useState(()=>createProductionWorkspaceReader<WorkflowData>({read:(force:boolean)=>readProductionWorkflow(force,readProfile.current),initial:productionSnapshot((mode==='work'||mode==='schedule')?'work':'full')}));
+  const requiredProfile:'full'|'work'=(mode==='schedule'||mode==='work'&&!assignmentOpen)?'work':'full';
+  const readProfile=useRef<'full'|'work'>(requiredProfile);
+  const snapshotProfiles=useRef(new WeakMap<WorkflowData,'full'|'work'>());
+  const [reader]=useState(()=>{
+    const initial=productionSnapshot(requiredProfile);if(initial)snapshotProfiles.current.set(initial,requiredProfile);
+    return createProductionWorkspaceReader<WorkflowData>({read:async(force:boolean)=>{const requested=readProfile.current,value=await readProductionWorkflow(force,requested);if(requested==='full'||!snapshotProfiles.current.has(value))snapshotProfiles.current.set(value,requested);return value;},initial});
+  });
   const [readState,setReadState]=useState(reader.getState);
 
   const [dailyEditing,setDailyEditing]=useState(false);
   const dailyOwner=useRef({});
-  const hasData=readState.value!==null;
-  const data=readState.value||emptyWorkflow;
+  const hasData=readState.value!==null&&((mode==='work'||mode==='schedule')||snapshotProfiles.current.get(readState.value)==='full');
+  const data=hasData?readState.value!:emptyWorkflow;
+  const mergeSaved=useCallback((value:WorkflowData,result:Row)=>{const next=mergeProductionSavedResult(value,result),profile=snapshotProfiles.current.get(value);if(profile)snapshotProfiles.current.set(next,profile);return next;},[]);
   const dailyMode=data.dailyOutputPolicy?.active===true;
   const [holdExpired,setHoldExpired]=useState(false);
   useEffect(()=>{setHoldExpired(false);if(!data.reportingHold?.active)return;const timer=setTimeout(()=>{setHoldExpired(true);void load(true,true);},Math.max(0,data.reportingHold.remainingMs));return ()=>clearTimeout(timer);},[data.reportingHold]);
@@ -99,11 +105,10 @@ export default function ProductionManagement({ mode, sessionLine, preferenceUser
   useEffect(()=>{void reader.setActive(workspaceActive);return()=>{void reader.setActive(false);};},[reader,workspaceActive]);
   const [busy,setBusy]=useState(false), [query,setQuery]=useState(""), [statusFilter,setStatusFilter]=useState("all"), [dueFilter,setDueFilter]=useState("all"), [line,setLine]=useState(viewLine || "all"), [showSearch,setShowSearch]=useState(false);
   const [chosen,setChosen]=useState<Row|null>(null), [action,setAction]=useState(""), [absenceKind,setAbsenceKind]=useState("Nghỉ"), [picked,setPicked]=useState<string[]>([]), [destination,setDestination]=useState(""), [detail,setDetail]=useState<Row|null>(null), [reviewOpen,setReviewOpen]=useState(false), [rejecting,setRejecting]=useState<string|null>(null);
-  useEffect(()=>{
-    if(mode!=='work')return;
-    readProfile.current=assignmentOpen?'full':'work';
-    if(workspaceActive&&!stageRequest&&assignmentOpen)void reader.refresh(true);
-  },[reader,mode,workspaceActive,stageRequest,assignmentOpen]);
+  useLayoutEffect(()=>{
+    const changed=readProfile.current!==requiredProfile;readProfile.current=requiredProfile;
+    if(workspaceActive&&(changed||mode==='work'&&assignmentOpen&&!stageRequest))void reader.refresh(mode==='work'&&assignmentOpen);
+  },[reader,requiredProfile,mode,workspaceActive,stageRequest,assignmentOpen]);
   useLayoutEffect(()=>{void reader.setHeld(!!stageRequest||!!action||!!incidentOrder||mode==='work'&&!!detail||dailyEditing);},[reader,stageRequest,action,incidentOrder,mode,detail,dailyEditing]);
   const [workSort,setWorkSort]=useState("due"),[absenceEndLocal,setAbsenceEndLocal]=useState(localNow),[effectiveLocal,setEffectiveLocal]=useState(localNow),[selectionTouched,setSelectionTouched]=useState(false);
   const [week,setWeek]=useState(()=>typeof window!=="undefined"?window.sessionStorage.getItem("onspa-production-week")||monday(new Date()):monday(new Date())), [calendarLine,setCalendarLine]=useState<string>(viewLine || "A"), [days,setDays]=useState<Row[]>([]), [calendarVersion,setCalendarVersion]=useState(0);
@@ -117,9 +122,9 @@ export default function ProductionManagement({ mode, sessionLine, preferenceUser
   const dataRevision=useDataRefresh(['production_workflow','production_report'],{ignoreSource:dailyOwner.current});
   const load=useCallback((_silent=false,force=false)=>reader.refresh(force),[reader]);
   const acceptStageSave=useCallback((result?:Row)=>{
-    if(result?.events?.length)reader.applyMutation((value:WorkflowData)=>mergeProductionSavedResult(value,result));
+    if(result?.events?.length)reader.applyMutation((value:WorkflowData)=>mergeSaved(value,result));
     void reader.refresh(true);
-  },[reader]);
+  },[reader,mergeSaved]);
   const refreshJournal=useCallback(()=>{void reader.refresh(true);},[reader]);
   useEffect(()=>{window.sessionStorage.removeItem('onspa-production-examples');const refresh=(event:Event)=>{if((event as CustomEvent).detail!==attendanceInstance.current)void reader.refresh(true);};window.addEventListener('onspa-production-updated',refresh);return()=>window.removeEventListener('onspa-production-updated',refresh);},[reader]);
   useEffect(()=>{if(dataRevision)void load(true,true);},[dataRevision]);
@@ -216,7 +221,7 @@ export default function ProductionManagement({ mode, sessionLine, preferenceUser
   {mode==="schedule"&&<ActualWorkSchedule recalculationAllowed={data.rights.historyImport} attendanceOnly={String(preferenceUser||'').trim().toLowerCase()==='haquyen'} week={week} setWeek={setWeek} line={calendarLine} setLine={setCalendarLine} locked={Boolean(viewLine)} days={days} setDays={setDays} version={calendarVersion} approved={calendarApproved} approvedSchedules={data.approvedSchedules} history={data.actualSchedules.find(s=>s.key===`${week}:${calendarLine}`)?.history||[]} events={liveEvents} orders={data.orders} employees={data.employees} displayEmployees={data.payrollEmployees||data.employees} restrictedLine={Boolean(data.rights.line&&!data.rights.crossLineView)} manager={data.rights.manager&&actualScheduleAllowed} attendanceManager={attendanceRights.manager&&actualScheduleAllowed} hr={data.rights.hr||false} busy={busy} save={ask} refresh={()=>load(true,true)} openAction={(order,eventAction,people,at)=>{setChosen(order);setAction(eventAction==="transfer"?"transfer":"absence");setPicked(people);setDestination("");setEffectiveLocal(at);setSelectionTouched(true);setAbsenceKind(eventAction==="transfer"?"Nghỉ":eventAction);}}/>}
   
   {mode==="work"&&assignmentOpen&&<ProductionAssignmentOverview orders={data.orders} events={data.events} reports={reports} employees={data.employees} restrictedLine={data.rights.line||viewLine||undefined} loading={loading} error={readState.error?.message} refresh={()=>void load(true,true)} onClose={()=>setAssignmentOpen(false)}/>}
-  {mode==="work"&&dailyMode&&<ProductionDailyBoard key={preferenceUser} orders={shown} reports={data.reports} policy={data.dailyOutputPolicy!} allowed={canMutateProduction&&!reportingPaused} active={workspaceActive} owner={dailyOwner.current} onEditingChange={setDailyEditing} openDetail={setDetail} onSaved={result=>{reader.applyMutation((value:WorkflowData)=>mergeProductionSavedResult(value,{events:result.event?[result.event]:[],reports:result.report?[result.report]:[]}));void reader.refresh(true);}}/>}
+  {mode==="work"&&dailyMode&&<ProductionDailyBoard key={preferenceUser} orders={shown} reports={data.reports} policy={data.dailyOutputPolicy!} allowed={canMutateProduction&&!reportingPaused} active={workspaceActive} owner={dailyOwner.current} onEditingChange={setDailyEditing} openDetail={setDetail} onSaved={result=>{reader.applyMutation((value:WorkflowData)=>mergeSaved(value,{events:result.event?[result.event]:[],reports:result.report?[result.report]:[]}));void reader.refresh(true);}}/>}
   {mode==="work"&&!dailyMode&&<ProductionWorkBoard stageLive={!!data.rights.stageLive} stageState={stageState} rows={shown} events={liveEvents} reports={reports} active={active} openAction={openWorkAction} showDetail={setDetail} chosen={chosen} action={action} effectiveLocal={effectiveLocal} setEffectiveLocal={setEffectiveLocal} submit={saveAction} cancel={()=>{setAction("");setChosen(null);}} busy={busy} schedules={data.approvedSchedules} line={line} employees={data.employees}/>}
   {mode==="work"&&incidentOrder&&<ProductionIncidentDialog order={incidentOrder} reports={data.reports} onClose={()=>setIncidentOrder(null)} onSaved={()=>{void load(true,true);window.dispatchEvent(new CustomEvent('onspa-production-updated'));}}/>}
   {mode==="work"&&!dailyMode&&<ProductionStageTrial live={!!data.rights.stageLive} onSaved={acceptStageSave} key={preferenceUser} request={stageRequest} trialState={stageState} onState={setStageState} schedules={data.approvedSchedules} events={liveEvents} orders={data.orders.filter(o=>o.status!=='HỦY')} employees={data.employees} onBack={()=>setStageRequest(null)}/>}
