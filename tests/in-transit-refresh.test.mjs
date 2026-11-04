@@ -29,6 +29,7 @@ function harness(initialActive=true){
   if(name.includes('production-plan.mjs'))return plan;if(name.includes('lib/in-transit.mjs'))return transit;if(name.includes('in-transit-edit-feedback'))return editFeedback;if(name.includes('production-progress-display'))return progress;
   // Display-only child is outside this effect/request harness; no authorization is stubbed.
   if(name.endsWith('week-visibility.mjs'))return weekVisibility;
+  if(name.endsWith('quantity-progress'))return {default:({value})=>React.createElement('span',null,value)};
   if(name.endsWith('production-status-legend'))return {default:()=>null};
   if(name.includes('in-transit-semantics'))return{inTransitCellKind:()=> 'text'};if(name.includes('StandardToolbar'))return{toolbar,StandardToolbar:()=>null};if(name.includes('ManualPagination'))return{ManualPagination:()=>null};if(name.includes('DataCell'))return{DataCell:()=>null};if(name.includes('transit-history-import'))return{default:()=>null};throw Error(name);
  }});

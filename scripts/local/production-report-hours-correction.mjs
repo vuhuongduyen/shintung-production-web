@@ -1,3 +1,4 @@
+import {isDailyOutput} from '../../lib/production-daily-output.mjs';
 import {productionMenuRights} from '../../lib/menu-action-access.mjs';
 import {readProductionWorkflow} from './production-workflow.mjs';
 import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
@@ -11,6 +12,7 @@ export async function correctReportHours(db,body,actor,catalog=[]){
  const reason=String(body.reason||'').trim();if(!reason||reason.length>1000)fail('Nhập lý do điều chỉnh (tối đa 1000 ký tự).');
  const state=await readProductionWorkflow(db,actor,catalog),report=state.reports.find(r=>r.id===body.reportId&&r.kind==='completion');
  if(!report||actor.line&&actor.line!==report.line)fail('Không có quyền điều chỉnh báo công này.',403);
+ if(isDailyOutput(report))fail('Phiếu sản lượng ngày không có giờ công theo lệnh để điều chỉnh.');
  if(report.cancelled||report.voided||report.reviewStatus==='Đã hủy')fail('Báo công đã hủy không thể điều chỉnh giờ.');
  if(Number(body.version)!==Number(report.version||0))fail(conflictMessage,409);
  const amount=v=>{if(v===''||v==null||!Number.isFinite(Number(v))||Number(v)<0)fail('Giờ công phải là số không âm.');return Math.round(Number(v)*10000)/10000;};

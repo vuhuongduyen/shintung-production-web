@@ -1,4 +1,6 @@
 import {cleaningLimitError} from '../../lib/actual-cleaning-limit.mjs';
+import {writeDailyOutput,readDailyOutputPolicy} from './production-daily-output.mjs';
+import {isDailyOutput} from '../../lib/production-daily-output.mjs';
 import {stageValidationPayload} from './production-stage-read.mjs';
 import {workflowReadSnapshot} from '../../worker/read-performance.mjs';
 import {backfillStageWork} from './production-backfill.mjs';
@@ -201,7 +203,7 @@ const shiftAt = (day, minute) => {
 };
 const eventRows = (events, actor) => events.filter((event) => permitted(actor, event.line) || event.destinationLine && permitted(actor, event.destinationLine));
 function canRecalculateReport(report) {
- return report.kind==='completion'&&!report.cancelled&&!report.voided&&!report.manualHours&&report.staffingIncomplete!==true&&(!report.historicalImport||report.erpStageImport&&report.employees?.length||report.stageReporting);
+ return report.kind==='completion'&&!isDailyOutput(report)&&!report.cancelled&&!report.voided&&!report.manualHours&&report.staffingIncomplete!==true&&(!report.historicalImport||report.erpStageImport&&report.employees?.length||report.stageReporting);
 }
 function sameReportHours(a,b) {
  const normalize=value=>typeof value==='number'?Math.round(value*1e7)/1e7:Array.isArray(value)?value.map(normalize):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,normalize(value[k])])):value;
@@ -258,10 +260,10 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   const scopedRosterIds=new Set(actor.line?[...calendar.approved.entries()].filter(([key])=>key.endsWith(':'+actor.line)).flatMap(([,r])=>(r.roster||[]).flatMap(day=>[...(day.hc||[]),...(day.ot||[])])):[]);
   const accounts=accountRecords.map(row=>({...row.payload,id:row.key}));
   const actorIdFor=row=>productionEntryActorId(row.payload,accounts)||(row.updatedAt===row.payload.recordedAt?productionEntryActorId({actor:row.updatedBy},accounts):'');
-  const journalEvents=eventRecords.map(row=>({...row.payload,actorId:actorIdFor(row)})),allEvents=journalEvents.filter(e=>!e.voided);
+  const journalEvents=eventRecords.map(row=>({...row.payload,actorId:actorIdFor(row)})),allEvents=journalEvents.filter(e=>!e.voided&&!isDailyOutput(e));
   const projectedHr=actor.line?projectPersonalHr(journalEvents,{line:actor.line,employees:employeeDirectory,references:[...calendar.approved.entries()].map(([key,reference])=>({...reference,key,days:resolveSchedule(calendar,...key.split(':')).days}))}):[];
   const scopedJournal=actor.line?[...journalEvents.filter(event=>!personalHrEvent(event)),...projectedHr]:journalEvents;
-  const calculationEvents=actor.line?scopedJournal.filter(event=>!event.voided):allEvents;
+  const calculationEvents=actor.line?scopedJournal.filter(event=>!event.voided&&!isDailyOutput(event)):allEvents;
   // All caches live inside this single read. Never reuse them after a write or
   // across users. Policies retain the global attendance/movement boundaries.
   const policies=new Map(),policyFor=line=>{if(!policies.has(line))policies.set(line,attendancePolicy(calendar,calculationEvents,line,true));return policies.get(line);};
@@ -336,7 +338,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
       String(a.recordedAt || a.effectiveAt).localeCompare(String(b.recordedAt || b.effectiveAt))),
     reports: [...historical.filter(r=>!reviewedHistory.has(r.id)),...reportRecords.map((row) => ({ id: row.key, ...row.payload,actorId:productionEntryActorId(row.payload,accounts) })).filter((row) => orderIds.has(row.transitId)&&permitted(readActor,row.line))
       .map((row) => {
-        const derive=includeDerivedHours&&(!reviewReportId||row.id===reviewReportId)&&!row.historicalImport;
+        const derive=includeDerivedHours&&(!reviewReportId||row.id===reviewReportId)&&!row.historicalImport&&!isDailyOutput(row);
         const refreshHours=derive&&!row.manualHours&&!row.cancelled&&row.reviewStatus==='Chờ kiểm tra';
         // Stage/ERP metadata also computes hours: reuse that result instead of calculating twice.
         const calculation=derive&&(row.kind==='completion'||refreshHours)?reportCalculation(calendar,calculationEvents,row,directory,refreshHours,false,policyFor,readContext):null;
@@ -354,14 +356,14 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
 export async function mutateProductionWorkflow(db, body, actor, catalog = []) {
  const responseScope={};
  const result=await mutateProductionWorkflowInternal(db,body,actor,catalog,responseScope);
- if(!hasQuickLineReadScope(actor)||responseScope.committedStages||(!result.event&&!result.report))return result;
+ if(!hasQuickLineReadScope(actor)||responseScope.committedStages||responseScope.committedDaily||(!result.event&&!result.report))return result;
  const visible=await readProductionWorkflow(workflowReadSnapshot(db),actor,catalog,{includeDerivedHours:!body.backfill&&!body.stageEntries});
  return {...result,...(result.event?{event:visible.events.find(row=>row.id===result.event.id)||null}:{}),...(result.report?{report:visible.reports.find(row=>row.id===result.report.id)||null}:{}),...(result.events?{events:result.events.map(event=>visible.events.find(row=>row.id===event.id)).filter(Boolean)}:{}),...(result.reports?{reports:result.reports.map(report=>visible.reports.find(row=>row.id===report.id)).filter(Boolean)}:{})};
 }
 async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], responseScope={}) {
   if (!workflowActionAllowed(actor,body)) fail("Không có quyền thao tác tại menu này.",403);
   if (!canWork(actor)&&!canHr(actor)) fail("Không có quyền ghi dữ liệu sản xuất.", 403);
-  const action = String(body.action || ""), permittedActions = ["recalculate-attendance-hours","staff-recall", "staff-recall-approve", "warehouse-duty", "preview-report", "attendance-edit", "attendance-cancel", "line-movement", "attendance-correction", "extra", "start", "transfer", "add", "reduce", "absence", "line-absence", "attendance-override", "schedule", "pause", "resume", "incident", "complete", "approve-hours"];
+  const action = String(body.action || ""), permittedActions = ["daily-output","recalculate-attendance-hours","staff-recall", "staff-recall-approve", "warehouse-duty", "preview-report", "attendance-edit", "attendance-cancel", "line-movement", "attendance-correction", "extra", "start", "transfer", "add", "reduce", "absence", "line-absence", "attendance-override", "schedule", "pause", "resume", "incident", "complete", "approve-hours"];
   if (!permittedActions.includes(action)) fail("Thao tác sản xuất không hợp lệ.");
   const hrAction=canHr(actor)&&["line-absence","attendance-override","attendance-correction","attendance-cancel","attendance-edit"].includes(action);
   if(!canWork(actor)&&!hrAction)fail("HR chỉ được ghi nhận vắng mặt và có mặt thực tế.",403);
@@ -372,6 +374,11 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   if(body.attendanceScope==='employee'&&(!canHr(actor)||actor.line))fail('Chỉ HR không giới hạn Line được ghi nhận theo nhân viên.',403);
   const requestId=String(body.requestIdempotency||"");
   if(requestId && !/^[a-zA-Z0-9-]{16,80}$/.test(requestId)) fail("Mã thao tác không hợp lệ.");
+  if(action==='daily-output'){const result=await writeDailyOutput(db,body,actor,commitEvents);responseScope.committedDaily=true;return result;}
+  if(['start','extra','complete','pause','resume','transfer','add','reduce','preview-report'].includes(action)){
+   const activation=await readDailyOutputPolicy(db);
+   if(activation.policy?.active)fail('Đã chuyển sang báo sản lượng thành phẩm theo ngày. Mở lại SX báo công để ghi nhận; không gửi thao tác công đoạn.',409);
+  }
   if(requestId&&(!body.backfill||['apply','save'].includes(body.backfill.mode))){const match=await db.prepare("SELECT payload FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(requestId).first();const existing=match?{payload:JSON.parse(match.payload)}:null;
     if(existing){if(personalHrEvent(existing.payload)&&(!canHr(actor)||actor.line))fail("Không có quyền đọc lại dữ liệu HR theo nhân viên.",403);if(existing.payload.actor!==actor.login)fail("Mã thao tác thuộc người khác.",409);return {event:existing.payload,replayed:true,...(existing.payload.kind==='staff-recall-request'?{pendingRecall:true,requestId:existing.payload.requestId}:{})};}}
   if(body.backfill){if(action!=='start'||!canWork(actor)||!canManage(actor)&&!actor.line)fail('Nhập trạm bù yêu cầu quyền báo công của Line hoặc QLSX/Admin.',403);if(!requestId)fail('Thiếu mã thao tác nhập bù.');return backfillStageWork(db,body,actor,catalog);}
@@ -852,8 +859,9 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   return { event, report };
 }
 
-async function commitEvents(db, actor, now, events, report = null, state = null, expectedCursor = null, extraRecords = []) {
-  await assertLegacyAllocationWrite(db,events);
+async function commitEvents(db, actor, now, events, report = null, state = null, expectedCursor = null, extraRecords = [],readGuards=[]) {
+  const quantityOnly=events.length>0&&events.every(e=>isDailyOutput(e)&&e.kind==='daily-output'&&!e.employees?.length&&!e.stageReporting&&!e.destinationId)&&!state&&!extraRecords.length;
+  if(!quantityOnly)await assertLegacyAllocationWrite(db,events);
   const key = "global", initial = JSON.stringify({ version: 0, token: "" });
   await db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('production_cursor',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key, initial, actor.login, now).run();
   const cursor = await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key=?").bind(key).first();
@@ -862,7 +870,8 @@ async function commitEvents(db, actor, now, events, report = null, state = null,
   const guardedInsert = (entity, id, payload) => db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?)").bind(entity, id, JSON.stringify(payload), actor.login, now, key, updated);
   const extraConditions=extraRecords.map(r=>r.expected===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)":"EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)");
   const extraArgs=extraRecords.flatMap(r=>r.expected===null?[r.entity,r.key]:[r.entity,r.key,r.expected]);
-  const writes = [db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key=? AND payload=?"+(extraConditions.length?' AND '+extraConditions.join(' AND '):'')).bind(updated, actor.login, now, key, cursor.payload,...extraArgs),
+  const conditions=[...extraConditions,...readGuards.map(g=>g.sql)],guardArgs=readGuards.flatMap(g=>g.args);
+  const writes = [db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key=? AND payload=?"+(conditions.length?' AND '+conditions.join(' AND '):'')).bind(updated, actor.login, now, key, cursor.payload,...extraArgs,...guardArgs),
     ...events.map((event) => guardedInsert("production_event", event.id, {...event,actorId:productionActorId(actor)}))];
   for(const r of extraRecords)writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(r.entity,r.key,JSON.stringify(r.payload),actor.login,now,key,updated));
   if (report) writes.push(guardedInsert("production_report", report.id, {...report,actorId:productionActorId(actor),reportedById:productionActorId(actor)}));

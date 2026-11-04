@@ -1,4 +1,5 @@
 "use client";
+import QuantityProgress from './quantity-progress';
 import ProductionStatusLegend from './production-status-legend';
 import {ACTION_FEEDBACK_CLEAR_EVENT,ACTION_FEEDBACK_DURATION,notifyInvalidAction} from '../lib/action-feedback';
 import {FeedbackActionButton} from './action-feedback';
@@ -721,6 +722,7 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
         "planQty",
         "lsxQty",
         "completedQty",
+        "pendingReportQty",
         "inTransitQty",
         "progress",
         "planEnd",
@@ -1006,7 +1008,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
       )}
       <section className="data-card it-card">
         <div className="it-table">
-          <table data-no-pagination="true" data-report-source={JSON.stringify({title:t('In transit','在途'),headers:['Nhóm sản phẩm','SKU','Tên sản phẩm','Quy cách','Line','Nguồn lệnh','Ưu tiên KHSX','Thứ tự SX','SL kế hoạch','Ngày bắt đầu KH','Ngày dự kiến HT','Mã LSX','SL LSX','Ngày mở LSX','SL hoàn thành','SL đang đi','Tiến độ','Trạng thái LSX','Trạng thái tiến độ','Đồng bộ','Ghi chú','Plan ID'],rows:filtered.map(r=>[r.group,r.sku,r.name,r.spec,r.line,businessLabel(r.source),businessLabel(r.priority),r.sequence,r.isAdditionalLsx?'':r.planQty,displayDate(r.planStart),displayDate(r.planEnd),r.lsxCode,r.lsxQty,displayDate(r.lsxOpenedAt),r.completedQty,r.inTransitQty,r.progress,businessLabel(r.status),businessLabel(r.progressStatus),businessLabel(r.syncStatus),r.planningNote,r.planId])})}>
+          <table data-no-pagination="true" data-report-source={JSON.stringify({title:t('In transit','在途'),headers:['Nhóm sản phẩm','SKU','Tên sản phẩm','Quy cách','Line','Nguồn lệnh','Ưu tiên KHSX','Thứ tự SX','SL kế hoạch','Ngày bắt đầu KH','Ngày dự kiến HT','Mã LSX','SL LSX','Ngày mở LSX','SL hoàn thành đã duyệt','SL chờ xác nhận','SL đang đi','Tiến độ','Trạng thái LSX','Trạng thái tiến độ','Đồng bộ','Ghi chú','Plan ID'],rows:filtered.map(r=>[r.group,r.sku,r.name,r.spec,r.line,businessLabel(r.source),businessLabel(r.priority),r.sequence,r.isAdditionalLsx?'':r.planQty,displayDate(r.planStart),displayDate(r.planEnd),r.lsxCode,r.lsxQty,displayDate(r.lsxOpenedAt),r.completedQty,r.pendingReportQty||0,r.inTransitQty,r.progress,businessLabel(r.status),businessLabel(r.progressStatus),businessLabel(r.syncStatus),r.planningNote,r.planId])})}>
             <thead>
               <tr>
                 {[
@@ -1025,7 +1027,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
                   t("Mã LSX", "工單號"),
                   t("SL LSX", "工單數量"),
                   t("Ngày mở LSX", "工單開立日"),
-                  t("SL hoàn thành", "完成數量"),
+                  t("SL hoàn thành SX", "生產完成數量"),
                   t("SL đang đi", "在製數量"),
                   t("Tiến độ", "進度"),
                   t("Trạng thái LSX", "工單狀態"),
@@ -1160,7 +1162,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
                       displayDate(r.lsxOpenedAt)
                     )}
                   </DataCell>
-                  <DataCell kind="number" className="num">{fmt(r.completedQty)}</DataCell>
+                  <DataCell kind="number" className="num"><QuantityProgress value={Number(r.completedQty||0)+Number(r.pendingReportQty||0)} total={Number(r.lsxQty)} approved={Number(r.completedQty||0)} pending={Number(r.pendingReportQty||0)}/></DataCell>
                   <DataCell kind="number" className="num">{fmt(r.inTransitQty)}</DataCell>
                   <DataCell className="center">
                     {r.progress === null

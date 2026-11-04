@@ -1,3 +1,5 @@
+import {isDailyOutput} from '../lib/production-report-model.mjs';
+const productionTime=report=>isDailyOutput(report)?report.productionDate:report?.completedAt;
 // Scoped bridge: only newly approved receipts explicitly marked for Sheets are exported.
 export const REAL_SHEET='1y5J-G5IoIzEgXsf_2hpqrXOTgvL0RJp5lBjR9bbapk4';
 export const sha=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');
@@ -44,7 +46,7 @@ export async function sheetBridge(request,env){
  await db.prepare("UPDATE app_records SET payload=json_set(payload,'$.lastContactAt',?) WHERE entity='warehouse_sheet_config' AND record_key='connection' AND json_extract(payload,'$.tokenHash')=? AND json_extract(payload,'$.enabled')=1").bind(contactAt,config.tokenHash).run();
  if(b.action==='ping')return reply({ok:true,connected:true,lastContactAt:contactAt});
  if(b.action==='pull'){
- const rows=(await db.prepare("SELECT w.record_key,w.payload,json_extract(r.payload,'$.completedAt') AS latest_completed_at FROM app_records w LEFT JOIN app_records r ON r.entity='production_report' AND r.record_key=json_extract(w.payload,'$.reportId') WHERE w.entity='warehouse_in' AND json_extract(w.payload,'$.sheetSync.status') IS NOT NULL AND (json_extract(w.payload,'$.sheetSync.status') IN ('pending','error') OR COALESCE(json_extract(r.payload,'$.completedAt'),json_extract(w.payload,'$.sourceCompletedAt'),'')<>COALESCE(json_extract(w.payload,'$.sheetSync.exportedCompletedAt'),'')) ORDER BY w.updated_at LIMIT 50").all()).results;
+ const rows=(await db.prepare("SELECT w.record_key,w.payload,CASE WHEN json_extract(r.payload,'$.reportingModel')='daily-finished-v1' AND json_extract(r.payload,'$.quantityOnly')=1 THEN json_extract(r.payload,'$.productionDate') ELSE json_extract(r.payload,'$.completedAt') END AS latest_completed_at FROM app_records w LEFT JOIN app_records r ON r.entity='production_report' AND r.record_key=json_extract(w.payload,'$.reportId') WHERE w.entity='warehouse_in' AND json_extract(w.payload,'$.sheetSync.status') IS NOT NULL AND (json_extract(w.payload,'$.sheetSync.status') IN ('pending','error') OR COALESCE(CASE WHEN json_extract(r.payload,'$.reportingModel')='daily-finished-v1' AND json_extract(r.payload,'$.quantityOnly')=1 THEN json_extract(r.payload,'$.productionDate') ELSE json_extract(r.payload,'$.completedAt') END,json_extract(w.payload,'$.sourceCompletedAt'),'')<>COALESCE(json_extract(w.payload,'$.sheetSync.exportedCompletedAt'),'')) ORDER BY w.updated_at LIMIT 50").all()).results;
  return reply({receipts:rows.map(r=>({...JSON.parse(r.payload),id:r.record_key,...(r.latest_completed_at?{sourceCompletedAt:r.latest_completed_at}:{})})).filter(p=>!p._deleted&&!p.cancelled&&!p.voided)});
  }
  const key=String(b.receiptId||''),stored=await db.prepare("SELECT payload FROM app_records WHERE entity='warehouse_in' AND record_key=?").bind(key).first();
@@ -53,7 +55,7 @@ export async function sheetBridge(request,env){
  if(!p.sheetSync||p.source!=='Sản xuất'||p.reportId!==b.reportId||p.sku!==b.sku||p._deleted||p.cancelled||p.voided)fail('Phiếu không thuộc kết nối này hoặc đã hủy.',409);
  const now=new Date().toISOString();let next;
  if(b.action==='ack'||b.action==='error'){
-  const report=await read(db,'production_report',p.reportId),latest=report?.completedAt||p.sourceCompletedAt||'';
+  const report=await read(db,'production_report',p.reportId),latest=productionTime(report)||p.sourceCompletedAt||'';
   if(b.action==='ack'&&p.sheetSync.correctionRevision&&(b.correctionRevision!==p.sheetSync.correctionRevision||Number(b.proposedQuantity)!==Number(p.proposedQuantity)))fail('Phiếu đã điều chỉnh số lượng. Cập nhật mã đồng bộ kho và tải lại phiếu mới trước khi xác nhận đồng bộ.',409);
   if(b.action==='ack'&&b.sourceCompletedAt!==latest)fail('Ngày xuất trạm vừa thay đổi. Hệ thống sẽ cập nhật lại.',409);
   next={...p,...(b.action==='ack'?{sourceCompletedAt:latest}:{}),sheetSync:{...p.sheetSync,...(b.action==='ack'?{exportedCompletedAt:latest,exportedCorrectionRevision:p.sheetSync.correctionRevision||null}:{}),status:b.action==='ack'?'sent':'error',at:now,error:b.action==='error'?String(b.error||'Lỗi ghi Sheet').slice(0,1000):'',spreadsheetId:config.spreadsheetId}};
@@ -89,10 +91,10 @@ async function sheetBackfill(db,config,body,actor,host){
  const rows=(await db.prepare("SELECT w.record_key,w.payload,r.payload AS report_payload FROM app_records w JOIN app_records r ON r.entity='production_report' AND r.record_key=json_extract(w.payload,'$.reportId') WHERE w.entity='warehouse_in' AND json_extract(w.payload,'$.source')='Sản xuất' ORDER BY w.record_key").all()).results;
  const eligible=[],blocked=[];
  for(const row of rows){
- const p=JSON.parse(row.payload),report=JSON.parse(row.report_payload),day=receiptDay(report.completedAt);
+ const p=JSON.parse(row.payload),report=JSON.parse(row.report_payload),day=receiptDay(productionTime(report));
  if(day<from||day>to||p._deleted||p.cancelled||p.voided||report._deleted||report.cancelled||report.voided)continue;
  if(report.reviewStatus!=='Đã xác nhận'||!Number.isFinite(Number(p.proposedQuantity))||Number(p.proposedQuantity)<=0||Number(p.proposedQuantity)!==Number(report.approvedQuantity??report.reportedQuantity)||report.sku!==p.sku){blocked.push({id:row.record_key,lsxCode:p.lsxCode,reason:'Báo công chưa xác nhận hoặc số lượng/SKU không khớp phiếu.'});continue;}
- eligible.push({...row,p,completedAt:report.completedAt,day});
+ eligible.push({...row,p,completedAt:productionTime(report),day});
  }
  if(eligible.length>500)fail('Có quá 500 phiếu. Chọn khoảng ngày ngắn hơn.');
  const revision=await sha(JSON.stringify([config.spreadsheetId,from,to,eligible.map(r=>[r.record_key,r.payload,r.report_payload])]));

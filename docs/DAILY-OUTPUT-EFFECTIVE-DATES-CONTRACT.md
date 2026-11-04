@@ -1,0 +1,71 @@
+# Báo sản lượng ngày và dữ liệu có hiệu lực
+
+Nguồn kiểm tra: GitHub main d8dbb1e031e540fec892509b577cd49c3d2cc442, sau PR #6. Không thay source Site đang xử lý FINAL, không dữ liệu thật hoặc migration production.
+
+## Quyết định đã chốt
+
+- Báo phát sinh thành phẩm theo ngày sản xuất và ID từng LSX; 200 rồi 300 thành lũy kế500 trên lệnh1000. Không nhập số lũy kế thay phát sinh, không nhân đôi báo công cũ, không cộng sản lượng công đoạn trung gian thành thành phẩm.
+- Không bắt chọn nhân viên, giờ theo lệnh hoặc báo từng công đoạn cho phiếu mới. Phiếu cũ giữ mô hình/căn cứ/nhân viên/giờ/audit cũ.
+- Chia tiền, giờ nhân sự, phụ kho/CV khác và phép tính quỹ hiện hành giữ nguyên. Tổng hợp theo tháng sản xuất; không thêm phân bổ WIP giữa tháng.
+- Sản lượng ngày nhân giờ chuẩn/SP có hiệu lực ngày sản xuất. Không dùng ngày nhập hoặc mức hiện hành để thay mức đã chốt của phiếu cũ.
+- Duyên đã chọn: nếu thiếu căn cứ hiệu lực, vẫn ghi sản lượng và đối chiếu kho, nhưng báo **Thiếu căn cứ định mức**, chưa tính tiền phần đó; không coi thiếu là0 hoặc dùng mức hiện tại. Bổ sung căn cứ sau này phải có thao tác đối chiếu/audit rõ, không âm thầm sửa phiếu cũ.
+- In Transit vẫn một dòng mỗi ID LSX. Không group theo Plan ID chung của các dòng Tách đơn. SX báo công và In Transit có thanh thể hiện lũy kế thành phẩm, số di chuyển theo tỷ lệ; thanh chỉ hiển thị, không phải slider được kéo để ghi dữ liệu.
+- Mốc chuyển đổi: **ngày triển khai sau nghiệm thu** (Duyên đã xác nhận), không gán sẵn ngày production trong source. Chỉ bật khi deployment đã được duyệt có mốc rõ ràng; TEST dùng mốc giả minh bạch.
+
+## Hợp đồng lưu và đối chiếu
+
+Phiếu mới có reportingModel riêng, ID riêng, productionDate date-only Asia/Ho_Chi_Minh, số phát sinh, ID nguồn In Transit, người/giờ ghi, revision, idempotency key và snapshot căn cứ định mức. Thời điểm máy chủ nhận không thay ngày sản xuất; không bịa giờ nhập/xuất trạm cho phiếu chỉ có ngày. UI/compatibility phải phân biệt hai mô hình.
+
+Giữ trạng thái chờ QLSX xác nhận và xác nhận theo quyền menu hiện có. Lũy kế đã duyệt và chờ duyệt trình bày riêng; tổng phát sinh hợp lệ giữ chỗ trong trần LSX để hai người không cùng vượt số lệnh. Xác nhận mới tạo/cập nhật đúng một phiếu kho theo report ID qua luồng hiện hành, không gửi Sheet hoặc ghi kho từ thao tác nhập/chọn dòng.
+
+Không upsert theo khóa ngày+Plan ID: cùng ngày có thể có nhiều lần nhập, nhiều lệnh chung Plan ID phải độc lập. Sửa/hủy dùng CAS, lưu before/after; phiếu gốc/audit còn đối chiếu được. Mất phản hồi giữ bản nháp và cùng khóa, không tự retry bằng khóa mới. Dữ liệu thay trong lúc ghi phải báo stale, không ghi đè.
+
+Đề xuất sửa/hủy sau kho: giữ guard hiện có, không tự sửa phiếu kho đã xử lý/đã nhận. Trước khi phát hành cần Duyên xem quy trình điều chỉnh kho liên quan; chưa tự mở quyền ghi hoặc tự đảo kho. Khi kho chưa xử lý, phải kiểm revision của báo công/lệnh/phiếu kho cùng transaction. Không tác động FINAL đang xử lý riêng.
+
+## Dữ liệu hiệu lực và bảo toàn lịch sử
+
+Khoảng hiệu lực date-only dùng [validFrom, validTo); đổi mức phải thêm version, không sửa/xóa version đã được phiếu tham chiếu. Phiếu lưu version/value/source/scope và ngày chọn. Hủy danh mục hiện tại không được xóa snapshot của chứng từ cũ. Khi không có căn cứ hiệu lực đã chứng minh, hiển thị thiếu căn cứ; không gán mức hiện tại rồi gọi đó là lịch sử.
+
+Riêng dữ liệu cũ chưa lưu snapshot: phải phân biệt **kết quả đang biết tại mốc bảo toàn** với **mức thực tế từng có trong quá khứ**. Có thể bảo toàn giá trị đang biết khi thay đổi mới bằng anchor có ngày ghi nhận và nguồn rõ; không tự suy ra lịch sử đã thiếu hoặc âm thầm tính lại dữ liệu cũ. Việc áp dụng anchor/snapshot cho production là bước chuyển đổi được duyệt sau, không chạy trong task phát triển.
+
+## Inventory tác động từ source
+
+| Nhóm | Điểm đọc/ghi hiện có | Rủi ro và công việc bắt buộc |
+|---|---|---|
+| SX, FINAL và nhập bù | production-workflow, production-stage-live, production-backfill, production-final-limit | Hai mô hình đồng tồn tại; không đổi guard FINAL cũ hoặc giờ legacy. Luồng mới không phụ thuộc staffing; phải cộng đủ sản lượng cũ còn hiệu lực vào trần. |
+| QLSX/xác nhận | production-progress-review, production-review-selection, site-api review | Hiện chặn thiếu hours/pending attendance và chốt hours khi duyệt. Tách kiểm tra theo reportingModel; không nới quyền cho legacy. Snapshot review gồm số lượng/ngày/căn cứ/version. |
+| In Transit/kho | in-transit, warehouse-confirm, production-corrections | Một dòng/LSX; một phiếu kho/report. Không merge các dòng có Plan ID chung. Xử lý approved/pending/returned/cancelled và sửa/hủy không đếm đôi. |
+| Nhật ký/tiến độ/báo cáo | production-output-summary, report-cumulative, journal-standards, detail-fields, output/payroll export | Phân biệt giờ thực tế legacy với giờ chuẩn kiếm được mới; không biến giờ chuẩn thành hours thực tế hoặc invent nhân viên. Ngày và tổng khớp kho/tháng. |
+| Giờ công/SP | site-api labor-hours, site-labor-hours, production-standards, payroll-month/payroll | Payroll hiện có currentOnly và map mức hiện hành; master chưa có validFrom theo ngày nghiệp vụ. Cần version/snapshot và tổng theo từng phiếu/ngày, không dùng một mức hiện tại nhân cả tháng. Giữ đơn vị HC/TC/quỹ của nhân sự riêng. |
+| Leadtime | transit-leadtime, getTransit, leadtime_versions | Có validFrom/validTo nhưng default at=now và current cancelled có thể chặn lịch sử trước khi xét versions. Cần snapshot/ngày nghiệp vụ đúng; không dựng lại version thiếu từ giá trị hiện hành. |
+| Safety Days | safety_rule_groups/safety_rules trong page/engine | Có effectiveFrom/To, nhưng bản tính lại có thể đọc dữ liệu hiện tại. Cần bảo toàn căn cứ bản Engine/Plan đã lưu và xác định phạm vi áp dụng trước khi đổi. |
+| BOM | bom-lifecycle, bom-bulk, bom-rules, engine | Có ngày hiệu lực, confirmationSnapshot và phiếu thay đổi; không tự sửa BOM đã chốt. Kiểm lookup theo ngày và snapshot kế hoạch cũ, nhất là hủy/khôi phục. |
+| SKU/đơn vị/tên/Line | catalog, getPlan/getTransit enrichment | Join danh mục hiện tại có thể làm nhãn/căn cứ cũ đổi. Ưu tiên snapshot chứng từ đã chốt; dữ liệu mới dùng master hợp lệ, không xóa nguồn cũ. |
+| Nhân sự/điều chuyển | employee-employment, employees history, monthly-attendance | startDate/endDate có semantics nhưng Line/name/danh mục hiện tại vẫn được join. Không đổi giờ chia tiền/phụ kho hoặc invent lịch sử Line. Cần đối chiếu các before/after và roster đã chốt. |
+| Capacity/lịch thực tế | capacity accepted/history, schedules, monthly-attendance | Giữ lịch/roster/đã duyệt và semantics giờ; không xóa phụ thuộc payroll vì SX không nhập người nữa. Không bỏ guard vệ sinh/số người thực tế. |
+| Engine/Plan/Forecast/định mức | engine, production-plan, plan-daily-load, planning-reports | Giữ snapshots đầu vào/đầu ra và Plan đã chốt; thay master không tự ghi đè kết quả cũ. Không replay Engine để tạo lịch sử còn thiếu. |
+| Quyền/audit/backup | menu-action-access, action-audit, revision/CAS, source/full-backup | Dùng quyền menu hiện hữu; business history không phải auth grants. Không làm quyền cũ có hiệu lực ngược hoặc đưa secrets vào snapshot công khai. |
+
+Đây là inventory đã đọc source, không phải tuyên bố đã sửa xong mọi nhóm. Các nhóm phải có regression riêng trước khi ghi trạng thái hoàn tất.
+
+## Bộ kiểm tra trước phát hành
+
+1. 200+300/1000, khác ngày/tháng, cùng ngày nhiều phiếu, hai LSX chung Plan ID, số0/số âm/vượt trần, lệnh hủy/chưa đồng bộ.
+2. Snapshot mức ngày D trước/sau đổi mức hoặc hủy master; ngày nhập khác ngày SX; thiếu/overlap/range rỗng; backfill không có bằng chứng không tự chọn mức hiện tại.
+3. Hai người ghi đồng thời, sửa stale, double click, timeout sau commit, non-JSON; không mất draft/ghi trùng.
+4. QLSX xác nhận/từ chối/sửa/hủy, pending/approved/returned/cancelled; kho pending/posted; audit actor/quyền Line, không nới guard legacy.
+5. Payroll giữ phụ kho/giờ/chia quỹ và theo tháng; tổng giờ chuẩn = tổng từng phiếu có mức đúng ngày; không WIP. Đổi master tương lai không đổi snapshot/kết quả đã bảo toàn.
+6. Thanh tiến độ desktop/mobile/bàn phím, số không tràn/đè, không có thao tác kéo ghi dữ liệu. Một dòng In Transit/LSX.
+7. Typecheck/build/full CI; benchmark fake data lớn và giữ v810. Browser full app/đúng Worker bằng dữ liệu giả trước gửi preview. Không merge/deploy/migration production trong task này.
+
+## Bổ sung giao diện và ranh giới triển khai
+
+Giữ nút **Báo công** tại cột thao tác đầu bảng. Mở trực tiếp hộp nhập SL phát sinh, ngày giờ mặc định hiện tại GMT+7 và cho sửa. `productionLocalDateTime`/`productionAt` là thời gian sản xuất do người dùng chọn; `productionDate` phải khớp ngày GMT+7 đó, là căn cứ định mức/tháng. `reportedAt`/`recordedAt` vẫn là thời gian máy chủ thực sự nhận thao tác. Không tạo `startedAt`/`completedAt` hay giờ nhân công cho phiếu mới.
+
+API mới chỉ hoạt động khi có policy được duyệt, đúng mô hình và ngày triển khai đã đến. Source không tạo policy production, không tự bật theo ngày hiện tại. Khi đã bật, các command công đoạn cũ bị từ chối; nghỉ/phụ kho/điều chuyển nhân sự và lịch vẫn giữ nghiệp vụ hiện hành. Lịch sử công đoạn cũ chỉ để tra cứu/đối chiếu, không phải điều kiện để ghi sản lượng mới.
+
+Bản triển khai hiện tại chỉ cho sửa/hủy phiếu sản lượng **chưa xác nhận và chưa liên kết kho**. Phiếu đã xác nhận khóa chỉnh sửa; cần hoàn tất quy trình đối chiếu kho trước khi mở thêm trường hợp. Chưa tự quyết cơ chế đảo kho, sửa Sheet hoặc sửa phiếu kho đã nhận.
+
+Các version định mức mới có ngày hiệu lực do người có quyền nhập, giữ audit before/after. Không dùng thời gian tải PDF hoặc configuredAt để tự dựng lịch sử. Cùng ngày đã có version thì báo xung đột, không ghi đè version. Cập nhật phiếu cùng ngày giữ cả snapshot thiếu căn cứ; đổi ngày sản xuất thì đối chiếu version ngày mới. Chưa có thao tác tự điền lại căn cứ thiếu vào các phiếu đã ghi.
+
+**Chưa đủ điều kiện phát hành:** cơ chế bảo toàn kết quả payroll legacy chưa có snapshot và các inventory Leadtime/Safety/BOM/nhân sự trên toàn web vẫn cần regression/triển khai tiếp. Không gọi việc thêm version cho phiếu mới là đã giải quyết hồi tố toàn web. Không thay current-only của payroll legacy bằng mức LSX tùy tiện, vì có thể làm đổi ngay kết quả cũ. Cần chốt và kiểm kế hoạch anchor bảo toàn kết quả đang biết, ghi rõ đó không phải lịch sử mức đã chứng minh.
