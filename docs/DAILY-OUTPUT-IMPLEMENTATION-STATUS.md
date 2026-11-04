@@ -383,3 +383,44 @@ Nhóm artifact/trace/fund/policy **22/22** local đạt (gồm 5 ca artifact m�
 Benchmark giả `node --test scripts/bench/payroll-export-preservation.mjs`, Node v24.19.0, ba mẫu/quy mô. 50 người/Line (100 tổng): chuẩn bị report 0,95–6,13 ms, encode XLSX 5,39–43,25 ms, tổng 6,57–44,19 ms, 15.783 byte. 500 người/Line (1.000 tổng): chuẩn bị 1,48–3,17 ms, encode 41,32–60,26 ms, tổng 42,80–63,43 ms, 79.006 byte. CPU tiến trình 8,38–48,97 / 46,50–96,49 ms. Giải nén/kiểm sau khoảng đo: đủ từng ID, mỗi ô tiền đúng khoản trả của người đó và tổng thực trả từng Line, input bất biến; **1/1** đạt. Đây không phải before/after tối ưu, không PDF/browser/DB/network/Worker CPU/p95/peak-memory hoặc chứng nhận 1.000 người qua publication anchor. Chưa có bằng chứng cần đổi encoder hoặc bỏ kiểm dữ liệu để tăng tốc.
 
 Kiểm cuối nhóm xuất/trace: **31/31** trong artifact mới, export/PDF cũ, trace, fund, policy, mounted Payroll và legacy preservation đạt; TypeScript/build đạt. PDF ở đây là test Node/canvas có kiểm ô/chữ và mounted là JSDOM, không phải browser nghiệm thu. Phạm vi source chạy thay đổi chỉ một mô tả công thức và bản dịch tương ứng; không có thay đổi API, JSON/DB, tiền, quyền, CSS/bố cục hoặc luồng kho. CI của commit mới được đọc riêng sau push. Gói Library cbaa86d không bị sửa; cần rebuild/kiểm phần chữ ở head bổ sung để nghiệm thu đúng phiên bản.
+
+## Snapshot scope lớn và chẩn đoán file thông báo trong CI
+
+CI `a9bebf912f5c98fb40a24316d5a668679dd5b71c`, [41874042619](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41874042619), kết thúc **failure/chưa chạy đủ**. TypeScript và ba build đạt; shard1 606/606 trong 96 file, shard3 597/597 trong 95 file. Shard2 chỉ 385/385 trong 65 file có summary, dở production-plan-notices và 30 file chưa chạy. Tổng 1.588 pass có summary trong 256 file, không phải full pass. Runner nhận shutdown/exit143 sau khoảng 26 giây trong file dở, không CI TIMEOUT/180 giây hoặc assertion not ok trong log đó. Checkpoint cbaa86d 1.739/1.739 vẫn giữ riêng.
+
+### Harness thông báo: đã tái hiện lỗi kiểm focus sớm
+
+Ba lượt local qua đúng `runFile` đạt 4/4 mỗi lượt (2.979–3.188 ms), chưa đủ giải thích CI. Diagnostic cache mới: tắt optimizeDeps discovery riêng lẻ vẫn có lần bị SIGKILL sau ca đầu. Đổi **chỉ cách in lỗi identity** sang boolean, giữ điều kiện so sánh, giúp thấy ca thứ hai fail vì kiểm focus ngay sau Escape (3/4, không phải callback sai hoặc không đóng panel). Có thể việc inspect DOM/React lớn làm khó chẩn đoán; chưa chứng minh đó là toàn bộ nguyên nhân runner shutdown/OOM và không dùng memory.peak toàn container làm peak riêng của test.
+
+Dependency đang khóa `@radix-ui/react-focus-scope/dist/index.mjs` thực hiện trả focus/unmount bằng setTimeout(...,0). Harness nay chờ đúng identity focus tối đa 500 ms, dọn task DOM sau unmount, giữ đủ các kiểm Escape/context/inactive/outside/callback và khung bảng. Các so sánh DOM dùng boolean/độ dài + từng identity để lỗi không in cả cây React; không xóa, skip hoặc nới kết quả kỳ vọng. Dùng helper SSR có sẵn để bỏ scan client không cần thiết, không đổi workflow/runner timeout hoặc dependency.
+
+**10 lượt cache mới liên tiếp**, mỗi lượt 4/4, 2.708–3.143 ms và tự thoát. Đây là chẩn đoán có mục tiêu, không rerun toàn CI giống hệt. Cần đọc CI đúng head mới, chưa gọi nguyên nhân shutdown đã được loại trừ hoàn toàn.
+
+### Tái hiện và sửa SQLITE_TOOBIG trên scope 10.000 phiếu
+
+Mở rộng fixture có sẵn từ 1.000 lên 10.000 phiếu cùng LSX, tất cả dữ liệu giả: source a9bebf9 gộp toàn bộ summary vào một cell JSON và `readDailyOrderReports` trả `D1_ERROR: string or blob too big: SQLITE_TOOBIG`, trước bước lưu. Tổng thời gian test khoảng 31,86 giây gồm seed, **không phải latency request**. Không có bằng chứng production có cùng số phiếu hoặc đây là nguyên nhân duy nhất của log quá tải.
+
+Source bổ sung `production-summary-scope.mjs`:
+- Metadata khóa theo cửa sổ 1.000 + một khóa nhìn trước; tải summary tối đa **512 KiB JSON/phần**, gồm dấu phân cách, không tải payload lớn một cell. Tối đa ba phần độc lập đọc cùng lúc. Không đọc lại full workflow, workforce, staffing hoặc công đoạn.
+- Giữ thứ tự khóa lưu và chỉ số số học của reports trong import, Boolean JSON và quy tắc stored report ghi đè cùng ID. Normalizer Unicode/whitespace và phân biệt LSX chung Plan ID giữ nguyên.
+- CAS đối chiếu **nguyên chuỗi SQL của từng phần** theo khoảng khóa, cộng phạm vi rỗng và tail; không dùng count/hash xấp xỉ. CTE materialized giữ một nguồn so sánh trong transaction. Thêm/sửa/xóa ở đầu/giữa/cuối, qua ranh giới trang hoặc sau khóa cuối đều làm guard không khớp. Chưa khớp không ghi report/event/kho.
+- Chặn rõ nếu một summary vượt 512 KiB, tổng hai nguồn vượt **8 MiB**, hoặc quá **32 phần**; chưa lưu và không cắt bớt phiếu/lịch sử. Đây là giới hạn kỹ thuật để kiểm dung lượng/binding an toàn, không phải chứng nhận xử lý vô hạn. Decode sau kiểm budget tổng; không thay schema/migration, dữ liệu, phép tính hoặc quyền.
+
+Ca mới kiểm trang theo byte, cửa sổ khóa >1.000, floating JSON 1.0, Unicode, chỉ số import 10/11 đúng thứ tự, duplicate ID ưu tiên stored, scope rỗng/phantom, thay/xóa ở nhiều khoảng, cap và lưu thật/CAS race. Hồi quy rộng daily/preservation/notices **111/111** đạt trước bổ sung cap byte tổng; kiểm cuối trên source đã có cap **22/22** (scope/legacy-match/review/notices), TypeScript/build đạt. Có giao nhau, không cộng các tổng thành số ca khác nhau.
+
+HTTP smoke trên **Worker đã build** **1/1** đạt: password/session thật của tài khoản giả, assets và phân quyền Line; POST sản lượng +100 không có giờ/công đoạn, mức .2 đúng ngày, gửi lại cùng mã chỉ có một report mới và không external fetch. Đây là HTTP loopback, chưa browser QA.
+
+### Đo cuối cùng trên source có cap và giữ idempotency
+
+`ONSPA_TEST_MATCH_REPORT_COUNTS=0,100,1000,10000 node --test scripts/bench/daily-matched-scope.mjs`, Node v24.19.0/Miniflare, chạy riêng sau build/test, một mẫu/quy mô. Biến này chỉ dành cho script benchmark, không cấu hình runtime/policy. Default vẫn 0/100/1.000; tùy chọn lớn là hồi quy lỗi thật, không biến lỗi thành expected pass.
+
+| Phiếu cùng LSX | Đọc scope | Lưu +200 | SELECT/batch lưu | Retry cùng mã | SELECT/batch retry |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 16,92 ms | 104,40 ms | 9/1 | 22,11 ms | 2/0 |
+| 100 | 28,43 ms | 112,59 ms | 10/1 | 12,43 ms | 2/0 |
+| 1.000 | 83,97 ms | 205,65 ms | 11/1 | 18,08 ms | 2/0 |
+| 10.000 | 753,11 ms | 1.524,80 ms | 38/1 | 17,47 ms | 2/0 |
+
+Summary 10.000 phiếu là 6.868.891 byte; tổng đúng 10.000+200, legacy baseline vẫn 0, report mới chỉ một, retry cùng report ID/không batch ghi. **1/1** benchmark đạt, tổng 35,40 giây chủ yếu seed nằm ngoài khoảng đo đọc/lưu. Trước sửa 10.000 fail, sau sửa đã xử lý đúng; không dùng các mẫu nhỏ khác thời điểm để tuyên bố tăng tốc. Không HTTP/auth/browser/network/Google/Worker CPU/peak memory/p95 hoặc cam kết production hết quá tải. Không giảm số SELECT bằng cách bỏ kiểm consistency.
+
+Gói cbaa86d và a9bebf9 không có bản phân trang này. Sau push cần browser kiểm lại đúng head mới: lưu/tải lại/gửi lại, QLSX xác nhận, sửa/hủy và các lỗi stale; không lấy QA gói cũ thay nghiệm thu. Ba quyết định HR/Leadtime/kế hoạch nhiều mức vẫn giữ nguyên trạng thái chờ, không tự chốt. Không merge/deploy/ghi DB hoặc Sheet thật.

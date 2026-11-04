@@ -1,3 +1,4 @@
+import {readSummaryScope,summaryByteBudget} from './production-summary-scope.mjs';
 import {preservationManifestValid} from './production-legacy-preservation.mjs';
 import {normalized} from '../../lib/production-plan.mjs';
 import {recordRevision} from '../../lib/record-revision.mjs';
@@ -25,13 +26,14 @@ function reportSnapshotQueries(order){
  // silently miss a legacy quantity because SQLite NOCASE is ASCII-only.
  const complexOrder=[order.lsxCode,order.planId].some(value=>/[^ -~]|  /.test(String(value||'')));
  const args=[order.id,complexOrder?1:0,normalized(order.lsxCode),order.planGroupId?0:1,normalized(order.planId)];
- const stored=`SELECT coalesce(json_group_array(json(v)),'[]') AS payload FROM (SELECT ${summary('payload',"coalesce(nullif(json_extract(payload,'$.id'),''),record_key)")} AS v FROM app_records WHERE entity='production_report' AND ${matches('payload')} ORDER BY record_key)`;
- const history=`SELECT coalesce(json_group_array(json(v)),'[]') AS payload FROM (SELECT ${summary('h.value',"coalesce(nullif(json_extract(h.value,'$.id'),''),a.record_key||':'||h.key)")} AS v FROM app_records a,json_each(a.payload,'$.reports') h WHERE a.entity='production_history_import' AND ${matches('h.value')} ORDER BY a.record_key,h.key)`;
+ const stored=`SELECT record_key AS k1,0 AS k2,${summary('payload',"coalesce(nullif(json_extract(payload,'$.id'),''),record_key)")} AS v FROM app_records WHERE entity='production_report' AND ${matches('payload')}`;
+ const history=`SELECT a.record_key AS k1,h.key AS k2,${summary('h.value',"coalesce(nullif(json_extract(h.value,'$.id'),''),a.record_key||':'||h.key)")} AS v FROM app_records a,json_each(a.payload,'$.reports') h WHERE a.entity='production_history_import' AND ${matches('h.value')}`;
  return [{sql:stored,args},{sql:history,args}];
 }
 export async function readDailyOrderReports(db,order){
- const queries=reportSnapshotQueries(order),snapshots=await Promise.all(queries.map(q=>db.prepare(q.sql).bind(...q.args).first()));
- return {reports:[...new Map([...JSON.parse(snapshots[1].payload),...JSON.parse(snapshots[0].payload)].map(r=>[r.id,r])).values()],guards:queries.map((q,i)=>({sql:`((${q.sql})=?)`,args:[...q.args,snapshots[i].payload]}))};
+ const snapshots=await Promise.all(reportSnapshotQueries(order).map(q=>readSummaryScope(db,q)));
+ if(snapshots.reduce((n,s)=>n+s.pages,0)>32||snapshots.reduce((n,s)=>n+s.bytes,0)>summaryByteBudget)fail('Phạm vi phiếu vượt giới hạn đối chiếu an toàn; chưa lưu, cần chia phạm vi kiểm tra.',409);
+ return {reports:[...new Map([...snapshots[1].reports,...snapshots[0].reports].map(r=>[r.id,r])).values()],guards:snapshots.map(s=>s.guard)};
 }
 export async function writeDailyOutput(db,body,actor,commitEvents){
  if(['stageEntries','stage','stageName','backfill','employees','hours','count'].some(key=>body[key]!==undefined))fail('Phiếu sản lượng ngày chỉ nhận lệnh, ngày và số thành phẩm phát sinh; không nhận công đoạn hoặc giờ theo lệnh.');
@@ -45,14 +47,14 @@ export async function writeDailyOutput(db,body,actor,commitEvents){
  if(actor.line&&actor.line!==order.line)fail('Không có quyền báo sản lượng Line khác.',403);
  if(!activation.policy?.active)fail('Báo sản lượng ngày chưa được bật theo mốc triển khai đã duyệt.',409);
  if(body.expectedOrderRevision!==await recordRevision(orderRow.payload))fail('Lệnh đã thay đổi. Tải lại để đối chiếu trước khi ghi.',409);
- const queries=reportSnapshotQueries(order),[stored,history,rateRow]=await Promise.all([...queries.map(q=>db.prepare(q.sql).bind(...q.args).first()),db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(String(order.sku||'').trim().toUpperCase()).first()]);
- const reports=[...new Map([...JSON.parse(history.payload),...JSON.parse(stored.payload)].map(r=>[r.id,r])).values()],rate=rateRow?JSON.parse(rateRow.payload):null,now=new Date().toISOString();
+ const [context,rateRow]=await Promise.all([readDailyOrderReports(db,order),db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(String(order.sku||'').trim().toUpperCase()).first()]);
+ const reports=context.reports,rate=rateRow?JSON.parse(rateRow.payload):null,now=new Date().toISOString();
  if(typeof body.productionLocalDateTime!=='string')fail('Thiếu ngày giờ sản xuất (GMT+7).');
  const report=buildDailyOutput({order,reports,quantity:body.quantity,productionDate:body.productionDate,productionLocalDateTime:body.productionLocalDateTime,cutoverDate:activation.policy.effectiveFrom,today:dailyToday(),rateVersions:rate?.effectiveVersions||[],id:crypto.randomUUID(),actor:actor.login,recordedAt:now});
  report.sourceOrderRevision=body.expectedOrderRevision;
  const event={id:crypto.randomUUID(),kind:'daily-output',reportingModel:dailyOutputModel,quantityOnly:true,sourceId:order.id,line:order.line,planId:order.planId,lsxCode:order.lsxCode,sku:order.sku,reportId:report.id,quantity:report.reportedQuantity,productionDate:report.productionDate,productionLocalDateTime:report.productionLocalDateTime,productionAt:report.productionAt,effectiveAt:now,recordedAt:now,actor:actor.login,requestIdempotency:token,requestFingerprint:fingerprint};
  const rawGuard=(entity,key,raw)=>({sql:raw===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)":"EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)",args:raw===null?[entity,key]:[entity,key,raw]});
- const guards=[rawGuard('in_transit',order.id,orderRow.payload),rawGuard('production_reporting_policy','global',activation.raw),...(activation.manifestKey?[rawGuard('production_legacy_manifest',activation.manifestKey,activation.manifestRaw)]:[]),rawGuard('labor_hours',String(order.sku||'').trim().toUpperCase(),rateRow?.payload??null),...queries.map((q,i)=>({sql:`((${q.sql})=?)`,args:[...q.args,i===0?stored.payload:history.payload]}))];
+ const guards=[rawGuard('in_transit',order.id,orderRow.payload),rawGuard('production_reporting_policy','global',activation.raw),...(activation.manifestKey?[rawGuard('production_legacy_manifest',activation.manifestKey,activation.manifestRaw)]:[]),rawGuard('labor_hours',String(order.sku||'').trim().toUpperCase(),rateRow?.payload??null),...context.guards];
  await commitEvents(db,actor,now,[event],report,null,cursorRaw,[],guards);
  return {event:{...event,actorId:productionActorId(actor)},report:{...report,actorId:productionActorId(actor),reportedById:productionActorId(actor)}};
 }
