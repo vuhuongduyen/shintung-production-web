@@ -190,3 +190,30 @@ Benchmark có script tái lập `node --test scripts/bench/daily-matched-scope.m
 Đây là handler trực tiếp và DB local, không gồm HTTP/auth wrapper, mạng/Sheet, p95/CPU/peak memory hoặc trên 1.000 phiếu cùng LSX. Không suy ra production hết quá tải. Source vẫn chưa đủ phát hành: còn hoàn thiện publish/activation snapshot trong TEST, ngày hiệu lực toàn web, browser/Worker và đối soát Sheet thực tế.
 
 Kiểm cuối source bổ sung: **45/45** pending API/UI/Sheet/nhật ký đạt; có giao nhau với nhóm rộng 154, không cộng gộp. TypeScript/build cuối đạt; GS/TXT byte-equal và diff whitespace sạch. CI đúng head mới sẽ ghi riêng sau push. Không có browser/Sheet thật được chạy.
+
+## Chốt snapshot theo lô và mô phỏng kích hoạt TEST
+
+Source mới bổ sung helper **nội bộ** `production-legacy-publication.mjs`; không HTTP route, nút Admin bật production, migration hoặc tự chạy trên menu. Chỉ chốt các anchor của báo công/payroll đã quan sát, **không phải backup đầy đủ hoặc chứng nhận ngày hiệu lực toàn web**.
+
+1. Tính package một lần trên source đã đóng băng, đúng build và capturedAt. Kế hoạch giữ hash/tổng từng nhóm và từng lô; không cho trùng khóa, bỏ lô hoặc đổi nội dung.
+2. Ghi tuần tự tối đa **8 anchor / 128 KiB mỗi lô** trong một batch atomic, kèm bản kiểm chứng byte-exact; cập nhật tiến độ cùng batch. Runtime chưa dùng mốc staging. Mất phản hồi thử lại đúng lô, không ghi đè anchor khác. Metadata giới hạn 256 KiB/2.048 lô; vượt giới hạn báo cần kế hoạch phân trang, không bỏ dữ liệu.
+3. Hoàn tất chỉ đổi manifest thành complete trong cùng hàng rào SQL kiểm **nguồn live không đổi**, đủ số anchor và mọi payload còn khớp bản kiểm chứng. Phantom, sửa nguồn, thiếu/thêm/sửa anchor hoặc batch lỗi không có complete giả; không sửa bản ghi nguồn.
+4. Kích hoạt mô phỏng chỉ nằm trong `tests/helpers/activate-prepared-daily-policy.mjs`, không import từ runtime; cần simulation=true và marker DB fixture cô lập. Driver kiểm lại source/anchor ngay trong batch, ghi mốc chuyển đổi cố định và policy cùng nhau, đúng ngày TEST đã chọn. Lượt cũ replay không bật lại một policy bị thay đổi, không ghi đè mốc khác.
+5. Runtime đọc policy và mốc cố định trong **một SELECT với hai lookup khóa**, không tăng round-trip. Khi đã có mốc mà policy bị xóa/tắt/trỏ mốc khác, fail closed trước khi tính/ghi legacy; không âm thầm quay lại mô hình cũ. Đây là guard dữ liệu, không thay grant/tài khoản.
+
+Kiểm riêng **10/10** publication/TEST activation: quyền/build, partial/out-of-order, retry, rollback cả batch, thay/phát sinh nguồn ngay trước final batch, thiếu/thêm/sửa anchor, kiểm lại trước activation, không policy tự bật, policy bị xóa không mở lại legacy. Authenticated Worker handler trên DB Miniflare đọc đúng anchor; đổi mức hiện tại 0,1→9 và tên/Line nhân viên không đổi basis, giờ, baseline tháng hoặc raw report đã lưu. Không gọi đó là bằng chứng 0,1 là mức thực tế của quá khứ. Nhóm rộng **38/38** gồm pending/legacy/policy/attendance (có giao nhau với các nhóm trước), TypeScript/build mốc này đạt; kiểm enum lỗi kết nối cuối và source cuối ghi riêng.
+
+Benchmark cold chuẩn bị/chốt có script tái lập `node --test scripts/bench/legacy-publication.mjs`, một mẫu/quy mô, DB mới hoàn toàn giả:
+
+| LSX/phiếu legacy | Anchor / lô | Copy source | Tính kế hoạch | Ghi toàn bộ lô | Final / kích hoạt TEST |
+| --- | --- | --- | --- | --- | --- |
+| 50 | 101 / 13 | 33,89 ms | 302,26 ms | 1.024,20 ms | 17,01 / 27,80 ms |
+| 500 | 1.001 / 126 | 43,08 ms | 955,01 ms | 10.054,13 ms | 31,75 / 42,49 ms |
+
+Mỗi lô chỉ một SELECT manifest và một batch ghi, không tải/tính lại workflow theo từng lô. Khoảng 10 giây là tổng 126 lượt ở Node/Miniflare, **không phải thời gian một request lưu sản lượng**, không đo Worker CPU, peak memory, p95, HTTP/Google hoặc quy mô lớn hơn. Khởi tạo vẫn phải tính một lần toàn nguồn, chưa chứng minh an toàn tài nguyên production. Cần adapter build riêng và kế hoạch phát hành được nghiệm thu; không dùng driver TEST làm đường kích hoạt thật.
+
+CI f83ea23 [41834282113](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41834282113) kết thúc failure vì runner shard1 nhận shutdown/exit143, không có CI SUMMARY; chưa xác định nguyên nhân shutdown. Hai shard đủ summary 529/529 và 687/687; shard bị ngắt có 345/345 trong 63 file đã đủ summary. Tổng 1.561 pass/248 file đủ summary, 1 file dở, 29 file chưa bắt đầu; không coi CI đạt. File dở production-plan-notices có một subtest ok trước ngắt, chạy riêng local đủ **4/4 và thoát bình thường**. Không sửa/bỏ assertion hoặc manual rerun giống hệt; checkpoint source mới có lý do kiểm toàn bộ gồm publication và immutable-cutover guard.
+
+Lỗi trạng thái kết nối Kho tắt được trả 409 (đã biết chưa ghi) thay vì 503 để client không khóa bản nháp thành kết quả chưa rõ; timeout/5xx/non-JSON thật vẫn giữ nonce và đối chiếu lượt cũ.
+
+Kiểm source cuối publication: nhóm targeted **30/30** đạt; TypeScript/build đạt. Đo lại lưu sản lượng cùng script sau marker lookup gộp: 0/100/1.000 phiếu cùng LSX, đọc 16,90/30,65/69,55 ms, lưu tăng 200 là 122,06/180,09/203,00 ms; 9 SELECT, một batch, baseline 0 và tổng cũ+200 đúng. Một mẫu/quy mô local, không phải before/after hoặc cam kết latency. CI commit mới phải kiểm riêng.

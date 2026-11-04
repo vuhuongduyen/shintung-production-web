@@ -4,6 +4,6 @@ Báo sản lượng thành phẩm theo ngày đang ở nhánh phát triển riê
 
 Luồng mới được khóa mặc định nếu chưa có policy/mốc triển khai được duyệt. Lịch sử/công thức phụ kho và chia tiền cũ được giữ; chưa tuyên bố hoàn tất bảo toàn ngày hiệu lực toàn web. Không coi persisted synthetic TEST hoặc mounted JSDOM là đã nghiệm thu trình duyệt/production.
 
-Source đã có luồng sửa/hủy trước Kho nhận và thu hồi sau Kho nhận, kèm queue/CAS/ACK và giữ lịch sử. Trước nhận cần phiếu gốc đã xuất và kết nối Kho đang hoạt động; chưa kiểm Google Sheets/browser thật hoặc triển khai script/công thức. Publish/activation snapshot và ngày hiệu lực toàn web vẫn đang hoàn thiện, không coi CI xanh là sẵn sàng phát hành.
+Source đã có luồng sửa/hủy trước Kho nhận và thu hồi sau Kho nhận, kèm queue/CAS/ACK và giữ lịch sử. Trước nhận cần phiếu gốc đã xuất và kết nối Kho đang hoạt động; chưa kiểm Google Sheets/browser thật hoặc triển khai script/công thức. Đã có helper chốt snapshot theo lô và driver kích hoạt chỉ trong TEST, giữ mốc để policy lỗi không mở lại legacy. Chưa có adapter kích hoạt production; ngày hiệu lực toàn web và QA thật vẫn đang hoàn thiện. Không coi CI xanh là sẵn sàng phát hành.
 
 Các chức năng không thuộc thay đổi này chưa được tái đánh giá toàn diện trong tài liệu này.

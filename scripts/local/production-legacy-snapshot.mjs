@@ -31,8 +31,7 @@ export async function captureLegacySource(db,{snapshotId,cutoverDate},actor,{sou
 export async function legacySourceStillMatches(db,snapshotId,actor,{sourceId}={}){
  access(actor);sourceIdentity(sourceId);identity(snapshotId);const row=await manifestRow(db,snapshotId);if(!row)fail('Không tìm thấy source snapshot.',404);const manifest=JSON.parse(row.payload);
  if(manifest.captureModel!=='observed-source-records-v1'||manifest.sourceId!==sourceId)fail('Source build đã đổi hoặc không đúng dạng snapshot. Chuẩn bị snapshot mới.');
- const frozen=relation(snapshotId);
- const result=await db.prepare(`SELECT ((SELECT count(*) FROM app_records WHERE entity IN (SELECT value FROM json_each(?)))=?) AND NOT EXISTS(SELECT 1 FROM ${frozen} frozen LEFT JOIN app_records live ON live.entity=frozen.entity AND live.record_key=frozen.record_key WHERE live.payload IS NULL OR live.payload IS NOT frozen.payload OR live.updated_by IS NOT frozen.updated_by OR live.updated_at IS NOT frozen.updated_at) AS unchanged`).bind(JSON.stringify(manifest.sources),manifest.sourceCount).first();return result.unchanged===1;
+ const condition=legacySourceCondition(snapshotId,manifest),result=await db.prepare(`SELECT ${condition.sql} AS unchanged`).bind(...condition.args).first();return result.unchanged===1;
 }
 export async function previewLegacyPreservation(db,{snapshotId},actor,{sourceId}={}){
  access(actor);sourceIdentity(sourceId);const row=await manifestRow(db,snapshotId);if(!row)fail('Không tìm thấy source snapshot.',404);const manifest=JSON.parse(row.payload);identity(snapshotId);
@@ -43,3 +42,6 @@ export async function previewLegacyPreservation(db,{snapshotId},actor,{sourceId}
  const proposed=await captureLegacyPreservation({workflow,standards,snapshotId,observedAt:manifest.capturedAt,cutoverDate:manifest.cutoverDate,rawReports,rawOrders});
  return {...proposed,manifest:{...proposed.manifest,status:'preview',captureModel:manifest.captureModel,sourceId,sourceCount:manifest.sourceCount},sourceStillMatches:await legacySourceStillMatches(db,snapshotId,actor,{sourceId})};
 }
+
+// Trusted manifest only; reusable inside the final atomic publication/TEST activation fence.
+export function legacySourceCondition(snapshotId,manifest){const frozen=relation(snapshotId);return {sql:`(((SELECT count(*) FROM app_records WHERE entity IN (SELECT value FROM json_each(?))))=?) AND NOT EXISTS(SELECT 1 FROM ${frozen} frozen LEFT JOIN app_records live ON live.entity=frozen.entity AND live.record_key=frozen.record_key WHERE live.payload IS NULL OR live.payload IS NOT frozen.payload OR live.updated_by IS NOT frozen.updated_by OR live.updated_at IS NOT frozen.updated_at)`,args:[JSON.stringify(manifest.sources),manifest.sourceCount]};}

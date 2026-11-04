@@ -24,7 +24,7 @@ export async function queuePendingDailyCorrection(db,body,actor){
  if(collision)fail('Mã thao tác đã dùng cho nội dung khác.');const report=reportRow?JSON.parse(reportRow.payload):null;
  if(!isDailyOutput(report)||report.cancelled||report.voided||report.reviewStatus!=='Đã xác nhận')fail('Cần phiếu ngày đã QLSX xác nhận còn hiệu lực.');
  if(actor.line&&actor.line!==report.line)fail('Không có quyền Line khác.',403);if(!policy.policy?.active)fail('Mốc báo sản lượng chưa đủ điều kiện.');
- if(sheet?.enabled!==1||!sheet.spreadsheetId)fail('Kết nối Kho chưa hoạt động; chưa ghi yêu cầu sửa/hủy.',503);
+ if(sheet?.enabled!==1||!sheet.spreadsheetId)fail('Kết nối Kho chưa hoạt động; chưa ghi yêu cầu sửa/hủy.',409);
  if(report.pendingCorrection?.status==='pending')fail('Phiếu đang chờ đồng bộ điều chỉnh; đối chiếu lượt cũ trước.');
  const receipts=(await db.prepare("SELECT record_key,payload FROM app_records WHERE entity='warehouse_in' AND (coalesce(json_extract(payload,'$.sourceReportId'),json_extract(payload,'$.reportId'))=? OR record_key=?)").bind(report.id,`SX:${report.id}`).all()).results;
  if(receipts.length!==1)fail('Cần đúng một phiếu Kho nguồn để đối chiếu.');const receiptRow=receipts[0],receipt=JSON.parse(receiptRow.payload);
