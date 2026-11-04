@@ -232,3 +232,22 @@ Kiểm local nhóm tổng hợp **44/44** (pending/withdrawal/legacy publication
 Phép đo trong test thu hồi, một mẫu/quy mô Miniflare, 0/1.000 report không liên quan: preview+lưu request 121,78/114,14 ms, 14 SELECT/1 batch; preview+quyết định 121,85/118,53 ms, 13 SELECT/1 batch; ACK 78,01/78,10 ms, 7 SELECT/1 batch. Đây không phải CPU/heap/p95/HTTP/Google và không chứng minh production hết quá tải.
 
 Vẫn chặn phát hành vì chưa có browser/Google Sheets thật, adapter kích hoạt production, bảo vệ tháng đóng sau cutover và ngày hiệu lực toàn web. Đang rà lại việc tính legacy trên full GET; chưa bỏ phép tính nào chỉ dựa trên suy đoán. Không merge, deploy, bật policy hoặc ghi DB/Sheet thật.
+
+## Rà Safety theo ngày và phần ngày hiệu lực còn lại
+
+Tái hiện trực tiếp hàm dùng trong `app/page.tsx`: xác nhận phiên bản mới tự chuyển bản trước sang `Hết hiệu lực`, giữ `confirmedAt` và khoảng ngày cũ; lookup cũ bỏ trạng thái đó nên cùng ngày lịch sử trả `undefined` thay vì V1. Test trước sửa **1 fail / 1 pass**. Sửa hẹp cho phép phiên bản hết hiệu lực có thời điểm xác nhận hợp lệ tham gia đúng khoảng ngày đã lưu; hủy, xóa, nháp hoặc thiếu/sai căn cứ vẫn bị loại. Giữ nguyên quy tắc biên ngày inclusive của Safety hiện có: tại ngày hai bản cùng biên, bản có ngày bắt đầu mới hơn thắng. Không chuyển Safety sang semantics định mức lao động khác, không sửa `effectiveTo`, không tính lại hoặc ghi Engine/Plan cũ.
+
+Nhóm Safety/basic master/planning import/hiển thị GMT+7 **16/16** đạt; kiểm riêng cuối Safety **2/2**, có giao nhau. Dữ liệu giả, VM chạy hàm lookup thật từ source, không phải browser QA. Phần hiệu lực này không khôi phục lịch sử đã thiếu và không chứng nhận toàn Engine/BOM.
+
+Rà chỉ đọc còn cho thấy:
+
+- `production-plan.mjs` giữ laborHour của dòng đã chốt/đã chuyển, còn draft dùng master hiện tại. Plan kéo dài nhiều ngày dùng một laborHour trên dòng; chưa có phân bổ lượng từng ngày để áp hai mức xuyên biên. Không tự tạo bình quân hoặc chia lượng; cần kiểm thiết kế phân bổ trước khi triển khai phần này.
+- Engine đã có lookup Leadtime/Safety theo tuần và lưu kết quả; không replay snapshot cũ để thay bằng kết quả lookup mới. BOM có confirmationSnapshot/phiếu thay đổi nhưng live projection nguồn được thiết kế riêng, chưa đủ căn cứ đổi toàn bộ sang raw snapshot.
+- Anchor attendance hiện bảo vệ tháng trước tháng cutover. Tháng chứa cutover và các tháng mới vẫn cần bảo vệ phần dữ liệu cũ mà không chặn HR bổ sung hợp lệ hay khóa cứng cả tháng; chưa tìm được hợp đồng chốt tháng trong component payroll. Đây là phần còn làm, không gọi mọi tháng đã bất biến.
+- Full GET lịch sử còn tính một số cumulative event hours trước khi phủ presentation đã chốt. Work profile đã bỏ derived report hours; chưa loại phép tính sự kiện khi chưa chứng minh dữ liệu hiển thị tương đương. Không dùng việc tắt tính để tạo số đo đẹp.
+
+Probe pure synthetic cho tháng chứa cutover đã xác nhận khoảng trống: cutover 04/11, ca 03/11 có 7 giờ 40 phút, capture không sinh monthly baseline tháng 11. Đổi `employee.startDate` hiện tại sang 01/12 khiến monthlyAttendance tháng 11 mất người đó (7,6667 giờ → không còn người, không báo issue). Không có DB thật được mở hay sửa. Phải bổ sung bảo vệ prefix trước mốc chuyển đổi cùng kiểm luồng HR bổ sung/sửa có audit, không dùng cách đóng băng cả tháng làm mất dữ liệu mới. Đây là lỗi bảo toàn chưa giải quyết, chặn nghiệm thu, không chỉ là câu hỏi chốt tháng.
+
+Điểm cần chốt nếu phát sinh điều chỉnh HR về trước cutover: giữ kết quả đã bảo toàn và lập phiên bản điều chỉnh được duyệt riêng, hay cho người có quyền sửa lại kết quả cũ qua chính luồng HR hiện tại? Cả hai đều phải giữ bản gốc/audit; chưa tự khóa quyền HR hoặc âm thầm bỏ qua một sửa đổi đã lưu. Việc bảo vệ khỏi thay master hiện tại là yêu cầu đã chốt, không hỏi lại.
+
+CI nhóm kho `3b975110ff5386d975428ee796a6f5ef1b847124`, run [41845095269](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41845095269), đã đạt **1.704/1.704 trong 279 file** (587 + 451 + 666), không fail/cancel/skip/todo, không file thiếu summary. TypeScript và ba build đạt. Source Safety tiếp theo phải kiểm CI riêng; không gán mốc 1.704 cho source chưa push.

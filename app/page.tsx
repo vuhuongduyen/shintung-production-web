@@ -1074,9 +1074,9 @@ const activeSafetyRuleFor = (weekStart: string, rules = safetyRuleSets) =>
     .filter(
       (rule) =>
         !rule._deleted &&
-        ["Đã xác nhận", "Đang áp dụng", "Sắp có hiệu lực"].includes(
+        (["Đã xác nhận", "Đang áp dụng", "Sắp có hiệu lực"].includes(
           rule.status,
-        ) &&
+        ) || (rule.status === "Hết hiệu lực" && !!rule.confirmedAt && Number.isFinite(Date.parse(rule.confirmedAt)))) &&
         rule.effectiveFrom <= weekStart &&
         (!rule.effectiveTo || rule.effectiveTo >= weekStart),
     )
