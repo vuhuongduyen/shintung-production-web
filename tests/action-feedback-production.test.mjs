@@ -33,7 +33,7 @@ beforeEach(()=>{
 });
 afterEach(()=>{assert.deepEqual(mutations,[]);assert.deepEqual(unexpected,[]);});
 after(async()=>{globalThis.fetch=originalFetch;for(const c of channels)c.close();globalThis.BroadcastChannel=OriginalBroadcastChannel;await vite.close();dom.window.close();});
-async function mount(component){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(el(React.Fragment,null,component,el(ActionFeedbackHost))));return{host,async close(){await act(async()=>root.unmount());host.remove();}};}
+async function mount(component){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const render=component=>act(async()=>root.render(el(React.Fragment,null,component,el(ActionFeedbackHost))));await render(component);return{host,render,async close(){await act(async()=>root.unmount());host.remove();}};}
 const toolbar=host=>host.querySelector('[data-standard-toolbar]');
 const button=(host,label)=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===label);
 const body=host=>[...host.querySelectorAll('tbody')].filter(b=>!b.closest('[hidden]')).map(b=>b.textContent).join('\n');
@@ -48,6 +48,61 @@ test('work board defers full history until explicit detail request and does not 
   assert.deepEqual(requests,['/api/production-workflow?view=work']);
   await click(button(view.host,'Phân công'));
   assert.deepEqual(requests,['/api/production-workflow?view=work','/api/production-workflow']);
+ }finally{await view.close();}
+});
+test('work detail never presents a partial work snapshot while full history is pending',async()=>{
+ const ordinary=globalThis.fetch;let resolveFull;const full=new Promise(resolve=>resolveFull=resolve);
+ globalThis.fetch=async(input,init)=>String(input)==='/api/production-workflow'?full:ordinary(input,init);
+ const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
+  await click(button(view.host,'LSX-ALPHA'));
+  const dialog=view.host.querySelector('[aria-label="Chi tiết dữ liệu sản xuất"]');assert.ok(dialog);
+  assert.match(dialog.querySelector('[role=status]')?.textContent||'',/Đang tải đầy đủ chi tiết/);
+  assert.doesNotMatch(dialog.textContent,/Nhật ký và báo công LSX|Thông tin lệnh sản xuất/);
+ }finally{await view.close();await act(async()=>resolveFull(Response.json({orders,reports:[],events:[],employees,actualSchedules:[],approvedSchedules:[],rights:{manager:true,line:null}})));}
+});
+const fullDetailData=()=>({orders:orders.map(o=>({...o,name:'FULL-'+o.lsxCode})),reports:[],events:[{id:'HIDDEN-VOIDED',sourceId:'order-ALPHA',kind:'SYNTHETIC-VOIDED',voided:true,effectiveAt:'2026-10-12T01:00:00Z'},{id:'HIDDEN-HISTORY',sourceId:'order-ALPHA',kind:'SYNTHETIC-HISTORY',historicalImport:true,effectiveAt:'2026-10-12T01:00:00Z'}],employees,actualSchedules:[],approvedSchedules:[],rights:{manager:true,line:null}});
+test('full-detail overload is local to dialog, retains the board, and explicit retry renders full data only',async()=>{
+ const ordinary=globalThis.fetch;let calls=0;
+ globalThis.fetch=async(input,init)=>{if(String(input)!=='/api/production-workflow')return ordinary(input,init);calls++;return calls===1?Response.json({error:'SYNTHETIC full overload'},{status:503}):Response.json(fullDetailData());};
+ const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
+  await click(button(view.host,'LSX-ALPHA'));let dialog=view.host.querySelector('[aria-label="Chi tiết dữ liệu sản xuất"]');
+  assert.match(dialog.querySelector('[role=alert]').textContent,/SYNTHETIC full overload/);assert.doesNotMatch(dialog.textContent,/Thông tin lệnh sản xuất|FULL-LSX/);assert.match(body(view.host),/Product ALPHA/);assert.equal(calls,1);
+  await click(button(dialog,'Thử tải lại chi tiết'));dialog=view.host.querySelector('[aria-label="Chi tiết dữ liệu sản xuất"]');assert.match(dialog.textContent,/FULL-LSX-ALPHA/);assert.equal(dialog.querySelector('[role=alert]'),null);assert.equal(calls,2);assert.doesNotMatch(dialog.textContent,/SYNTHETIC-VOIDED|SYNTHETIC-HISTORY/,'live order journal retains its existing voided/imported filtering');
+  assert.match(body(view.host),/Product ALPHA/);assert.doesNotMatch(body(view.host),/FULL-LSX/,'detail response must not replace work board');
+ }finally{await view.close();}
+});
+test('closing a pending detail ignores the late full response and never reopens or replaces work data',async()=>{
+ const ordinary=globalThis.fetch;let resolveFull;const full=new Promise(resolve=>resolveFull=resolve);
+ globalThis.fetch=async(input,init)=>String(input)==='/api/production-workflow'?full:ordinary(input,init);
+ const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
+  await click(button(view.host,'LSX-ALPHA'));await click(view.host.querySelector('.production-detail-modal header button'));assert.equal(view.host.querySelector('.production-detail-modal'),null);
+  await act(async()=>resolveFull(Response.json(fullDetailData())));assert.equal(view.host.querySelector('.production-detail-modal'),null);assert.match(body(view.host),/Product ALPHA/);assert.doesNotMatch(body(view.host),/FULL-LSX/);
+ }finally{await view.close();}
+});
+test('inactive workspace hides/cancels detail consumption; returning requests fresh full data without a work/full waterfall',async()=>{
+ const ordinary=globalThis.fetch;let calls=0,resolveFull;const full=new Promise(resolve=>resolveFull=resolve);
+ globalThis.fetch=async(input,init)=>{if(String(input)!=='/api/production-workflow')return ordinary(input,init);calls++;return calls===1?full:Response.json(fullDetailData());};
+ const component=active=>el(sync.WorkspaceActivityContext.Provider,{value:active},el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));
+ const view=await mount(component(true));try{
+  await click(button(view.host,'LSX-ALPHA'));await view.render(component(false));assert.equal(view.host.querySelector('.production-detail-modal'),null);
+  await act(async()=>resolveFull(Response.json(fullDetailData())));assert.equal(view.host.querySelector('.production-detail-modal'),null);assert.equal(calls,1);
+  await view.render(component(true));assert.match(view.host.querySelector('.production-detail-modal').textContent,/FULL-LSX-ALPHA/);assert.equal(calls,2);assert.deepEqual(requests,['/api/production-workflow?view=work']);
+ }finally{await view.close();}
+});
+test('detail refresh keeps only previously loaded full data on overload, discards it on auth denial, and never refetches held work',async()=>{
+ const ordinary=globalThis.fetch;let calls=0,resolveRefresh;const refresh=new Promise(resolve=>resolveRefresh=resolve);
+ globalThis.fetch=async(input,init)=>{if(String(input)!=='/api/production-workflow')return ordinary(input,init);calls++;return calls===1?Response.json(fullDetailData()):calls===2?refresh:Response.json({error:'SYNTHETIC authorization denied'},{status:403});};
+ const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
+  await click(button(view.host,'LSX-ALPHA'));const dialog=()=>view.host.querySelector('.production-detail-modal');assert.match(dialog().textContent,/FULL-LSX-ALPHA/);
+  await act(async()=>sync.announceDataChange('production_workflow'));assert.match(dialog().textContent,/FULL-LSX-ALPHA/);assert.equal(calls,2);assert.deepEqual(requests,['/api/production-workflow?view=work']);
+  await act(async()=>resolveRefresh(Response.json({error:'SYNTHETIC refresh overload'},{status:503})));assert.match(dialog().querySelector('[role=alert]').textContent,/Đang hiển thị chi tiết đầy đủ của lần tải trước/);assert.match(dialog().textContent,/FULL-LSX-ALPHA/);
+  await act(async()=>sync.announceDataChange('production_workflow'));assert.match(dialog().querySelector('[role=alert]').textContent,/authorization denied/);assert.doesNotMatch(dialog().textContent,/FULL-LSX|Thông tin lệnh sản xuất/);assert.equal(calls,3);assert.deepEqual(requests,['/api/production-workflow?view=work']);
+ }finally{await view.close();}
+});
+test('a record missing from the full response never falls back to the selected work record',async()=>{
+ const ordinary=globalThis.fetch;globalThis.fetch=async(input,init)=>String(input)==='/api/production-workflow'?Response.json({...fullDetailData(),orders:[]}):ordinary(input,init);
+ const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
+  await click(button(view.host,'LSX-ALPHA'));const dialog=view.host.querySelector('.production-detail-modal');assert.match(dialog.querySelector('[role=alert]').textContent,/Bản ghi không còn/);assert.doesNotMatch(dialog.textContent,/Product ALPHA|FULL-LSX|Thông tin lệnh sản xuất/);
  }finally{await view.close();}
 });
 for(const method of ['click','enter']){
