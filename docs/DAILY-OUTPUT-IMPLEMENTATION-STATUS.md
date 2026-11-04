@@ -134,3 +134,23 @@ Bổ sung hồi quy điều chỉnh: preview phải ràng buộc cả nội dung
 Giới hạn chặn nghiệm thu vẫn còn: sửa/hủy trực tiếp khi Kho chưa xác nhận chưa hoàn thiện; UI yêu cầu/theo dõi thu hồi chưa nối đủ; công thức Sheet thực tế cần kế hoạch triển khai/đối soát riêng; chưa QA browser đúng Worker, chưa benchmark riêng luồng thu hồi hoặc recalculate Google Sheets. Snapshot mới chỉ captured/preview, chưa publish/activation; ngày hiệu lực toàn web và bảo vệ tháng đóng sau cutover chưa hoàn tất. Không merge/triển khai từ checkpoint này.
 
 Kiểm local checkpoint thu hồi: nhóm rộng **80/80**; nhóm thu hồi cuối **15/15** (có giao nhau, thêm race insert giữa batch), nhóm Nhật ký **6/6**; không fail/cancel/skip. Replay bridge chỉ cho phép metadata kết nối `lastContactAt` cập nhật, mọi bản ghi nghiệp vụ/audit cũ vẫn bất biến. TypeScript/build đạt trước bổ sung nhãn Nhật ký thuần; test Nhật ký chạy sau thay đổi nhãn. CI commit mới cần đọc riêng, không lấy 1.626 test của cda5889 làm kết quả source mới.
+
+
+### CI 975f5fe và giao diện yêu cầu thu hồi
+
+CI [41825813749](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41825813749) đúng `975f5fe856ea3e22697af6cb145cd0019ec17ec7` hoàn tất: TypeScript, ba build, **1.659/1.659 test, 275 file**, 0 fail/cancel/skip/timeout, đủ summary. Ba shard lần lượt 578/450/631 test. Đây là checkpoint backend/Sheet trước giao diện bổ sung dưới đây.
+
+Giao diện Điều chỉnh phiếu ngày đã xác nhận có thao tác **Yêu cầu thu hồi**, chỉ nhập lý do và xem đối chiếu số/người/thời điểm Kho đã nhận từ máy chủ. Không gửi quantity/day/time để sửa ngầm. Preview không ghi; xác nhận chỉ báo đã gửi yêu cầu, không báo đã đảo kho. Lỗi 503/non-JSON giữ nguyên lý do và mã thao tác, đối chiếu bằng đúng body cũ. Trạng thái pending/approved-awaiting-sheet lấy từ nhật ký đã được phân quyền và tải sẵn, không gọi N request theo từng dòng; khóa yêu cầu thứ hai, hiển thị rõ chờ đối soát. Kho chưa nhận vẫn bị backend trả hướng dẫn sửa/hủy trực tiếp, **luồng sửa/hủy này chưa xong**, không được xem giao diện yêu cầu là thay thế.
+
+Mounted/pure UI **7/7**: không quyền, chờ kho, preview bắt buộc, không tự sửa lượng, retry sau overload, trạng thái lịch sử bất biến/thứ tự đảo, chặn yêu cầu lặp. Đây là JSDOM, chưa kiểm hình ảnh/focus thật desktop/mobile. TypeScript/build của phần UI đạt.
+
+Phép kiểm hot path thu hồi bằng Miniflare local, Node24, dữ liệu giả, **một mẫu cho mỗi quy mô**, không chạy production:
+
+| Phiếu không liên quan | Yêu cầu preview+apply | Kho quyết định preview+apply | ACK hoàn tất |
+| --- | --- | --- | --- |
+| 0 | 180,71 ms; 14 SELECT | 129,15 ms; 13 SELECT | 94,15 ms; 7 SELECT |
+| 1.000 | 167,90 ms; 14 SELECT | 147,60 ms; 13 SELECT | 164,95 ms; 7 SELECT |
+
+Mỗi ô có đúng một batch ghi atomic. Test bảo vệ số lượt đọc không tăng, không tải toàn workforce/nhân viên/all events và các phiếu không liên quan còn nguyên; không khẳng định SQLite không quét index/CPU tăng, không suy ra p95 hoặc thông lượng. Không có baseline luồng thu hồi trước vì đó là chức năng mới; không đo Apps Script/Sheet, mạng người dùng, peak memory hay nhiều phiếu cùng LSX. Thời gian mẫu trong CI có thể khác; không dùng latency làm assertion.
+
+Nhóm kết hợp cuối UI/backend/điều chỉnh: **29/29**, không fail/cancel/skip; thêm một mẫu hiệu năng lặp cho mục đích hồi quy count, không dùng để khẳng định cải thiện latency. CI đúng commit UI phải kiểm riêng sau push.
