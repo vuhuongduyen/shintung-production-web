@@ -9,3 +9,5 @@ Source đã có luồng sửa/hủy trước Kho nhận và thu hồi sau Kho nh
 Các chức năng không thuộc thay đổi này chưa được tái đánh giá toàn diện trong tài liệu này.
 
 Checkpoint publication `2c4ecf8` đã đạt CI 1.699/1.699 (279 file). Source bổ sung tiếp hàng rào phiếu kho quản lý bởi sản lượng ngày: không sửa vòng qua API chung, thu hồi/ACK đúng Sheet gốc, loại phiếu chờ đối soát khỏi xác nhận và bỏ preview stale. Snapshot công đoạn legacy đã được kiểm khi danh mục SKU đổi. Kiểm local và CI của từng checkpoint được tách trong tài liệu triển khai; chưa nghiệm thu browser/Sheet thật, chưa đủ phát hành.
+
+Checkpoint `6a84ffd` đạt CI 1.708/1.708 (281 file). Nhóm đang bổ sung giữ giờ trước ngày cutover ngay trong tháng đó, còn phần sau mốc tiếp tục cập nhật; có đối chiếu HR/lịch và chặn tiền khi sửa ngược cần quyết định, không khóa quyền lưu HR. Ngưng làm việc có ngày rõ sau mốc vẫn dùng công thức hiện có. Mốc cũ thiếu capability tháng cutover không đủ bật policy mới. Đây không phải cơ chế tự chốt mọi tháng hoặc xác nhận toàn web đã có ngày hiệu lực đầy đủ; xem kết quả từng checkpoint và các giới hạn trong tài liệu triển khai.

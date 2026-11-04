@@ -19,7 +19,7 @@ export async function captureLegacySource(db,{snapshotId,cutoverDate},actor,{sou
  const existing=await manifestRow(db,snapshotId);
  if(existing){const saved=JSON.parse(existing.payload);if(saved.captureModel!=='observed-source-records-v1'||saved.createdBy!==actor.login||saved.cutoverDate!==cutoverDate||saved.sourceId!==sourceId)fail('Định danh snapshot đã có nội dung/người chuẩn bị khác.');return {...saved,replayed:true};}
  if((await db.prepare("SELECT count(*) AS n FROM app_records WHERE entity=? AND record_key>=? AND record_key<?").bind(entity,prefix,prefix+'\uffff').first()).n)fail('Có source snapshot chưa được đối chiếu; không ghi đè hoặc xóa.');
- const now=new Date().toISOString(),manifest={id:snapshotId,kind:'observed-production-baseline-v1',captureModel:'observed-source-records-v1',sourceId,cutoverDate,capturedAt:now,observedAt:now,createdBy:actor.login,status:'captured',sources:legacySnapshotSources,scope:{earned:false,reportPresentation:false,monthlyAttendance:false,orderMetadata:false}};
+ const now=new Date().toISOString(),manifest={id:snapshotId,kind:'observed-production-baseline-v1',captureModel:'observed-source-records-v1',sourceId,cutoverDate,capturedAt:now,observedAt:now,createdBy:actor.login,status:'captured',sources:legacySnapshotSources,scope:{earned:false,reportPresentation:false,monthlyAttendance:false,orderMetadata:false,cutoverMonthAttendance:false}};
  // One atomic batch: all sources are copied before any live edit can interleave.
  // Payload and original metadata remain byte-exact; JSON is only used for the key.
  await db.batch([

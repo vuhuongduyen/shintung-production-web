@@ -1,4 +1,5 @@
 import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
+import {attendancePrefixModel,checkAttendancePrefix} from '../../lib/production-attendance-prefix.mjs';
 import {productionHistoryOrder} from '../../lib/production-history-order.mjs';
 import {attachLegacyEarnedBasis} from '../../lib/production-legacy-earned-basis.mjs';
 import {normalizeTransit} from '../../lib/in-transit.mjs';
@@ -317,7 +318,8 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   const historyEvents=reviewReportId?[]:historical.filter(r=>!r.sourceVerified&&!r.cancelled&&!r.voided).flatMap(r=>[...(!historical.some(p=>p.transitId===r.transitId&&p.completedAt<r.completedAt)?[{id:r.id+':start',kind:'start',effectiveAt:r.actualStartedAt||r.startedAt}]:[]),...(r.pauses||[]).flatMap((p,i)=>[{id:r.id+':pause:'+i,kind:'pause',effectiveAt:p[0]},{id:r.id+':resume:'+i,kind:'resume',effectiveAt:p[1]}]),{id:r.id+':complete',kind:'complete',effectiveAt:r.completedAt,quantity:r.reportedQuantity,reportId:r.id,cumulativeLaborHours:historical.filter(p=>p.transitId===r.transitId&&p.completedAt<=r.completedAt).reduce((s,p)=>s+Number(p.hours?.total||0),0)}].map(e=>({...e,sourceId:r.transitId,planId:r.planId,lsxCode:r.lsxCode,sku:r.sku,name:r.name,spec:r.spec,line:r.line,recordedAt:r.importedAt,actor:r.reportedBy,actorId:r.reportedById,historicalImport:true,estimatedStaffing:true,reviewStatus:r.reviewStatus,reason:'Nhập lịch sử · phân bổ ước tính. Giờ lũy kế Sheet: '+(r.sourceCumulativeHours??'—')+'. '+(r.sourceNote||'')})));
   const stageScopes=historyRecords.filter(r=>r.payload.erpStageImport&&r.payload.scope).map(r=>r.payload.scope);
  const supersededTime=e=>!e.erpStageImport&&stageScopes.some(s=>s.orderIds.includes(e.sourceId)&&Date.parse(e.effectiveAt)>=Date.parse(s.from+'T00:00:00+07:00')&&Date.parse(e.effectiveAt)<=Date.parse(s.to+'T23:59:59+07:00'));
- const sourceTimeEvents=[...new Map(historyRecords.slice().sort((a,b)=>String(a.payload.createdAt).localeCompare(String(b.payload.createdAt))).flatMap(row=>row.payload.timeEvents||[]).filter(e=>permitted(readActor,e.line)&&(!e.orderSnapshot||permitted(readActor,e.orderSnapshot.line))).map(e=>[e.id,e])).values()];
+ const sourceTimeRows=historyRecords.slice().sort((a,b)=>String(a.payload.createdAt).localeCompare(String(b.payload.createdAt))).flatMap(row=>row.payload.timeEvents||[]);
+ const sourceTimeEvents=[...new Map(sourceTimeRows.filter(e=>permitted(readActor,e.line)&&(!e.orderSnapshot||permitted(readActor,e.orderSnapshot.line))).map(e=>[e.id,e])).values()];
   for(const e of sourceTimeEvents)if(!orderIds.has(e.sourceId)&&e.orderSnapshot){orders.push({...e.orderSnapshot,historicalOnly:true});orderIds.add(e.sourceId);}
   const visibleReportIds=new Set([...historical,...reportRecords.map(r=>({...r.payload,id:r.key}))].filter(r=>orderIds.has(r.transitId)&&permitted(readActor,r.line)).map(r=>r.id));
   // Cross-Line movement remains visible to its receiving Line, without exposing
@@ -366,7 +368,11 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   };
   if(legacyPreservation){
    const rawReports=[...historyRecords.flatMap(r=>r.payload.reports||[]),...reportRecords.map(r=>({...r.payload,id:r.key}))];
-   return {...result,reports:await attachLegacyEarnedBasis(result.reports,legacyPreservation.basis,{required:legacyPreservation.required,rawReports}),payrollBaselines:legacyPreservation.monthly,payrollHistoryProtection:legacyPreservation.historyProtection};
+   const prefix=legacyPreservation.attendancePrefix||legacyPreservation.monthly.find(m=>m.kind===attendancePrefixModel);
+   const prefixSourceEvents=prefix&&legacyPreservation.required?(actor.line?[...new Map(sourceTimeRows.map(e=>[e.id,e])).values()]:sourceTimeEvents).filter(e=>!supersededTime(e)&&!journalEvents.some(saved=>saved.id===e.id&&saved.sourceTimeCorrected)):[];
+   const checked=prefix&&legacyPreservation.required?checkAttendancePrefix(prefix,{events:[...journalEvents,...prefixSourceEvents],schedules:[...calendar.approved.entries()].map(([key,reference])=>({key,...reference,days:resolveSchedule(calendar,...key.split(':')).days})),orders:state.rows,preservedOrders:legacyPreservation.orders,currentEmployees:directory.map(r=>({...r.payload,id:r.key})).filter(r=>!r._deleted)}):null;
+   const payrollBaselines=legacyPreservation.monthly.map(m=>m.kind===attendancePrefixModel?{...m,...(checked?{integrity:actor.line?{[actor.line]:checked.integrity[actor.line]}:checked.integrity,livePrefixMatches:actor.line?{[actor.line]:checked.livePrefixMatches[actor.line]}:checked.livePrefixMatches}:{})}:m);
+   return {...result,reports:await attachLegacyEarnedBasis(result.reports,legacyPreservation.basis,{required:legacyPreservation.required,rawReports}),payrollBaselines,payrollHistoryProtection:legacyPreservation.historyProtection};
   }
   return result;
 }

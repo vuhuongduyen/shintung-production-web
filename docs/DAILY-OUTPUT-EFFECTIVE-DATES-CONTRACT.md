@@ -26,6 +26,8 @@ Không upsert theo khóa ngày+Plan ID: cùng ngày có thể có nhiều lần 
 
 Khoảng hiệu lực date-only dùng [validFrom, validTo); đổi mức phải thêm version, không sửa/xóa version đã được phiếu tham chiếu. Phiếu lưu version/value/source/scope và ngày chọn. Hủy danh mục hiện tại không được xóa snapshot của chứng từ cũ. Khi không có căn cứ hiệu lực đã chứng minh, hiển thị thiếu căn cứ; không gán mức hiện tại rồi gọi đó là lịch sử.
 
+Source đang bổ sung bảo toàn phần giờ trước ngày cutover ngay trong tháng chuyển đổi, cộng với phần sau mốc đang phát sinh; không đóng băng cả tháng. HR sửa ngược phần đã bảo toàn vẫn được lưu theo quyền nhưng cần đối chiếu trước khi thay số tính tiền. Ngày ngưng làm việc rõ sau mốc vẫn theo quy tắc chia lại quỹ hiện hành. Chưa có quyết định cho sửa ngược startDate/Line làm đổi điều kiện giữa hai phần; không tự áp một quy tắc mới. Chi tiết kiểm thử và giới hạn ngày/tháng ở tài liệu triển khai, chưa phải nghiệm thu production.
+
 Riêng dữ liệu cũ chưa lưu snapshot: phải phân biệt **kết quả đang biết tại mốc bảo toàn** với **mức thực tế từng có trong quá khứ**. Có thể bảo toàn giá trị đang biết khi thay đổi mới bằng anchor có ngày ghi nhận và nguồn rõ; không tự suy ra lịch sử đã thiếu hoặc âm thầm tính lại dữ liệu cũ. Việc áp dụng anchor/snapshot cho production là bước chuyển đổi được duyệt sau, không chạy trong task phát triển.
 
 ## Inventory tác động từ source
