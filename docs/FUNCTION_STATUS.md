@@ -7,3 +7,5 @@ Luồng mới được khóa mặc định nếu chưa có policy/mốc triển 
 Source đã có luồng sửa/hủy trước Kho nhận và thu hồi sau Kho nhận, kèm queue/CAS/ACK và giữ lịch sử. Trước nhận cần phiếu gốc đã xuất và kết nối Kho đang hoạt động; chưa kiểm Google Sheets/browser thật hoặc triển khai script/công thức. Đã có helper chốt snapshot theo lô và driver kích hoạt chỉ trong TEST, giữ mốc để policy lỗi không mở lại legacy. Chưa có adapter kích hoạt production; ngày hiệu lực toàn web và QA thật vẫn đang hoàn thiện. Không coi CI xanh là sẵn sàng phát hành.
 
 Các chức năng không thuộc thay đổi này chưa được tái đánh giá toàn diện trong tài liệu này.
+
+Checkpoint publication `2c4ecf8` đã đạt CI 1.699/1.699 (279 file). Source bổ sung tiếp hàng rào phiếu kho quản lý bởi sản lượng ngày: không sửa vòng qua API chung, thu hồi/ACK đúng Sheet gốc, loại phiếu chờ đối soát khỏi xác nhận và bỏ preview stale. Snapshot công đoạn legacy đã được kiểm khi danh mục SKU đổi. Kiểm local và CI của từng checkpoint được tách trong tài liệu triển khai; chưa nghiệm thu browser/Sheet thật, chưa đủ phát hành.

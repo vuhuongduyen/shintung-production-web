@@ -34,11 +34,12 @@ export async function requestDailyWithdrawal(db,body,actor){
  if(receipt.source!=='Sản xuất'||receipt.reportId!==report.id||receipt.sku!==report.sku||receipt.line!==report.line||receipt._deleted||receipt.cancelled||receipt.voided)fail('Phiếu kho không khớp hoặc không còn hiệu lực.');
  if(!warehouseReceiptPosted(receipt))fail('Kho chưa xác nhận: QLSX sửa/hủy trực tiếp, không yêu cầu thu hồi.');
  if(!receipt.confirmedBy||!Number.isFinite(Date.parse(receipt.confirmedAt))||!Number.isFinite(Number(receipt.receivedQuantity))||receipt.receivedQuantity===null||receipt.receivedQuantity===''||Number(receipt.receivedQuantity)<0)fail('Thiếu căn cứ số lượng kho đã nhận; cần đối chiếu, không tự gán số.',422);
+ if(!receipt.sheetSync?.spreadsheetId||!receipt.sheetSync.exportedCompletedAt)fail('Chờ đồng bộ và đối soát phiếu gốc đúng Sheet trước khi yêu cầu thu hồi.');
  if(['pending','approved-awaiting-sheet'].includes(receipt.withdrawalRequest?.status))fail('Phiếu đang có yêu cầu thu hồi; đối chiếu lượt cũ.');
- const revision=await recordRevision(JSON.stringify([fingerprint,reportRow.payload,receiptReview(receipt),policy.raw,policy.manifestRaw]));
+ const revision=await recordRevision(JSON.stringify([fingerprint,reportRow.payload,receiptReview(receipt),receipt.sheetSync.spreadsheetId,receipt.sheetSync.exportedCompletedAt,policy.raw,policy.manifestRaw]));
  if(body.action==='preview')return {ok:true,expectedRevision:revision,report,receipt,requiresWarehouse:true};
  if(body.expectedRevision!==revision||Number(body.expectedVersion)!==Number(report.version||0))fail(conflictMessage);
- const now=new Date().toISOString(),request={id,reportId:report.id,receiptId:receiptRow.record_key,transitId:report.transitId,line:report.line,operation:'withdrawal',status:'pending',fingerprint,requestedBy:actor.login,requestedAt:now,reason,beforeReport:report,beforeReceipt:receipt,version:1};
+ const now=new Date().toISOString(),request={id,reportId:report.id,receiptId:receiptRow.record_key,transitId:report.transitId,line:report.line,originalSpreadsheetId:receipt.sheetSync.spreadsheetId,operation:'withdrawal',status:'pending',fingerprint,requestedBy:actor.login,requestedAt:now,reason,beforeReport:report,beforeReceipt:receipt,version:1};
  const nextReceipt={...receipt,withdrawalRequest:{id,status:'pending',requestedBy:actor.login,requestedAt:now,reason},sheetSync:{...receipt.sheetSync,status:'pending',command:{kind:'withdrawal-request',id,revision:1}},updatedBy:actor.login,updatedAt:now};
  const event={id:crypto.randomUUID(),kind:'daily-output-withdrawal-request',quantityOnly:true,reportingModel:report.reportingModel,reportId:report.id,sourceId:report.transitId,line:report.line,withdrawalId:id,actor:actor.login,recordedAt:now,effectiveAt:now,reason,requestIdempotency:id,before:{warehouseQuantity:receipt.receivedQuantity,reportedQuantity:report.reportedQuantity,approvedQuantity:report.approvedQuantity},after:{status:'Chờ Kho xử lý thu hồi',warehouseQuantity:receipt.receivedQuantity,reportedQuantity:report.reportedQuantity,approvedQuantity:report.approvedQuantity}};
  await commitDailyRecords(db,actor,cursor,[dailyRecordGuard('production_warehouse_withdrawal',id,null),dailyRecordGuard('production_report',report.id,reportRow.payload),dailyRecordGuard('warehouse_in',receiptRow.record_key,receiptRow.payload),...policyGuards(policy)],[{entity:'production_warehouse_withdrawal',key:id,value:request,old:null},{entity:'warehouse_in',key:receiptRow.record_key,value:nextReceipt,old:receiptRow.payload},{entity:'production_event',key:event.id,value:event,old:null}]);
@@ -61,6 +62,7 @@ async function decideWithdrawalInternal(db,body,actor,decisionSource,expectedRec
  if(body.action==='withdrawal-preview')return {ok:true,expectedRevision:revision,request,receipt,report};
  if(!policy.policy?.active)fail('Policy hiện chưa cho phép quyết định thu hồi mới.');
  if(await db.prepare("SELECT record_key FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(decisionToken).first())fail('Mã quyết định đã dùng cho thao tác khác.');
+ if(receipt.sheetSync?.spreadsheetId!==request.originalSpreadsheetId)fail('Kết nối của phiếu gốc đã đổi; chưa quyết định thu hồi.');
  if(request.status!=='pending'||receipt.withdrawalRequest?.id!==id||report.cancelled||receipt.cancelled||!warehouseReceiptPosted(receipt))fail('Yêu cầu đã xử lý hoặc phiếu nguồn đổi trạng thái.');
  if(JSON.stringify(report)!==JSON.stringify(request.beforeReport)||['source','reportId','sourceReportId','sku','line','lsxCode','planId','proposedQuantity','receivedQuantity','confirmedBy','confirmedAt','status','confirmationStatus','confirmation_status','cancelled','voided','_deleted'].some(k=>receipt[k]!==request.beforeReceipt[k]))fail('Số liệu nguồn thay đổi; cần đối chiếu lại yêu cầu.');
  const approve=body.action==='withdrawal-approve';if(!approve&&!reason)fail('Nhập ý kiến từ chối thu hồi.',422);if(body.expectedRevision!==revision||approve&&body.checked!==true)fail('Kiểm tra phiếu và số lượng trước khi quyết định.');
@@ -73,6 +75,7 @@ async function decideWithdrawalInternal(db,body,actor,decisionSource,expectedRec
 export async function acknowledgeDailyWithdrawal(db,body,connection){
  if(connection?.verified!==true||typeof connection.spreadsheetId!=='string')fail('Chưa xác thực kết nối kho.',403);
  const id=token(body.commandId),requestRow=await raw(db,'production_warehouse_withdrawal',id);if(!requestRow)fail('Không tìm thấy yêu cầu thu hồi.',404);const request=JSON.parse(requestRow.payload);
+ if(request.originalSpreadsheetId!==connection.spreadsheetId)fail('Bằng chứng không thuộc Sheet gốc đã đối chiếu thu hồi.',403);
  if(request.receiptId!==body.receiptId||request.reportId!==body.reportId)fail('Lệnh thu hồi không khớp phiếu nguồn.');
  const at=String(body.withdrawnAt||''),by=String(body.withdrawnBy||'').trim(),sheetRow=Number(body.sheetRow);
  if(body.rowCreatedForHistory===true)fail('Không dùng dòng mới thay cho dòng gốc khi đối soát thu hồi.',422);

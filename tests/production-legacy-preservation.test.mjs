@@ -28,5 +28,7 @@ test('journal final marker/rate/cumulative hours and known missing metadata do n
  assert.equal(finalReportIds(attached,changed).size,0);assert.equal(preservedJournalFinalIds(attached,finalReportIds(attached,changed)).size,2);
  const view=preservedJournalPresentation(attached[0]);assert.equal(view.standardUnitHours,.1);assert.equal(view.standardLaborHours,20);assert.equal(view.orderCumulativeHours,8);assert.equal(view.standardUnit,.1);
  const basis=p.orders[0];assert.equal(preservedOrderMetadata(w.orders[0],basis).standardLeadtime,2);assert.equal(preservedOrderMetadata({...w.orders[0],standardLeadtime:3},basis).standardLeadtime,undefined,'explicit source edit is not overridden');
+ assert.deepEqual(preservedOrderMetadata(structuredClone(w.orders[0]),basis).processes,['PACKING','FINAL'],'equal arrays survive serialization');assert.equal(preservedOrderMetadata({...w.orders[0],processes:['NEW']},basis).processes,undefined,'explicit source process edit invalidates only the old process projection');
+ w.orders[0].processes.push('LATER');assert.deepEqual(basis.sourceFields.processes,['PACKING','FINAL']);assert.deepEqual(basis.display.processes,['PACKING','FINAL'],'capture does not alias mutable process arrays');
  const missing=calculate(w,{attendanceBaselines:[],historyProtection:{requiredBeforeMonth:'2026-11',snapshotId}});assert.ok(missing.every(r=>r.result.fund===null));assert.match(missing[0].result.issues.join(),/Thiếu mốc bảo toàn/);
 });

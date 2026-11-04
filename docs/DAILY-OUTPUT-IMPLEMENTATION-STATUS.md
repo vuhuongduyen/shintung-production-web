@@ -217,3 +217,18 @@ CI f83ea23 [41834282113](https://github.com/vuhuongduyen/shintung-production-web
 Lỗi trạng thái kết nối Kho tắt được trả 409 (đã biết chưa ghi) thay vì 503 để client không khóa bản nháp thành kết quả chưa rõ; timeout/5xx/non-JSON thật vẫn giữ nonce và đối chiếu lượt cũ.
 
 Kiểm source cuối publication: nhóm targeted **30/30** đạt; TypeScript/build đạt. Đo lại lưu sản lượng cùng script sau marker lookup gộp: 0/100/1.000 phiếu cùng LSX, đọc 16,90/30,65/69,55 ms, lưu tăng 200 là 122,06/180,09/203,00 ms; 9 SELECT, một batch, baseline 0 và tổng cũ+200 đúng. Một mẫu/quy mô local, không phải before/after hoặc cam kết latency. CI commit mới phải kiểm riêng.
+
+## Kiểm cuối publication và bổ sung hàng rào phiếu kho
+
+CI commit `2c4ecf81ec2f10dc178104b2694f20fa8efe9b27`, run [41839367227](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41839367227), đã **đạt 1.699/1.699 kiểm thử trong 279 file**, không fail/cancel/skip/todo; TypeScript và ba build đạt. Đây là kết quả của checkpoint trước nhóm bổ sung dưới đây, không tự gán cho head mới.
+
+- Tái hiện API `/api/records` có thể sửa lượng phiếu sản lượng ngày trực tiếp (200 thay vì 409). Chặn sửa, hủy/khôi phục hoặc tạo lại phiếu quản lý bởi báo sản lượng qua API chung, đối chiếu cả ID liên kết cũ/mới và khóa `SX:`. Phiếu kho nhập tay vẫn giữ hành vi cũ. Kiểm thử Worker/auth giữ dữ liệu nghiệp vụ và audit đúng hợp đồng, không đổi quyền.
+- Thu hồi phải có bằng chứng phiếu gốc đã xuất; request, quyết định và ACK ràng buộc Sheet ban đầu. Lọc lệnh thuộc Sheet khác **trước LIMIT 50** để không làm đói các phiếu hợp lệ. Setup bình thường vốn đã chặn đổi file đang liên kết; test lỗi phục hồi cấu hình chỉ fault-inject vào DB giả, không tuyên bố API cho phép đổi Sheet. ACK sai Sheet bị từ chối, khôi phục đúng kết nối giả thì hoàn tất đúng một lần.
+- Phiếu chờ sửa/hủy vẫn hiện trong danh sách chờ Kho với trạng thái rõ ràng, nhưng không được chọn/xác nhận. Preview gặp 409 bị bỏ, xóa chọn và tải lại thay vì giữ nút commit cũ. Mounted JSDOM kiểm ba tình huống, không phải browser QA.
+- Snapshot bổ sung danh sách công đoạn LSX đã quan sát. Sau đổi danh mục SKU, lịch sử vẫn trả danh sách cũ; so sánh array theo giá trị và deep clone để không alias. Sửa rõ nguồn riêng làm mất hiệu lực projection trường đó, không ghi ngược dữ liệu cũ.
+
+Kiểm local nhóm tổng hợp **44/44** (pending/withdrawal/legacy publication/preservation/warehouse UI) đạt; thêm kiểm clone/explicit process edit **2/2** trong cùng file, có giao nhau. TypeScript/build cuối đạt. Kiểm script Sheet bằng VM được ghi riêng theo file; không chạy Apps Script hay sửa Sheet thật. CI nhóm bổ sung phải đọc theo commit mới sau push.
+
+Phép đo trong test thu hồi, một mẫu/quy mô Miniflare, 0/1.000 report không liên quan: preview+lưu request 121,78/114,14 ms, 14 SELECT/1 batch; preview+quyết định 121,85/118,53 ms, 13 SELECT/1 batch; ACK 78,01/78,10 ms, 7 SELECT/1 batch. Đây không phải CPU/heap/p95/HTTP/Google và không chứng minh production hết quá tải.
+
+Vẫn chặn phát hành vì chưa có browser/Google Sheets thật, adapter kích hoạt production, bảo vệ tháng đóng sau cutover và ngày hiệu lực toàn web. Đang rà lại việc tính legacy trên full GET; chưa bỏ phép tính nào chỉ dựa trên suy đoán. Không merge, deploy, bật policy hoặc ghi DB/Sheet thật.

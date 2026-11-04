@@ -6,9 +6,10 @@ import {productionDisplayTime} from '../lib/production-display-time.mjs';
 import {ACTION_FEEDBACK_EVENT,notifyActionFailure} from '../lib/action-feedback';
 import {recordFetch} from '../lib/record-fetch';
 import {announceDataChange} from '../lib/data-sync';
-type Receipt={sheetSync?:{status:string;error?:string};id:string;group?:string;confirmedBy?:string;source?:string;entryMode?:string;reportId?:string;lsxCode?:string;sku?:string;name?:string;spec?:string;line?:string;proposedQuantity?:number;receivedQuantity?:number|null;status?:string;confirmation_status?:string;confirmationStatus?:string;createdBy?:string;createdAt?:string;sourceCompletedAt?:string;cancelled?:boolean;voided?:boolean;_deleted?:boolean};
+type Receipt={pendingCorrection?:{status:string};withdrawalRequest?:{status:string};sheetSync?:{status:string;error?:string;command?:{kind:string}};id:string;group?:string;confirmedBy?:string;source?:string;entryMode?:string;reportId?:string;lsxCode?:string;sku?:string;name?:string;spec?:string;line?:string;proposedQuantity?:number;receivedQuantity?:number|null;status?:string;confirmation_status?:string;confirmationStatus?:string;createdBy?:string;createdAt?:string;sourceCompletedAt?:string;cancelled?:boolean;voided?:boolean;_deleted?:boolean};
 const receiptTime=(value?:string)=>{if(!value)return 0;const normalized=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)?value+'+07:00':value;return Date.parse(normalized)||0;};
-const statusOf=(r:Receipt)=>r.confirmation_status||r.confirmationStatus||r.status||'—';
+const rawStatusOf=(r:Receipt)=>r.confirmation_status||r.confirmationStatus||r.status||'—';
+const statusOf=(r:Receipt)=>r.pendingCorrection?.status==='pending'?'Chờ đối soát sửa/hủy':r.withdrawalRequest?.status==='pending'?'Chờ Kho xử lý thu hồi':r.withdrawalRequest?.status==='approved-awaiting-sheet'?'Kho đồng ý, chờ đối soát Sheet':rawStatusOf(r);
 export function WarehouseReceipts({catalog,onOpenSku,pendingOnly,requestSequence,searchOpen,onCloseSearch,onOpenSearch,onChooseErp}:{onOpenSearch:()=>void;onChooseErp:()=>void;searchOpen:boolean;onCloseSearch:()=>void;catalog:{code:string;group:string}[];onOpenSku:(sku:string)=>void;pendingOnly:boolean;requestSequence?:number}){
  const canUse=useContext(ToolbarPermissions),canConfirm=canUse('WarehouseContent','Xác nhận');
  const [selected,setSelected]=useState<string[]>([]),[review,setReview]=useState<{revision:string;receipts:Receipt[]}|null>(null),[confirmBusy,setConfirmBusy]=useState(false);
@@ -19,13 +20,13 @@ export function WarehouseReceipts({catalog,onOpenSku,pendingOnly,requestSequence
   try{
    const response=await recordFetch('/api/warehouse-confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,ids:action==='preview'?selectedShown.map(r=>r.id):review?.receipts.map(r=>r.id),revision:review?.revision,receivedAsProposed:receivedChecked})});
    const result=await response.json();
-   if(!response.ok)throw Error(result.error||'Không xác nhận được. Kiểm tra kết nối và thử lại.');
+   if(!response.ok)throw Object.assign(Error(result.error||'Không xác nhận được. Kiểm tra kết nối và thử lại.'),{status:response.status});
    if(action==='preview'){setReview(result);setReceivedChecked(false);return;}
    setReview(null);setSelected([]);announceDataChange('warehouse_in');setReload(n=>n+1);
    window.dispatchEvent(new CustomEvent('onspa-approvals-changed'));
    if(result.ok===false)throw Error(result.error);
    window.dispatchEvent(new CustomEvent(ACTION_FEEDBACK_EVENT,{detail:{kind:'success',message:`Đã xác nhận ${result.confirmed} phiếu nhập kho.`}}));
-  }catch(e){notifyActionFailure((e as Error).message);}finally{lock.current=false;setConfirmBusy(false);}
+  }catch(e){if((e as {status?:number}).status===409){setReview(null);setReceivedChecked(false);setSelected([]);setReload(n=>n+1);}notifyActionFailure((e as Error).message);}finally{lock.current=false;setConfirmBusy(false);}
  };
  const [maintenance]=useState(()=>typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('warehouse-maintenance')==='1');
  const [confirmPlan,setConfirmPlan]=useState<any>(null);
@@ -41,8 +42,8 @@ export function WarehouseReceipts({catalog,onOpenSku,pendingOnly,requestSequence
  const valueOf=(r:Receipt,key:string)=>key==='group'?groupOf(r):key==='mode'?modeOf(r):key==='status'?statusOf(r):String(r[key as keyof Receipt]||'');
  const fields=[['lsxCode','Lệnh sản xuất'],['sku','SKU'],['name','Tên SP'],['group','Nhóm SP'],['line','Line'],['status','Trạng thái'],['createdBy','Người ghi nhận'],['confirmedBy','Người xác nhận'],['mode','Cách ghi nhận']];
  const clear=()=>{setDraft('');setApplied({field:'',value:''})};
- const shown=rows.filter(r=>!applied.value||valueOf(r,applied.field).toLocaleLowerCase('vi').includes(applied.value.toLocaleLowerCase('vi'))).filter(r=>!pendingOnly||statusOf(r)==='Chờ xác nhận').sort((a,b)=>receiptTime(b.sourceCompletedAt)-receiptTime(a.sourceCompletedAt));
- const eligible=shown.filter(r=>r.source==='Sản xuất'&&statusOf(r)==='Chờ xác nhận'&&!r.cancelled&&!r.voided);
+ const shown=rows.filter(r=>!applied.value||valueOf(r,applied.field).toLocaleLowerCase('vi').includes(applied.value.toLocaleLowerCase('vi'))).filter(r=>!pendingOnly||rawStatusOf(r)==='Chờ xác nhận').sort((a,b)=>receiptTime(b.sourceCompletedAt)-receiptTime(a.sourceCompletedAt));
+ const eligible=shown.filter(r=>r.source==='Sản xuất'&&rawStatusOf(r)==='Chờ xác nhận'&&!r.cancelled&&!r.voided&&r.pendingCorrection?.status!=='pending'&&!r.sheetSync?.command);
  const selectedShown=eligible.filter(r=>selected.includes(r.id));
  useEffect(()=>{if(allBox.current)allBox.current.indeterminate=selectedShown.length>0&&selectedShown.length<eligible.length;},[selectedShown.length,eligible.length]);
  useEffect(()=>{setSelected([]);setReview(null);},[applied,pendingOnly,requestSequence]);

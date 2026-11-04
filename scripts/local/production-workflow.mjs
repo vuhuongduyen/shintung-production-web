@@ -1,3 +1,4 @@
+import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
 import {productionHistoryOrder} from '../../lib/production-history-order.mjs';
 import {attachLegacyEarnedBasis} from '../../lib/production-legacy-earned-basis.mjs';
 import {normalizeTransit} from '../../lib/in-transit.mjs';
@@ -262,6 +263,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   const [state, eventRecords, reportRecords, directory, calendar, capacityRecords,accountRecords,laborRecords,historyRecords] = await Promise.all([
     getTransit(db, {}, catalog,{includeHistory:false,stageValidation,preservedOrders:legacyPreservation?.orders,leadtimeAt:observationAt}), rows(db, "production_event"), rows(db, "production_report",stageValidation), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,"labor_hours"),rows(db,'production_history_import',stageValidation),
   ]);
+  const preservedMetadata=new Map((legacyPreservation?.orders||[]).map(b=>[b.orderId,b]));
   const orders = state.rows.filter((row) => ((row.syncStatus === "ĐÃ ĐỒNG BỘ" && row.lsxCode) || row.status === "HỦY") && permitted(readActor, row.line));
   const employeeDirectory = directory.map(row => ({...row.payload, id: row.key,active:employeeActiveOn(row.payload,observationDay)}));
   const scopedRosterIds=new Set(actor.line?[...calendar.approved.entries()].filter(([key])=>key.endsWith(':'+actor.line)).flatMap(([,r])=>(r.roster||[]).flatMap(day=>[...(day.hc||[]),...(day.ot||[])])):[]);
@@ -344,7 +346,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   };
   const result={
     progressOrders: [...new Map([...state.rows.filter(row=>permitted(readActor,row.line)),...orders].map(row=>[row.id,row])).values()],
-    orders:orders.map(order=>{const row=catalog.find(r=>upper(r.key||r.code||r.payload?.code)===upper(order.sku));const master=row?.payload||row;return {...order,processes:order.historicalOnly&&Array.isArray(order.processes)?order.processes:Array.isArray(master?.processes)?master.processes:[]};}), events: reviewReportId?[]:[...events, ...historyEvents, ...sourceTimeEvents.filter(e=>!supersededTime(e)&&!events.some(saved=>saved.id===e.id&&saved.sourceTimeCorrected)), ...scheduleHistory, ...capacityHistory].map(projectEvent).sort((a, b) =>
+    orders:orders.map(order=>{const row=catalog.find(r=>upper(r.key||r.code||r.payload?.code)===upper(order.sku));const master=row?.payload||row;const preserved=preservedOrderMetadata(order,preservedMetadata.get(order.id));return {...order,processes:Array.isArray(preserved?.processes)?preserved.processes:order.historicalOnly&&Array.isArray(order.processes)?order.processes:Array.isArray(master?.processes)?master.processes:[]};}), events: reviewReportId?[]:[...events, ...historyEvents, ...sourceTimeEvents.filter(e=>!supersededTime(e)&&!events.some(saved=>saved.id===e.id&&saved.sourceTimeCorrected)), ...scheduleHistory, ...capacityHistory].map(projectEvent).sort((a, b) =>
       String(a.recordedAt || a.effectiveAt).localeCompare(String(b.recordedAt || b.effectiveAt))),
     reports: [...historical.filter(r=>!reviewedHistory.has(r.id)),...reportRecords.map((row) => ({ id: row.key, ...row.payload,actorId:productionEntryActorId(row.payload,accounts) })).filter((row) => orderIds.has(row.transitId)&&permitted(readActor,row.line))
       .map((row) => {

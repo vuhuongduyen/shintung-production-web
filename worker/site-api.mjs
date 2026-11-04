@@ -495,7 +495,13 @@ async function handleSiteApi(request,env,timing){
    }
   }
   const oldRow=await env.DB.prepare('SELECT payload,updated_by,updated_at FROM app_records WHERE entity=? AND record_key=?').bind(body.entity,body.key).first(),old=oldRow?JSON.parse(oldRow.payload):(body.entity==='demand_event'?siteDemand([]).find(r=>r.key===body.key)?.payload:null);
-  if(body.entity==='warehouse_in'&&old?.pendingCorrection?.status==='pending')return json({error:'Phiếu đang đối soát điều chỉnh; dùng luồng nghiệp vụ, không ghi đè trực tiếp.'},409);
+  if(body.entity==='warehouse_in'){
+   if(old?.pendingCorrection?.status==='pending'||['pending','approved-awaiting-sheet'].includes(old?.withdrawalRequest?.status))return json({error:'Phiếu đang đối soát điều chỉnh/thu hồi; dùng luồng nghiệp vụ, không ghi đè trực tiếp.'},409);
+   const reportIds=[...new Set([old?.reportId,old?.sourceReportId,body.payload.reportId,body.payload.sourceReportId,String(body.key).startsWith('SX:')?String(body.key).slice(3):null].filter(id=>typeof id==='string'&&id))];
+   if(reportIds.length){const linked=(await env.DB.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key IN (SELECT value FROM json_each(?))").bind(JSON.stringify(reportIds)).all()).results;
+    if(linked.some(row=>isDailyOutput(JSON.parse(row.payload))))return json({error:'Phiếu từ sản lượng ngày phải dùng quy trình sửa/xác nhận/thu hồi, không ghi đè hoặc tạo lại qua danh sách chung.'},409);
+   }
+  }
   if(body.entity==='users'&&(old?.authMode==='quick_line'||body.payload.authMode==='quick_line')){if(!old||body.payload.authMode!==old.authMode||body.payload.line!==old.line||body.payload.login!==old.login||body.key!==old.login||body.payload.role!=='USER')return json({error:'User Line giữ nguyên ID, Line và vai trò USER. Tạo user Line bằng chức năng riêng.'},409);}
   if(['leadtime','leadtime_versions','safety_rules','safety_rule_groups','safety_days'].includes(body.entity)&&old?.cancelled)return json({error:'Dữ liệu đã Hủy; không được áp dụng lại bằng thao tác sửa/xác nhận.'},409);
   const actualRevision=await recordRevision(oldRow?.payload);
