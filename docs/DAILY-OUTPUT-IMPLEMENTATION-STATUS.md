@@ -295,3 +295,20 @@ Rà tiếp chỉ đọc: Leadtime In Transit có precedence hiện hành “mast
 Kiểm cuối nhóm tháng cutover: hồi quy rộng **63/63** (payroll/export/attendance/policy/snapshot/publication/API), kiểm thêm bộ pure cuối **13/13** có giao nhau; TypeScript và build source cuối đạt. Test publication cũ vẫn so mọi giá trị baseline đã lưu; chỉ tách cờ kiểm livePrefixMatches được tính lại theo master và kiểm rõ integrity phải matched. Không bỏ kiểm dữ liệu cũ cho test xanh.
 
 Đo cuối cùng `node --test scripts/bench/legacy-publication.mjs`, chạy riêng sau build/test: 50/500 LSX, 4 nhân viên giả, full API GET 463,42/739,86 ms (33/36 SELECT), work GET 364,27/562,76 ms (29/31 SELECT), không batch ghi. JSON full 212.482/2.052.686 byte; work 165.453/1.607.055 byte. Số truy vấn giữ như checkpoint trước, thêm kiểm prefix không gọi DB theo người/phiếu; một mẫu không chứng minh latency được cải thiện. Chuẩn bị 102/1.002 anchor, 13/126 lô, tổng ghi 1.018,49/11.126,31 ms; là cold preparation, không phải request lưu HR/sản lượng. Script **1/1** đạt, so giờ/status/earned từng phiếu với anchor và production records GET trước–sau bất biến. Không browser/network/Google/p95/CPU/peak memory hoặc bằng chứng cho quy mô nhân sự lớn. CI commit mới phải đọc riêng sau push.
+
+## Kiểm tiếp BOM: đơn vị/mẫu số/hao hụt lịch sử có căn cứ
+
+CI `a2274d9e8de2005adfb7e8f0a047d43c1b72dcf3` [41856830003](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41856830003) đã **đạt 1.722/1.722 trong 283 file** (549 + 505 + 668), không fail/cancel/skip/todo hoặc thiếu summary; TypeScript và ba build đạt. Đây là mốc sửa tháng cutover, trước nhóm BOM dưới đây.
+
+Tái hiện bằng chính đoạn projection trong `app/page.tsx`, không phải mô phỏng lại công thức: dòng lịch sử được dựng khi thiếu dòng đã ngưng lấy `unit` từ danh mục **hiện tại**, còn denominator/waste từ dòng phiếu thay đổi có thể là **giá trị mới**. Fixture có bản trước 2 kg / mẫu số 3 / hao hụt 1%, phiếu thay thế mẫu số 10 / 9%, danh mục hiện tại chiếc: trước sửa trả chiếc / 10 / 9%, đổi danh mục sang thùng còn đổi tiếp đơn vị của cùng lượng cũ. Hai test đầu đều fail, không có API/DB thật được dùng.
+
+Source bổ sung helper chỉ đọc `bomHistoricalMeasure`: dùng đúng `sourceSnapshots[SKU]`, mã và lượng cũ khớp, cùng ngày hiệu lực đã ghi nếu có, phải có **duy nhất** một dòng trước phù hợp. Lấy đơn vị/mẫu số/hao hụt từ bản đó; không đổi oldQty trên phiếu. Nếu thiếu, mơ hồ, lượng mâu thuẫn hoặc đơn vị gốc còn thiếu thì hiển thị thiếu căn cứ; không dùng master hiện tại hoặc suy từ giá trị thay thế. Mẫu số bỏ trống trong bản nguồn duy nhất vẫn theo default 1 của schema BOM hiện có; không mặc định 1 khi hoàn toàn thiếu bản nguồn. Không tự tạo ngày đã thiếu.
+
+Kiểm thêm các rủi ro cùng view:
+- Phiếu hàng loạt dùng danh sách skus, không chỉ sku đầu tiên; chọn SKU thứ hai vẫn dùng bản nguồn của chính SKU đó.
+- Một dòng đã ngưng ở ngày khác không được che mất lần thay đổi đang xem; đối chiếu cùng mã và ngày hết hiệu lực, hiểu cả ISO/dd-mm display. Không sinh lại dòng đã lưu cùng mốc.
+- Dòng dựng từ chứng từ cũ không trở thành lượng đang dùng chỉ vì thiếu ngày hết hiệu lực. Đây là phân loại projection đọc trên UI, không đổi bomLineActive của backend hoặc dữ liệu BOM.
+- Lịch sử 31/10 và 04/11 sắp theo ngày nghiệp vụ chuẩn hóa; chuỗi dd/mm trước đó chọn tháng cũ làm latest. Ngày chưa rõ nằm sau ngày đã biết, không gán ngày giả.
+- Giữ nguyên hợp đồng **nguồn SKU hiện hành** của live lookup, kể cả dòng ngưng đã lưu. Sửa này chỉ bảo vệ bộ đơn vị/mẫu số/hao hụt của dòng lịch sử dựng lại, không tự thay toàn bộ live-source projection hay lượng dùng Engine.
+
+Ghi chú căn cứ nằm ở ô hiện có (title/tên truy cập), không thêm banner/cột hoặc thay bố cục. **9/9** ca projection từ source và **28/28** nhóm BOM/source/bulk/lifecycle/hierarchy/reconciliation đạt; có giao nhau, không cộng gộp. TypeScript/build cuối đạt. Dữ liệu giả và VM, chưa browser desktop/mobile. Không có route/lượt fetch/write mới; không đo hoặc tuyên bố tốc độ render được cải thiện. DB/save/confirmation/undo/permissions không sửa; raw before-image và dòng phiếu được test bất biến. CI đúng commit bổ sung sẽ kiểm sau push.
