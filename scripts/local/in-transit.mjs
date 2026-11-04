@@ -114,7 +114,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
       const frozenLead=preservedOrderMetadata(row,preserved.get(row.id));
       const standardLeadtime = options.planningOnly ? null : Object.hasOwn(frozenLead||{},'standardLeadtime') ? frozenLead.standardLeadtime : transitStandardLeadtime(row,
         leadtimes.flatMap(r=>Array.isArray(r.payload?.rows)?r.payload.rows:[{...r.payload,sku:r.payload?.sku||r.record_key}]),
-        leadVersions.map(r=>r.payload).filter(Boolean));
+        leadVersions.map(r=>r.payload).filter(Boolean),options.leadtimeAt);
       return {
         ...row,
         standardLeadtime,

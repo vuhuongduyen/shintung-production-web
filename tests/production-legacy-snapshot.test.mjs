@@ -23,3 +23,26 @@ test('unauthorized/missing provenance and failed batch leave all source and poli
  const before=await records(c.db);for(const who of [{login:'HR'},{...actor,line:'A'}])await assert.rejects(()=>captureLegacySource(c.db,input(),who,build),{status:403});await assert.rejects(()=>captureLegacySource(c.db,input(),actor),{status:503});await assert.rejects(()=>captureLegacySource(c.db,{...input(),snapshotId:"bad'key"},actor,build),{status:422});
  const broken=new Proxy(c.db,{get(target,key){if(key==='batch')return statements=>target.batch([...statements,target.prepare('INSERT INTO synthetic_missing_table VALUES(1)')]);const v=target[key];return typeof v==='function'?v.bind(target):v;}});await assert.rejects(()=>captureLegacySource(broken,input(),actor,build));assert.deepEqual(await records(c.db),before);
 }));
+
+test('observed In Transit leadtime is captured from its real reader, not replaced by null or a later master',()=>fixture(async c=>{
+ const {getTransit}=await import('../scripts/local/in-transit.mjs');
+ await c.db.prepare("INSERT INTO app_records VALUES('leadtime','SYNTHETIC-SKU',?,'SYNTHETIC','now')").bind(JSON.stringify({sku:'SYNTHETIC-SKU',leadTime:4})).run();
+ const before=await getTransit(c.db,{},[],{includeHistory:false}),saved=await captureLegacySource(c.db,input(),actor,build);assert.equal(before.rows[0].standardLeadtime,4);
+ await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.leadTime',9) WHERE entity='leadtime'").run();
+ const preview=await previewLegacyPreservation(c.db,input(),actor,build);assert.equal(preview.sourceStillMatches,false);assert.equal(preview.manifest.status,'preview');assert.equal(preview.orders.find(o=>o.orderId===before.rows[0].id).display.standardLeadtime,4);
+ const after=await getTransit(c.db,{},[],{includeHistory:false,preservedOrders:preview.orders});for(const old of before.rows){const row=after.rows.find(r=>r.id===old.id);assert.equal(row.standardLeadtime,old.standardLeadtime);assert.equal(row.leadtimeVariance,old.leadtimeVariance);}
+ const same=await previewLegacyPreservation(c.db,input(),actor,build);assert.deepEqual(same.orders,preview.orders);assert.equal(saved.capturedAt,preview.manifest.observedAt);
+}));
+
+test('snapshot preview uses the captured observation time when a future Leadtime version becomes effective later',async t=>fixture(async c=>{
+ const observed=Date.now(),future=new Date(observed+3600000).toISOString();
+ await c.db.batch([c.db.prepare("INSERT INTO app_records VALUES('leadtime','SYNTHETIC-SKU',?,'SYNTHETIC','now')").bind(JSON.stringify({sku:'SYNTHETIC-SKU',leadTime:4})),c.db.prepare("INSERT INTO app_records VALUES('leadtime_versions','SYNTHETIC-FUTURE-LEAD',?,'SYNTHETIC','now')").bind(JSON.stringify({sku:'SYNTHETIC-SKU',leadTime:9,status:'Đang áp dụng',validFrom:future}))]);
+ await captureLegacySource(c.db,input(),actor,build);const before=await previewLegacyPreservation(c.db,input(),actor,build);assert.equal(before.orders[0].display.standardLeadtime,4);
+ t.mock.timers.enable({apis:['Date'],now:observed+7200000});try{const later=await previewLegacyPreservation(c.db,input(),actor,build);assert.deepEqual(later,before);assert.equal(later.sourceStillMatches,true);}finally{t.mock.timers.reset();}
+}));
+
+test('frozen reader keeps employee presence at observation day across an employment end boundary; live reader still follows today',async t=>fixture(async c=>{
+ const {readProductionWorkflow}=await import('../scripts/local/production-workflow.mjs'),now=Date.now(),observationAt=new Date(now).toISOString(),endDate=new Date(now+86400000+25200000).toISOString().slice(0,10);
+ await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.employmentDatesManaged',json('true'),'$.startDate','2026-01-01','$.endDate',?) WHERE entity='employees' AND record_key='SYNTHETIC-NV0'").bind(endDate).run();await captureLegacySource(c.db,input(),actor,build);const frozen=legacySnapshotDatabase(c.db,id),before=await readProductionWorkflow(frozen,actor,[],{observationAt});assert.ok(before.employees.some(e=>e.id==='SYNTHETIC-NV0'));
+ t.mock.timers.enable({apis:['Date'],now:now+172800000});try{const old=await readProductionWorkflow(frozen,actor,[],{observationAt}),live=await readProductionWorkflow(c.db,actor);assert.deepEqual(old.employees,before.employees);assert.equal(live.employees.some(e=>e.id==='SYNTHETIC-NV0'),false);}finally{t.mock.timers.reset();}
+}));

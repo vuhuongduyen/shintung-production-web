@@ -154,3 +154,12 @@ Phép kiểm hot path thu hồi bằng Miniflare local, Node24, dữ liệu gi�
 Mỗi ô có đúng một batch ghi atomic. Test bảo vệ số lượt đọc không tăng, không tải toàn workforce/nhân viên/all events và các phiếu không liên quan còn nguyên; không khẳng định SQLite không quét index/CPU tăng, không suy ra p95 hoặc thông lượng. Không có baseline luồng thu hồi trước vì đó là chức năng mới; không đo Apps Script/Sheet, mạng người dùng, peak memory hay nhiều phiếu cùng LSX. Thời gian mẫu trong CI có thể khác; không dùng latency làm assertion.
 
 Nhóm kết hợp cuối UI/backend/điều chỉnh: **29/29**, không fail/cancel/skip; thêm một mẫu hiệu năng lặp cho mục đích hồi quy count, không dùng để khẳng định cải thiện latency. CI đúng commit UI phải kiểm riêng sau push.
+
+
+### Cố định thời điểm quan sát snapshot
+
+Test thực tế qua reader In Transit xác nhận Leadtime đang hiển thị có được lấy vào anchor, không mặc định null khi raw LSX không có trường này. Tuy nhiên đã tái hiện lỗi khác: giữ nguyên toàn bộ source, chỉ để đồng hồ qua mốc một phiên bản Leadtime tương lai thì cùng preview snapshot đổi **4 → 9**. Trước sửa test thất bại; sau sửa reader snapshot truyền `capturedAt` vào lựa chọn Leadtime, không dùng giờ chạy lại. Reader nhân sự của snapshot cũng dùng ngày GMT+7 quan sát để một endDate tương lai không làm nhân viên biến mất khi kiểm lại. Reader live vẫn theo ngày hiện tại, không đổi quyền hay ghi lịch sử.
+
+Nhóm snapshot/giữ lịch sử/Leadtime/GET recovery/lifecycle nhân viên **14/14** đạt. Gồm đổi live master, phiên bản tương lai tới hiệu lực, endDate qua ngày, raw nguồn bất biến, preview không publish/activation. Đây là bảo vệ thời điểm cho snapshot chuẩn bị; chưa phải hoàn tất ngày hiệu lực Engine/Safety/BOM hoặc triển khai snapshot production. Không có thao tác DB/Sheet thật.
+
+CI UI [41827063274](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41827063274) đúng `2f532eca4b3d2b83e1babc3c4e069cf56c6003d6` completed/success: TypeScript, ba build, **1.665/1.665 test, 276 file**, không fail/cancel/skip/timeout, đủ summary; shard 558/557/550. Bản sửa thời điểm snapshot phía trên có TypeScript/build local đạt, 7/7 snapshot cuối deepEqual toàn package preview qua mốc thời gian; CI commit mới phải kiểm riêng.

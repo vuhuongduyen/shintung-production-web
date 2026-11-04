@@ -250,17 +250,20 @@ function reportMetadata(calendar,events,row,directory) {
  if(row.kind!=="completion")return {};
  const {hours,sourceSnapshot,...meta}=reportCalculation(calendar,events,row,directory,false);return meta;
 }
-export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, reviewReportId=null, stageValidation=false,legacyPreservation=null} = {}) {
+export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, reviewReportId=null, stageValidation=false,legacyPreservation=null,observationAt=undefined} = {}) {
   if (!canWork(actor) && !canHr(actor) && !hasRole(actor, "xem")) fail("Không có quyền xem Quản lý sản xuất.", 403);
   // Menu visibility does not broaden the authenticated Line data boundary.
   const crossLineView=false,readActor=actor;
   // Share this request's capacity read; do not cache across users or requests.
+  const observationTime=observationAt===undefined?Date.now():Date.parse(observationAt);
+  if(!Number.isFinite(observationTime))fail("Thời điểm quan sát snapshot không hợp lệ.",422);
+  const observationDay=new Date(observationTime+25200000).toISOString().slice(0,10);
   const capacityRead = rows(db, "capacity");
   const [state, eventRecords, reportRecords, directory, calendar, capacityRecords,accountRecords,laborRecords,historyRecords] = await Promise.all([
-    getTransit(db, {}, catalog,{includeHistory:false,stageValidation,preservedOrders:legacyPreservation?.orders}), rows(db, "production_event"), rows(db, "production_report",stageValidation), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,"labor_hours"),rows(db,'production_history_import',stageValidation),
+    getTransit(db, {}, catalog,{includeHistory:false,stageValidation,preservedOrders:legacyPreservation?.orders,leadtimeAt:observationAt}), rows(db, "production_event"), rows(db, "production_report",stageValidation), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,"labor_hours"),rows(db,'production_history_import',stageValidation),
   ]);
   const orders = state.rows.filter((row) => ((row.syncStatus === "ĐÃ ĐỒNG BỘ" && row.lsxCode) || row.status === "HỦY") && permitted(readActor, row.line));
-  const employeeDirectory = directory.map(row => ({...row.payload, id: row.key,active:employeeActiveOn(row.payload)}));
+  const employeeDirectory = directory.map(row => ({...row.payload, id: row.key,active:employeeActiveOn(row.payload,observationDay)}));
   const scopedRosterIds=new Set(actor.line?[...calendar.approved.entries()].filter(([key])=>key.endsWith(':'+actor.line)).flatMap(([,r])=>(r.roster||[]).flatMap(day=>[...(day.hc||[]),...(day.ot||[])])):[]);
   const accounts=accountRecords.map(row=>({...row.payload,id:row.key}));
   const actorIdFor=row=>productionEntryActorId(row.payload,accounts)||(row.updatedAt===row.payload.recordedAt?productionEntryActorId({actor:row.updatedBy},accounts):'');
@@ -354,7 +357,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
           ...(derive&&row.kind==='completion'?meta:{}),...(refreshHours?{hours}: {})};
       })].map(projectEvent),
     payrollEmployees:reviewReportId?[]:directory.map(row=>({...row.payload,id:row.key})).filter(row=>!row._deleted&&(permitted(readActor,row.line)||scopedRosterIds.has(row.id)||actor.line&&(projectedHr.some(event=>event.employees.includes(row.id))||effectiveAttendance(allEvents).some(event=>event.destinationLine===actor.line&&event.employees?.includes(row.id))))).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}),
-    employees: reviewReportId?[]:directory.map((row) => ({ ...row.payload, id: row.key,active:employeeActiveOn(row.payload) })).filter((row) => row.active !== false && (canManage(actor) || permitted(readActor, row.line)||scopedRosterIds.has(row.id)||actor.line&&activeStaffMovement(allEvents,row.id,Date.now())?.destinationLine===actor.line)).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}).concat(actor.line?employeeDirectory.filter(person=>!permitted(readActor,person.line)&&!scopedRosterIds.has(person.id)&&projectedHr.some(event=>event.employees.includes(person.id))&&person.active!==false&&!canManage(actor)&&activeStaffMovement(allEvents,person.id,Date.now())?.destinationLine!==actor.line).map(person=>({id:person.id,name:person.name,line:person.line,active:person.active})):[]),
+    employees: reviewReportId?[]:employeeDirectory.filter((row) => row.active !== false && (canManage(actor) || permitted(readActor, row.line)||scopedRosterIds.has(row.id)||actor.line&&activeStaffMovement(allEvents,row.id,observationTime)?.destinationLine===actor.line)).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}).concat(actor.line?employeeDirectory.filter(person=>!permitted(readActor,person.line)&&!scopedRosterIds.has(person.id)&&projectedHr.some(event=>event.employees.includes(person.id))&&person.active!==false&&!canManage(actor)&&activeStaffMovement(allEvents,person.id,observationTime)?.destinationLine!==actor.line).map(person=>({id:person.id,name:person.name,line:person.line,active:person.active})):[]),
     actualSchedules: reviewReportId?[]:[...calendar.actual.values()].filter((row) => permitted(readActor, row.line)),
     approvedSchedules: reviewReportId?[]:[...calendar.approved.entries()].filter(([key]) => permitted(readActor, key.split(":")[1])).map(([key, reference]) => ({ key, ...reference, days: resolveSchedule(calendar, ...key.split(":")).days })),
     rights: { stageLive:true, crossLineView, historyImport:Boolean(actor.isAdmin&&!actor.line),hr:canHr(actor), ...productionMenuRights(actor), line: actor.line || null },
