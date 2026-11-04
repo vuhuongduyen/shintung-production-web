@@ -22,7 +22,9 @@ export async function correctDailyOutput(db,body,actor){
  if(!(await db.prepare(`SELECT ${warehouseSql} AS safe`).bind(...warehouseArgs).first()).safe)fail('Phiếu đã liên kết kho, không tự sửa hoặc đảo kho.');
  const [orderRow,cursor,policy,rateRow]=await Promise.all([rawRow(db,'in_transit',old.transitId),rawRow(db,'production_cursor','global'),readDailyOutputPolicy(db),rawRow(db,'labor_hours',String(old.sku||'').trim().toUpperCase())]);
  if(!orderRow||!policy.policy?.active)fail('Lệnh hoặc mốc triển khai đã thay đổi.');
- const order={...JSON.parse(orderRow.payload),id:old.transitId},scoped=await readDailyOrderReports(db,order),now=new Date().toISOString();
+ const order={...JSON.parse(orderRow.payload),id:old.transitId};
+ if(['line','sku','lsxCode'].some(k=>order[k]!==old[k]))fail('Lệnh đã đổi Line/SKU/LSX so với phiếu. Cần đối chiếu trước khi điều chỉnh.');
+ const scoped=await readDailyOrderReports(db,order),now=new Date().toISOString();
  let next={...old,cancelled:true,cancelledAt:now,cancelledBy:actor.login,cancelReason:reason};
  if(body.operation==='daily-output-edit'){
   // Same-day quantity/time edit retains its original (including missing) basis.

@@ -416,6 +416,7 @@ async function handleSiteApi(request,env,timing){
    const approvedBefore=dailyContext?dailyOutputTotals({...JSON.parse(transitStored.payload),id:report.transitId},dailyContext.reports.filter(r=>r.id!==report.id)).approved:reportRows.filter(item=>item.key!==body.reportId&&item.payload.kind==='completion'&&item.payload.reviewStatus==='Đã xác nhận'&&(!item.payload.stageReporting||Number(item.payload.approvedQuantity??item.payload.reportedQuantity)>0)&&(report.transitId?item.payload.transitId===report.transitId:item.payload.lsxCode===report.lsxCode)).reduce((sum,item)=>sum+Number(item.payload.approvedQuantity??item.payload.reportedQuantity??0),0);
    const approvedQuantity=approve?Number(report.reportedQuantity||0):0,cumulative=approvedBefore+approvedQuantity,now=new Date().toISOString();
    const transit=transitStored?JSON.parse(transitStored.payload):{};
+   if(isDailyOutput(report)&&['line','sku','lsxCode'].some(k=>transit[k]!==report[k]))return json({error:'Lệnh đã đổi Line/SKU/LSX so với phiếu sản lượng. Đối chiếu lại trước khi xác nhận.'},409);
    if(transit.status==='HỦY'||transit.cancelReason)return json({error:'Lệnh đã hủy tại In transit. Không thể xác nhận hoặc điều chỉnh báo công.'},409);
    if(approve&&cumulative>Number(transit.lsxQty||report.lsxQty||0))return json({error:`LSX ${report.lsxCode}: sản lượng lũy kế vượt số lượng lệnh; kiểm tra các báo công trước khi xác nhận.`},409);
    const completed=Number(transit.lsxQty||report.lsxQty||0)>0&&cumulative>=Number(transit.lsxQty||report.lsxQty||0);

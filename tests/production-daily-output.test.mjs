@@ -21,7 +21,7 @@ test('approved missing-rate contract records quantity but blocks earned money in
 });
 test('invalid amounts, cancelled/unsynced orders, and total above cap reject without input mutation',()=>{
  const before=structuredClone(input);for(const quantity of [0,-1,1.5,1001,NaN])assert.throws(()=>buildDailyOutput({...input,quantity}));
- for(const patch of [{status:'HỦY'},{syncStatus:'CHƯA ĐỒNG BỘ'},{lsxCode:''}])assert.throws(()=>buildDailyOutput({...input,order:{...order,...patch}}));assert.deepEqual(input,before);
+ for(const patch of [{status:'HỦY'},{syncStatus:'CHƯA ĐỒNG BỘ'},{lsxCode:''},{sku:''},{line:'X'}])assert.throws(()=>buildDailyOutput({...input,order:{...order,...patch}}));assert.deepEqual(input,before);
 });
 
 test('editable Vietnam production time selects its own day and never rewrites audit time',()=>{
