@@ -102,7 +102,6 @@ import LaborHoursMaster, {
 } from "../components/labor-hours-master";
 const loadProductionManagement = () => import("../components/production-management");
 const ProductionManagement = deferredScreen(loadProductionManagement);
-import {readProductionWorkflow as prefetchProductionWorkflow} from '../lib/production-workflow-cache';
 const ProductionAllocationWorkspace = deferredScreen(() => import("../components/production-allocation-workspace"));
 import bomData from "./bom-data.json";
 import skuExtraData from "./sku-extra-data.json";
@@ -18093,11 +18092,10 @@ export default function Home() {
     const workAllowed=['report-work','report-review'].some(section=>canOpenMenu(identity.session,'production',section));
     const fullAllowed=canOpenMenu(identity.session,'production','report-progress')||canOpenMenu(identity.session,'production','report-dashboard');
     if(!workAllowed&&!fullAllowed)return;
-    // Prepare both profiles concurrently; menu navigation never starts a waterfall.
-    const warm=()=>{if(document.hidden)return;void loadProductionManagement().catch(()=>{});if(workAllowed)void prefetchProductionWorkflow(false,'work').catch(()=>{});if(fullAllowed)void prefetchProductionWorkflow(false,'full').catch(()=>{});};
-    const timer=window.setTimeout(warm,150),interval=window.setInterval(warm,45000);
-    window.addEventListener('focus',warm);
-    return()=>{window.clearTimeout(timer);window.clearInterval(interval);window.removeEventListener('focus',warm);};
+    // Preload code only. Business data belongs to the active workspace reader;
+    // warming both full/work on every focus/timer multiplies expensive reads.
+    const timer=window.setTimeout(()=>{void loadProductionManagement().catch(()=>{});},150);
+    return()=>window.clearTimeout(timer);
   },[accountKey,identity.authenticated]);
   useEffect(()=>{
     if(LOCAL_TEST||!accountKey)return;

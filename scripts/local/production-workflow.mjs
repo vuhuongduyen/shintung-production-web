@@ -89,17 +89,18 @@ const peopleAt = (events, orderId, at) => {
   }
   return { known, people };
 };
-const laborNotesForReport = (events, report, directory) => {
+const laborNotesForReport = (events, report, directory, readContext=null) => {
+ const own=readContext?readContext.orderEvents.get(report.transitId)||[]:events.filter(e=>e.sourceId===report.transitId||e.destinationId===report.transitId);
  const from=Date.parse(report.startedAt),to=Date.parse(report.completedAt);
  const label=value=>{const {date,minute}=vnMoment(value);return `${String(Math.floor(minute/60)).padStart(2,"0")}:${String(minute%60).padStart(2,"0")} ${date.split("-").reverse().join("/")}`;};
- return effectiveAttendance(events).filter(e=>["absence","line-absence","attendance-override"].includes(e.kind)&&(!e.sourceId||e.sourceId===report.transitId)&&Date.parse(e.effectiveAt)<to&&Date.parse(e.endsAt)>from).flatMap(e=>{
+ return (readContext?.attendance||effectiveAttendance(events)).filter(e=>["absence","line-absence","attendance-override"].includes(e.kind)&&(!e.sourceId||e.sourceId===report.transitId)&&Date.parse(e.effectiveAt)<to&&Date.parse(e.endsAt)>from).flatMap(e=>{
    const start=Math.max(from,Date.parse(e.effectiveAt)),end=Math.min(to,Date.parse(e.endsAt));
-   const points=[start,end,...events.filter(x=>x.sourceId===report.transitId||x.destinationId===report.transitId).map(x=>Date.parse(x.effectiveAt)).filter(t=>t>start&&t<end)].sort((a,b)=>a-b);
+   const points=[start,end,...own.map(x=>Date.parse(x.effectiveAt)).filter(t=>t>start&&t<end)].sort((a,b)=>a-b);
    const spans=[];
    for(let i=1;i<points.length;i++){
      const middle=(points[i-1]+points[i])/2;
-     if(!assignedAt(events,report.transitId,middle).running)continue;
-     const affected=(e.employees||[]).filter(id=>peopleAt(events,report.transitId,middle).people.includes(id));if(!affected.length)continue;
+     if(!assignedAt(own,report.transitId,middle).running)continue;
+     const affected=(e.employees||[]).filter(id=>peopleAt(own,report.transitId,middle).people.includes(id));if(!affected.length)continue;
      const last=spans.at(-1);if(last&&last.end===points[i-1]&&JSON.stringify(last.employees)===JSON.stringify(affected))last.end=points[i];else spans.push({start:points[i-1],end:points[i],employees:affected});
    }
    return spans.map(span=>{const names=span.employees.map(id=>{const p=directory.find(r=>upper(r.key)===id)?.payload;return p?.name?`${p.name} (${id})`:id;}),type=e.absenceType||"Nghỉ";
@@ -173,16 +174,25 @@ const toScheduleMap = (schedules, from, to, line) => {
   }
   return map;
 };
-const attendancePolicy = (calendar, events, line) => ({
+const attendancePolicy = (calendar, events, line, memoize=false) => {
+ const references=new Map(),presence=new Map(),edgeCache=new Map();
+ const referenceFor=date=>{
+  const week=weekOf(date),key=`${week}:${line}`;
+  if(memoize&&references.has(key))return references.get(key);
+  const reference=calendar.approved.get(key),value=reference?{...reference,days:resolveSchedule(calendar,week,line).days}:null;
+  if(memoize)references.set(key,value);return value;
+ };
+ return {
   perDay:true,
   present: (id, date, minute, part) => {
-    const reference = calendar.approved.get(`${weekOf(date)}:${line}`);
-    return !reference || isPresent({ ...reference, days: resolveSchedule(calendar, weekOf(date), line).days }, events, id, line, date, minute, part);
+    const key=JSON.stringify([id,date,minute,part]);if(memoize&&presence.has(key))return presence.get(key);
+    const reference=referenceFor(date),value=!reference||isPresent(reference,events,id,line,date,minute,part);
+    if(memoize&&presence.size<20000)presence.set(key,value);return value;
   },
-  edges: date => [...attendanceEdges(calendar.approved.get(`${weekOf(date)}:${line}`), date),
+  edges: date => {if(memoize&&edgeCache.has(date))return edgeCache.get(date);const value=[...attendanceEdges(calendar.approved.get(`${weekOf(date)}:${line}`), date),
     ...effectiveAttendance(events).filter(event=>["absence","line-absence","attendance-override","line-movement"].includes(event.kind))
-      .flatMap(event=>[event.effectiveAt,event.endsAt].filter(value=>value&&vnMoment(value).date===date).map(value=>vnMoment(value).minute))],
-});
+      .flatMap(event=>[event.effectiveAt,event.endsAt].filter(value=>value&&vnMoment(value).date===date).map(value=>vnMoment(value).minute))];if(memoize)edgeCache.set(date,value);return value;},
+ };};
 const shiftAt = (day, minute) => {
   if (!day?.working) return null;
   const hcStart = asMinutes(day.hcStart || "08:00"), hcEnd = asMinutes(day.hcEnd || "17:00");
@@ -210,7 +220,7 @@ function affectedReport(event,report,events) {
  const points=[from,to,...events.filter(e=>e.sourceId===report.transitId||e.destinationId===report.transitId).map(e=>Date.parse(e.effectiveAt)).filter(t=>t>from&&t<to)].sort((a,b)=>a-b);
  return points.slice(1).some((t,i)=>peopleAt(events,report.transitId,(points[i]+t)/2).people.some(id=>employees.includes(upper(id))));
 }
-function reportCalculation(calendar, events, report, directory, calculateHours=true, includeSnapshot=false) {
+function reportCalculation(calendar, events, report, directory, calculateHours=true, includeSnapshot=false, policyFor=null, readContext=null) {
  if(report.erpStageImport){
   const schedule=toScheduleMap(calendar,report.startedAt,report.completedAt,report.line);
   // Retain the ERP import's established fallback for dates without a web calendar.
@@ -218,15 +228,15 @@ function reportCalculation(calendar, events, report, directory, calculateHours=t
   return {hours:calculateErpStage(report,schedule,effectiveAttendance(events)),laborNotes:report.laborNotes||[],pendingAttendance:[],unresolvedAttendance:[]};
  }
 
- if(report.stageReporting){const policy=attendancePolicy(calendar,events,report.line);policy.extraPresent=(id,date,minute,part)=>{
+ if(report.stageReporting){const policy=policyFor?policyFor(report.line):attendancePolicy(calendar,events,report.line);policy.extraPresent=(id,date,minute,part)=>{
   return isPresent(null,events,id,report.line,date,minute,part);
  };return {hours:stageHours(events,report,toScheduleMap(calendar,report.startedAt,report.completedAt,report.line),policy,hoursForOrder),laborNotes:[],pendingAttendance:[],unresolvedAttendance:[]};}
 
  const schedule=toScheduleMap(calendar,report.startedAt,report.completedAt,report.line);
- const hours=calculateHours&&report.staffingIncomplete!==true?hoursForOrder(events,schedule,report.transitId,report.startedAt,report.completedAt,attendancePolicy(calendar,events,report.line)):null;
- const laborNotes=laborNotesForReport(events,report,directory);
+ const hours=calculateHours&&report.staffingIncomplete!==true?hoursForOrder(events,schedule,report.transitId,report.startedAt,report.completedAt,policyFor?policyFor(report.line):attendancePolicy(calendar,events,report.line)):null;
+ const laborNotes=laborNotesForReport(events,report,directory,readContext);
  const unresolved=laborNotes.filter(note=>note.openArrival);
- const pending=effectiveAttendance(events,true).filter(e=>e.approved===false && ["absence","line-absence","attendance-override"].includes(e.kind) && affectedReport(e,report,events));
+ const pending=(readContext?.pending||effectiveAttendance(events,true)).filter(e=>e.approved===false && ["absence","line-absence","attendance-override"].includes(e.kind) && affectedReport(e,report,readContext?readContext.orderEvents.get(report.transitId)||[]:events));
  return {hours,laborNotes,unresolvedAttendance:unresolved,pendingAttendance:pending.map(e=>({id:e.id,employees:e.employees,absenceType:e.absenceType,effectiveAt:e.effectiveAt,endsAt:e.endsAt})),
    ...(includeSnapshot?{sourceSnapshot:{schedule,attendance:effectiveAttendance(events).filter(e=>Date.parse(e.effectiveAt)<=Date.parse(report.completedAt)&&(["absence","line-absence","attendance-override"].includes(e.kind)?affectedReport(e,report,events):e.sourceId===report.transitId||e.destinationId===report.transitId)),capacity:[...calendar.approved.entries()].filter(([key])=>key.endsWith(`:${report.line}`)&&key.split(":")[0]>=weekOf(vnMoment(report.startedAt).date)&&key.split(":")[0]<=weekOf(vnMoment(report.completedAt).date)).map(([key,r])=>({key,version:r.version,approvedAt:r.approvedAt,roster:r.roster,input:r.input}))}}:{})};
 }
@@ -252,21 +262,27 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   const projectedHr=actor.line?projectPersonalHr(journalEvents,{line:actor.line,employees:employeeDirectory,references:[...calendar.approved.entries()].map(([key,reference])=>({...reference,key,days:resolveSchedule(calendar,...key.split(':')).days}))}):[];
   const scopedJournal=actor.line?[...journalEvents.filter(event=>!personalHrEvent(event)),...projectedHr]:journalEvents;
   const calculationEvents=actor.line?scopedJournal.filter(event=>!event.voided):allEvents;
+  // All caches live inside this single read. Never reuse them after a write or
+  // across users. Policies retain the global attendance/movement boundaries.
+  const policies=new Map(),policyFor=line=>{if(!policies.has(line))policies.set(line,attendancePolicy(calendar,calculationEvents,line,true));return policies.get(line);};
+  const journalPolicies=new Map(),journalPolicy=line=>{if(calculationEvents===allEvents)return policyFor(line);if(!journalPolicies.has(line))journalPolicies.set(line,attendancePolicy(calendar,allEvents,line,true));return journalPolicies.get(line);};
+  const orderEvents=new Map();if(includeDerivedHours)for(const event of allEvents)for(const id of new Set([event.sourceId,event.destinationId].filter(Boolean))){if(!orderEvents.has(id))orderEvents.set(id,[]);orderEvents.get(id).push(event);}
+  const readContext=includeDerivedHours?{orderEvents,attendance:effectiveAttendance(calculationEvents),pending:effectiveAttendance(calculationEvents,true).filter(e=>e.approved===false&&["absence","line-absence","attendance-override"].includes(e.kind))}:null;
   const events = eventRows(scopedJournal, readActor).map(event => ({...event, employeeDetails:eventEmployees(event, employeeDirectory),
-    affectedOrderIds:includeDerivedHours&&!reviewReportId&&!event.sourceId&&["line-absence","attendance-override"].includes(event.kind)?orders.filter(order=>{
+    affectedOrderIds:includeDerivedHours&&!reviewReportId&&!event.sourceId&&["line-absence","attendance-override"].includes(event.kind)?(()=>{
       const start=Date.parse(event.effectiveAt),end=Date.parse(event.endsAt),points=[start,end,...allEvents.map(e=>Date.parse(e.effectiveAt)).filter(t=>t>start&&t<end)].sort((a,b)=>a-b);
-      return points.slice(1).some((t,i)=>peopleAt(allEvents,order.id,(points[i]+t)/2).people.some(id=>event.employees?.includes(id)));
-    }).map(o=>o.id):undefined}));
+      return orders.filter(order=>{const own=orderEvents.get(order.id)||[];return points.slice(1).some((t,i)=>peopleAt(own,order.id,(points[i]+t)/2).people.some(id=>event.employees?.includes(id)));}).map(o=>o.id);
+    })():undefined}));
   if(includeDerivedHours&&!reviewReportId)for (const order of orders) {
-    const moments=allEvents.filter(e=>e.sourceId===order.id||e.destinationId===order.id).map(e=>Date.parse(e.effectiveAt)).filter(Number.isFinite);
+    const moments=(orderEvents.get(order.id)||[]).map(e=>Date.parse(e.effectiveAt)).filter(Number.isFinite);
     if(!moments.length)continue;
     const map=toScheduleMap(calendar,new Date(Math.min(...moments)).toISOString(),new Date(Math.max(...moments)).toISOString(),order.line);
-    const cumulative=timeJournalHours(allEvents,order.id,map,attendancePolicy(calendar,allEvents,order.line));
+    const cumulative=timeJournalHours(allEvents,order.id,map,journalPolicy(order.line));
     for(const event of events)if(event.sourceId===order.id&&cumulative.has(event.id)){
       event.cumulativeLaborHours=cumulative.get(event.id);
       if(event.stageReporting&&event.stageAfter?.startedAt&&Date.parse(event.effectiveAt)>Date.parse(event.stageAfter.startedAt)){
         const report={stageReporting:true,transitId:order.id,line:order.line,stageName:event.stageName,startedAt:event.stageAfter.startedAt,completedAt:event.effectiveAt};
-        event.cumulativeLaborHours=reportCalculation(calendar,calculationEvents,report,[]).hours.total;
+        event.cumulativeLaborHours=reportCalculation(calendar,calculationEvents,report,[],true,false,policyFor,readContext).hours.total;
       }
     }
   }
@@ -323,7 +339,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
         const derive=includeDerivedHours&&(!reviewReportId||row.id===reviewReportId)&&!row.historicalImport;
         const refreshHours=derive&&!row.manualHours&&!row.cancelled&&row.reviewStatus==='Chờ kiểm tra';
         // Stage/ERP metadata also computes hours: reuse that result instead of calculating twice.
-        const calculation=derive&&(row.kind==='completion'||refreshHours)?reportCalculation(calendar,calculationEvents,row,directory,refreshHours):null;
+        const calculation=derive&&(row.kind==='completion'||refreshHours)?reportCalculation(calendar,calculationEvents,row,directory,refreshHours,false,policyFor,readContext):null;
         const {hours,sourceSnapshot,...meta}=calculation||{};
         return {...row,...(overrides.has(row.id)&&(!row.correctedAt||overrides.get(row.id).at>row.correctedAt)?{hours:overrides.get(row.id).hours,hourStatus:'Đã duyệt điều chỉnh'}:{}),
           ...(derive&&row.kind==='completion'?meta:{}),...(refreshHours?{hours}: {})};

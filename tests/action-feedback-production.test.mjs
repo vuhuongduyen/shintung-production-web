@@ -7,7 +7,7 @@ import {createServer} from 'vite';
 // Actual components and shared toolbar/notification host, synthetic reads only.
 const {JSDOM}=createRequire(import.meta.url)('jsdom');
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'https://synthetic.test',pretendToBeVisual:true});
-for(const name of ['window','document','HTMLElement','Element','HTMLInputElement','HTMLSelectElement','HTMLButtonElement','MutationObserver','CustomEvent','Event'])globalThis[name]=dom.window[name];
+for(const name of ['window','document','HTMLElement','Element','HTMLInputElement','HTMLSelectElement','HTMLButtonElement','MutationObserver','CustomEvent','Event','Node','NodeFilter','getComputedStyle'])globalThis[name]=dom.window[name];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
 const vite=await createServer({appType:'custom',configFile:false,resolve:{alias:{'@':fileURLToPath(new URL('..',import.meta.url))}},server:{middlewareMode:true,hmr:false}});
@@ -43,6 +43,13 @@ async function choose(s,value){assert.ok(s);await act(async()=>{s.value=value;s.
 async function change(input,value){assert.ok(input);await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new window.Event('input',{bubbles:true}));});}
 async function search(host,method,control){if(method==='click')await click(button(toolbar(host),'Tìm kiếm'));else{assert.ok(control);await act(async()=>control.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true})));}}
 function scheduleProps(extra={}){return{week,setWeek:()=>{},line:'A',setLine:()=>{},locked:false,days,setDays:()=>{},version:2,approved:{key:`${week}:A`,version:3,days},approvedSchedules:[],history:[],events,orders:[],employees,manager:true,hr:true,busy:false,save:async()=>{throw Error('Unexpected save');},openAction:()=>{throw Error('Unexpected action');},refresh:async()=>true,...extra};}
+test('work board defers full history until explicit detail request and does not first reload work',async()=>{
+ const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
+  assert.deepEqual(requests,['/api/production-workflow?view=work']);
+  await click(button(view.host,'Phân công'));
+  assert.deepEqual(requests,['/api/production-workflow?view=work','/api/production-workflow']);
+ }finally{await view.close();}
+});
 for(const method of ['click','enter']){
  test(`ProductionManagement ${method}: missing category/text explains and preserves previously applied results`,async()=>{
   const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
@@ -54,7 +61,7 @@ for(const method of ['click','enter']){
    await change(input,'   ');await search(view.host,method,input);assert.match(alert(view.host),/Nhập nội dung/);assert.doesNotMatch(body(view.host),/LSX-BETA/);
    await choose(category,'');await search(view.host,method,category);assert.match(alert(view.host),/Chọn hạng mục/);assert.doesNotMatch(body(view.host),/LSX-BETA/);
    await choose(category,'SKU');input=toolbar(view.host).querySelector('input');await change(input,'BETA');await search(view.host,method,input);assert.match(body(view.host),/LSX-BETA/);assert.doesNotMatch(body(view.host),/LSX-ALPHA/);
-   assert.deepEqual(requests,['/api/production-workflow?view=work','/api/production-workflow'],'initial light/full enrichment only; searching must not fetch again');
+   assert.deepEqual(requests,['/api/production-workflow?view=work'],'active work board loads only its own profile; search must not request full history');
   }finally{await view.close();}
  });
  test(`ActualWorkSchedule ${method}: blank employee/week/month criteria explain without changing applied results`,async()=>{
