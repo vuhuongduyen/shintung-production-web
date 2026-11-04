@@ -57,7 +57,7 @@ export function fixture(initial,props={},options={}) {
   if(name.includes('plan-capacity-confirmation.mjs'))return capacityConfirmation;
   if(name.endsWith('plan-transit-backlog.mjs'))return backlog;
   // Display-only dialogs are not mounted by this hook/request harness.
-  if(['./production-plan-rules','./plan-daily-load-warning','./capacity-day-detail'].includes(name))return {default:()=>null};
+  if(['./production-plan-rules','./plan-daily-load-warning','./capacity-day-detail','./production-plan-notices'].includes(name))return {default:()=>null};
   if(name==='./plan-transit-backlog')return {PlanTransitBacklogDetail:()=>null};
   if(name.includes('in-transit'))return {invalidateInTransitCache(){invalidations++;}};
   if(name.includes('production-display-time'))return {productionDisplayTime:value=>value||'—'};

@@ -5,7 +5,8 @@ import {fileURLToPath} from 'node:url';
 import {createServer} from 'vite';
 const {JSDOM}=createRequire(import.meta.url)('jsdom');
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'https://synthetic.test',pretendToBeVisual:true});
-for(const name of ['window','document','HTMLElement','Element','HTMLInputElement','HTMLSelectElement','HTMLButtonElement','MutationObserver','CustomEvent','Event','Node','getComputedStyle'])globalThis[name]=dom.window[name];
+for(const name of ['window','document','HTMLElement','Element','HTMLInputElement','HTMLSelectElement','HTMLButtonElement','MutationObserver','CustomEvent','Event','Node','NodeFilter','DOMRect','getComputedStyle'])globalThis[name]=dom.window[name];
+globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client'),el=React.createElement;
 const vite=await createServer({appType:'custom',configFile:false,resolve:{alias:{'@':fileURLToPath(new URL('..',import.meta.url))}},server:{middlewareMode:true,hmr:false}});
@@ -14,13 +15,13 @@ const {ToolbarPermissions}=await vite.ssrLoadModule('/components/standard-toolba
 const sync=await vite.ssrLoadModule('/lib/data-sync.ts');
 const originalFetch=globalThis.fetch,OriginalChannel=globalThis.BroadcastChannel,channels=new Set();
 if(OriginalChannel)globalThis.BroadcastChannel=class extends OriginalChannel{constructor(name){super(name);channels.add(this);}};
-const week='2026-11-02';let rows,writes,release,planReads,holdNextRead,releaseRead;
+const week='2026-11-02';let rows,writes,release,planReads,holdNextRead,releaseRead,capacityRows;
 const original={id:'ROOT-SYNTHETIC',week,sku:'SYNTHETIC-SKU',name:'Synthetic product',line:'A',start:week,end:week,plan:100,suggested:100,laborHour:0.1,status:'DỰ KIẾN',type:'TUẦN CHÍNH',priority:'THƯỜNG',planId:'SHARED-PLAN',sourceIds:[]};
-beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];release=null;planReads=0;holdNextRead=false;releaseRead=null;globalThis.fetch=async(input,init={})=>{
+beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];release=null;planReads=0;holdNextRead=false;releaseRead=null;capacityRows=[];globalThis.fetch=async(input,init={})=>{
  const url=new URL(String(input),'https://synthetic.test');
  if((init.method||'GET')==='GET'){
   if(url.pathname==='/api/capacity')return Response.json({requests:[]});
-  assert.equal(url.pathname,'/api/production-plan');if(url.searchParams.has('capacityOnly'))return Response.json({capacity:[]});planReads++;const snapshot=structuredClone({revision:rows.length,rows,sources:[],capacity:[],transit:[],audit:[],warnings:[],canReopen:false});if(holdNextRead){holdNextRead=false;return await new Promise(resolve=>releaseRead=()=>resolve(Response.json(snapshot)));}return Response.json(snapshot);
+  assert.equal(url.pathname,'/api/production-plan');if(url.searchParams.has('capacityOnly'))return Response.json({capacity:capacityRows});planReads++;const snapshot=structuredClone({revision:rows.length,rows,sources:[],capacity:capacityRows,transit:[],audit:[],warnings:[],canReopen:false});if(holdNextRead){holdNextRead=false;return await new Promise(resolve=>releaseRead=()=>resolve(Response.json(snapshot)));}return Response.json(snapshot);
  }
  assert.equal(url.pathname,'/api/production-plan');const body=JSON.parse(init.body);writes.push(body);assert.equal(body.action,'split');assert.deepEqual(body.ids,[original.id]);
  rows=[{...original,planGroupId:original.id,groupPlanId:original.planId},{...original,id:'CHILD-SYNTHETIC',planGroupId:original.id,groupPlanId:original.planId,splitFromId:original.id,suggested:null,plan:null}];
@@ -81,5 +82,16 @@ test('a delayed split response cannot overwrite a newer foreign snapshot already
   await act(async()=>sync.announceDataChange('production_plan'));assert.equal(view.host.querySelectorAll('.pp-plan-grid tbody>tr').length,3);
   await act(async()=>release());assert.equal(view.host.querySelectorAll('.pp-plan-grid tbody>tr').length,3);
   assert.deepEqual([...view.host.querySelectorAll('input[aria-label^="Quantity "]')].map(n=>n.value).sort(),['','50','80']);
+ }finally{await view.close();}
+});
+
+
+test('Capacity notice is compact for actionable drafts and disappears without adding/removing banner siblings',async()=>{
+ const view=await mount();try{
+  const slot=view.host.querySelector('[data-plan-notices]'),table=view.host.querySelector('.pp-plan-grid');assert.equal(slot.querySelector('button').style.visibility,'visible');
+  assert.equal(view.host.querySelectorAll('.pp-alert').length,0,'capacity warning is no longer an inline banner');
+  capacityRows=[{week,line:'A',status:'Đã xác nhận',version:1,availableHours:1000}];await act(async()=>sync.announceDataChange('capacity'));
+  assert.equal(view.host.querySelector('[data-plan-notices]'),slot);assert.equal(view.host.querySelector('.pp-plan-grid'),table);assert.equal(slot.querySelector('button').style.visibility,'hidden');assert.equal(view.host.querySelectorAll('.pp-alert').length,0);
+  capacityRows=[];rows=[{...original,status:'HỦY'}];await act(async()=>sync.announceDataChange('production_plan'));assert.equal(slot.querySelector('button').style.visibility,'hidden','a cancelled-only list does not warn about closing new plans');assert.equal(writes.length,0);
  }finally{await view.close();}
 });
