@@ -452,3 +452,7 @@ html body .app-shell .payroll-help-dialog .payroll-rule-section :is(th,td){width
 .production-labor-overlay .production-labor-table .production-subtext{display:block;font-size:14px;line-height:1.4;margin-top:3px}
 .production-labor-overlay .production-labor-table th{background:#edf3ed!important;color:#174c30!important}
 .production-labor-overlay button{border:1px solid #9db6a2;border-radius:3px;padding:5px 8px;background:#f4f8f4;color:#174c30}
+
+/* Radix/Tailwind supplies individual translate. Keep a single centering offset;
+   plain legacy .production-modal elements still use their original transform. */
+.production-modal[data-slot="dialog-content"]{translate:-50% -50%;transform:none}

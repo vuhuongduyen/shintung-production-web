@@ -25,3 +25,9 @@ Browser phải chặn mọi request ngoài origin loopback trước điều hư�
 Kiểm đúng full shell/menu: SX mở Báo công không có công đoạn/giờ NV, ngày giờ mặc định GMT+7 được sửa; lưu phát sinh và lũy kế; nhiều LSX chung Plan ID không lẫn; QLSX chọn/xác nhận; Nhật ký/Điều chỉnh; đổi work sang Payroll khi full chậm/lỗi; HR nghỉ và QLSX phụ kho theo quyền; desktop/mobile và vị trí bảng/overlay. Theo dõi request, lỗi JS, response status và DB giả trước–sau, không chỉ chụp ảnh.
 
 Sửa phiếu đã liên kết kho, thu hồi sau nhận và ACK/công thức tồn cần môi trường Sheet giả/được phép riêng. Không có Sheet thật hoặc giả bridge luôn thành công trong harness này; outbound bị chặn. Không coi lỗi kết nối đó là bằng chứng thao tác kho thành công. CI/HTTP smoke không thay browser acceptance. Không gửi link cho Duyên chỉ vì server chạy, và loopback này không phải URL truy cập từ máy Duyên.
+
+## Bổ sung quyền của tài khoản thử
+
+Ở checkpoint 5783408, fixture có login/session và tên bộ phận nhưng chưa seed department_permissions, nên tài khoản USER HR/QLSX/Kho có thể xem nhờ quyền đọc hiện có mà bị chặn ghi đúng cơ chế backend. Không dùng 403 của fixture thiếu này để kết luận quyền production lỗi; bản Admin/Line và các kiểm backend trước vẫn có phạm vi riêng.
+
+Source bổ sung chỉ trong harness: seed bản ghi quyền bộ phận **trong DB volatile mới** từ permissionProfiles.HR/QLSX/KHO hiện có, không sửa template hay backend, không cập nhật bảng quyền thật. Đăng nhập người dùng cho QA_HR/QA_QLSX/QA_KHO; nút đăng nhập Admin dành QA_ADMIN. HTTP smoke kiểm quyền thật qua site-session và thao tác: HR nghỉ được nhưng không xác nhận SX, QLSX phụ kho/xác nhận được, Kho không được điều chỉnh SX; phiếu báo công không bị viết lại bởi HR/phụ kho. Đây là tài khoản giả theo template, không chứng nhận toàn bộ quyền user production.

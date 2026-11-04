@@ -8,6 +8,7 @@ import {passwordRecord} from '../../worker/password-auth.mjs';
 import {activateDailyPolicy} from '../../tests/helpers/activate-daily-policy.mjs';
 import {mutateProductionWorkflow} from '../local/production-workflow.mjs';
 import {reviewDailyOutput} from '../local/production-daily-review.mjs';
+import {permissionProfiles} from '../../lib/user-permission-profiles.mjs';
 import {warehouseHelperNames} from '../../lib/warehouse-duty.mjs';
 import {recordRevision} from '../../lib/record-revision.mjs';
 // Each QA process creates a disposable local-only test passphrase, never a real credential.
@@ -22,6 +23,7 @@ export async function dailyOutputLoopback({port=0}={}){
  try{
   const db=await runtime.getD1Database('DB');await migrate(db);
   const now=new Date().toISOString(),put=(entity,key,value)=>db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(entity,key,JSON.stringify(value),'SYNTHETIC-QA',now).run();
+  for(const department of ['HR','QLSX','KHO'])await put('department_permissions',department,{department,active:true,permissions:permissionProfiles[department].grants.join(' · ')});
   const fixturePassphrase=crypto.randomUUID();
   const accounts=[['QA_ADMIN','SUPER_ADMIN',''],['QA_HR','USER','HR'],['QA_QLSX','USER','QLSX'],['QA_KHO','USER','KHO']];
   for(const [login,role,department] of accounts){await put('users',login,{login,name:'Synthetic '+login,role,department,active:true});const p=await passwordRecord(fixturePassphrase);await db.prepare('INSERT INTO auth_accounts VALUES(?,?,?,?,1,?)').bind(login,p.hash,p.salt,p.iterations,now).run();}

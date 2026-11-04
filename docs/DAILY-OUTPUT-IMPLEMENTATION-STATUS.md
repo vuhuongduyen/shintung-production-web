@@ -424,3 +424,26 @@ HTTP smoke trên **Worker đã build** **1/1** đạt: password/session thật c
 Summary 10.000 phiếu là 6.868.891 byte; tổng đúng 10.000+200, legacy baseline vẫn 0, report mới chỉ một, retry cùng report ID/không batch ghi. **1/1** benchmark đạt, tổng 35,40 giây chủ yếu seed nằm ngoài khoảng đo đọc/lưu. Trước sửa 10.000 fail, sau sửa đã xử lý đúng; không dùng các mẫu nhỏ khác thời điểm để tuyên bố tăng tốc. Không HTTP/auth/browser/network/Google/Worker CPU/peak memory/p95 hoặc cam kết production hết quá tải. Không giảm số SELECT bằng cách bỏ kiểm consistency.
 
 Gói cbaa86d và a9bebf9 không có bản phân trang này. Sau push cần browser kiểm lại đúng head mới: lưu/tải lại/gửi lại, QLSX xác nhận, sửa/hủy và các lỗi stale; không lấy QA gói cũ thay nghiệm thu. Ba quyết định HR/Leadtime/kế hoạch nhiều mức vẫn giữ nguyên trạng thái chờ, không tự chốt. Không merge/deploy/ghi DB hoặc Sheet thật.
+
+## Browser tìm thấy modal dịch hai lần; chuẩn bị quyền QA đúng
+
+Checkpoint 5783408: workflow 41879590911 SUCCESS, 1.749/1.749 trong 288 file. Metadata job/check-run có độ trễ; đã đọc lại cả bốn job completed/success, không rerun vì độ trễ. Gói source 578 vẫn giữ nguyên, không thay artifact đang QA.
+
+Browser độc lập trên 578, viewport 390 px: modal SL ở x=-163/y=-15,16/rộng358. CSS có đồng thời individual translate -50% -50% của DialogContent/Tailwind và transform translate(-50%,-50%) của .production-modal. Đây là bằng chứng browser, không phải đo JSDOM trong executor này.
+
+Sửa hẹp `.production-modal[data-slot="dialog-content"]`: giữ translate -50% -50%, reset transform về none. Chỉ hai Radix modal sản lượng/điều chỉnh dùng selector này; plain legacy .production-modal giữ transform cũ. Không thay global Dialog, width/max-height, navigation/CSS bảng/font hoặc che body overflow. Dùng individual translate còn tránh để animation transform tạo thêm phần dịch tâm. Cần browser kiểm thực desktop/mobile theo đúng SHA bổ sung, chưa gọi là đã nghiệm thu bằng JSDOM.
+
+Ca cascade trên Board thật tái hiện fail trước sửa: transform còn translate(-50%,-50%) khi translate riêng đã có. Sau sửa test kiểm một offset, fixed/top/left giữ nguyên và legacy plain không bị reset. JSDOM chỉ kiểm cascade, với individual translate mô phỏng đúng utility đã đo bởi browser; không dùng nó để xác nhận pixel/animation. Nhóm Board/HTTP/withdraw-view/notices **11/11**, TypeScript/build đạt; kiểm thêm correction/HTTP ghi riêng khi xong.
+
+Trong lúc đo API quy mô lớn phát hiện fixture QA chưa seed department_permissions: QLSX USER bị 403 đúng backend. Sửa **fixture**, không mở quyền ứng dụng: seeding fresh volatile DB từ các template permissionProfiles chuẩn hiện có. HTTP thực trên Worker build kiểm non-admin roles/grants, HR từ chối xác nhận và Kho từ chối điều chỉnh không đổi phiếu; QLSX xác nhận 100 với reviewedBy QA_QLSX; HR nghỉ/QLSX phụ kho được lưu mà toàn raw report cũ và mới không đổi. Không dùng alias/Admin bypass. Không thay quyền thật hoặc tự chứng nhận user production.
+
+Đo bổ sung `node scripts/bench/daily-confirm-correction.mjs`, Node24/Miniflare/session giả + actual siteApi Request/Response, một mẫu mỗi quy mô; QLSX dùng quyền bộ phận chuẩn, isAdmin=false. Kết nối/bridge chỉ giả trong DB local, không Google/Apps Script/công thức thật. Hai lỗi input fixture lúc chuẩn bị (thiếu quyền và thiếu sku trong ACK) bị backend chặn, đã sửa dữ liệu giả theo hợp đồng, không sửa backend để cho qua.
+
+| Phiếu cùng LSX | Xác nhận QLSX | Preview sửa đã duyệt | Gửi sửa | Retry cùng mã | ACK giả | Retry ACK |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1.000 | 403,14 ms /16 SELECT | 402,75/23 | 467,59/23 | 113,77/7 | 249,86/13 | 29,27/3 |
+| 10.000 | 1.763,27 ms /43 SELECT | 1.316,77/50 | 1.725,04/50 | 93,51/7 | 1.489,51/40 | 34,93/3 |
+
+Xác nhận/gửi sửa/ACK mỗi phase 1 batch; preview/retry không batch. Lượng 200 giữ đến ACK rồi 300; chỉ một receipt, tổng LSX count+300, từng raw report không chọn bằng trước. Đọc so dữ liệu trước/sau dùng readRecordPages để không tự tạo full response lớn trong benchmark. Không before/after speedup, browser/network/Google/Worker CPU/peak-memory/p95; fixtures seed ngoài khoảng đo. Đây là kiểm auth/session API Node, không test password/browser (password đã có HTTP smoke riêng). Chưa tuyên bố stock Sheet thật đã vô hiệu hay công thức production được sửa.
+
+Kiểm cuối nhóm modal/fixture: **17/17** (Board/cascade, corrections, withdrawal view, notices và HTTP role/write/denial), TypeScript/build đạt. Script benchmark trong repo chạy hoàn tất cả hai quy mô, không thay các raw report không chọn. Browser desktop/mobile chưa chạy trong executor này: cần workspace browser độc lập đo lại modal sản lượng và điều chỉnh ở đúng SHA bổ sung; không lấy cascade JSDOM thay pixel. Checkpoint 578/gói cũ không bị ghi đè. Chỉ CSS scoped và công cụ/dữ liệu QA thay đổi, không backend/quyền thật/công thức/kho hoặc policy production. CI mới sau push được đọc riêng.
