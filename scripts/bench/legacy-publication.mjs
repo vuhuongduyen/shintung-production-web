@@ -6,6 +6,9 @@ import {captureLegacySource} from '../local/production-legacy-snapshot.mjs';
 import {prepareLegacyPublication,publishLegacyChunk,finalizeLegacyPublication} from '../local/production-legacy-publication.mjs';
 import {activatePreparedTestPolicy} from '../../tests/helpers/activate-prepared-daily-policy.mjs';
 import {dailyToday,readDailyOutputPolicy} from '../local/production-daily-output.mjs';
+import {reviewer} from '../../tests/helpers/daily-output-reviewer.mjs';
+import {readLegacyPreservation} from '../local/production-legacy-preservation.mjs';
+import {records as databaseRecords} from '../local/database.mjs';
 test('synthetic legacy preservation prepares once and writes bounded chunks without rereading the business workflow',async t=>{
  for(const count of [50,500]){const c=await workflowGetFixture(count);try{
   const actor={isAdmin:true,login:'SYNTHETIC-BENCH'},build={sourceId:'a'.repeat(64)},input={snapshotId:'SYNTHETIC-PUBLICATION-BENCH-'+count,cutoverDate:dailyToday()};
@@ -18,5 +21,14 @@ test('synthetic legacy preservation prepares once and writes bounded chunks with
   start=performance.now();const complete=await finalizeLegacyPublication(c.db,input,actor,build),finalizeMs=performance.now()-start;assert.equal(complete.counts.reports,count);assert.equal((await readDailyOutputPolicy(c.db)).policy,null);
   start=performance.now();await activatePreparedTestPolicy(c.db,input,actor,{...build,simulation:true});const activateMs=performance.now()-start;assert.equal((await readDailyOutputPolicy(c.db)).policy.active,true);
   t.diagnostic(JSON.stringify({orders:count,records:prepared.manifest.publication.recordCount,chunks:prepared.chunks.length,maxChunkRecords:Math.max(...prepared.chunks.map(r=>r.length)),captureMs,prepareMs,chunksMs,finalizeMs,activateMs,chunkReads:reads,chunkBatches:batches}));
+  const anchored=await readLegacyPreservation(c.db,(await readDailyOutputPolicy(c.db)).policy,actor),expected=new Map(anchored.basis.map(b=>[b.reportId,b]));
+  const call=await reviewer({...c,db,put:(entity,key,payload)=>c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(entity,key,JSON.stringify(payload),'SYNTHETIC','now').run()}),beforeRecords=(await databaseRecords(c.db)).filter(r=>r.entity.startsWith('production_')||r.entity==='in_transit');
+  for(const view of ['full','work']){
+   reads=0;batches=0;start=performance.now();const response=await call('/api/production-workflow'+(view==='work'?'?view=work':'')),elapsedMs=performance.now()-start;
+   assert.equal(response.status,200,JSON.stringify(response.body));assert.equal(response.body.reports.length,count);assert.equal(response.body.orders.length,count);
+   if(view==='full')for(const report of response.body.reports){const basis=expected.get(report.id);assert.ok(basis,report.id);assert.equal(report.legacyEarnedBasis.status,basis.status);assert.deepEqual(report.hours,basis.presentation.hours);assert.equal(report.legacyEarnedBasis.earned,basis.earned);}
+   assert.deepEqual((await databaseRecords(c.db)).filter(r=>r.entity.startsWith('production_')||r.entity==='in_transit'),beforeRecords,'GET cannot rewrite business history');
+   t.diagnostic(JSON.stringify({phase:'authenticated-activated-workflow',orders:count,view,elapsedMs,selects:reads,batches,responseBytes:Buffer.byteLength(JSON.stringify(response.body)),limits:'One local synthetic sample; HTTP Request/Response/session/JSON included, no network/browser/Google or production CPU/peak-memory'}));
+  }
  }finally{await c.close();}}
 });

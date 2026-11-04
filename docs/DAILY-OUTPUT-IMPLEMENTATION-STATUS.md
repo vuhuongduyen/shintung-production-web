@@ -244,10 +244,27 @@ Rà chỉ đọc còn cho thấy:
 - `production-plan.mjs` giữ laborHour của dòng đã chốt/đã chuyển, còn draft dùng master hiện tại. Plan kéo dài nhiều ngày dùng một laborHour trên dòng; chưa có phân bổ lượng từng ngày để áp hai mức xuyên biên. Không tự tạo bình quân hoặc chia lượng; cần kiểm thiết kế phân bổ trước khi triển khai phần này.
 - Engine đã có lookup Leadtime/Safety theo tuần và lưu kết quả; không replay snapshot cũ để thay bằng kết quả lookup mới. BOM có confirmationSnapshot/phiếu thay đổi nhưng live projection nguồn được thiết kế riêng, chưa đủ căn cứ đổi toàn bộ sang raw snapshot.
 - Anchor attendance hiện bảo vệ tháng trước tháng cutover. Tháng chứa cutover và các tháng mới vẫn cần bảo vệ phần dữ liệu cũ mà không chặn HR bổ sung hợp lệ hay khóa cứng cả tháng; chưa tìm được hợp đồng chốt tháng trong component payroll. Đây là phần còn làm, không gọi mọi tháng đã bất biến.
-- Full GET lịch sử còn tính một số cumulative event hours trước khi phủ presentation đã chốt. Work profile đã bỏ derived report hours; chưa loại phép tính sự kiện khi chưa chứng minh dữ liệu hiển thị tương đương. Không dùng việc tắt tính để tạo số đo đẹp.
+- Đối chiếu tiếp **call site** API cho thấy policy ngày active đã tắt `includeDerivedHours` cho cả full và work. Mặc định helper còn tính khi chuẩn bị snapshot là có chủ đích, không chứng minh màn hình runtime vẫn tính công đoạn. Các phép cộng lịch sử từ dữ liệu đã lưu vẫn còn để tra cứu; chưa loại chúng khi chưa chứng minh kết quả tương đương.
 
 Probe pure synthetic cho tháng chứa cutover đã xác nhận khoảng trống: cutover 04/11, ca 03/11 có 7 giờ 40 phút, capture không sinh monthly baseline tháng 11. Đổi `employee.startDate` hiện tại sang 01/12 khiến monthlyAttendance tháng 11 mất người đó (7,6667 giờ → không còn người, không báo issue). Không có DB thật được mở hay sửa. Phải bổ sung bảo vệ prefix trước mốc chuyển đổi cùng kiểm luồng HR bổ sung/sửa có audit, không dùng cách đóng băng cả tháng làm mất dữ liệu mới. Đây là lỗi bảo toàn chưa giải quyết, chặn nghiệm thu, không chỉ là câu hỏi chốt tháng.
 
 Điểm cần chốt nếu phát sinh điều chỉnh HR về trước cutover: giữ kết quả đã bảo toàn và lập phiên bản điều chỉnh được duyệt riêng, hay cho người có quyền sửa lại kết quả cũ qua chính luồng HR hiện tại? Cả hai đều phải giữ bản gốc/audit; chưa tự khóa quyền HR hoặc âm thầm bỏ qua một sửa đổi đã lưu. Việc bảo vệ khỏi thay master hiện tại là yêu cầu đã chốt, không hỏi lại.
 
 CI nhóm kho `3b975110ff5386d975428ee796a6f5ef1b847124`, run [41845095269](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41845095269), đã đạt **1.704/1.704 trong 279 file** (587 + 451 + 666), không fail/cancel/skip/todo, không file thiếu summary. TypeScript và ba build đạt. Source Safety tiếp theo phải kiểm CI riêng; không gán mốc 1.704 cho source chưa push.
+
+## Bỏ projection công đoạn trên màn sản lượng; đo API sau kích hoạt TEST
+
+Tìm thấy effect của ProductionManagement vẫn gọi `projectLiveStages` hoặc `projectIncidentStages` ở chế độ work, kể cả khi policy ngày active. Thêm guard `dailyMode`, có dependency để chuyển policy đúng; luồng stage/incident cũ giữ nguyên. Test chạy chính callback từ source chứng minh chế độ ngày không gọi cả hai hàm và không schedule setStageState; luồng legacy vẫn nhận đủ đầu vào. Nhóm effect/daily board/loading **31/31** đạt, không phải nghiệm thu browser hoặc số đo thời gian render.
+
+Mở rộng script tái lập `node --test scripts/bench/legacy-publication.mjs`: sau chốt đủ anchor/kích hoạt DB fixture, gọi **siteApi thật bằng Request/Response và session giả**, đối chiếu từng report.hours, trạng thái/căn cứ earned với anchor và kiểm mọi production record/in_transit trước–sau GET bất biến. Không dùng direct helper mặc định để suy ra đường đi API.
+
+| LSX/phiếu legacy | Full GET / SELECT / JSON | Work GET / SELECT / JSON |
+| --- | --- | --- |
+| 50 | 552,29 ms / 33 / 211.058 byte | 462,34 ms / 29 / 165.426 byte |
+| 500 | 753,33 ms / 36 / 2.051.261 byte | 624,34 ms / 31 / 1.607.028 byte |
+
+Một mẫu/quy mô Node24/Miniflare, đã gồm session handler và parse JSON, không gồm mạng/trình duyệt/Google, không CPU/peak memory/p95 hoặc cam kết tải production. Payload work vẫn lớn theo lịch sử; cần phân tách dữ liệu sâu hơn sau khi chứng minh mọi consumer dùng projection gọn đúng, không tự xóa lịch sử. Test script **1/1** đạt và thoát bình thường; script benchmark không thuộc danh sách tests/*.test.mjs cấp cao nhất của CI nên không cộng vào tổng CI.
+
+Đo riêng API xác nhận (ba mẫu/quy mô, không chạy build hay benchmark khác đồng thời): 0/1.000/10.000 report không liên quan có thời gian 218,02–252,10 / 190,06–219,32 / 194,37–285,47 ms; cố định **12 SELECT/1 batch**, đúng lượng 200 và chỉ một phiếu kho. Đây là số đo TEST hiện tại, không so before/after hay chứng nhận Sheet/browser.
+
+CI Safety `0693e496f64717a0fc34f59a5fd57ea709eeccfc`, run [41846383446](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41846383446), đã đạt **1.706/1.706 trong 280 file** (533 + 510 + 663), không fail/cancel/skip/todo hoặc file thiếu summary; TypeScript và ba build đạt. Nhóm projection/benchmark bổ sung tiếp: kiểm local 31/31, kiểm callback cuối 2/2 có giao nhau, TypeScript/build đạt; CI của commit bổ sung phải kiểm riêng sau push.

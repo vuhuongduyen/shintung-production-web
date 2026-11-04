@@ -112,7 +112,7 @@ export default function ProductionManagement({ mode, sessionLine, preferenceUser
   const {message,setMessage,clearMessage,onInteraction}=useProductionActionNotice(JSON.stringify([mode,preferenceUser,workspaceActive,line,calendarLine,week]));
   useEffect(()=>{window.sessionStorage.setItem("onspa-production-week",week);},[week]);
   const liveEvents=useMemo(()=>data.events.filter(e=>!e.voided&&!e.historicalImport),[data.events]);
-  useEffect(()=>{if(mode!=='work')return;setStageState(old=>data.rights.stageLive?projectLiveStages(data.orders,data.reports,data.events):projectIncidentStages(old,liveEvents,data.orders));},[mode,liveEvents,data.orders,data.reports,data.rights.stageLive]);
+  useEffect(()=>{if(mode!=='work'||dailyMode)return;setStageState(old=>data.rights.stageLive?projectLiveStages(data.orders,data.reports,data.events):projectIncidentStages(old,liveEvents,data.orders));},[mode,dailyMode,liveEvents,data.orders,data.reports,data.rights.stageLive]);
   const attendanceInstance=useRef({});
   const dataRevision=useDataRefresh(['production_workflow','production_report'],{ignoreSource:dailyOwner.current});
   const load=useCallback((_silent=false,force=false)=>reader.refresh(force),[reader]);
