@@ -63,3 +63,5 @@ test('output quantities stay per event, accumulate before filtering and exclude 
  assert.equal(timeJournalQuantities(events,[]).at(-1).cumulativeQuantity,null);
  assert.equal(timeJournalQuantities(events,reports.map(r=>({...r,reportedQuantity:0}))).at(-1).cumulativeQuantity,0);
 });
+
+test('withdrawal journal preserves each historical phase instead of claiming all events are applied or completed',()=>{for(const [kind,phase,status] of [['daily-output-withdrawal-request','pending','Chờ Kho xử lý thu hồi'],['daily-output-withdrawal-decision','approved-awaiting-sheet','Kho đồng ý, chờ đối soát Sheet'],['daily-output-withdrawal-decision','rejected','Kho từ chối thu hồi'],['daily-output-withdrawal-completed','completed','Đã thu hồi']]){const entry={id:kind+phase,kind,reportingModel:'daily-finished-v1',quantityOnly:true,after:{status:phase}},before=JSON.stringify(entry);assert.equal(journalContext(entry,[]).status,status);assert.equal(JSON.stringify(entry),before);}});

@@ -119,3 +119,18 @@ Payroll lập nhóm reports theo transitId một lần; không quét toàn bộ 
 - Kết quả chỉ `captured`/`preview`, **không publish complete, không tạo anchor/policy hoặc kích hoạt**. Bản policy trỏ đến snapshot chưa complete vẫn bị khóa. Cần triển khai chốt anchor theo lô + kiểm atomic cuối, kiểm quy mô lớn và bước activation riêng sau nghiệm thu. Không xem helper preview là đã hoàn thiện toàn bộ cutover.
 
 Kiểm local: nhóm rộng payroll/ngày/legacy/journal/lookup **128/128**, nhóm Worker/snapshot/orphan cuối **15/15** (có giao nhau); TypeScript và build đạt. Test snapshot có idempotency, mất/đổi source build, lỗi batch rollback, nguồn live thay đổi, phantom và source guard; không đọc/ghi DB thật. CI đúng head bổ sung phải kiểm riêng; ea83107 trước đó đã đạt 1.617/1.617, 270 file.
+
+
+## CI cda5889 và luồng thu hồi đang phát triển
+
+CI [41818025046](https://github.com/vuhuongduyen/shintung-production-web/actions/runs/41818025046) đúng head `cda5889586f9cf7dea07c6c3e4ddc9be7f0defaf`: TypeScript, ba build và **1.626/1.626 test, 272 file**, không fail/cancel/skip/timeout. Đây là checkpoint LSX lưu trữ/snapshot đầu vào, không phải chứng nhận các phần bổ sung dưới đây.
+
+Source thu hồi bổ sung queue yêu cầu, quyết định Kho và ACK qua bridge đã xác thực sẵn. Không thêm quyền hoặc endpoint công khai. Phiếu đã nhận chỉ hủy hiệu lực sau khi Kho đồng ý và Sheet chứng minh giữ dòng gốc, giữ lượng gốc, công thức loại lượng khỏi tồn. Trước ACK, báo cáo/kho vẫn giữ lượng có hiệu lực; chỉ ghi yêu cầu/quyết định. Hoàn tất giữ số lượng và người/thời điểm xác nhận gốc trên phiếu đã hủy, ghi riêng lịch sử thu hồi, tính lại đúng LSX từ các phiếu còn hiệu lực. Phiếu mới/LSX chung Plan ID khác không bị ghi đè; LSX lưu trữ không tự tạo lại. Khi hủy phiếu ngày cuối, không được phục hồi completedQty cache cũ.
+
+Source Apps Script có menu quyết định bằng email Google hiện hành, kiểm quyền sửa trước/sau xem xét, giữ dòng/ghi chú và E/N/R/S. Chỉ cập nhật trạng thái vô hiệu hóa khi đúng ID/SKU/LSX/lượng và công thức tồn cho SKU đã loại trạng thái hủy; thiếu dòng gốc không tạo dòng thay thế. Mất phản hồi giữ mã quyết định/lượt ACK, không quyết định lại; di chuyển dòng chỉ đổi vị trí quan sát, không tạo thao tác mới. Source này **chưa cài lên Sheet**, công thức thật chưa được thay, không có ghi dữ liệu production.
+
+Bổ sung hồi quy điều chỉnh: preview phải ràng buộc cả nội dung đề xuất. Test trước sửa tái hiện đổi quantity sau preview vẫn ghi được; bản sửa thêm fingerprint vào expectedRevision, giữ kiểm phiên bản/quyền/CAS và bắt xem lại lượng, ngày giờ hoặc lý do khác.
+
+Giới hạn chặn nghiệm thu vẫn còn: sửa/hủy trực tiếp khi Kho chưa xác nhận chưa hoàn thiện; UI yêu cầu/theo dõi thu hồi chưa nối đủ; công thức Sheet thực tế cần kế hoạch triển khai/đối soát riêng; chưa QA browser đúng Worker, chưa benchmark riêng luồng thu hồi hoặc recalculate Google Sheets. Snapshot mới chỉ captured/preview, chưa publish/activation; ngày hiệu lực toàn web và bảo vệ tháng đóng sau cutover chưa hoàn tất. Không merge/triển khai từ checkpoint này.
+
+Kiểm local checkpoint thu hồi: nhóm rộng **80/80**; nhóm thu hồi cuối **15/15** (có giao nhau, thêm race insert giữa batch), nhóm Nhật ký **6/6**; không fail/cancel/skip. Replay bridge chỉ cho phép metadata kết nối `lastContactAt` cập nhật, mọi bản ghi nghiệp vụ/audit cũ vẫn bất biến. TypeScript/build đạt trước bổ sung nhãn Nhật ký thuần; test Nhật ký chạy sau thay đổi nhãn. CI commit mới cần đọc riêng, không lấy 1.626 test của cda5889 làm kết quả source mới.

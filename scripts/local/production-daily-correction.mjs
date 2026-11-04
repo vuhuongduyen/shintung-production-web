@@ -35,7 +35,7 @@ export async function correctDailyOutput(db,body,actor){
   next={...old,...rebuilt,legacyCompletedBaseline:old.legacyCompletedBaseline,reportedAt:old.reportedAt,delayReason:body.productionDate===old.productionDate?old.delayReason:null,reviewStatus:'Chờ kiểm tra',rejectionReason:null,correctedAt:now,correctedBy:actor.login};
  }
  next.version=Number(old.version||0)+1;
- const cursorRaw=cursor?.payload||JSON.stringify({version:0,token:''}),expectedRevision=await recordRevision(JSON.stringify([cursorRaw,reportRow.payload,orderRow.payload,policy.raw,policy.manifestRaw,rateRow?.payload??null,scoped.guards]));
+ const cursorRaw=cursor?.payload||JSON.stringify({version:0,token:''}),expectedRevision=await recordRevision(JSON.stringify([fingerprint,cursorRaw,reportRow.payload,orderRow.payload,policy.raw,policy.manifestRaw,rateRow?.payload??null,scoped.guards]));
  if(body.action==='preview')return {ok:true,expectedRevision,before:old,after:next};
  if(body.expectedRevision!==expectedRevision||Number(body.expectedVersion)!==Number(old.version||0))fail(conflictMessage);
  const event={id:crypto.randomUUID(),kind:'daily-output-correction',reportingModel:dailyOutputModel,quantityOnly:true,sourceId:old.transitId,line:old.line,reportId:old.id,operation:body.operation,before:old,after:next,reason,actor:actor.login,recordedAt:now,effectiveAt:now,requestIdempotency:token,requestFingerprint:fingerprint};

@@ -117,6 +117,8 @@ function KHO_TP_taoMenuKho_() {
       "Xác nhận dòng đang chọn",
       "KHO_TP_xacNhanDongDangChon"
     )
+    .addItem("Đồng ý thu hồi dòng đang chọn", "ONSPA_dongYThuHoiDongDangChon")
+    .addItem("Từ chối thu hồi dòng đang chọn", "ONSPA_tuChoiThuHoiDongDangChon")
     .addToUi();
 }
 

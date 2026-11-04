@@ -1,3 +1,4 @@
+import {decideDailyWithdrawalFromSheet,acknowledgeDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
 import {isDailyOutput} from '../lib/production-report-model.mjs';
 const productionTime=report=>isDailyOutput(report)?report.productionDate:report?.completedAt;
 // Scoped bridge: only newly approved receipts explicitly marked for Sheets are exported.
@@ -52,8 +53,24 @@ export async function sheetBridge(request,env){
  const key=String(b.receiptId||''),stored=await db.prepare("SELECT payload FROM app_records WHERE entity='warehouse_in' AND record_key=?").bind(key).first();
  if(!stored)fail('Không tìm thấy phiếu nhập kho trên web.',404);
  const p=JSON.parse(stored.payload);
- if(!p.sheetSync||p.source!=='Sản xuất'||p.reportId!==b.reportId||p.sku!==b.sku||p._deleted||p.cancelled||p.voided)fail('Phiếu không thuộc kết nối này hoặc đã hủy.',409);
+ if(!p.sheetSync||p.source!=='Sản xuất'||p.reportId!==b.reportId||p.sku!==b.sku||p._deleted)fail('Phiếu không thuộc kết nối này.',409);
+ if(b.action==='withdrawal-ack')return reply(await acknowledgeDailyWithdrawal(db,b,{verified:true,spreadsheetId:config.spreadsheetId}));
+ if(['withdrawal-preview','withdrawal-approve','withdrawal-reject'].includes(b.action)){if(!p.withdrawalRequest?.id||p.withdrawalRequest.id!==b.commandId)fail('Yêu cầu thu hồi không khớp dòng Kho.',409);return reply(await decideDailyWithdrawalFromSheet(db,{...b,withdrawalId:p.withdrawalRequest.id},{verified:true,spreadsheetId:config.spreadsheetId,receiptId:key}));}
+ if(p.cancelled||p.voided)fail('Phiếu đã hủy.',409);
  const now=new Date().toISOString();let next;
+ if(b.action==='withdrawal-notice-ack'){
+  const last=p.sheetSync.lastWithdrawalNotice;
+  if(last?.id===b.commandId&&last.revision===Number(b.commandRevision))return reply({ok:true,duplicate:true,pending:last.status==='pending'});
+  const command=p.sheetSync.command,request=command?await read(db,'production_warehouse_withdrawal',command.id):null;
+  if(!request||!['pending','rejected'].includes(request.status)||request.status!==b.markedStatus||request.receiptId!==key||command.id!==b.commandId||command.revision!==Number(b.commandRevision)||request.version!==command.revision)fail('Thông báo thu hồi đã đổi; tải đúng phiên bản lệnh trước khi ghi nhận.',409);
+  if(b.originalRowRetained!==true||b.noQuantityChange!==true||Number(b.originalProposedQuantity)!==Number(p.proposedQuantity)||Number(b.originalReceivedQuantity)!==Number(p.receivedQuantity)||!Number.isSafeInteger(b.sheetRow)||b.sheetRow<2)fail('Chưa đủ căn cứ giữ nguyên dòng và lượng kho.',422);
+  const report=await read(db,'production_report',p.reportId),latest=productionTime(report)||p.sourceCompletedAt||'',notice={id:command.id,revision:command.revision,status:request.status,at:now};
+  next={...p,sheetSync:{...p.sheetSync,status:request.status==='pending'?'waiting-warehouse':'sent',command:request.status==='pending'?command:null,lastWithdrawalNotice:notice,exportedCompletedAt:latest,at:now,error:''}};
+  const result=await db.batch([db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='warehouse_in' AND record_key=? AND payload=?").bind(JSON.stringify(next),'Google Sheet kho',now,key,stored.payload),db.prepare("INSERT INTO app_records SELECT 'warehouse_sheet_audit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=? AND payload=?)").bind(crypto.randomUUID(),JSON.stringify({action:b.action,receiptId:key,withdrawalId:command.id,revision:command.revision,status:request.status,at:now}),'Google Sheet kho',now,key,JSON.stringify(next))]);
+  if(result[0].meta.changes!==1)fail('Lệnh thu hồi vừa đổi; chưa ghi nhận thông báo cũ.',409);return reply({ok:true,pending:request.status==='pending'});
+ }
+
+ if(b.action==='ack'&&p.sheetSync.command)fail('Phiếu có lệnh điều chỉnh/thu hồi đang chờ. Cần mã đồng bộ hỗ trợ đúng lệnh; chưa xác nhận hoàn tất.',409);
  if(b.action==='ack'||b.action==='error'){
   const report=await read(db,'production_report',p.reportId),latest=productionTime(report)||p.sourceCompletedAt||'';
   if(b.action==='ack'&&p.sheetSync.correctionRevision&&(b.correctionRevision!==p.sheetSync.correctionRevision||Number(b.proposedQuantity)!==Number(p.proposedQuantity)))fail('Phiếu đã điều chỉnh số lượng. Cập nhật mã đồng bộ kho và tải lại phiếu mới trước khi xác nhận đồng bộ.',409);

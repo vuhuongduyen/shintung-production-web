@@ -1,3 +1,4 @@
+import {decideDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
 import {readLegacyPreservation} from '../scripts/local/production-legacy-preservation.mjs';
 import {dailyAttendanceActions} from '../lib/production-report-model.mjs';
 import {reviewDailyOutput} from '../scripts/local/production-daily-review.mjs';
@@ -378,9 +379,9 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/production-workflow'&&body.action==='unassigned-reminder'){if(reportingHold)return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,await readProductionWorkflow(productionDb,actor,await loadCatalog(),{includeDerivedHours:false}),body.reminder));}
   if(path==='/api/production-workflow'&&body.action==='incident-create')return json(await createProductionIncident(productionDb,actor,body,await readProductionWorkflow(productionDb,actor,await loadCatalog())));
   if(path==='/api/production-workflow'){const quantityOnly=body.action==='daily-output',attendanceOnly=dailyAttendanceActions.has(body.action)&&(await readDailyOutputPolicy(productionDb)).policy?.active;return json(await mutateProductionWorkflow(productionDb,body,actor,quantityOnly||attendanceOnly?[]:await loadCatalog()));}
-  if(path==='/api/warehouse-confirm')return json(await confirmSelectedWarehouse(env.DB,body,actor));
+  if(path==='/api/warehouse-confirm')return json(await (String(body.action||'').startsWith('withdrawal-')?decideDailyWithdrawal(env.DB,body,actor):confirmSelectedWarehouse(env.DB,body,actor)));
   if(path==='/api/warehouse-backfill')return json(await (String(body.action).startsWith('confirm')?confirmWarehouse(env.DB,body,actor):warehouseBackfill(env.DB,body,actor)));
-  if(path==='/api/production-correction'){if(body.operation==='cancel-reporting-day'&&(await readDailyOutputPolicy(productionDb)).policy?.cutoverReached)return json({error:'Lịch sử công đoạn chỉ để tra cứu; không hủy ngày báo công cũ sau chuyển đổi.'},409);return json(body.operation==='cancel-reporting-day'?await cancelReportingDay(productionDb,body,actor,url.hostname):await correctProduction(productionDb,body,actor,['daily-output-edit','daily-output-cancel'].includes(body.operation)?[]:await loadCatalog()));}
+  if(path==='/api/production-correction'){if(body.operation==='cancel-reporting-day'&&(await readDailyOutputPolicy(productionDb)).policy?.cutoverReached)return json({error:'Lịch sử công đoạn chỉ để tra cứu; không hủy ngày báo công cũ sau chuyển đổi.'},409);return json(body.operation==='cancel-reporting-day'?await cancelReportingDay(productionDb,body,actor,url.hostname):await correctProduction(productionDb,body,actor,['daily-output-edit','daily-output-cancel','daily-output-withdraw'].includes(body.operation)?[]:await loadCatalog()));}
   if(path==='/api/production-report'){
    if(!actor.isAdmin&&!hasMenuPermission(actor,productionMenus.progress,['Xác nhận']))return json({error:'Chỉ QLSX được duyệt báo công.'},403);
    if(body.action!=='review'||!body.reportId)return json({error:'Yêu cầu kiểm tra báo công không hợp lệ.'},400);
