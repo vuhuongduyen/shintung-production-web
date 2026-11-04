@@ -28,21 +28,30 @@ function ONSPA_dongBoTuDong(){
  try{
  const p=PropertiesService.getScriptProperties().getProperties(),sh=SpreadsheetApp.openById(p.ONSPA_SHEET).getSheetByName('NHAP');if(!sh)throw Error('Không có tab NHAP.');
  const receipts=ONSPA_api_({action:'pull'}).receipts||[];
+ let indexedLastRow=-1,reportRows=new Map();
+ function refreshReportRows(){const last=sh.getLastRow();if(last===indexedLastRow)return;reportRows=new Map();if(last>1)sh.getRange(2,10,last-1,1).getValues().forEach((v,i)=>{const id=String(v[0]);if(!reportRows.has(id))reportRows.set(id,[]);reportRows.get(id).push(i+2);});indexedLastRow=last;}
  for(const r of receipts){
  try{
- const n=sh.getLastRow(),values=n>1?sh.getRange(2,1,n-1,21).getValues():[],matches=[];
- values.forEach((v,i)=>{if(String(v[9])===r.reportId)matches.push(i+2);});
+ refreshReportRows();const matches=reportRows.get(String(r.reportId))||[];
+ const fresh=indexedLastRow>1?sh.getRange(2,10,indexedLastRow-1,1).createTextFinder(String(r.reportId)).matchEntireCell(true).matchCase(true).useRegularExpression(false).findAll().map(cell=>cell.getRow()):[];
+ if(fresh.length!==matches.length||fresh.some((row,i)=>row!==matches[i]))throw Error('ID hoặc vị trí phiếu vừa thay đổi trong Sheet. Cần tải lại và đối chiếu, không tự ghi đè.');
  if(matches.length>1)throw Error('ID báo công trùng nhiều dòng. Cần đối chiếu, không tự ghi đè.');
  const raw=String(r.sourceCompletedAt||'');const date=new Date(/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?$/.test(raw)?raw+'+07:00':raw);if(!Number.isFinite(date.getTime()))throw Error('Thiếu ngày xuất trạm hợp lệ.');
  let row=matches[0];
- if(row){const v=sh.getRange(row,1,1,21).getValues()[0];if(String(v[2])!==r.sku||String(v[8])!==r.lsxCode||Number(v[4])!==Number(r.proposedQuantity)||v[7]!=='ONSPA_WEB')throw Error('ID đã có nhưng dữ liệu hoặc nguồn khác. Cần đối chiếu phiếu cũ trước khi liên kết.');}
+ if(row){const v=sh.getRange(row,1,1,21).getValues()[0];if(String(v[9])!==String(r.reportId)||String(v[2])!==r.sku||String(v[8])!==r.lsxCode||v[7]!=='ONSPA_WEB')throw Error('ID đã có nhưng dữ liệu hoặc nguồn khác. Cần đối chiếu phiếu cũ trước khi liên kết.');
+ if(Number(v[4])!==Number(r.proposedQuantity)){
+  if(!r.sheetSync?.correctionRevision||v[12]!=='CHỜ KHO XÁC NHẬN'||v[13]!==''||v[17]!==''||v[18]!=='')throw Error('Phiếu kho đã có dữ liệu nhận hàng hoặc chưa có điều chỉnh hợp lệ; không tự ghi đè.');
+  sh.getRange(row,5).setValue(r.proposedQuantity);
+ }
+}
  else{
  row=Math.max(2,sh.getLastRow()+1);if(row>sh.getMaxRows())sh.insertRowsAfter(sh.getMaxRows(),1);
  sh.getRange(row,1,1,21).setValues([[date,'',ONSPA_text_(r.sku),ONSPA_text_(r.name),r.proposedQuantity,ONSPA_text_(r.spec),'','ONSPA_WEB',ONSPA_text_(r.lsxCode),ONSPA_text_(r.reportId),ONSPA_text_(r.planId),ONSPA_text_(r.line),'CHỜ KHO XÁC NHẬN','','','',new Date(),'','','CHƯA ĐỒNG BỘ WEB','']]);
+ reportRows.set(String(r.reportId),[row]);indexedLastRow=sh.getLastRow();
  sh.getRange(row,1).setNumberFormat('dd/MM/yyyy');sh.getRange(row,17,1,2).setNumberFormat('dd/MM/yyyy HH:mm:ss');
  }
  sh.getRange(row,1).setValue(date).setNumberFormat('dd/MM/yyyy');
- SpreadsheetApp.flush();ONSPA_api_({action:'ack',receiptId:r.id,reportId:r.reportId,sku:r.sku,sourceCompletedAt:r.sourceCompletedAt});
+ SpreadsheetApp.flush();ONSPA_api_({action:'ack',receiptId:r.id,reportId:r.reportId,sku:r.sku,sourceCompletedAt:r.sourceCompletedAt,proposedQuantity:r.proposedQuantity,correctionRevision:r.sheetSync?.correctionRevision||null});
  }catch(e){ONSPA_api_({action:'error',receiptId:r.id,reportId:r.reportId,sku:r.sku,error:String(e.message||e)});}
  }
  const n=sh.getLastRow();if(n>1){const rows=sh.getRange(2,1,n-1,21).getValues();let count=0;rows.forEach((v,i)=>{if(count<50&&v[7]==='ONSPA_WEB'&&['KHO ĐÃ XÁC NHẬN','CÓ CHÊNH LỆCH'].includes(v[12])&&v[19]!=='ĐÃ ĐỒNG BỘ WEB'){count++;ONSPA_guiXacNhan_(sh,i+2);}});}
