@@ -17,3 +17,47 @@ test('a chunk batch failure rolls progress and every anchor back; an extra ancho
 test('published anchors are read by the authenticated Worker and retain the observed result after current rate/personnel changes',()=>fixture(async c=>{const {activatePreparedTestPolicy}=await import('./helpers/activate-prepared-daily-policy.mjs');await c.db.prepare("INSERT INTO app_records VALUES('production_test_environment','isolated','{\"isolated\":true}','SYNTHETIC','now')").run();const p=await prepareLegacyPublication(c.db,input,actor,build);await allChunks(c,p);await finalizeLegacyPublication(c.db,input,actor,build);await activatePreparedTestPolicy(c.db,input,actor,{...build,simulation:true});const {reviewer}=await import('./helpers/daily-output-reviewer.mjs'),call=await reviewer({...c,put:(e,k,v)=>c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(e,k,JSON.stringify(v),'SYNTHETIC','now').run()}),before=await call('/api/production-workflow');assert.equal(before.status,200);const historical=before.body.reports.find(r=>r.id==='SYNTHETIC-LSX3-report');assert.equal(historical.legacyEarnedBasis.status,'resolved');assert.equal(historical.legacyEarnedBasis.unit,.1);assert.equal(historical.legacyEarnedBasis.earned,10);assert.deepEqual(before.body.orders[0].processes,['OLD-ASSY','OLD-PACK']);const rawReports=(await records(c.db)).filter(r=>r.entity==='production_report');await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.laborHour',9) WHERE entity='labor_hours'").run();await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.name','SYNTHETIC-NEW-NAME','$.line','B') WHERE entity='employees'").run();await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.processes',json('[\"NEW-ONLY\"]')) WHERE entity='sku' AND record_key='SYNTHETIC-SKU'").run();const after=await call('/api/production-workflow');assert.equal(after.status,200);assert.deepEqual(after.body.orders[0].processes,before.body.orders[0].processes);const preserved=after.body.reports.find(r=>r.id===historical.id);assert.deepEqual(preserved.legacyEarnedBasis,historical.legacyEarnedBasis);assert.deepEqual(preserved.hours,historical.hours);const storedBaseline=rows=>rows.map(({integrity,livePrefixMatches,...row})=>row);assert.deepEqual(storedBaseline(after.body.payrollBaselines),storedBaseline(before.body.payrollBaselines));assert.deepEqual(after.body.payrollBaselines.find(b=>b.until)?.integrity,{A:'matched',B:'matched'});assert.equal(after.body.payrollBaselines.find(b=>b.until)?.livePrefixMatches.B,false,'live master mismatch is verification metadata, not a rewritten anchor');assert.deepEqual((await records(c.db)).filter(r=>r.entity==='production_report'),rawReports);}));
 
 test('TEST activation rechecks every published anchor atomically instead of trusting only the complete flag',()=>fixture(async c=>{const {activatePreparedTestPolicy}=await import('./helpers/activate-prepared-daily-policy.mjs');await c.db.prepare("INSERT INTO app_records VALUES('production_test_environment','isolated','{\"isolated\":true}','SYNTHETIC','now')").run();const p=await prepareLegacyPublication(c.db,input,actor,build);await allChunks(c,p);await finalizeLegacyPublication(c.db,input,actor,build);const r=p.chunks[0][0];await c.db.prepare('UPDATE app_records SET payload=? WHERE entity=? AND record_key=?').bind('{}',r.entity,r.key).run();const before=await records(c.db);await assert.rejects(()=>activatePreparedTestPolicy(c.db,input,actor,{...build,simulation:true}),{status:409});assert.deepEqual(await records(c.db),before);assert.equal((await readDailyOutputPolicy(c.db)).policy,null);}));
+
+// Faults are injected after the preparatory reads, immediately before D1 batch.
+// Only the synthetic competing write may survive; activation must add nothing.
+for(const fault of ['source','anchor','manifest','activation'])test(`TEST activation rejects concurrent ${fault} changes at commit without partial policy`,()=>fixture(async c=>{
+ const {activatePreparedTestPolicy}=await import('./helpers/activate-prepared-daily-policy.mjs');
+ await c.db.prepare("INSERT INTO app_records VALUES('production_test_environment','isolated','{\"isolated\":true}','SYNTHETIC','now')").run();
+ const p=await prepareLegacyPublication(c.db,input,actor,build);await allChunks(c,p);await finalizeLegacyPublication(c.db,input,actor,build);
+ let expected,injected=false;
+ const raced=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{
+  assert.equal(injected,false,'activation must not retry with a new nonce');injected=true;
+  if(fault==='source')await target.prepare("INSERT INTO app_records VALUES('employees','SYNTHETIC-ACTIVATION-PHANTOM','{}','SYNTHETIC','now')").run();
+  if(fault==='anchor'){const r=p.chunks[0][0];await target.prepare('UPDATE app_records SET payload=? WHERE entity=? AND record_key=?').bind('{}',r.entity,r.key).run();}
+  if(fault==='manifest')await target.prepare("UPDATE app_records SET payload=json_set(payload,'$.status','staging') WHERE entity='production_legacy_manifest' AND record_key=?").bind(input.snapshotId).run();
+  if(fault==='activation')await target.prepare("INSERT INTO app_records VALUES('production_reporting_activation','global',?,'SYNTHETIC','now')").bind(JSON.stringify({id:'SYNTHETIC-COMPETING-ACTIVATION',legacySnapshotId:'SYNTHETIC-OTHER-SNAPSHOT',sourceId:build.sourceId})).run();
+  expected=await records(target);return target.batch(statements);
+ };const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ await assert.rejects(()=>activatePreparedTestPolicy(raced,input,actor,{...build,simulation:true}),{status:409});
+ assert.equal(injected,true);assert.deepEqual(await records(c.db),expected);
+ assert.equal(await c.db.prepare("SELECT payload FROM app_records WHERE entity='production_reporting_policy'").first(),null);
+}));
+
+test('TEST activation batch failure rolls marker and policy back together; retry then preserves all source records',()=>fixture(async c=>{
+ const {activatePreparedTestPolicy}=await import('./helpers/activate-prepared-daily-policy.mjs');
+ await c.db.prepare("INSERT INTO app_records VALUES('production_test_environment','isolated','{\"isolated\":true}','SYNTHETIC','now')").run();
+ const p=await prepareLegacyPublication(c.db,input,actor,build);await allChunks(c,p);await finalizeLegacyPublication(c.db,input,actor,build);
+ const before=await records(c.db),broken=new Proxy(c.db,{get(target,key){if(key==='batch')return statements=>target.batch([...statements,target.prepare('INSERT INTO synthetic_missing_activation_table VALUES(1)')]);const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ await assert.rejects(()=>activatePreparedTestPolicy(broken,input,actor,{...build,simulation:true}));
+ assert.deepEqual(await records(c.db),before);assert.equal((await readDailyOutputPolicy(c.db)).policy,null);
+ assert.equal((await activatePreparedTestPolicy(c.db,input,actor,{...build,simulation:true})).replayed,false);
+ assert.deepEqual((await records(c.db)).filter(r=>!['production_reporting_activation','production_reporting_policy'].includes(r.entity)),before);
+}));
+
+test('lost TEST activation response replays the original marker without another batch or changing source/history',()=>fixture(async c=>{
+ const {activatePreparedTestPolicy}=await import('./helpers/activate-prepared-daily-policy.mjs');
+ await c.db.prepare("INSERT INTO app_records VALUES('production_test_environment','isolated','{\"isolated\":true}','SYNTHETIC','now')").run();
+ const p=await prepareLegacyPublication(c.db,input,actor,build);await allChunks(c,p);await finalizeLegacyPublication(c.db,input,actor,build);
+ const before=await records(c.db),lost=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{await target.batch(statements);throw Error('SYNTHETIC lost response after commit');};const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ await assert.rejects(()=>activatePreparedTestPolicy(lost,input,actor,{...build,simulation:true}),/lost response after commit/);
+ const committed=await records(c.db),marker=JSON.parse(committed.find(r=>r.entity==='production_reporting_activation').payload);
+ assert.equal((await readDailyOutputPolicy(c.db)).policy.active,true);
+ const noWrite=new Proxy(c.db,{get(target,key){if(key==='batch')return ()=>assert.fail('replay must not write');const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ const replay=await activatePreparedTestPolicy(noWrite,input,actor,{...build,simulation:true});assert.equal(replay.replayed,true);assert.deepEqual(replay.activation,marker);
+ assert.deepEqual(await records(c.db),committed);assert.deepEqual(committed.filter(r=>!['production_reporting_activation','production_reporting_policy'].includes(r.entity)),before);
+}));
