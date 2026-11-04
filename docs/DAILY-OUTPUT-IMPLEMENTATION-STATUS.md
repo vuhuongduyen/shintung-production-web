@@ -47,3 +47,9 @@ Không thay thế nguồn Site bằng repo TEST hoặc tự triển khai. Không
 ## Hồi quy snapshot Line/SKU bổ sung
 
 Test độc lập đã tái hiện: đổi Line hiện tại của LSX từ A sang B làm mất hàng tiền của phiếu mới đã ghi ở A (expected 1 hàng, actual 0). Bản sửa dùng Line và thông tin SKU/LSX đã lưu trên phiếu cho payroll mới; lưu snapshot thông tin lệnh khi tạo. Line cũ vẫn xem được lịch sử của chính mình bằng snapshot, không nhận nội dung mới của Line khác; bản lịch sử chỉ xem, không ghi thêm. Duyệt/sửa bị chặn nếu Line/SKU/LSX hiện tại không còn khớp, cần đối chiếu rõ. Legacy current-only giữ nguyên, không đổi assertion lịch sử cho khớp code. Nhóm targeted cuối sau sửa: 69/69 đạt, TypeScript và build local đạt. Kết quả CI của head bổ sung phải đọc riêng từ checks PR #7, không lấy CI của 8141320 thay thế.
+
+## Hồi quy mã nguồn LSX legacy bổ sung
+
+Sáu test API bảo vệ mã viết thường/khoảng trắng, alias `orderCode`/`mo`, chuẩn hóa Unicode và import xảy ra giữa đọc/commit. Trước sửa năm tình huống mã legacy bị bỏ sót (không chặn vượt lượng); sau sửa sáu tình huống đều đạt. SQL lọc chặt mã ASCII; các ứng viên Unicode/khoảng trắng phức tạp chỉ đọc summary gọn rồi dùng normalizer chung, giữ guard trước commit. Guard này có thể phải đọc thêm ứng viên legacy phức tạp; không tuyên bố mọi tập lịch sử có cùng chi phí.
+
+Đo lại sau bổ sung snapshot/guard: cùng 500 lệnh/10.000 phiếu, UI quét 116,285–131,544 ms so với index 20,575–23,450 ms; lưu 147,593–164,899 ms (8 SELECT + 1 batch), replay 19,195–41,823 ms, full read không giờ dẫn xuất 1.700,955 ms; Node heap cuối 58,91 MiB. Đây là lượt local khác với bảng mốc đầu, có biến động tải; không dùng chênh lệch thời gian giữa hai lượt để gọi là tối ưu backend. Giữ toàn bộ kiểm tra consistency, không bỏ guard để lấy số nhanh.

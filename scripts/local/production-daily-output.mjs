@@ -1,3 +1,4 @@
+import {normalized} from '../../lib/production-plan.mjs';
 import {recordRevision} from '../../lib/record-revision.mjs';
 import {productionActorId} from '../../lib/production-actor.mjs';
 import {buildDailyOutput,dailyOutputModel,isDailyOutput} from '../../lib/production-daily-output.mjs';
@@ -9,11 +10,17 @@ export async function readDailyOutputPolicy(db){
  const p=row?JSON.parse(row.payload):null,approved=p?.mode===dailyOutputModel&&p.approved===true&&validBusinessDate(p.effectiveFrom);
  return {raw:row?.payload??null,policy:approved?{mode:dailyOutputModel,effectiveFrom:p.effectiveFrom,revision:p.revision??1,active:p.effectiveFrom<=dailyToday()}:null};
 }
-const fields=['reportingModel','quantityOnly','legacyCompletedBaseline','reportedAt','updatedAt','eventAt','completedAt','productionDate','actualStartedAt','actualCompletedAt','productionState','status','transitId','lsxCode','planId','kind','reviewStatus','reportedQuantity','approvedQuantity','completedQty','quantityCompleted','cancelled','voided','replacedByStageBatch','stageReporting'];
+const fields=['reportingModel','quantityOnly','legacyCompletedBaseline','orderCode','mo','reportedAt','updatedAt','eventAt','completedAt','productionDate','actualStartedAt','actualCompletedAt','productionState','status','transitId','lsxCode','planId','kind','reviewStatus','reportedQuantity','approvedQuantity','completedQty','quantityCompleted','cancelled','voided','replacedByStageBatch','stageReporting'];
 const summary=(value,id)=>`json_object('id',${id},${fields.flatMap(key=>[`'${key}'`,`json_extract(${value},'$.${key}')`]).join(',')})`;
-const matches=value=>`(json_extract(${value},'$.transitId')=? OR (coalesce(json_extract(${value},'$.transitId'),'')='' AND json_extract(${value},'$.lsxCode')=?) OR (?=1 AND coalesce(json_extract(${value},'$.transitId'),'')='' AND coalesce(json_extract(${value},'$.lsxCode'),'')='' AND json_extract(${value},'$.planId')=?))`;
+const sourceCode=value=>`CAST(coalesce(nullif(nullif(json_extract(${value},'$.lsxCode'),''),0),nullif(nullif(json_extract(${value},'$.orderCode'),''),0),nullif(nullif(json_extract(${value},'$.mo'),''),0),'') AS TEXT)`;
+const complexSql=value=>`(${value} GLOB '*[^ -~]*' OR instr(${value},'  ')>0)`;
+const matches=value=>{const code=sourceCode(value),plan=`CAST(coalesce(json_extract(${value},'$.planId'),'') AS TEXT)`;return `(json_extract(${value},'$.transitId')=? OR (coalesce(json_extract(${value},'$.transitId'),'')='' AND (?=1 OR ${complexSql(code)} OR ${complexSql(plan)} OR upper(trim(${code}))=? OR (?=1 AND trim(${code})='' AND upper(trim(${plan}))=?))))`;};
 function reportSnapshotQueries(order){
- const args=[order.id,order.lsxCode,order.planGroupId?0:1,order.planId||''];
+ // ASCII keys stay tightly scoped in SQL. Complex Unicode/whitespace candidates
+ // pass through compact summaries for the exact shared JS normalizer; never
+ // silently miss a legacy quantity because SQLite NOCASE is ASCII-only.
+ const complexOrder=[order.lsxCode,order.planId].some(value=>/[^ -~]|  /.test(String(value||'')));
+ const args=[order.id,complexOrder?1:0,normalized(order.lsxCode),order.planGroupId?0:1,normalized(order.planId)];
  const stored=`SELECT coalesce(json_group_array(json(v)),'[]') AS payload FROM (SELECT ${summary('payload',"coalesce(nullif(json_extract(payload,'$.id'),''),record_key)")} AS v FROM app_records WHERE entity='production_report' AND ${matches('payload')} ORDER BY record_key)`;
  const history=`SELECT coalesce(json_group_array(json(v)),'[]') AS payload FROM (SELECT ${summary('h.value',"coalesce(nullif(json_extract(h.value,'$.id'),''),a.record_key||':'||h.key)")} AS v FROM app_records a,json_each(a.payload,'$.reports') h WHERE a.entity='production_history_import' AND ${matches('h.value')} ORDER BY a.record_key,h.key)`;
  return [{sql:stored,args},{sql:history,args}];
