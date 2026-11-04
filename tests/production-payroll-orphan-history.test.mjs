@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {monthlyEarnedOrders} from '../lib/production-payroll.mjs';import {captureLegacyEarnedBasis,attachLegacyEarnedBasis} from '../lib/production-legacy-earned-basis.mjs';
+const order={id:'SYNTHETIC-OLD-LSX',planId:'SYNTHETIC-SHARED-PLAN',lsxCode:'SYNTHETIC-OLD-LSX',line:'A',sku:'SYNTHETIC-OLD-SKU',name:'Observed product',spec:'Observed spec',lsxQty:1000},report={id:'SYNTHETIC-LEGACY',kind:'completion',transitId:order.id,line:'A',productionDate:'2026-10-01',reviewStatus:'Đã xác nhận',approvedQuantity:200,reportedQuantity:200,hours:{hc:4,ot:0,total:4}};
+async function anchored(r=report,standards=new Map([[order.sku,.1]])){const saved=await captureLegacyEarnedBasis({orders:[order],reports:[r],standards,snapshotId:'SYNTHETIC-SNAPSHOT',observedAt:'2026-11-04T01:00:00Z'});return (await attachLegacyEarnedBasis([r],saved.basis,{required:true}))[0];}
+test('anchored legacy earnings and original identity survive LSX absent from current input without recreating a writable order',async()=>{
+ const r=await anchored(),before=structuredClone({orders:[order],reports:[r]}),expected=monthlyEarnedOrders([order],[r],'2026-10','A',new Map(),true),actual=monthlyEarnedOrders([],[r],'2026-10','A',new Map([[order.sku,9]]),true);
+ assert.equal(actual.length,1);for(const key of ['qty','earned','reported','unit','source','basis'])assert.deepEqual(actual[0][key],expected[0][key],key);assert.equal(actual[0].order.planId,order.planId);assert.equal(actual[0].order.name,order.name);assert.equal(actual[0].order.historicalOnly,true);assert.equal(monthlyEarnedOrders([],[r],'2026-10','B',new Map(),true).length,0);assert.deepEqual({orders:[order],reports:[r]},before);
+});
+test('daily own snapshot survives missing LSX; sibling sharing Plan ID stays separate',()=>{
+ const daily={...report,id:'SYNTHETIC-DAILY',reportingModel:'daily-finished-v1',quantityOnly:true,sku:order.sku,line:'A',name:order.name,lsxCode:order.lsxCode,planId:order.planId,productionDate:'2026-11-02',rateBasis:{value:.2,productionDate:'2026-11-02',versionId:'SYNTHETIC-RATE'},orderSnapshot:order},other={...order,id:'OTHER-LSX',lsxCode:'OTHER-LSX'},second={...daily,id:'SECOND',transitId:other.id,lsxCode:other.lsxCode,orderSnapshot:other};
+ const result=monthlyEarnedOrders([other],[daily,second],'2026-11','A',new Map(),true);assert.equal(result.length,2);assert.deepEqual(new Set(result.map(r=>r.order.id)),new Set([order.id,other.id]));assert.equal(result.reduce((n,r)=>n+r.earned,0),80);assert.equal(result.find(r=>r.order.id===order.id).order.historicalOnly,true);
+});
+test('missing anchored rate remains a visible blocking row; unanchored history never invents order context',async()=>{
+ const missing=await anchored(report,new Map()),result=monthlyEarnedOrders([],[missing],'2026-10','A',new Map([[order.sku,9]]),true);assert.equal(result.length,1);assert.equal(result[0].earned,null);assert.equal(result[0].unit,null);assert.equal(monthlyEarnedOrders([],[report],'2026-10','A',new Map([[order.sku,.1]]),true).length,0);
+});

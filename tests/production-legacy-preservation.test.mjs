@@ -20,6 +20,7 @@ test('past month preserves every person/hour/payment/quantity after current mast
  const after=calculate(changed,{standards:new Map([['NEW',9]]),attendanceBaselines:p.monthly,historyProtection:{requiredBeforeMonth:'2026-11',snapshotId}});
  // Order display also has a separately guarded snapshot; compare all calculation values and preserved labels.
  for(let i=0;i<before.length;i++){for(const key of ['people','selected','earned','share','result','actual','support','production','quantity','missing'])assert.deepEqual(after[i][key],before[i][key],key);assert.equal(after[i].rows[0].order.name,before[i].rows[0].order.name);assert.equal(after[i].rows[0].earned,before[i].rows[0].earned);}
+ const orphan=calculate({...changed,orders:[]},{standards:new Map([['NEW',9]]),attendanceBaselines:p.monthly,historyProtection:{requiredBeforeMonth:'2026-11',snapshotId}});for(let i=0;i<before.length;i++){for(const key of ['people','selected','earned','share','result','actual','support','production','quantity','missing'])assert.deepEqual(orphan[i][key],before[i][key],`orphan ${key}`);assert.equal(orphan[i].rows[0].order.historicalOnly,true);}
  assert.deepEqual(w,raw,'capture and calculation never write original data');
 });
 test('journal final marker/rate/cumulative hours and known missing metadata do not follow later master changes',async()=>{

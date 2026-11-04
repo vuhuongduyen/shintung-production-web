@@ -1,3 +1,4 @@
+import {productionHistoryOrder} from '../../lib/production-history-order.mjs';
 import {attachLegacyEarnedBasis} from '../../lib/production-legacy-earned-basis.mjs';
 import {normalizeTransit} from '../../lib/in-transit.mjs';
 import {dailyAttendanceActions} from '../../lib/production-report-model.mjs';
@@ -299,6 +300,9 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
       line: row.line, week: record.key, effectiveAt: entry.at, recordedAt: entry.at, actor: entry.actor, actorId:productionEntryActorId(entry,accounts), reason: entry.reason,
       capacityAction: entry.action, capacityDecision:entry.decision, requestDescription:entry.request?.intendedChange||entry.request?.reason, before: entry.previousHours, after: entry.newHours })))) : [];
   const orderIds = new Set(orders.map((row) => row.id));
+  // Keep proven legacy context visible after an LSX is archived or moves out of scope.
+  // This is a read-only projection; never recreate an in_transit record.
+  if(legacyPreservation?.required){const basis=new Map(legacyPreservation.basis.map(b=>[b.reportId,b]));for(const row of reportRecords){const r={...row.payload,id:row.key},saved=basis.get(row.key);if(saved&&!orderIds.has(r.transitId)&&permitted(readActor,r.line)&&permitted(readActor,saved.line)){const context=productionHistoryOrder({...r,legacyEarnedBasis:saved});if(context){orders.push(context);orderIds.add(context.id);}}}}
   const overrides = new Map(events.filter((event) => !event.voided&&event.kind === "hours-adjustment").flatMap((event) => (event.changes || []).map((change) => [change.reportId, {hours:change.after,at:event.recordedAt}])));
   const historyStandards=new Map(siteLaborHours(laborRecords).map(r=>[r.key,r.payload.cancelled?null:r.payload.laborHour]));
   const reviewedHistory=new Map(reportRecords.filter(r=>r.payload.historicalImport).map(r=>[r.key,{...r.payload,id:r.key}]));
@@ -337,7 +341,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   };
   const result={
     progressOrders: [...new Map([...state.rows.filter(row=>permitted(readActor,row.line)),...orders].map(row=>[row.id,row])).values()],
-    orders:orders.map(order=>{const row=catalog.find(r=>upper(r.key||r.code||r.payload?.code)===upper(order.sku));const master=row?.payload||row;return {...order,processes:Array.isArray(master?.processes)?master.processes:[]};}), events: reviewReportId?[]:[...events, ...historyEvents, ...sourceTimeEvents.filter(e=>!supersededTime(e)&&!events.some(saved=>saved.id===e.id&&saved.sourceTimeCorrected)), ...scheduleHistory, ...capacityHistory].map(projectEvent).sort((a, b) =>
+    orders:orders.map(order=>{const row=catalog.find(r=>upper(r.key||r.code||r.payload?.code)===upper(order.sku));const master=row?.payload||row;return {...order,processes:order.historicalOnly&&Array.isArray(order.processes)?order.processes:Array.isArray(master?.processes)?master.processes:[]};}), events: reviewReportId?[]:[...events, ...historyEvents, ...sourceTimeEvents.filter(e=>!supersededTime(e)&&!events.some(saved=>saved.id===e.id&&saved.sourceTimeCorrected)), ...scheduleHistory, ...capacityHistory].map(projectEvent).sort((a, b) =>
       String(a.recordedAt || a.effectiveAt).localeCompare(String(b.recordedAt || b.effectiveAt))),
     reports: [...historical.filter(r=>!reviewedHistory.has(r.id)),...reportRecords.map((row) => ({ id: row.key, ...row.payload,actorId:productionEntryActorId(row.payload,accounts) })).filter((row) => orderIds.has(row.transitId)&&permitted(readActor,row.line))
       .map((row) => {

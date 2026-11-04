@@ -21,3 +21,21 @@ test('actual Worker preserves observed legacy display and raw records after acti
   await c.db.prepare("DELETE FROM app_records WHERE entity='production_legacy_manifest'").run();const blocked=await call('/api/production-workflow');assert.equal(blocked.status,503);assert.equal(blocked.body.dailyOutputPolicy.active,false);assert.equal(blocked.body.reports,undefined);assert.match(blocked.body.dailyOutputPolicy.blockedReason,/bảo toàn/);
  }finally{await c.close();}
 });
+
+test('actual Worker retains proven legacy report/order context when current LSX disappears, without recreating it',async()=>{
+ const c=await workflowGetFixture(6);try{
+  const {reviewer}=await import('./helpers/daily-output-reviewer.mjs');const put=(entity,key,value)=>c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(entity,key,JSON.stringify(value),'SYNTHETIC','2026-11-02').run();const call=await reviewer({...c,put});await put('labor_hours','SYNTHETIC-SKU',{sku:'SYNTHETIC-SKU',laborHour:.1});
+  const before=(await call('/api/production-workflow')).body,old=before.reports.find(r=>r.id==='SYNTHETIC-LSX3-report');assert.ok(old);
+  await activateDailyPolicy(c.db,{effectiveFrom:day});await c.db.prepare("DELETE FROM app_records WHERE entity='in_transit' AND record_key='SYNTHETIC-LSX3'").run();const after=(await call('/api/production-workflow')).body,saved=after.reports.find(r=>r.id===old.id),context=after.orders.find(o=>o.id===old.transitId);assert.ok(saved);assert.equal(context.historicalOnly,true);assert.equal(saved.legacyEarnedBasis.earned,10);assert.deepEqual(saved.hours,old.hours);assert.equal(context.sku,'SYNTHETIC-SKU');
+  assert.equal((await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='in_transit' AND record_key='SYNTHETIC-LSX3'").first()).n,0);
+  await assert.rejects(()=>mutateProductionWorkflow(c.db,{action:'daily-output',orderId:old.transitId,quantity:1,productionDate:day,productionLocalDateTime:`${day}T09:00`,requestIdempotency:crypto.randomUUID()}, {login:'SYNTHETIC-ADMIN',isAdmin:true}),{status:404});
+ }finally{await c.close();}
+});
+
+test('Line-scoped legacy history keeps its captured context after LSX moves, without exposing current other-Line fields',async()=>{
+ const c=await workflowGetFixture(6);try{
+  await activateDailyPolicy(c.db,{effectiveFrom:day});await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.line','B','$.sku','PRIVATE-CURRENT-B-SKU','$.name','Private current Line B product') WHERE entity='in_transit' AND record_key='SYNTHETIC-LSX3'").run();
+  const {actor}=await import('./helpers/daily-output-fixture.mjs'),{readProductionWorkflow}=await import('../scripts/local/production-workflow.mjs'),{readLegacyPreservation}=await import('../scripts/local/production-legacy-preservation.mjs'),{readDailyOutputPolicy}=await import('../scripts/local/production-daily-output.mjs');const policy=(await readDailyOutputPolicy(c.db)).policy,preservation=await readLegacyPreservation(c.db,policy,actor),view=await readProductionWorkflow(c.db,actor,[],{includeDerivedHours:false,legacyPreservation:preservation}),order=view.orders.find(o=>o.id==='SYNTHETIC-LSX3');
+  assert.ok(order);assert.equal(order.historicalOnly,true);assert.equal(order.line,'A');assert.equal(order.sku,'SYNTHETIC-SKU');assert.ok(view.reports.some(r=>r.id==='SYNTHETIC-LSX3-report'));assert.doesNotMatch(JSON.stringify(view),/PRIVATE-CURRENT-B-SKU|Private current Line B product/);
+ }finally{await c.close();}
+});
