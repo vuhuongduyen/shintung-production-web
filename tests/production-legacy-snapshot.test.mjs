@@ -14,6 +14,14 @@ test('source guard detects phantom/replacement changes, ignores unrelated logs, 
  await captureLegacySource(c.db,input(),actor,build);await c.db.prepare("INSERT INTO app_records VALUES('synthetic_unrelated_log','x','{}','SYNTHETIC','now')").run();assert.equal(await legacySourceStillMatches(c.db,id,actor,build),true);
  await c.db.prepare("INSERT INTO app_records VALUES('employees','SYNTHETIC-PHANTOM','{}','SYNTHETIC','now')").run();assert.equal(await legacySourceStillMatches(c.db,id,actor,build),false);await c.db.prepare("DELETE FROM app_records WHERE entity='employees' AND record_key='SYNTHETIC-NV0'").run();assert.equal(await legacySourceStillMatches(c.db,id,actor,build),false,'same count replacement is not fresh');await assert.rejects(()=>previewLegacyPreservation(c.db,input(),actor,{sourceId:'b'.repeat(64)}),{status:409});
 }));
+test('a missing frozen source cannot hide a same-count live edit from the source fence',()=>fixture(async c=>{
+ await captureLegacySource(c.db,input(),actor,build);
+ const key=JSON.stringify([id,'employees','SYNTHETIC-NV0']);
+ await c.db.prepare("DELETE FROM app_records WHERE entity='production_legacy_source' AND record_key=?").bind(key).run();
+ const unchangedLive=await records(c.db);assert.equal(await legacySourceStillMatches(c.db,id,actor,build),false,'missing copy alone must invalidate proof');assert.deepEqual(await records(c.db),unchangedLive);
+ await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.name','SYNTHETIC-HIDDEN-CHANGE') WHERE entity='employees' AND record_key='SYNTHETIC-NV0'").run();
+ const changed=await records(c.db);assert.equal(await legacySourceStillMatches(c.db,id,actor,build),false,'unchanged live row count cannot replace complete byte-exact source proof');assert.deepEqual(await records(c.db),changed);
+}));
 test('preview uses one frozen input set and matching static source; it never publishes anchors or activates policy',()=>fixture(async c=>{
  await c.db.prepare("INSERT INTO app_records VALUES('labor_hours','SYNTHETIC-SKU',?,'SYNTHETIC','now')").bind(JSON.stringify({sku:'SYNTHETIC-SKU',laborHour:.1})).run();const source=await captureLegacySource(c.db,input(),actor,build);await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.laborHour',9) WHERE entity='labor_hours'").run();const before=await records(c.db),preview=await previewLegacyPreservation(c.db,input(),actor,build);
  assert.equal(preview.manifest.status,'preview');assert.equal(preview.manifest.observedAt,source.capturedAt);assert.equal(preview.sourceStillMatches,false);assert.equal(preview.basis.find(b=>b.reportId==='SYNTHETIC-LSX3-report').earned,10);assert.deepEqual(await records(c.db),before);assert.equal(before.filter(r=>r.entity==='production_reporting_policy'||r.entity==='production_legacy_basis').length,0);

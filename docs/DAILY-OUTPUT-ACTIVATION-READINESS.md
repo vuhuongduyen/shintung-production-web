@@ -48,3 +48,9 @@ Các fault-injection bổ sung kiểm ngay trước batch kích hoạt: nguồn 
 Lưu riêng: SHA source/CI; SHA đang preview và phạm vi browser đã kiểm; thời điểm/ngày GMT+7; snapshotId/sourceId/counts/capabilities và phần thiếu căn cứ; kết quả so raw record/báo cáo trước–sau; trạng thái adapter/policy; dữ liệu/kho/Sheet còn chờ; người nghiệm thu và quyền merge/phát hành. Chỉ ghi định danh và tổng hợp không nhạy cảm trong repository, giữ chứng cứ dữ liệu thật ở nơi được phép.
 
 Nếu kết quả ghi chưa xác nhận, đọc trạng thái đúng snapshot/lượt cũ trước khi thử lại. Không tạo snapshot, intent hoặc khóa mới chỉ vì timeout; không tự sửa/thu hồi phiếu kho thật để kiểm. Khi có source hoặc dữ liệu thay đổi đồng thời, dừng bước phụ thuộc, ghi rõ denied/pending/uncertain và tiếp tục việc độc lập được phép.
+
+## Guard nguồn thiếu bản sao
+
+Fault injection phát hiện guard trước đây chỉ so các bản sao còn tồn tại với live và đếm live; mất một source copy vẫn có thể báo khớp. Regression trước sửa fail (`true !== false`) ngay khi bỏ một copy. Guard chung nay đếm cả quan hệ frozen bằng sourceCount trong cùng SQL, rồi giữ kiểm live count và byte/metadata từng record. Áp dụng cho kiểm nguồn, hoàn tất publication và fence của TEST activation; không thêm lượt đọc full workflow, không sửa dữ liệu thật, không tự dựng lại copy thiếu.
+
+Kiểm bổ sung: missing copy đơn lẻ; live edit vẫn giữ tổng số dòng; finalization giữ staging và không policy; mất copy ngay trước batch activation không để lại marker/policy. Mọi raw record chỉ khác ở chính fault giả đã tiêm. Đây là lỗi kỹ thuật đã tái hiện trên fixture, không có chứng cứ sự cố tương ứng trên production. Các giới hạn quyền/nghiệm thu/adapter ghi ở trên giữ nguyên.

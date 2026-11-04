@@ -20,7 +20,7 @@ test('TEST activation rechecks every published anchor atomically instead of trus
 
 // Faults are injected after the preparatory reads, immediately before D1 batch.
 // Only the synthetic competing write may survive; activation must add nothing.
-for(const fault of ['source','anchor','manifest','activation'])test(`TEST activation rejects concurrent ${fault} changes at commit without partial policy`,()=>fixture(async c=>{
+for(const fault of ['source','copy','anchor','manifest','activation'])test(`TEST activation rejects concurrent ${fault} changes at commit without partial policy`,()=>fixture(async c=>{
  const {activatePreparedTestPolicy}=await import('./helpers/activate-prepared-daily-policy.mjs');
  await c.db.prepare("INSERT INTO app_records VALUES('production_test_environment','isolated','{\"isolated\":true}','SYNTHETIC','now')").run();
  const p=await prepareLegacyPublication(c.db,input,actor,build);await allChunks(c,p);await finalizeLegacyPublication(c.db,input,actor,build);
@@ -28,6 +28,7 @@ for(const fault of ['source','anchor','manifest','activation'])test(`TEST activa
  const raced=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{
   assert.equal(injected,false,'activation must not retry with a new nonce');injected=true;
   if(fault==='source')await target.prepare("INSERT INTO app_records VALUES('employees','SYNTHETIC-ACTIVATION-PHANTOM','{}','SYNTHETIC','now')").run();
+  if(fault==='copy')await target.prepare("DELETE FROM app_records WHERE entity='production_legacy_source' AND record_key=?").bind(JSON.stringify([input.snapshotId,'employees','SYNTHETIC-NV0'])).run();
   if(fault==='anchor'){const r=p.chunks[0][0];await target.prepare('UPDATE app_records SET payload=? WHERE entity=? AND record_key=?').bind('{}',r.entity,r.key).run();}
   if(fault==='manifest')await target.prepare("UPDATE app_records SET payload=json_set(payload,'$.status','staging') WHERE entity='production_legacy_manifest' AND record_key=?").bind(input.snapshotId).run();
   if(fault==='activation')await target.prepare("INSERT INTO app_records VALUES('production_reporting_activation','global',?,'SYNTHETIC','now')").bind(JSON.stringify({id:'SYNTHETIC-COMPETING-ACTIVATION',legacySnapshotId:'SYNTHETIC-OTHER-SNAPSHOT',sourceId:build.sourceId})).run();
@@ -36,6 +37,13 @@ for(const fault of ['source','anchor','manifest','activation'])test(`TEST activa
  await assert.rejects(()=>activatePreparedTestPolicy(raced,input,actor,{...build,simulation:true}),{status:409});
  assert.equal(injected,true);assert.deepEqual(await records(c.db),expected);
  assert.equal(await c.db.prepare("SELECT payload FROM app_records WHERE entity='production_reporting_policy'").first(),null);
+}));
+
+test('finalization cannot mark complete after a source copy is lost, even if live business records did not change',()=>fixture(async c=>{
+ const p=await prepareLegacyPublication(c.db,input,actor,build);await allChunks(c,p);
+ await c.db.prepare("DELETE FROM app_records WHERE entity='production_legacy_source' AND record_key=?").bind(JSON.stringify([input.snapshotId,'employees','SYNTHETIC-NV0'])).run();
+ const before=await records(c.db);await assert.rejects(()=>finalizeLegacyPublication(c.db,input,actor,build),{status:409});assert.deepEqual(await records(c.db),before);
+ assert.equal(JSON.parse(before.find(r=>r.entity==='production_legacy_manifest').payload).status,'staging');assert.equal((await readDailyOutputPolicy(c.db)).policy,null);
 }));
 
 test('TEST activation batch failure rolls marker and policy back together; retry then preserves all source records',()=>fixture(async c=>{
