@@ -1,6 +1,6 @@
 # Quyết định ngày hiệu lực và phần còn chờ đối chiếu
 
-Cập nhật 05/11: Duyên cho HR nhập bổ sung trước ngày trả sản lượng (thường trước ngày 10 tháng sau), chốt Leadtime theo ngày chốt Plan và tách kế hoạch qua nhiều mức/có công thức khi bấm kết quả. Không dùng câu về HR để cho phép đổi kỳ đã chốt/đã trả.
+Cập nhật 05/11: Duyên cho HR nhập bổ sung trước ngày trả sản lượng (thường trước ngày 10 tháng sau), chốt Leadtime theo ngày chốt Plan và giờ công Plan theo ngày hiệu lực tại ngày chốt, không bắt tách/không bấm từng kết quả. Không dùng câu về HR để cho phép đổi kỳ đã chốt/đã trả.
 
 Đây là ví dụ dữ liệu giả, không phải lỗi hoặc số liệu đã xác minh trên production. Không tự áp phương án vào dữ liệu thật. Các yêu cầu đã chốt (bảo toàn lịch sử, nhập sản lượng không công đoạn, chia tiền/phụ kho cũ, xử lý kho) không được hỏi lại.
 
@@ -25,9 +25,9 @@ Duyên chọn **ngày chốt kế hoạch**. Không hỏi lại mốc Plan/mở 
 
 ## 3. Kế hoạch qua nhiều mức — đã chốt ngày 05/11
 
-Duyên chọn **tách kế hoạch** và nhấn vào kết quả để xem công thức/các số liệu căn cứ. KHSX dùng Tách đơn hiện có để nhập lượng và khoảng ngày từng dòng; không tự chia đều, bình quân mức hoặc trừ số lượng dòng chính. Các dòng giữ Plan ID chung và định danh riêng trong Chi tiết. Tổng lượng không bắt buộc bằng đề xuất theo yêu cầu Tách đơn đã chốt.
+Quyết định mới ngày 05/11 thay thế lựa chọn tách trước đó: không bắt tách khi khoảng kế hoạch qua hai mức. Chọn phiên bản có hiệu lực tại **ngày chốt Plan GMT+7**; bản tương lai không được dùng sớm, thời gian cập nhật/scalar không thay ngày hiệu lực. Server lưu căn cứ cùng chốt và kiểm CAS để không trộn phiên bản thay đồng thời. Kế hoạch đã chốt không tự đổi, dòng từng tách không tự gộp.
 
-Source dưới policy mới phát hiện khoảng kế hoạch có nhiều mức, chưa cho chốt cho tới khi tách; giờ chưa đủ căn cứ hiển thị thiếu, không thành số 0 giả. Kết quả mỗi dòng mở Chi tiết: lượng × giờ/SP, khoảng ngày và phiên bản làm căn cứ. Dòng đã chốt giữ basis, chuyển In Transit/backlog dùng lại, không đổi theo master hiện tại. Có kiểm source CAS khi chốt để không lưu căn cứ trộn nếu master/policy vừa đổi.
+Giờ công là kết quả tham khảo xếp lịch, hiển thị thường. Tiêu đề có ghi chú đóng mặc định bằng mũi tên; không còn bắt bấm từng kết quả xem công thức. Chi tiết vẫn giữ dữ liệu chứng minh theo quyền xem hiện có. Tách đơn tùy chọn và tổng lượng có thể khác đề xuất vẫn giữ nguyên. Thiếu căn cứ không dùng mức hiện tại thay thế. **Sản lượng thực tế vẫn dùng mức có hiệu lực ngày hoàn thành**, không lấy mức Plan. Leadtime và bậc MOQ tiếp tục theo căn cứ ngày chốt như đã duyệt.
 
 ## Điều kiện còn lại trước phát hành
 

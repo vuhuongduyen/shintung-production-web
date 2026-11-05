@@ -83,8 +83,8 @@ Các version định mức mới có ngày hiệu lực do người có quyền 
 ## Plan và Leadtime — quyết định 05/11 đã triển khai trên nhánh nháp
 
 - Leadtime theo **ngày chốt Plan**, không ngày mở LSX/ngày SX/master hiện tại. Giữ đầu vào và các bậc MOQ để LSX chọn đúng lượng; không áp mức của tổng Plan cho mọi LSX. Field căn cứ null/hỏng vẫn thiếu, legacy vắng field giữ đường cũ.
-- Plan đi qua hai mức giờ/SP phải **Tách đơn**; KHSX nhập lượng/ngày từng dòng, không tự chia hoặc bình quân. Tổng không bắt buộc bằng đề xuất. Plan ID chung, mã dòng riêng chỉ trong Chi tiết; chỉ tách dòng còn sửa được.
-- Bấm kết quả Giờ công mở công thức, lượng, mức, khoảng ngày/phiên bản chứng minh. Thiếu mức giữ null/cảnh báo, không thành 0; giữ ngoại lệ chốt thiếu labor đã có, không thêm khóa mọi SKU thiếu history.
+- Quyết định thay thế ngày 05/11: **không bắt tách kế hoạch qua nhiều mức giờ/SP**. Chọn duy nhất phiên bản đã công bố có hiệu lực tại ngày chốt Plan GMT+7, không theo thứ tự cập nhật, mức scalar hiện tại hay mức tương lai. Bản nháp tham khảo ngày hiện tại; server kiểm lại ngày chốt thực tế và lưu ngày/phiên bản/giá trị/người/thời điểm cùng transaction. Dòng đã chốt/chuyển giữ nguyên cả căn cứ cũ; không tự gộp dòng từng tách. Tách đơn vẫn là thao tác tùy chọn với lượng/ngày riêng theo quyền cũ.
+- Kết quả Giờ công là văn bản, không còn nút mở công thức mỗi dòng. Ghi chú có mũi tên đóng mặc định ở tiêu đề Giờ công giải thích cách tính; Chi tiết thường vẫn giữ căn cứ tra cứu. Thiếu/chồng lấn/hỏng định mức giữ null/cảnh báo, không lấy scalar bù; giữ ngoại lệ chốt thiếu labor đã có. Giờ công sản lượng thực tế vẫn theo **ngày hoàn thành**, độc lập mức Plan.
 - Chốt/transfer giữ căn cứ riêng từng dòng và CAS; LSX bổ sung chỉ sao chép tham chiếu/căn cứ Plan, không nhận nhầm lượng chờ, mã CSV, kho hoặc ngoại lệ nhập lịch sử của nguồn.
 - HR được nhập muộn trước trả sản lượng, không tự đặt ngày 10 thành hạn cứng. Chưa tự cho phép đổi kỳ đã chốt/đã trả; cách nhận diện và điều chỉnh phần prefix đã bảo toàn còn chờ quyết định.
 

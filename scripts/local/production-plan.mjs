@@ -8,7 +8,7 @@ import {calculateCapacity, dailyParticipants, linkedOtLeaveDates} from '../../li
 import {engineDemandMatches} from '../../lib/engine-demand.mjs';
 import {usableSku, confirmationStatus} from '../../lib/sku-state.mjs';
 import {siteLaborHours} from '../../lib/site-labor-hours.mjs';
-import {applyPlanLaborBasis} from '../../lib/plan-effective-basis.mjs';
+import {applyPlanLaborBasis,planReferenceDate} from '../../lib/plan-effective-basis.mjs';
 import {capturePlanLeadtime} from '../../lib/transit-leadtime.mjs';
 import {readDailyOutputPolicy} from './production-daily-output.mjs';
 import { randomUUID } from 'node:crypto';
@@ -55,7 +55,7 @@ export async function getPlanCapacity(db, week, effectivePlanning, sources={}) {
     const backlog=await readPlanTransitBacklog(db,week,laborModel.map(r=>r.payload));
     const calendars=unpack(calendarRecords),standards=new Map(laborModel.map(r=>[text(r.payload.sku).toUpperCase(),numberOrNull(r.payload.laborHour)]));
     const datedStandards=new Map(laborModel.map(r=>[text(r.payload.sku).toUpperCase(),r.payload]));
-    const otherPlans=unpack(planRecords.filter(r=>r.key!==week)).filter(r=>dateISO(r.start)&&dateISO(r.end)&&r.start<=weekEnd(week)&&!['ĐÃ CHUYỂN','HỦY','TẠM HOÃN'].includes(r.status)&&!planCoveredByTransit(r,backlog)).map(r=>{if(effectivePlanning)return applyPlanLaborBasis(r,datedStandards);const labor=standards.get(text(r.sku).toUpperCase());return {...r,laborHour:r.status!=='ĐÃ CHỐT'&&labor!==undefined?labor:r.laborHour};});
+    const otherPlans=unpack(planRecords.filter(r=>r.key!==week)).filter(r=>dateISO(r.start)&&dateISO(r.end)&&r.start<=weekEnd(week)&&!['ĐÃ CHUYỂN','HỦY','TẠM HOÃN'].includes(r.status)&&!planCoveredByTransit(r,backlog)).map(r=>{if(effectivePlanning)return applyPlanLaborBasis(r,datedStandards,sources.planningDate);const labor=standards.get(text(r.sku).toUpperCase());return {...r,laborHour:r.status!=='ĐÃ CHỐT'&&labor!==undefined?labor:r.laborHour};});
     const capacityRows=envelope?.schemaVersion===1&&Array.isArray(envelope.rows)?envelope.rows:[];
     const allLines=[...new Set(['A','B',...capacityRows.map(r=>r.line),...backlog.rows.map(r=>r.line)])];
     return allLines.map(line=>{const row=capacityRows.find(r=>r.line===line)||{line,week,status:'Chưa xác nhận Capacity'};
@@ -71,7 +71,8 @@ export async function getPlan(db, week, canReopen = false, catalog = null) {
         fail('invalidWeek');
     const policy=await readDailyOutputPolicy(db),effectivePlanning=policy.policy?.cutoverReached===true,planningBlocked=effectivePlanning&&policy.policy?.active!==true;
     const [plans, engines, transit, labor, audits] = await Promise.all(['production_plan', 'production_engine', 'in_transit', 'labor_hours', 'production_plan_audit'].map(e => read(db, e)));
-    const capacity=await getPlanCapacity(db,week,effectivePlanning,{plans,labor});
+    const planningDate=planReferenceDate();
+    const capacity=await getPlanCapacity(db,week,effectivePlanning,{plans,labor,planningDate});
     const masters = catalog || await read(db,'sku');
     const masterPayloads=masters.map(record=>record?.payload&&typeof record.payload==='object'?record.payload:record);
     const masterBySku=new Map(masterPayloads.map(master=>[text(master?.code).toUpperCase(),master]));
@@ -88,12 +89,12 @@ export async function getPlan(db, week, canReopen = false, catalog = null) {
     // Draft plans follow the current SKU standard; confirmed/transferred plans retain their historical basis.
     const rows = unpack(candidates).filter(r => r.sku || r.id).map((r, i) => {
         const row=withMasterGroup(normalizeRow(r, week, i));
-        if(effectivePlanning)return applyPlanLaborBasis(row,datedStandards);
+        if(effectivePlanning)return applyPlanLaborBasis(row,datedStandards,planningDate);
         const current= laborBySku.get(text(row.sku).toUpperCase());
         return !['ĐÃ CHỐT','ĐÃ CHUYỂN'].includes(row.status)&&current!==undefined?{...row,laborHour:current}:row;
     });
     const ambiguous = candidates.length > 1 || !validPlanGroups(rows);
-    const result={ week, effectivePlanning, planningBlocked, revision: Number(envelope?.revision) || 0, rows: sortedRows(rows), sources, capacity, labor: effectiveLabor,
+    const result={ week, planningDate, effectivePlanning, planningBlocked, revision: Number(envelope?.revision) || 0, rows: sortedRows(rows), sources, capacity, labor: effectiveLabor,
         transit: unpack(transit).filter(r => monday(r.week) === week).map(withMasterGroup), audit: audits.filter(r => active(r) && r.payload.week === week).map(r => r.payload), canReopen,
         envelope: envelope || {}, deletedRows, warnings: [...(ambiguous ? ['legacyConflict'] : []), ...(plans.some(r => r.invalid) ? ['invalidLegacy'] : [])], legacyKey: current?.key || candidates[0]?.key || null };
     planPolicies.set(result,policy);return result;
@@ -219,8 +220,8 @@ export async function mutatePlan(db, body, actor) {
             }
             if (action === 'close') {
                 if(closingBasis){
-                    Object.assign(row,applyPlanLaborBasis(row,closingBasis.labor));
-                    if(row.planLaborBasis.status==='split-required')fail('Kế hoạch đi qua nhiều mức giờ công/SP. Tách đơn và nhập lượng/ngày từng dòng trước khi chốt.',422);
+                    Object.assign(row,applyPlanLaborBasis(row,closingBasis.labor,planReferenceDate(now)));
+                    row.planLaborBasis={...row.planLaborBasis,closedAt:now,closedBy:actor.login};
                     // Keep the existing close exception for missing labor. It
                     // remains unknown/warned, never replaced with today's rate.
                     row.planLeadtimeBasis=capturePlanLeadtime(row,closingBasis.leadtime,closingBasis.versions,now,actor.login);

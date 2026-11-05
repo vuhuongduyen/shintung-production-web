@@ -4,20 +4,20 @@ import {capturePlanLeadtime,transitStandardLeadtime} from '../lib/transit-leadti
 import {summary} from '../lib/production-plan.mjs';
 import {planTransitBacklog,remainingPlanWithTransitSummary} from '../lib/plan-transit-backlog.mjs';
 const rates=[{id:'OLD',status:'published',value:.1,validFrom:'2026-11-01',validTo:'2026-11-04'},{id:'NEW',status:'published',value:.2,validFrom:'2026-11-04'}];
-test('a plan spanning two effective rates requires quantities to be split, without inventing an average',()=>{
+test('planning resolves on confirmation date, independent of schedule and publication order, never the future scalar',()=>{
  const row={sku:'SYNTHETIC',start:'2026-11-02',end:'2026-11-06',plan:1000,laborHour:9,status:'DỰ KIẾN'},before=structuredClone(row);
- const basis=planLaborBasis(row,rates);assert.equal(basis.status,'split-required');assert.deepEqual(basis.segments.map(s=>[s.from,s.basis.value]),[['2026-11-02',.1],['2026-11-04',.2]]);assert.equal(basis.value,undefined);
- assert.equal(applyPlanLaborBasis(row,new Map([['SYNTHETIC',{laborHour:9,effectiveVersions:rates}]] )).laborHour,null);assert.deepEqual(row,before);
- assert.equal(planLaborBasis({...row,end:'2026-11-03'},rates).value,.1);assert.equal(planLaborBasis({...row,start:'2026-11-04'},rates).value,.2);
+ const basis=planLaborBasis(row,[rates[1],rates[0]],'2026-11-03');assert.equal(basis.status,'resolved');assert.equal(basis.value,.1);assert.equal(basis.businessDate,'2026-11-03');assert.equal(basis.basis.versionId,'OLD');
+ assert.equal(applyPlanLaborBasis(row,new Map([['SYNTHETIC',{laborHour:9,effectiveVersions:rates}]]),'2026-11-03').laborHour,.1);assert.deepEqual(row,before);
+ assert.equal(planLaborBasis({...row,start:'2026-12-01',end:'2026-12-31'},rates,'2026-11-03').value,.1);assert.equal(planLaborBasis(row,rates,'2026-11-04').value,.2);
 });
-test('missing/gapped/ambiguous standards do not fall back to current, while confirmed legacy rows remain untouched',()=>{
+test('missing/gapped/ambiguous close-day standards do not fall back to current; closed rows and legacy split rows remain untouched',()=>{
  const row={sku:'SYNTHETIC',start:'2026-11-02',end:'2026-11-06',laborHour:9,status:'DỰ KIẾN'};
- for(const versions of [[],[rates[1]],[...rates,{...rates[0],id:'OVERLAP'}]])assert.equal(planLaborBasis(row,versions).status,'missing');
- const locked={...row,status:'ĐÃ CHỐT'};assert.equal(applyPlanLaborBasis(locked,new Map()),locked);
- const gap=[{...rates[0],validTo:'2026-11-03'},rates[1]];assert.equal(planLaborBasis(row,gap).status,'missing');
+ for(const versions of [[],[rates[1]],[...rates,{...rates[0],id:'OVERLAP'}]])assert.equal(planLaborBasis(row,versions,'2026-11-03').status,'missing');
+ for(const status of ['ĐÃ CHỐT','ĐÃ CHUYỂN']){const locked={...row,status,planLaborBasis:{status:'resolved',value:9,segments:[]}};assert.equal(applyPlanLaborBasis(locked,new Map(),'2026-12-01'),locked);}
+ const gap=[{...rates[0],validTo:'2026-11-03'},rates[1]];assert.equal(planLaborBasis(row,gap,'2026-11-03').status,'missing');assert.equal(planLaborBasis(row,rates,'2026-02-30').status,'missing');
 });
 test('new unresolved planning load remains unknown, and a transferred resolved basis is not replaced by the latest rate',()=>{
- const row={id:'ROW',week:'2026-11-02',sku:'SYNTHETIC',line:'A',status:'DỰ KIẾN',plan:100,start:'2026-11-02',end:'2026-11-06',laborHour:null,planLaborBasis:{status:'split-required'}};
+ const row={id:'ROW',week:'2026-11-02',sku:'SYNTHETIC',line:'A',status:'DỰ KIẾN',plan:100,start:'2026-11-02',end:'2026-11-06',laborHour:null,planLaborBasis:{status:'missing'}};
  assert.equal(summary([row],[],row.week)[0].required,null);assert.equal(remainingPlanWithTransitSummary([row],[],row.week)[0].totalRequired,null);
  const daily=[{line:'A',week:row.week,status:'Đã xác nhận',availableHours:100,dailyBudgets:[{date:row.start,available:100}]}];assert.equal(remainingPlanWithTransitSummary([row],daily,row.week)[0].totalRequired,null);
  const transit={id:'TRANSIT',sku:row.sku,week:row.week,line:'A',status:'MỞ',lsxQty:100,completedQty:0,planStart:row.start,planEnd:row.end,laborHour:.2,planLaborBasis:{status:'resolved',value:.2}};

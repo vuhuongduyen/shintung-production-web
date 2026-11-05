@@ -96,13 +96,12 @@ test('Capacity notice is compact for actionable drafts and disappears without ad
  }finally{await view.close();}
 });
 
-test('clicking planned-hours result opens the formula and dated basis without sending a write',async()=>{
- effectivePlanning=true;laborRows=[{sku:original.sku,effectiveVersions:[{id:'SYNTHETIC-RATE-1',status:'published',value:.1,validFrom:'2026-11-01',validTo:'2026-11-04'}]}];
- rows=[{...original,plan:200,laborHour:.1,planLaborBasis:{status:'resolved',value:.1,segments:[{from:'2026-11-02',until:null,through:'2026-11-03',basis:{value:.1,versionId:'SYNTHETIC-RATE-1'}}]}}];
+test('planned hours are plain text and a collapsed header arrow explains the close-day rule without writes',async()=>{
+ effectivePlanning=true;laborRows=[{sku:original.sku,effectiveVersions:[{id:'SYNTHETIC-RATE-1',status:'published',value:.1,validFrom:'2026-11-01'}]}];
+ rows=[{...original,plan:200,laborHour:.1,planLaborBasis:{status:'resolved',value:.1,businessDate:'2026-11-03'}}];
  const view=await mount();try{
-  const trigger=view.host.querySelector('[aria-label="Xem công thức SYNTHETIC-SKU"]');assert.ok(trigger);assert.equal(trigger.type,'button');assert.match(trigger.textContent,/20/);trigger.focus();await click(trigger);
-  const detail=view.host.querySelector('[role=dialog]');assert.ok(detail);const formula=detail.querySelector('[aria-label="Căn cứ tính toán"]');assert.ok(formula);assert.match(formula.textContent,/Giờ công = SL kế hoạch × Giờ công\/SP/);assert.match(formula.textContent,/200 ×/);assert.match(formula.textContent,/SYNTHETIC-RATE-1/);assert.match(formula.textContent,/02\/11\/2026/);assert.equal(writes.length,0);assert.equal(document.activeElement,button(detail,'Đóng'));
-  await act(async()=>document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true})));assert.equal(document.activeElement,button(detail,'Đóng'));
-  await act(async()=>document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));assert.equal(view.host.querySelector('[role=dialog]'),null);assert.equal(document.activeElement,trigger);assert.equal(writes.length,0);
+  const table=view.host.querySelector('.pp-plan-grid'),cell=table.querySelector('tbody>tr').cells[7];assert.match(cell.textContent,/20/);assert.equal(cell.querySelector('button'),null);assert.equal(view.host.querySelector('[aria-label="Xem công thức SYNTHETIC-SKU"]'),null);
+  const note=table.querySelector('thead details.pp-labor-note'),summary=note.querySelector('summary');assert.ok(note);assert.equal(note.open,false);assert.equal(summary.textContent,'Giờ công');summary.focus();await click(summary);assert.equal(note.open,true);assert.match(note.textContent,/ngày chốt/);assert.match(note.textContent,/Không bắt tách/);assert.match(note.textContent,/ngày hoàn thành/);await click(summary);assert.equal(note.open,false);assert.equal(document.activeElement,summary);assert.equal(view.host.querySelector('[role=dialog]'),null);assert.equal(writes.length,0);
+  await click(button(view.host,'Chi tiết'));const detail=view.host.querySelector('[role=dialog]');assert.ok(detail);assert.doesNotMatch(detail.textContent,/Tách đơn và nhập lượng/);await click(button(detail,'Đóng'));assert.equal(writes.length,0);
  }finally{await view.close();}
 });

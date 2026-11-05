@@ -48,3 +48,10 @@ CI ứng dụng a74ace7 đã đạt1.806/1.806 trong294file, TypeScript/ba build
 
 
 05/11 — bổ sung phục hồi sau reload: cursor/journal theo principal server và CAS cùng batch tạo LSX, không lưu form/note/tài khoản/session vào browser storage. Reload đọc kết quả đã commit, chọn dòng cũ và ACK metadata, không tạo LSX mới; request cũ vẫn stale sau ACK, hai tab không ghi hai lượt. ACK cũ/idempotent/permissions/owner/corrupt proof có hồi quy; ACK không invalidate business cache thêm lần nữa. Nội dung chưa từng lưu cần nhập lại, không auto-submit hoặc bịa draft. Local rộng140/140, Worker WIP2/2, TypeScript đạt; exact SHA build/CI/browser đọc riêng. Số đo có overhead guard/journal, các pha point lookup và giới hạn ở DAILY-OUTPUT-IMPLEMENTATION-STATUS.md. Không đổi công thức, quyền hay dữ liệu thật.
+
+
+## Điều chỉnh giờ công kế hoạch ngày 05/11 — thay quyết định bắt tách trước đó
+
+Theo yêu cầu mới, Plan dùng mức giờ công/SP có hiệu lực tại ngày chốt GMT+7, không theo khoảng ngày SX, mức scalar hoặc thứ tự cập nhật. Bản nháp xem mức ngày hiện tại; server kiểm lại khi chốt, kể cả đi qua nửa đêm. Lưu giá trị/phiên bản/ngày và người/thời điểm chốt; không thay căn cứ dòng đã chốt/chuyển, không gộp dòng tách cũ. Tách đơn vẫn tùy chọn. Thiếu căn cứ giữ null/cảnh báo theo ngoại lệ hiện có; CAS master/policy/Capacity giữ nguyên. Sản lượng thực tế độc lập theo ngày hoàn thành. Các đoạn lịch sử yêu cầu bắt tách/click từng kết quả ở trên là checkpoint cũ đã được quyết định này thay thế.
+
+Kết quả giờ công không còn button; tiêu đề có ghi chú mũi tên đóng mặc định, mở khi cần. Chi tiết thường vẫn có căn cứ đọc. Kiểm targeted/helper/API/mounted và kết quả cuối ghi riêng sau kiểm; không coi đây là nghiệm thu browser hoặc quyền phát hành. Không thay DB/Sheet thật hoặc policy kích hoạt.
