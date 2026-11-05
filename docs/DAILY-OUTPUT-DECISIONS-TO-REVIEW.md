@@ -1,8 +1,14 @@
-# Các lựa chọn cần Duyên xem trước khi hoàn thiện ngày hiệu lực
+# Quyết định ngày hiệu lực và phần còn chờ đối chiếu
 
-Đây là ví dụ dữ liệu giả để quyết định, không phải lỗi hoặc số liệu đã xác minh trên production. Không tự áp phương án vào dữ liệu thật. Các yêu cầu đã chốt (bảo toàn lịch sử, nhập sản lượng không công đoạn, chia tiền/phụ kho cũ, xử lý kho) không được hỏi lại.
+Cập nhật 05/11: Duyên cho HR nhập bổ sung trước ngày trả sản lượng (thường trước ngày 10 tháng sau), chốt Leadtime theo ngày chốt Plan và tách kế hoạch qua nhiều mức/có công thức khi bấm kết quả. Không dùng câu về HR để cho phép đổi kỳ đã chốt/đã trả.
 
-## 1. HR cố ý sửa ngược phần giờ đã bảo toàn
+Đây là ví dụ dữ liệu giả, không phải lỗi hoặc số liệu đã xác minh trên production. Không tự áp phương án vào dữ liệu thật. Các yêu cầu đã chốt (bảo toàn lịch sử, nhập sản lượng không công đoạn, chia tiền/phụ kho cũ, xử lý kho) không được hỏi lại.
+
+## 1. HR nhập muộn và phần lịch sử đã bảo toàn
+
+HR nhập muộn sau ngày làm việc được phép; test USER HR nhập ngày 05/12 cho ngày 05/11 (sau cutover 04/11) đã cập nhật giờ tính thử tháng 11, không ghi lại báo công hoặc baseline cũ. Không tự khóa HR sau ngày làm việc hoặc tự chọn ngày 10 làm hạn cứng.
+
+Phần còn cần nguồn trạng thái tin cậy: source hiện chỉ có báo cáo tính thử, chưa có marker phân biệt kỳ đã chốt/đã trả với kỳ chưa trả. Vì vậy chưa tự mở lại prefix đã bảo toàn. Cần xác định cách nhận diện kỳ chưa trả trước khi áp dụng sửa ngược vào phần đó; không hỏi lại quyền nhập HR đã chốt.
 
 Ví dụ chốt chuyển đổi ngày 04/11, đã bảo toàn 03/11 là 8 giờ. Sau đó HR sửa 03/11 thành 7 giờ hoặc sửa ngày bắt đầu/Line làm khác điều kiện chia tiền. Hệ thống vẫn lưu thao tác HR và audit theo quyền; phép tính hiện giữ số quan sát cũ, báo cần đối chiếu và chặn tiền tại phần mâu thuẫn. Không âm thầm thay 8 thành 7 hoặc bỏ thao tác HR.
 
@@ -13,31 +19,16 @@ Ví dụ chốt chuyển đổi ngày 04/11, đã bảo toàn 03/11 là 8 giờ.
 
 Đề xuất để xem xét: phiên bản điều chỉnh riêng cho phần đã bảo toàn, không cấp thêm quyền trong source hiện tại. Ngày ngưng làm việc rõ ràng sau mốc và hủy ngày ngưng dự kiến đã được kiểm theo công thức hiện có, không nằm trong câu hỏi này.
 
-## 2. Ngày chọn Leadtime cho LSX mới
+## 2. Leadtime — đã chốt ngày 05/11
 
-Ví dụ Plan chốt 03/11 khi mức là 2 ngày, mở LSX 05/11 khi mức là 4 ngày, bắt đầu SX 06/11. Các LSX cũ trước mốc đã có anchor quan sát; câu hỏi dưới đây chỉ cho chứng từ mới hoặc lần điều chỉnh có căn cứ.
+Duyên chọn **ngày chốt kế hoạch**. Không hỏi lại mốc Plan/mở LSX/bắt đầu SX. Source mới dưới policy sản lượng active lưu căn cứ Leadtime riêng của từng dòng khi chốt; chuyển In Transit giữ căn cứ đó, không tra master mới để thay kết quả đã lưu. Có ngày GMT+7, thời điểm/người chốt và phiên bản nếu đã có chứng cứ. Căn cứ thiếu/chồng lấn giữ thiếu, không lấy mức hiện tại hoặc ngày mở LSX để bịa lịch sử. Lệnh cũ/anchor trước chuyển đổi giữ nguyên.
 
-| Mốc lựa chọn | Ảnh hưởng |
-| --- | --- |
-| Ngày chốt Plan | Giữ cam kết từ lúc lập/chốt kế hoạch; LSX mở muộn vẫn dùng 2 ngày. Cần liên kết phiên bản Plan thực sự đã chốt. |
-| Ngày mở LSX | Dùng mức 4 ngày có hiệu lực khi tạo cam kết LSX; không thay khi master đổi sau đó. |
-| Ngày bắt đầu SX | Chưa chốt mục tiêu cho tới lúc SX bắt đầu; việc đổi ngày bắt đầu cần quy tắc sửa căn cứ và audit. |
-| Luôn dùng mức hiện tại | Mục tiêu có thể đổi sau mỗi lần sửa/hủy master. Đây là hành vi một số lookup hiện có; nếu vẫn cần, nên tách rõ chỉ tiêu tham khảo hiện tại với cam kết đã lưu, không ghi đè lịch sử. |
+## 3. Kế hoạch qua nhiều mức — đã chốt ngày 05/11
 
-Chưa tự chọn mốc hoặc xử lý hủy master thành hủy chứng từ cũ. Thiếu lịch sử thì ghi thiếu căn cứ, không tự dùng recordedAt hoặc ngày nhập để tạo ngày hiệu lực.
+Duyên chọn **tách kế hoạch** và nhấn vào kết quả để xem công thức/các số liệu căn cứ. KHSX dùng Tách đơn hiện có để nhập lượng và khoảng ngày từng dòng; không tự chia đều, bình quân mức hoặc trừ số lượng dòng chính. Các dòng giữ Plan ID chung và định danh riêng trong Chi tiết. Tổng lượng không bắt buộc bằng đề xuất theo yêu cầu Tách đơn đã chốt.
 
-## 3. Một dòng kế hoạch kéo qua hai mức giờ công/SP
-
-Ví dụ dòng Pro Plan dự kiến 1.000 SP từ 02–05/11, mức 0,1 giờ/SP trước 04/11 và 0,2 từ 04/11. Dòng hiện không có số lượng kế hoạch cho từng ngày nên không biết bao nhiêu SP thuộc mỗi mức.
-
-| Lựa chọn | Ảnh hưởng |
-| --- | --- |
-| KHSX tách dòng và nhập lượng/ngày | Dùng chức năng Tách đơn hiện có, hai dòng giữ cùng Plan ID và định danh riêng trong Chi tiết. Tính tải từng phần theo ngày tương ứng; cần người lập kế hoạch xác định lượng, không tự chia đều. |
-| Một căn cứ cho cả dòng theo một mốc đã chọn | Dòng giữ nguyên lượng; cần chốt rõ mốc như ngày bắt đầu/chốt Plan. Giờ kế hoạch có thể khác giờ chuẩn kiếm được từ sản lượng thực tế theo từng ngày. |
-| Thêm lượng kế hoạch mỗi ngày | Chính xác hơn cho tải ngày nhưng là thay đổi nhập liệu/kiểm soát rộng hơn; chưa nằm trong quy tắc đã chốt. |
-
-Đề xuất để xem xét: dùng Tách đơn thủ công khi cần chia tải theo hai mức, không tự chia lượng hoặc lấy bình quân. Báo sản lượng thực tế vẫn luôn dùng đúng mức của từng ngày trên phiếu, không phụ thuộc lựa chọn kế hoạch này.
+Source dưới policy mới phát hiện khoảng kế hoạch có nhiều mức, chưa cho chốt cho tới khi tách; giờ chưa đủ căn cứ hiển thị thiếu, không thành số 0 giả. Kết quả mỗi dòng mở Chi tiết: lượng × giờ/SP, khoảng ngày và phiên bản làm căn cứ. Dòng đã chốt giữ basis, chuyển In Transit/backlog dùng lại, không đổi theo master hiện tại. Có kiểm source CAS khi chốt để không lưu căn cứ trộn nếu master/policy vừa đổi.
 
 ## Điều kiện còn lại trước phát hành
 
-Các lựa chọn trên không cấp quyền merge/triển khai. Còn phải tự kiểm trình duyệt full ONSPA/đúng Worker bằng dữ liệu giả, kiểm script/công thức Sheet trong môi trường được phép và nghiệm thu. Không cập nhật DB/Sheet thật để minh họa các ví dụ này.
+Các quyết định trên không cấp quyền merge/triển khai. Còn phải tự kiểm trình duyệt full ONSPA/đúng Worker bằng dữ liệu giả, kiểm script/công thức Sheet trong môi trường được phép và nghiệm thu. Không cập nhật DB/Sheet thật để minh họa các ví dụ này.

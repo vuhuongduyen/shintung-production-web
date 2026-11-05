@@ -4,7 +4,25 @@ import {captureLegacySource} from '../scripts/local/production-legacy-snapshot.m
 import {prepareLegacyPublication,publishLegacyChunk,finalizeLegacyPublication} from '../scripts/local/production-legacy-publication.mjs';
 import {activatePreparedTestPolicy} from './helpers/activate-prepared-daily-policy.mjs';import {dailyToday} from '../scripts/local/production-daily-output.mjs';
 import {reviewer} from './helpers/daily-output-reviewer.mjs';import {payrollMonth} from '../lib/production-payroll-month.mjs';
+import {activateDailyPolicy} from './helpers/activate-daily-policy.mjs';
+import {permissionProfiles} from '../lib/user-permission-profiles.mjs';
 const actor={login:'SYNTHETIC-PUBLISHER',isAdmin:true},build={sourceId:'a'.repeat(64)};
+test('HR can enter a prior-month new-period absence on the fifth before payout without rewriting frozen hours or reports',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-04T03:00:00Z')});
+ const c=await workflowGetFixture(2),put=(entity,key,payload)=>c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload').bind(entity,key,JSON.stringify(payload),'SYNTHETIC',new Date().toISOString()).run();
+ try{
+  await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.startDate','2026-01-01') WHERE entity='employees'").run();
+  await activateDailyPolicy(c.db,{effectiveFrom:'2026-11-04'});
+  t.mock.timers.tick(31*86400000);assert.equal(dailyToday(),'2026-12-05');
+  const call=await reviewer({...c,put});await put('users','SYNTHETIC-REVIEWER',{login:'SYNTHETIC-REVIEWER',role:'USER',department:'HR',active:true});await put('department_permissions','HR',{department:'HR',active:true,permissions:permissionProfiles.HR.grants.join(' · ')});
+  const before=await call('/api/production-workflow');assert.equal(before.status,200,JSON.stringify(before.body));
+  const calc=view=>payrollMonth({orders:view.orders,reports:view.reports,events:view.events,schedules:view.approvedSchedules,employees:view.payrollEmployees,month:'2026-11',standards:new Map(),attendanceBaselines:view.payrollBaselines,historyProtection:view.payrollHistoryProtection});
+  const original=calc(before.body)[0].people.find(p=>p.id==='SYNTHETIC-NV0'),raw=(await records(c.db)).filter(r=>['production_report','production_legacy_month'].includes(r.entity));assert.ok(original.hc>1);
+  const saved=await call('/api/production-workflow',{action:'line-absence',line:'A',absenceType:'Đi trễ',employees:['SYNTHETIC-NV0'],effectiveAt:'2026-11-05T01:00:00Z',endsAt:'2026-11-05T02:00:00Z',reason:'Synthetic late HR entry before payout',lateReason:'Synthetic December entry for November',requestIdempotency:crypto.randomUUID()});assert.equal(saved.status,200,JSON.stringify(saved.body));
+  const after=await call('/api/production-workflow');assert.equal(after.status,200);assert.equal(after.body.payrollBaselines.find(b=>b.until).integrity.A,'matched');
+  assert.ok(Math.abs(calc(after.body)[0].people.find(p=>p.id==='SYNTHETIC-NV0').hc-(original.hc-1))<1e-9);assert.deepEqual((await records(c.db)).filter(r=>['production_report','production_legacy_month'].includes(r.entity)),raw);
+ }finally{await c.close();t.mock.timers.reset();}
+});
 test('authenticated activated workflow protects cutover-prefix hours, retains explicit HR saves, and does not expose another Line baseline',async t=>{
  t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-04T03:00:00Z')});
  const c=await workflowGetFixture(6),put=(entity,key,payload)=>c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(entity,key,JSON.stringify(payload),'SYNTHETIC','now').run();

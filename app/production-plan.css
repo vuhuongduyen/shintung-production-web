@@ -48,3 +48,5 @@ html body .pp-workspace .pp-plan-grid :is(input:not([type=checkbox]),select) {
   border-color:#d6dfd7; border-radius:3px; background:#fff;
 }
 .pp-workspace .pp-backlog-open{font:inherit;padding:3px 8px;border:1px solid #86b9a4;border-radius:5px;background:#edf7f2;color:#14604d;cursor:pointer;margin-left:6px}.pp-load-card dl{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.pp-load-card dl>div{border:1px solid #e0e7e1;padding:6px;border-radius:4px}.pp-load-card dl>div:nth-child(2),.pp-load-card dl>div:nth-child(3){background:#fff5df}
+
+.pp-calculation-link{font:inherit;color:inherit;background:transparent;border:0;padding:0;min-height:32px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}.pp-calculation-link:focus-visible{outline:2px solid #177451;outline-offset:2px}

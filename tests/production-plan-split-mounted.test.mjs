@@ -15,13 +15,13 @@ const {ToolbarPermissions}=await vite.ssrLoadModule('/components/standard-toolba
 const sync=await vite.ssrLoadModule('/lib/data-sync.ts');
 const originalFetch=globalThis.fetch,OriginalChannel=globalThis.BroadcastChannel,channels=new Set();
 if(OriginalChannel)globalThis.BroadcastChannel=class extends OriginalChannel{constructor(name){super(name);channels.add(this);}};
-const week='2026-11-02';let rows,writes,release,planReads,holdNextRead,releaseRead,capacityRows;
+const week='2026-11-02';let rows,writes,release,planReads,holdNextRead,releaseRead,capacityRows,effectivePlanning,laborRows;
 const original={id:'ROOT-SYNTHETIC',week,sku:'SYNTHETIC-SKU',name:'Synthetic product',line:'A',start:week,end:week,plan:100,suggested:100,laborHour:0.1,status:'DỰ KIẾN',type:'TUẦN CHÍNH',priority:'THƯỜNG',planId:'SHARED-PLAN',sourceIds:[]};
-beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];release=null;planReads=0;holdNextRead=false;releaseRead=null;capacityRows=[];globalThis.fetch=async(input,init={})=>{
+beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];release=null;planReads=0;holdNextRead=false;releaseRead=null;capacityRows=[];effectivePlanning=false;laborRows=[];globalThis.fetch=async(input,init={})=>{
  const url=new URL(String(input),'https://synthetic.test');
  if((init.method||'GET')==='GET'){
   if(url.pathname==='/api/capacity')return Response.json({requests:[]});
-  assert.equal(url.pathname,'/api/production-plan');if(url.searchParams.has('capacityOnly'))return Response.json({capacity:capacityRows});planReads++;const snapshot=structuredClone({revision:rows.length,rows,sources:[],capacity:capacityRows,transit:[],audit:[],warnings:[],canReopen:false});if(holdNextRead){holdNextRead=false;return await new Promise(resolve=>releaseRead=()=>resolve(Response.json(snapshot)));}return Response.json(snapshot);
+  assert.equal(url.pathname,'/api/production-plan');if(url.searchParams.has('capacityOnly'))return Response.json({capacity:capacityRows});planReads++;const snapshot=structuredClone({revision:rows.length,rows,sources:[],capacity:capacityRows,transit:[],audit:[],warnings:[],canReopen:false,effectivePlanning,labor:laborRows});if(holdNextRead){holdNextRead=false;return await new Promise(resolve=>releaseRead=()=>resolve(Response.json(snapshot)));}return Response.json(snapshot);
  }
  assert.equal(url.pathname,'/api/production-plan');const body=JSON.parse(init.body);writes.push(body);assert.equal(body.action,'split');assert.deepEqual(body.ids,[original.id]);
  rows=[{...original,planGroupId:original.id,groupPlanId:original.planId},{...original,id:'CHILD-SYNTHETIC',planGroupId:original.id,groupPlanId:original.planId,splitFromId:original.id,suggested:null,plan:null}];
@@ -93,5 +93,16 @@ test('Capacity notice is compact for actionable drafts and disappears without ad
   capacityRows=[{week,line:'A',status:'Đã xác nhận',version:1,availableHours:1000}];await act(async()=>sync.announceDataChange('capacity'));
   assert.equal(view.host.querySelector('[data-plan-notices]'),slot);assert.equal(view.host.querySelector('.pp-plan-grid'),table);assert.equal(slot.querySelector('button').style.visibility,'hidden');assert.equal(view.host.querySelectorAll('.pp-alert').length,0);
   capacityRows=[];rows=[{...original,status:'HỦY'}];await act(async()=>sync.announceDataChange('production_plan'));assert.equal(slot.querySelector('button').style.visibility,'hidden','a cancelled-only list does not warn about closing new plans');assert.equal(writes.length,0);
+ }finally{await view.close();}
+});
+
+test('clicking planned-hours result opens the formula and dated basis without sending a write',async()=>{
+ effectivePlanning=true;laborRows=[{sku:original.sku,effectiveVersions:[{id:'SYNTHETIC-RATE-1',status:'published',value:.1,validFrom:'2026-11-01',validTo:'2026-11-04'}]}];
+ rows=[{...original,plan:200,laborHour:.1,planLaborBasis:{status:'resolved',value:.1,segments:[{from:'2026-11-02',until:null,through:'2026-11-03',basis:{value:.1,versionId:'SYNTHETIC-RATE-1'}}]}}];
+ const view=await mount();try{
+  const trigger=view.host.querySelector('[aria-label="Xem công thức SYNTHETIC-SKU"]');assert.ok(trigger);assert.equal(trigger.type,'button');assert.match(trigger.textContent,/20/);trigger.focus();await click(trigger);
+  const detail=view.host.querySelector('[role=dialog]');assert.ok(detail);const formula=detail.querySelector('[aria-label="Căn cứ tính toán"]');assert.ok(formula);assert.match(formula.textContent,/Giờ công = SL kế hoạch × Giờ công\/SP/);assert.match(formula.textContent,/200 ×/);assert.match(formula.textContent,/SYNTHETIC-RATE-1/);assert.match(formula.textContent,/02\/11\/2026/);assert.equal(writes.length,0);assert.equal(document.activeElement,button(detail,'Đóng'));
+  await act(async()=>document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true})));assert.equal(document.activeElement,button(detail,'Đóng'));
+  await act(async()=>document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));assert.equal(view.host.querySelector('[role=dialog]'),null);assert.equal(document.activeElement,trigger);assert.equal(writes.length,0);
  }finally{await view.close();}
 });

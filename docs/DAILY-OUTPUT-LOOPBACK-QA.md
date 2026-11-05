@@ -31,3 +31,11 @@ Sửa phiếu đã liên kết kho, thu hồi sau nhận và ACK/công thức t�
 Ở checkpoint 5783408, fixture có login/session và tên bộ phận nhưng chưa seed department_permissions, nên tài khoản USER HR/QLSX/Kho có thể xem nhờ quyền đọc hiện có mà bị chặn ghi đúng cơ chế backend. Không dùng 403 của fixture thiếu này để kết luận quyền production lỗi; bản Admin/Line và các kiểm backend trước vẫn có phạm vi riêng.
 
 Source bổ sung chỉ trong harness: seed bản ghi quyền bộ phận **trong DB volatile mới** từ permissionProfiles.HR/QLSX/KHO hiện có, không sửa template hay backend, không cập nhật bảng quyền thật. Đăng nhập người dùng cho QA_HR/QA_QLSX/QA_KHO; nút đăng nhập Admin dành QA_ADMIN. HTTP smoke kiểm quyền thật qua site-session và thao tác: HR nghỉ được nhưng không xác nhận SX, QLSX phụ kho/xác nhận được, Kho không được điều chỉnh SX; phiếu báo công không bị viết lại bởi HR/phụ kho. Đây là tài khoản giả theo template, không chứng nhận toàn bộ quyền user production.
+
+## Bổ sung Pro Plan theo quyết định 05/11
+
+Gói mới có QA_KHSX (USER, profile KHSX chuẩn chỉ trong DB giả), không grant tài khoản thật. Mở Production Plan tuần 02/11/2026: SYNTHETIC-QA-PLAN 100 SP từ 02–06/11, rate .1 trước 03/11 và .2 từ 03/11. Bấm ô Giờ công để xem lý do cần tách và các khoảng nguồn; tách rồi nhập ví dụ dòng chính 40 SP ngày 02/11, dòng con 60 SP ngày 03–06/11. Tổng nhỏ/lớn hơn đề xuất được phép; không tự chia lượng. Chốt từng dòng, chuyển In Transit và xem Leadtime theo ngày chốt, không theo ngày SX hoặc ngày mở LSX. Legacy/hours/output fixtures cũ vẫn có để đối chiếu.
+
+Capacity fixture giờ có availableHours/syncedAt/khsxAcceptedAt và input factor đầy đủ, availableHours tính bằng calculateCapacity từ cùng input/roster giả; không giả capacity chấp thuận vượt khả năng thật. Nếu thấy panel vượt tải phải dùng đúng luồng hỏi/ACK, không bỏ guard để demo. Tài khoản/passphrase vẫn được tạo mới mỗi tiến trình, outbound Worker fetch vẫn chặn. Không nhập hoặc seed thêm vào DB đang dùng; harness luôn DB volatile riêng.
+
+Browser kiểm desktop/390 px, không clip/nhảy bảng; button công thức có Tab/Escape/trả focus; sửa ngày đổi basis preview, chưa có căn cứ phải hiện thiếu; chốt qua nhiều mức bị chặn, dòng khóa giữ basis, mỗi dòng chuyển riêng không gộp Plan ID. Mọi thao tác chỉ dữ liệu giả. HTTP/mounted pass không thay nghiệm thu pixel; các gói b5/6a cũ không có UI/fixture này.

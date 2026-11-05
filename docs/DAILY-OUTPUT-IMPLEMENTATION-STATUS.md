@@ -1,4 +1,4 @@
-# Trạng thái báo sản lượng ngày — 04/11/2026
+# Trạng thái báo sản lượng ngày — 04–05/11/2026
 
 Nhánh `feature/daily-output-effective-dates-20261104`, nền main sau PR #6 (`d8dbb1e031e540fec892509b577cd49c3d2cc442`). Bản phát triển, chưa merge/triển khai hoặc bật policy production. Quyết định và inventory tại [hợp đồng](DAILY-OUTPUT-EFFECTIVE-DATES-CONTRACT.md).
 
@@ -471,3 +471,31 @@ Phần còn lại không tự quyết: HR sửa ngược phần đã bảo toàn
 Sau khi preflight được chuẩn bị ở 4480d3f, đối chiếu fence ghi tìm thấy guard cũ chưa đếm quan hệ frozen. Ca fixture xóa copy của một nhân viên làm legacySourceStillMatches vẫn true; test trước sửa fail (`true !== false`), không suy rộng thành sự cố production. Sửa chỉ SQL legacySourceCondition: frozen count phải bằng sourceCount, giữ live count và so byte/metadata. Không thêm query round-trip, nguồn workforce/fullworkflow hoặc nới cap; không thuộc hot path lưu sản lượng.
 
 Ba hồi quy bổ sung: missing copy vẫn chặn dù live count không đổi; finalization không complete khi mất copy; mất copy ngay trước batch TEST activation chặn cả marker/policy. Nhóm snapshot/publication/preflight **38/38** đạt; so mọi raw record và không tự phục hồi copy. TypeScript/build đạt; CI cuối đọc riêng sau push. UI/API, preview, quyền và dữ liệu thật không đổi. Việc cần quyết định/dữ liệu thật vẫn ở checklist và tài liệu lựa chọn, chưa tự chốt.
+
+## Quyết định bổ sung 05/11: HR, ngày chốt Plan và nhiều mức
+
+Chưa merge/deploy/bật policy. Baseline remote trước sửa là 6a86cfb, CI 1.771/1.771. Các lựa chọn Leadtime và kế hoạch đã được Duyên chốt, không hỏi lại. HR được nhập muộn trước trả sản lượng; không tự đặt hạn cứng ngày 10 hoặc cho đổi kỳ đã chốt/đã trả.
+
+### Phần source đã bổ sung
+
+- Policy chưa active/chưa tới ngày chuyển đổi giữ hợp đồng Plan cũ. Sau mốc, draft lấy các mức có ngày hiệu lực trên toàn khoảng kế hoạch; đi qua nhiều mức thì giờ chưa xác định và chặn chốt cho tới khi KHSX dùng Tách đơn nhập lượng/ngày riêng. Không tự chia lượng/bình quân, không bắt tổng bằng đề xuất. Dòng khóa không tính lại.
+- Giữ ngoại lệ close thiếu giờ công của source cũ (rowWarnings vốn bỏ missingLabor): thiếu căn cứ giữ null/cảnh báo, không tự lấy mức hiện tại. Không tạo thêm lệnh cấm chốt tất cả SKU chưa có lịch sử. Tổng tải mới thiếu căn cứ giữ unknown, không biến thành 0; cách tổng hợp thiếu giờ legacy giữ nguyên.
+- Lần chốt lưu Leadtime riêng theo thời điểm/ngày GMT+7 chốt, lượng kế hoạch và nguồn phiên bản khi có; version tương lai/chồng lấn không chứng minh mức ở ngày chốt. Chuyển từng dòng sang In Transit và backlog giữ định mức/Leadtime đã lưu, không đổi khi master thay. Không dựng lại căn cứ chốt cho chứng từ cũ.
+- Căn cứ master và policy/manifest được kiểm raw trong batch close (có cap 8 MiB), cùng rollback Plan/audit khi stale/phantom. Không đổi quyền, schema, secrets hoặc nối dịch vụ thật. Policy bị vô hiệu/không khớp sau mốc không quay về current-only để ghi Plan.
+- Kết quả giờ từng dòng là button mở Chi tiết hiện có: lượng × giờ/SP, khoảng ngày/phiên bản và cảnh báo cần tách/thiếu. Không thêm cột mã hay banner. Có focus vào panel, Tab trong modal, Escape/Đóng trả focus không cuộn; mounted/JSDOM không thay browser pixel QA.
+- HTTP USER HR nhập 05/12 cho ngày 05/11 (sau cutover 04/11): lưu thành công, preview tháng 11 giảm đúng một giờ; prefix/raw reports/baselines cũ bất biến. Không sửa thuật toán HR chỉ để tạo kết quả mới. Phần HR sửa prefix trước mốc vẫn giữ bảo vệ vì chưa có trạng thái kỳ đã chốt/đã trả đáng tin trong source; cần nguồn xác định kỳ chưa trả trước khi áp ngoại lệ vào phần đã bảo toàn.
+
+### Kiểm local và hiệu năng
+
+Nhóm chính **68/68**, UI/search/cache/VM **111/111** (có giao nhau, không cộng thành full suite), API KHSX/HR mới **6/6** có trong nhóm chính; TypeScript/build đạt. VM harness trước đó thiếu import helper mới gây 25 lỗi setup; đã nạp module thật và chạy lại 111/111, không bỏ/nới assertions. Actual HTTP Worker built/fixture mới **1/1** đạt, ordinary password/session QA_KHSX đọc Plan cần tách và Capacity hợp lệ; HR/QLSX/Kho/Line/sản lượng/replay vẫn đạt. CI exact head sau push và browser là các bước riêng.
+
+Đo riêng sau khi các test khác đã dừng, Node24/Miniflare direct handler, 50/500 dòng Pro Plan cùng nhóm với 2 LSX giả; 3 mẫu GET mỗi phiên bản, 1 close một dòng. Script scripts/bench/plan-effective-load.mjs. Bản trước là bản sao thực của cùng WIP trước tái sử dụng reads, không phải baseline v809/6a86cfb và không so hai mô hình nghiệp vụ khác nhau; full GET output deep-equal. Bản sao remap import dùng đo có SHA256 8a22c0ca8a3cac377b055ce69db97c4f2d6301b82580af4e1135161358d5bbad, không dùng làm source phát hành.
+
+| Dòng Plan | GET trước | GET sau | SELECT trước/sau | Close 1 dòng | SELECT/batch/request close |
+| --- | --- | --- | --- | --- | --- |
+| 50 | 196,32–197,90 ms | 147,41–159,76 ms | 20/17 | 278,73 ms | 27/1/1 |
+| 500 | 199,08–242,79 ms | 149,61–197,72 ms | 20/17 | 350,96 ms | 27/1/1 |
+
+Dùng lại rows Plan/labor cho Capacity/backlog, không đọc lặp; Map định mức client memo theo snapshot. GET không batch; close đúng basis và raw reports không đổi. Không HTTP/auth/browser/Google/WorkerCPU/peak-memory/p95 hoặc cam kết production. Một probe trước chạy cùng tests không dùng làm số đo; bảng trên là lượt riêng. Không dùng số đo này để kết luận toàn web hết quá tải.
+
+Harness QA mới có QA_KHSX USER/profile chuẩn trong DB volatile, Plan 100 SP kéo qua hai mức 02–06/11, Engine giả và Capacity xác nhận được tính từ input giả; không cấp quyền thật. Browser cần tự kiểm lại full ONSPA đúng commit mới, formula/keyboard/table mobile, split/save/close/transfer và giờ/Leadtime, không dùng nghiệm thu b5 cũ thay cho UI mới. Chưa cập nhật preview runtime của Duyên.

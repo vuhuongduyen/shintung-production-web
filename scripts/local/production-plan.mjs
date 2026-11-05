@@ -8,6 +8,9 @@ import {calculateCapacity, dailyParticipants, linkedOtLeaveDates} from '../../li
 import {engineDemandMatches} from '../../lib/engine-demand.mjs';
 import {usableSku, confirmationStatus} from '../../lib/sku-state.mjs';
 import {siteLaborHours} from '../../lib/site-labor-hours.mjs';
+import {applyPlanLaborBasis} from '../../lib/plan-effective-basis.mjs';
+import {capturePlanLeadtime} from '../../lib/transit-leadtime.mjs';
+import {readDailyOutputPolicy} from './production-daily-output.mjs';
 import { randomUUID } from 'node:crypto';
 import { monday, weekEnd, normalizeRow, matchKey, text, normalized, numberOrNull, dateISO, lineOf, planId, planTypes, priorities, rowWarnings, sortedRows,validPlanGroups,primaryPlanRow,transitMatchesPlan,planCoveredByTransit } from '../../lib/production-plan.mjs';
 export class PlanError extends Error {
@@ -21,6 +24,7 @@ catch {
     return { key: r.record_key, payload: null, invalid: true };
 } }); }
 const active = r => r.payload && typeof r.payload === 'object' && !r.payload._deleted;
+const planPolicies=new WeakMap();
 function unpack(records) { return records.filter(active).flatMap(r => Array.isArray(r.payload.rows) ? r.payload.rows : Array.isArray(r.payload) ? r.payload : [r.payload]).filter(r => r && typeof r === 'object' && !r._deleted); }
 export async function getPlanCapacityDetail(db, week, line) {
  if(!week || monday(week)!==week) fail('invalidWeek');
@@ -41,14 +45,17 @@ export async function getPlanCapacityDetail(db, week, line) {
  available:unallocated?null:(d.hcNet+d.otNet)*Number(input.factor)/100,
  absences:entries.filter(r=>(r.date||r.from)<=d.date&&(r.to||r.date||r.from)>=d.date).map(r=>({names:(r.employees||[]).map(id=>names.get(id)||id),people:r.people||r.employees?.length||0,kind:r.kind,period:r.mode==='full'?'full':r.start&&r.end?r.start+'–'+r.end:r.hours?String(r.hours)+' h':r.mode,linkedOt:linkedOtLeaveDates(r,input.dailySchedule).includes(d.date)}))}))};
 }
-export async function getPlanCapacity(db, week) {
+export async function getPlanCapacity(db, week, effectivePlanning, sources={}) {
     if(!week || monday(week)!==week) fail('invalidWeek');
+    effectivePlanning??=(await readDailyOutputPolicy(db)).policy?.cutoverReached===true;
     const record=await db.prepare("SELECT payload FROM app_records WHERE entity='capacity' AND record_key=?").bind(week).first();
     const envelope=record?JSON.parse(record.payload):null;
-    const backlog=await readPlanTransitBacklog(db,week);
-    const [calendarRecords,planRecords,laborRecords]=await Promise.all(['capacity','production_plan','labor_hours'].map(e=>read(db,e)));
-    const calendars=unpack(calendarRecords),standards=new Map(siteLaborHours(laborRecords.map(r=>({key:r.key,payload:r.payload,updatedAt:r.updatedAt}))).map(r=>[text(r.payload.sku).toUpperCase(),numberOrNull(r.payload.laborHour)]));
-    const otherPlans=unpack(planRecords.filter(r=>r.key!==week)).filter(r=>dateISO(r.start)&&dateISO(r.end)&&r.start<=weekEnd(week)&&!['ĐÃ CHUYỂN','HỦY','TẠM HOÃN'].includes(r.status)&&!planCoveredByTransit(r,backlog)).map(r=>{const labor=standards.get(text(r.sku).toUpperCase());return {...r,laborHour:r.status!=='ĐÃ CHỐT'&&labor!==undefined?labor:r.laborHour};});
+    const [calendarRecords,planRecords,laborRecords]=await Promise.all([read(db,'capacity'),sources.plans||read(db,'production_plan'),sources.labor||read(db,'labor_hours')]);
+    const laborModel=siteLaborHours(laborRecords.map(r=>({key:r.key,payload:r.payload,updatedAt:r.updatedAt})));
+    const backlog=await readPlanTransitBacklog(db,week,laborModel.map(r=>r.payload));
+    const calendars=unpack(calendarRecords),standards=new Map(laborModel.map(r=>[text(r.payload.sku).toUpperCase(),numberOrNull(r.payload.laborHour)]));
+    const datedStandards=new Map(laborModel.map(r=>[text(r.payload.sku).toUpperCase(),r.payload]));
+    const otherPlans=unpack(planRecords.filter(r=>r.key!==week)).filter(r=>dateISO(r.start)&&dateISO(r.end)&&r.start<=weekEnd(week)&&!['ĐÃ CHUYỂN','HỦY','TẠM HOÃN'].includes(r.status)&&!planCoveredByTransit(r,backlog)).map(r=>{if(effectivePlanning)return applyPlanLaborBasis(r,datedStandards);const labor=standards.get(text(r.sku).toUpperCase());return {...r,laborHour:r.status!=='ĐÃ CHỐT'&&labor!==undefined?labor:r.laborHour};});
     const capacityRows=envelope?.schemaVersion===1&&Array.isArray(envelope.rows)?envelope.rows:[];
     const allLines=[...new Set(['A','B',...capacityRows.map(r=>r.line),...backlog.rows.map(r=>r.line)])];
     return allLines.map(line=>{const row=capacityRows.find(r=>r.line===line)||{line,week,status:'Chưa xác nhận Capacity'};
@@ -62,7 +69,9 @@ export async function getPlanCapacity(db, week) {
 export async function getPlan(db, week, canReopen = false, catalog = null) {
     if (!week || monday(week) !== week)
         fail('invalidWeek');
-    const [plans, engines, transit, labor, audits, capacity] = await Promise.all([...['production_plan', 'production_engine', 'in_transit', 'labor_hours', 'production_plan_audit'].map(e => read(db, e)),getPlanCapacity(db,week)]);
+    const policy=await readDailyOutputPolicy(db),effectivePlanning=policy.policy?.cutoverReached===true,planningBlocked=effectivePlanning&&policy.policy?.active!==true;
+    const [plans, engines, transit, labor, audits] = await Promise.all(['production_plan', 'production_engine', 'in_transit', 'labor_hours', 'production_plan_audit'].map(e => read(db, e)));
+    const capacity=await getPlanCapacity(db,week,effectivePlanning,{plans,labor});
     const masters = catalog || await read(db,'sku');
     const masterPayloads=masters.map(record=>record?.payload&&typeof record.payload==='object'?record.payload:record);
     const masterBySku=new Map(masterPayloads.map(master=>[text(master?.code).toUpperCase(),master]));
@@ -75,16 +84,19 @@ export async function getPlan(db, week, canReopen = false, catalog = null) {
     const deletedRows = candidates.flatMap(r => Array.isArray(r.payload.rows) ? r.payload.rows : []).filter(r => r && r._deleted);
     const effectiveLabor=siteLaborHours(labor.map(r=>({key:r.key,payload:r.payload,updatedAt:r.updatedAt}))).map(r=>r.payload);
     const laborBySku=new Map(effectiveLabor.map(item=>[text(item.sku).toUpperCase(),numberOrNull(item.laborHour)]));
+    const datedStandards=new Map(effectiveLabor.map(item=>[text(item.sku).toUpperCase(),item]));
     // Draft plans follow the current SKU standard; confirmed/transferred plans retain their historical basis.
     const rows = unpack(candidates).filter(r => r.sku || r.id).map((r, i) => {
         const row=withMasterGroup(normalizeRow(r, week, i));
+        if(effectivePlanning)return applyPlanLaborBasis(row,datedStandards);
         const current= laborBySku.get(text(row.sku).toUpperCase());
         return !['ĐÃ CHỐT','ĐÃ CHUYỂN'].includes(row.status)&&current!==undefined?{...row,laborHour:current}:row;
     });
     const ambiguous = candidates.length > 1 || !validPlanGroups(rows);
-    return { week, revision: Number(envelope?.revision) || 0, rows: sortedRows(rows), sources, capacity, labor: effectiveLabor,
+    const result={ week, effectivePlanning, planningBlocked, revision: Number(envelope?.revision) || 0, rows: sortedRows(rows), sources, capacity, labor: effectiveLabor,
         transit: unpack(transit).filter(r => monday(r.week) === week).map(withMasterGroup), audit: audits.filter(r => active(r) && r.payload.week === week).map(r => r.payload), canReopen,
         envelope: envelope || {}, deletedRows, warnings: [...(ambiguous ? ['legacyConflict'] : []), ...(plans.some(r => r.invalid) ? ['invalidLegacy'] : [])], legacyKey: current?.key || candidates[0]?.key || null };
+    planPolicies.set(result,policy);return result;
 }
 const write = (db, entity, key, payload, actor, now) => db.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload,updated_by=excluded.updated_by,updated_at=excluded.updated_at').bind(entity, key, JSON.stringify(payload), actor, now);
 export async function mutatePlan(db, body, actor) {
@@ -95,6 +107,7 @@ export async function mutatePlan(db, body, actor) {
         fail('invalidAction');
     if(action==='split'&&!canPlanAction(actor,'save'))fail('permissionDenied',403);
     const state = await getPlan(db, week, !!actor.canReopenPlan, actor.catalog);
+    if(state.planningBlocked)fail('Thiếu căn cứ chuyển đổi đã kiểm chứng; chưa ghi kế hoạch. Cần đối chiếu cấu hình.',409);
     if (state.warnings.length || state.legacyKey && state.legacyKey !== week)
         fail('legacyConflict', 409);
     if (!Number.isInteger(body.revision) || body.revision !== state.revision)
@@ -102,6 +115,17 @@ export async function mutatePlan(db, body, actor) {
     const now = new Date().toISOString(), before = state.rows;
     let next = structuredClone(before), added = 0, existing = 0, updated = 0;
     const extra = [];
+    let closingBasis=null;
+    if(action==='close'&&state.effectivePlanning){
+        const policy=planPolicies.get(state),scope="entity IN ('labor_hours','leadtime','leadtime_versions') OR (entity='production_reporting_policy' AND record_key='global') OR (entity='production_legacy_manifest' AND record_key=?)";
+        const {results}=await db.prepare(`SELECT entity,record_key,payload FROM app_records WHERE ${scope}`).bind(policy.manifestKey).all();
+        if(results.find(r=>r.entity==='production_reporting_policy')?.payload!==policy.raw||results.find(r=>r.entity==='production_legacy_manifest')?.payload!==policy.manifestRaw)fail('Căn cứ chuyển đổi vừa thay đổi; tải lại trước khi chốt.',409);
+        const expected=JSON.stringify(results.map(r=>[r.entity,r.record_key,r.payload]));
+        if(new TextEncoder().encode(expected).length>8*1024*1024)fail('Căn cứ chốt kế hoạch vượt giới hạn đối chiếu; chưa chốt.',422);
+        extra.push(db.prepare(`INSERT INTO app_records SELECT entity,record_key,payload,updated_by,updated_at FROM app_records WHERE entity='production_plan' AND record_key=? AND NOT (((SELECT count(*) FROM app_records WHERE ${scope})=?) AND NOT EXISTS(SELECT 1 FROM json_each(?) j LEFT JOIN app_records a ON a.entity=json_extract(j.value,'$[0]') AND a.record_key=json_extract(j.value,'$[1]') WHERE a.payload IS NOT json_extract(j.value,'$[2]')))` ).bind(week,policy.manifestKey,results.length,expected));
+        const values=e=>results.filter(r=>r.entity===e).map(r=>({...JSON.parse(r.payload),_recordKey:r.record_key}));
+        closingBasis={labor:new Map(siteLaborHours(values('labor_hours').map(p=>({key:p._recordKey,payload:p}))).map(r=>[text(r.payload.sku).toUpperCase(),r.payload])),leadtime:values('leadtime').flatMap(p=>Array.isArray(p.rows)?p.rows:[{...p,sku:p.sku||p._recordKey}]),versions:values('leadtime_versions')};
+    }
     const details = [];
     let splitRowIds=[];
     if (action === 'receive') {
@@ -194,6 +218,13 @@ export async function mutatePlan(db, body, actor) {
                 Object.assign(row, normalizedEdit);
             }
             if (action === 'close') {
+                if(closingBasis){
+                    Object.assign(row,applyPlanLaborBasis(row,closingBasis.labor));
+                    if(row.planLaborBasis.status==='split-required')fail('Kế hoạch đi qua nhiều mức giờ công/SP. Tách đơn và nhập lượng/ngày từng dòng trước khi chốt.',422);
+                    // Keep the existing close exception for missing labor. It
+                    // remains unknown/warned, never replaced with today's rate.
+                    row.planLeadtimeBasis=capturePlanLeadtime(row,closingBasis.leadtime,closingBasis.versions,now,actor.login);
+                }
                 const errors = rowWarnings(row).filter(x => x !== 'missingLabor');
                 if (row.status !== 'DỰ KIẾN' || errors.length)
                     fail('cannotClose', 422, [{ id, reason: errors.join(',') || 'invalidStatus' }]);
@@ -248,7 +279,7 @@ export async function mutatePlan(db, body, actor) {
                     columns[29] = normalized(columns[29]) === 'CHUA DONG BO' ? 'CHƯA ĐỒNG BỘ' : 'CÓ THAY ĐỔI';
                     columns[32] = actor.login;
                 }
-                const target = { ...old?.payload, planRowId: id, ...(row.planGroupId?{planGroupId:row.planGroupId}:{}), planId: row.planId, week, sku: row.sku, name: row.name, spec: row.spec, line: row.line, group: row.group, plan: row.plan, start: row.start, end: row.end, priority: row.priority, sequence: row.sequence, columns, status: old?.payload.status || 'CHƯA MỞ LSX', syncStatus: columns[29], transferredAt: now, transferredBy: actor.login };
+                const target = { ...old?.payload, ...(row.planLeadtimeBasis?{planLeadtimeBasis:structuredClone(row.planLeadtimeBasis)}:{}), ...(row.planLaborBasis?{planLaborBasis:structuredClone(row.planLaborBasis),laborHour:row.laborHour}:{}), planRowId: id, ...(row.planGroupId?{planGroupId:row.planGroupId}:{}), planId: row.planId, week, sku: row.sku, name: row.name, spec: row.spec, line: row.line, group: row.group, plan: row.plan, start: row.start, end: row.end, priority: row.priority, sequence: row.sequence, columns, status: old?.payload.status || 'CHƯA MỞ LSX', syncStatus: columns[29], transferredAt: now, transferredBy: actor.login };
                 extra.push(write(db, 'in_transit', old?.key || `plan:${id}`, target, actor.login, now));
                 row.status = 'ĐÃ CHUYỂN';
                 row.transferredAt = now;
@@ -265,11 +296,12 @@ export async function mutatePlan(db, body, actor) {
     }
     if (action === 'transfer' && !updated)
         return { added, existing, updated, errors: 0, revision: state.revision };
+    if(state.effectivePlanning){const standards=new Map(state.labor.map(r=>[text(r.sku).toUpperCase(),r]));for(const row of next)Object.assign(row,applyPlanLaborBasis(row,standards));}
     let dailyCapacityCheck=null;
     const schedulingFields=['start','end','line','plan','sequence','status'];
     const schedulingIds=['save','close'].includes(action)?(body.ids||[]).filter(id=>{const old=before.find(r=>r.id===id),row=next.find(r=>r.id===id);return row&&old&&schedulingFields.some(k=>row[k]!==old[k]);}):[];
     if(schedulingIds.length){
-        dailyCapacityCheck=await checkPlanDailyLoad(db,week,next,schedulingIds,state.labor);
+        dailyCapacityCheck=await checkPlanDailyLoad(db,week,next,schedulingIds,state.labor,{effectivePlanning:state.effectivePlanning});
         if(dailyCapacityCheck.warnings.length&&body.dailyCapacityAck!==dailyCapacityCheck.token)
             fail('dailyCapacityConfirmation',409,[{id:'dailyCapacity',reason:JSON.stringify(dailyCapacityCheck)}]);
     }
@@ -279,7 +311,7 @@ export async function mutatePlan(db, body, actor) {
         await db.batch([write(db, 'production_plan', week, envelope, actor.login, now), ...extra, write(db, 'production_plan_audit', audit.id, audit, actor.login, now)]);
     }
     catch (error) {
-        if (action === 'close' && String(error).includes('UNIQUE')) fail('capacityChanged',409);
+        if (action === 'close' && String(error).includes('UNIQUE')) fail(closingBasis?'Căn cứ định mức/Leadtime/Capacity vừa thay đổi; tải lại trước khi chốt.':'capacityChanged',409);
         if (String(error).includes('PLAN_CONFLICT'))
             fail('conflict', 409);
         throw error;
