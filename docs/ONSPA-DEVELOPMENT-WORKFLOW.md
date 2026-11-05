@@ -16,6 +16,7 @@ Quy trình này là điểm tham chiếu cố định cho các lần làm việc
 
 - Chỉ sửa phần đã được yêu cầu. Giữ DB, uploads, tài khoản, quyền, khóa Sheet, Site identity và production ngoài phạm vi thay đổi nếu chưa được phép riêng.
 - Cài dependencies theo lockfile khi cần. Chạy kiểm tra phù hợp: targeted tests trước, typecheck/build khi có thay đổi mã hoặc cấu hình liên quan; ghi rõ lint/browser/full suite đã chạy hay chưa.
+- Trước push, chạy `npm run test:ci-contract`, TypeScript và test nhóm tác động; build khi thay mã cần biên dịch. Gom các bản sửa có liên quan vào một lần push sau bằng chứng local; không push tiến độ nhỏ liên tục làm hủy CI. Bước nhanh không thay full CI hoặc browser.
 - Khi test thất bại, phân loại harness/fixture, hợp đồng test cũ và nghiệp vụ chưa rõ. Ghi test/file, expected/actual, giả thuyết và phép kiểm chứng. Không rerun toàn bộ giống hệt nếu chưa có thay đổi hoặc lý do cụ thể; không xóa/skip/nới assertion để xanh.
 - Tài liệu thuần túy không cần chạy lại test thủ công. Nếu workflow hiện hữu tự chạy do push, ghi nhận trung thực; không đổi workflow/settings hoặc dùng skip-ci để che checks.
 
@@ -82,3 +83,10 @@ Mỗi lần bàn giao phải điền riêng từng trạng thái, dùng “chưa
 | Deploy | Chưa yêu cầu/chưa làm/pending/failed/succeeded; active version/commit readback nếu có |
 
 Tài liệu liên quan: [CI](CI.md), [bàn giao lỗi đã biết](BUG-HANDOFF-2026-11-02.md), [chẩn đoán và hướng xử lý](CI-RESIDUAL-DIAGNOSIS-2026-11-02.md). Báo cáo lỗi là mốc lịch sử; luôn đọc kết quả của head hiện tại khi quyết định bước tiếp theo.
+
+
+## Tiết kiệm phút GitHub — cập nhật bản nháp 05/11
+
+Theo [cấu hình CI](CI.md), nhánh làm việc gửi lên GitHub rồi mở/cập nhật PR để chạy một lượt kiểm; không dùng push nhánh source-sync tạo thêm lượt full trùng PR. Main vẫn được kiểm sau merge. PR draft vẫn chạy; sửa mô tả/chuyển ready không tạo CI mới nếu commit không đổi. Bốn check giữ tên, gate nhanh/TypeScript đi trước ba shard; khi gate đạt vẫn chạy đủ toàn bộ test cuối. Lỗi gate không được coi là full suite đạt.
+
+Trình tự xử lý lỗi: đọc đúng log/head → nhóm nguyên nhân → sửa → quick + targeted trước/sau + kiểm cần thiết → gom push → theo dõi đúng run tới terminal. Không rerun giống hệt chỉ để thử may mắn, không bỏ test/assertion/skip-ci hoặc đổi quyền/billing. Báo source, local, CI và browser riêng; cấu hình mới trong PR chưa tự cập nhật main hay cấp quyền merge/deploy. Nghiệm thu ứng dụng có thể làm song song trên checkpoint app có manifest khớp; phải ghi chính xác SHA/phạm vi và kiểm diff nếu head chỉ đổi tooling/docs.
