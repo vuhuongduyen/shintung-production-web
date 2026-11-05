@@ -65,3 +65,7 @@ Test production-additional-lsx-worker đi qua actual compiled Worker/ordinary KH
 6. Theo dõi localStorage/sessionStorage: không có ghi chú/request token/credentials của cơ chế này. Client chỉ giữ draft trong bộ nhớ; journal/receipt thuộc lần Save thành công ở DB giả. Chỉ point lookup, ACK không phát thêm refresh business; đo thời gian từng pha và không stress production.
 
 Backend/direct tests và mounted JSDOM đã có các nhánh trên; Worker HTTP dùng auth thật trên Miniflare giả kiểm KHSX/role/re-login/permission/receipt. Đây chưa là browser pixel/touch/keyboard acceptance, Google thật hoặc quyền bật policy. Không có migration/journal backfill cho các lượt cũ thiếu proof; không suy đoán lịch sử. Các gói QA trước source journal không chứa thay đổi này.
+
+## Adapter cho Codespace Private (không thay harness loopback mặc định)
+
+Xem [CODESPACE-PRIVATE-PREVIEW-TEST.md](CODESPACE-PRIVATE-PREVIEW-TEST.md). Adapter chỉ QA, fixed origin HTTPS của Codespace cũ/cổng5173, full Worker/volatile fixtures/normal auth. Không thay Vite/Worker production, dùng local-owner hoặc public port. HTTP Host/Origin mô phỏng ở cloud không chứng minh URL forwarded thực tế hay cookie/browser hoạt động; phải kiểm phiên Codespace được phép trước khi gửi link.

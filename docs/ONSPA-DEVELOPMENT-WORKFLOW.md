@@ -40,6 +40,8 @@ Mặc định ưu tiên tái sử dụng **GitHub Codespaces có sẵn, cổng 5
 - Lệnh phát triển từng dùng: `CLOUDFLARE_CF_FETCH_ENABLED=false npm run dev`. Đây là ghi nhận lịch sử, không phải lệnh bảo đảm chạy được mọi commit. Không tự chuyển sang main hoặc chép nguyên source PR #3.
 - `5174/report-review.html` là fixture riêng, không phải full-app preview được chấp nhận.
 
+Adapter QA cố định cho Codespace cũ và giới hạn Host/Origin/role: [CODESPACE-PRIVATE-PREVIEW-TEST.md](CODESPACE-PRIVATE-PREVIEW-TEST.md). Đây là lựa chọn TEST cần kiểm actual forwarding; không tự có link đang chạy hoặc thay allowlist Vite/production.
+
 ### Các điểm phải xác minh trước khi gửi link
 
 1. Kiểm tra Codespace thực tế, repo/branch, working tree và SHA. Bảo toàn công việc/dữ liệu đang có; chạy đúng commit cần review, không chỉ đúng tên nhánh.
