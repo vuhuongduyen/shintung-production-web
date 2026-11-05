@@ -468,3 +468,6 @@ html body .app-shell .production-work-screen .daily-output-table .work-product{w
 
 .production-time-correction-dialog .daily-correction-table{width:100%;min-width:0!important;table-layout:fixed}
 .production-time-correction-dialog .daily-correction-table :is(th,td){white-space:normal!important;overflow-wrap:anywhere}
+
+/* Hidden accessible labels stay anchored inside their own scrolled cell. */
+.daily-output-board [data-feedback-button],.production-correction-orders-table [data-feedback-button],.production-time-correction-dialog [data-feedback-button]{position:relative}
