@@ -499,3 +499,11 @@ Nhóm chính **68/68**, UI/search/cache/VM **111/111** (có giao nhau, không c�
 Dùng lại rows Plan/labor cho Capacity/backlog, không đọc lặp; Map định mức client memo theo snapshot. GET không batch; close đúng basis và raw reports không đổi. Không HTTP/auth/browser/Google/WorkerCPU/peak-memory/p95 hoặc cam kết production. Một probe trước chạy cùng tests không dùng làm số đo; bảng trên là lượt riêng. Không dùng số đo này để kết luận toàn web hết quá tải.
 
 Harness QA mới có QA_KHSX USER/profile chuẩn trong DB volatile, Plan 100 SP kéo qua hai mức 02–06/11, Engine giả và Capacity xác nhận được tính từ input giả; không cấp quyền thật. Browser cần tự kiểm lại full ONSPA đúng commit mới, formula/keyboard/table mobile, split/save/close/transfer và giờ/Leadtime, không dùng nghiệm thu b5 cũ thay cho UI mới. Chưa cập nhật preview runtime của Duyên.
+
+## Bổ sung giữ bậc MOQ của Leadtime
+
+Checkpoint 32965d35172cf24acfa1ca3652d7da43d2f7be46 có CI 41951056869 SUCCESS, **1.784/1.784 trong 291 file** (650+555+579), TypeScript/ba build và bốn checks completed/success. Gói QA 329 giữ riêng; chưa có browser acceptance cho UI mới.
+
+Rà thêm phát hiện snapshot Leadtime phẳng của 329 có thể thay quy tắc bậc MOQ: lượng Plan và lượng từng LSX có thể khác nhau. Regression trước sửa fail (2 khác 5), đối chiếu lookup cũ độc lập xác nhận vẫn phải chọn bậc theo lượng LSX. Bổ sung snapshot giữ các bậc lượng/ngày chốt khi nguồn chưa có version phẳng; đọc In Transit chọn theo lượng LSX như cũ từ chính các bậc đã giữ, không đọc master mới. Version hiệu lực phẳng vẫn theo quy tắc phẳng cũ; missing/malformed không fallback current. Không thay cách phân bổ hoặc trần lượng LSX.
+
+Ca tích hợp: Plan 1.000 chốt với các mức ≤100=2 ngày, ≤1.000=5 ngày; sau chuyển, tạo LSX 50 bằng handler draft-lsx, master đổi 99 ngày; In Transit vẫn đúng 2, còn căn cứ Plan 1.000 vẫn ghi 5. Không dùng ví dụ LSX vượt lượng Plan để chứng minh luồng API. Nhóm basis/handler/Leadtime **13/13**, TypeScript đạt; build/CI của commit bổ sung ghi riêng sau khi hoàn tất. Source UI/fixture/browser mới không đổi trong bổ sung MOQ; cần đối chiếu đúng SHA khi bàn giao. Không merge/triển khai/ghi thật.

@@ -23,7 +23,7 @@ test('new unresolved planning load remains unknown, and a transferred resolved b
  const transit={id:'TRANSIT',sku:row.sku,week:row.week,line:'A',status:'MỞ',lsxQty:100,completedQty:0,planStart:row.start,planEnd:row.end,laborHour:.2,planLaborBasis:{status:'resolved',value:.2}};
  assert.equal(planTransitBacklog([transit],row.week,[{sku:row.sku,laborHour:99}]).rows[0].hours,20);
 });
-test('Leadtime is captured at plan confirmation in GMT+7 and never follows later masters, quantities or LSX open date',()=>{
+test('Leadtime version is captured at plan confirmation in GMT+7 and never follows later masters or LSX open date',()=>{
  const row={id:'SYNTHETIC-ROW',sku:'SYNTHETIC',plan:100},versions=[{id:'L1',sku:row.sku,leadTime:2,status:'Hết hiệu lực',confirmedAt:'2026-10-31',validFrom:'2026-11-01',validTo:'2026-11-05'},{id:'L2',sku:row.sku,leadTime:4,status:'Đang áp dụng',validFrom:'2026-11-05'}];
  const old=capturePlanLeadtime(row,[],versions,'2026-11-04T16:59:00Z','QLSX'),next=capturePlanLeadtime(row,[],versions,'2026-11-04T17:00:00Z','QLSX');assert.equal(old.value,2);assert.equal(next.value,4);assert.equal(next.businessDate,'2026-11-05');
  const order={...row,planRowId:row.id,lsxQty:999,planLeadtimeBasis:old};assert.equal(transitStandardLeadtime(order,[{sku:row.sku,cancelled:true}],[],'2027-01-01'),2);
@@ -31,4 +31,12 @@ test('Leadtime is captured at plan confirmation in GMT+7 and never follows later
  const missing=capturePlanLeadtime(row,[],[],'2026-11-03T00:00:00Z','QLSX');assert.equal(missing.value,null);assert.equal(transitStandardLeadtime({...order,planLeadtimeBasis:missing},[{sku:row.sku,leadTime:99}]),null);
  assert.equal(capturePlanLeadtime(row,[{sku:row.sku,leadTime:99}],[versions[1]],'2026-11-03T00:00:00Z','QLSX').value,null,'a future-only version does not prove the current master effective on confirmation day');
  assert.equal(capturePlanLeadtime(row,[],[versions[0],{...versions[0],id:'OVERLAP'}],'2026-11-03T00:00:00Z','QLSX').value,null,'overlapping versions need reconciliation');
+});
+
+test('Plan-date preservation retains the existing LSX quantity tier rule using levels observed at confirmation',()=>{
+ const row={id:'SYNTHETIC-TIERED',sku:'SYNTHETIC-TIERED',plan:1000},levels=[{sku:row.sku,moq:100,leadTime:2},{sku:row.sku,moq:1000,leadTime:5}];
+ const basis=capturePlanLeadtime(row,levels,[],'2026-11-03T00:00:00Z','KHSX');assert.equal(basis.value,5);
+ assert.equal(transitStandardLeadtime({...row,planRowId:row.id,lsxQty:50},levels,[]),2,'pre-existing lookup independently defines the quantity tier');
+ assert.equal(transitStandardLeadtime({...row,planRowId:row.id,lsxQty:50,planLeadtimeBasis:basis},[{sku:row.sku,leadTime:99}],[]),2,'changing the lookup date must not change the existing MOQ quantity rule');
+ assert.equal(transitStandardLeadtime({...row,planRowId:row.id,lsxQty:1000,planLeadtimeBasis:basis},[{sku:row.sku,leadTime:99}],[]),5);
 });

@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {workflowGetFixture} from './helpers/workflow-get-fixture.mjs';
 import {activateDailyPolicy} from './helpers/activate-daily-policy.mjs';
 import {getPlan,mutatePlan} from '../scripts/local/production-plan.mjs';
-import {getTransit} from '../scripts/local/in-transit.mjs';
+import {getTransit,mutateTransit} from '../scripts/local/in-transit.mjs';
 import {records} from '../scripts/local/database.mjs';
 import {reviewer} from './helpers/daily-output-reviewer.mjs';
 import {siteApi} from '../worker/site-api.mjs';
@@ -75,4 +75,13 @@ test('authenticated HR denial and KHSX split validation keep exact receipts; per
  await user('KHSX');before=await records(c.db);result=await call('/api/production-plan',body);assert.equal(result.status,422);assert.match(result.body.error,/Tách đơn/);await assertRequestAudit({before,after:await records(c.db),response,actorId:'SYNTHETIC-REVIEWER',route:'/api/production-plan',body});
  body={...body,edits:{'SYNTHETIC-PLAN':{end:'2026-11-03'}}};before=await records(c.db);result=await call('/api/production-plan',body);assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(result.body.rows[0].closedBy,'SYNTHETIC-REVIEWER');assert.equal(result.body.rows[0].planLeadtimeBasis.closedBy,'SYNTHETIC-REVIEWER');assert.equal(result.body.rows[0].laborHour,.1);
  await assertRequestAudit({before,after:await records(c.db),response,actorId:'SYNTHETIC-REVIEWER',route:'/api/production-plan',body,mutableEntities:['production_plan','production_plan_audit']});
+}));
+
+test('a smaller LSX still selects its original MOQ tier from the Plan-close source after live tiers change',()=>fixture(async c=>{
+ await c.put('leadtime',sku,{sku,rows:[{sku,moq:100,leadTime:2},{sku,moq:1000,leadTime:5}]});
+ const closed=await send(c.db,req('close',0,['SYNTHETIC-PLAN'],{edits:{'SYNTHETIC-PLAN':{end:'2026-11-03'}}}));assert.equal(closed.rows[0].planLeadtimeBasis.value,5);
+ await send(c.db,req('transfer',closed.revision,['SYNTHETIC-PLAN']));let row=(await getTransit(c.db,{},[],{includeHistory:false})).rows.find(r=>r.planRowId==='SYNTHETIC-PLAN');
+ await mutateTransit(c.db,{action:'draft-lsx',id:row.id,expectedRevision:row.revision,changes:{lsxCode:'SYNTHETIC-TIER-LSX',lsxQty:50,lsxOpenedAt:week}},actor);
+ await c.put('leadtime',sku,{sku,rows:[{sku,moq:1000,leadTime:99}]});row=(await getTransit(c.db,{},[],{includeHistory:false})).rows.find(r=>r.planRowId==='SYNTHETIC-PLAN');
+ assert.equal(row.lsxQty,50);assert.equal(row.planLeadtimeBasis.plannedQuantity,1000);assert.equal(row.standardLeadtime,2);assert.equal(row.planLeadtimeBasis.value,5);
 }));
