@@ -901,8 +901,10 @@ async function commitEvents(db, actor, now, events, report = null, state = null,
   const quantityOnly=events.length>0&&events.every(e=>isDailyOutput(e)&&e.kind==='daily-output'&&!e.employees?.length&&!e.stageReporting&&!e.destinationId)&&!state&&!extraRecords.length;
   if(!quantityOnly)await assertLegacyAllocationWrite(db,events);
   const key = "global", initial = JSON.stringify({ version: 0, token: "" });
-  await db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('production_cursor',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key, initial, actor.login, now).run();
-  const cursor = await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key=?").bind(key).first();
+  const initializeCursor=db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('production_cursor',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key, initial, actor.login, now);
+  const inlineCursor=quantityOnly&&expectedCursor!==null;
+  if(!inlineCursor)await initializeCursor.run();
+  const cursor = inlineCursor?{payload:expectedCursor}:await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key=?").bind(key).first();
   if(expectedCursor!==null&&cursor.payload!==expectedCursor)fail("Có thao tác SX đồng thời; tải lại trước khi ghi để tránh phân công trùng.",409);
   const token = crypto.randomUUID(), updated = JSON.stringify({ version: Number(JSON.parse(cursor.payload).version || 0) + 1, token });
   const guardedInsert = (entity, id, payload) => db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?)").bind(entity, id, JSON.stringify(payload), actor.login, now, key, updated);
@@ -914,8 +916,8 @@ async function commitEvents(db, actor, now, events, report = null, state = null,
   for(const r of extraRecords)writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(r.entity,r.key,JSON.stringify(r.payload),actor.login,now,key,updated));
   if (report) writes.push(guardedInsert("production_report", report.id, {...report,actorId:productionActorId(actor),reportedById:productionActorId(actor)}));
   if (state) writes.push(guardedInsert("production_report", state.id, {...state,actorId:productionActorId(actor)}));
-  const results = await db.batch(writes);
-  if (results[0].meta.changes !== 1 || results[1].meta.changes !== 1) fail("Có thao tác đồng thời trên dữ liệu SX; tải lại rồi thử lại.", 409);
+  const results = await db.batch(inlineCursor?[initializeCursor,...writes]:writes),offset=inlineCursor?1:0;
+  if (results[offset].meta.changes !== 1 || results[offset+1].meta.changes !== 1) fail("Có thao tác đồng thời trên dữ liệu SX; tải lại rồi thử lại.", 409);
 }
 
 export async function recalculateProductionReport(db,events,report,directory=[]) {

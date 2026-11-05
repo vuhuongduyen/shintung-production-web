@@ -578,3 +578,35 @@ Kết quả giờ công không còn button; tiêu đề có ghi chú mũi tên �
 Bằng chứng local của thay đổi này: 25/25 helper/API/mounted (gồm boundary GMT+7, future-only/scalar, giữ nguồn Plan khác ngày thực tế, HR403/KHSX chốt không tách, CAS đổi labor/Leadtime); 139/139 hồi quy rộng/quick contracts; 9/9 legacy preservation/split identity; API cuối 9/9 và HTTP actual built Worker 2/2. Các lượt có giao nhau, không cộng làm tổng full-suite. TypeScript và build đạt. Không thêm truy vấn DB để chọn mức; helper giải quyết một ngày thay cho quét từng đoạn của cả khoảng. Chưa benchmark mới, không hứa tốc độ production. Chưa browser pixel/touch cho mũi tên tiêu đề; nghiệm thu cần đúng source mới, không dùng ảnh/gói cũ. Hai tài liệu thiết kế 23/09 được AGENTS trỏ tới vẫn vắng trong snapshot; yêu cầu mới trực tiếp và hợp đồng hiệu lực hiện có là căn cứ, không tuyên bố đã đọc tài liệu vắng. CI đúng head đọc riêng sau push.
 
 Đối chiếu sau push 24f1f94 tìm lỗi UI: cùng phép map theo chỉ số đã gắn ghi chú vào cột Bắt đầu của bảng tracking. Test mới trước sửa fail 1!==0; sửa chỉ gỡ ghi chú khỏi bảng tracking, giữ ở đúng Giờ công của Plan. Hồi quy mounted/feedback 29/29 đạt, gồm cả Plan và tracking với VI/EN/ZH, không ghi request; không bỏ assertion. Cần dùng gói/head sửa cuối, gói24f1f94 là checkpoint trước sửa, không coi đã nghiệm thu. Đây là sửa UI có bằng chứng mới, không rerun cùng SHA chỉ để đổi trạng thái.
+
+## 05/11 — Sửa phản hồi nghiệm thu QA: bố cục và lưu sản lượng
+
+Bản đối chiếu giao diện là `production-work-board.tsx` và `production-correction-orders.tsx` trên GitHub base `d8dbb1e`, không phải component `production-corrections.tsx`. Metadata Site chính đọc lại vẫn v810; chưa kiểm trực tiếp giao diện/browser hoặc trích đủ source archive v810. Bản tổng hợp 04/11 13:47 GMT+7 cùng quyết định mới ngày 05/11 là hợp đồng; không bật cutover hoặc sửa tiền/ngày hiệu lực trong lượt này.
+
+- SX báo công trở lại work-table, nút có wrapper `.work-actions` để nhận đúng border/padding cũ, phân nhóm tuần, thẻ mobile và các cột Quy cách/Ghi chú/Thứ tự SX/Trạng thái/Plan ID. Cột phân công nhân viên theo LSX được bỏ riêng theo mô hình không báo nhân công từng lệnh. Thanh sản lượng chỉ rộng 7em, không kéo giãn theo bảng; giữ tổng chờ/duyệt và nhãn truy cập.
+- Điều chỉnh dùng lại **một bảng theo lệnh và toolbar gốc** của `production-correction-orders`; không chèn card sản lượng mới lên trên. Nút Sửa mở danh sách ngày/số lượng của đúng lệnh trong một dialog; chọn phiếu để sửa/hủy/thu hồi với preview, cùng khóa thử lại và các guard hiện hữu. Legacy vẫn tra cứu, không được mở sửa sau cutover. Không đổi cách Kho nhận/thu hồi/ACK Sheet.
+- Xác nhận phiếu mới gọn còn chọn/ngày hoàn thành/số lượng/Chi tiết. Actor, người duyệt, thời điểm và Kho ở disclosure; lý do trễ, blocker và thiếu căn cứ tiền vẫn hiện ngoài disclosure. Bảng lịch sử công đoạn giữ nguyên 13 cột.
+- Xuất Nhật ký sản lượng dùng đúng 14 cột của loại sản lượng, không dùng cấu trúc time-event. Chi tiết lệnh dùng productionAt/quantity cho phiếu mới; không báo thiếu phân công/giờ nhân viên. Tổng hợp ngày chỉ hiện giờ khi thực sự có lịch sử legacy.
+- Lưu phiếu gom policy/activation/manifest/lệnh/cursor/kiểm khóa cũ trong một snapshot SQL của riêng request. Tạo cursor lần đầu và CAS nằm cùng batch ghi. Vẫn đối chiếu nguyên trạng lệnh, mức, policy/activation/manifest, tất cả trang/tail/phantom của phiếu; không bỏ quyền, audit hoặc giới hạn lượng. Lưu thành công đóng hộp trước refresh; dùng notice hiện hữu của màn SX thay vì chèn dòng mới làm bảng nhảy; lỗi cập nhật màn hình được báo riêng, không biến thành lưu thất bại.
+
+### Bằng chứng hiện trạng trước sửa và số đo local
+
+Chỉ đọc Site QA riêng `ONSPA QA riêng · Dữ liệu giả`, không production: request `548ecf2d7abfc045dbaa973eb8409ca6` lúc 09:54:18.916Z trả 200, wall 2.855ms, CPU37ms, 16DB calls. Phiếu `bb73b7ac-0806-49a2-84de-ba6a021d4e2f` có lượng200, ngày05/11, chờ kiểm tra, chưa tạo kho; ghi một lần. Không gửi lại phiếu này. GET work theo sau mất khoảng2.099ms; code daily board không await refresh trong trạng thái đang lưu. dbMs cộng các truy vấn song song không phải wall time.
+
+`node scripts/bench/daily-output.mjs` trên Node24.19/Miniflare local, cùng dữ liệu giả502LSX/10.000phiếu không liên quan, 5lượt lưu mới:
+
+| Chỉ số | a59740e trước sửa | Local sau gom snapshot/cursor |
+| --- | --- | --- |
+| SELECT mỗi lượt có phiếu sẵn | 10 | 5 |
+| SELECT lượt đầu scope rỗng | 9 | 4 |
+| Batch ghi | 1 | 1 |
+| Thời gian 5 lượt (ms) |139.463;149.366;144.617;121.627;140.430|106.616;136.058;124.577;118.091;127.139|
+| Trung vị (ms) |140.430|124.577|
+
+Không áp độ trễ mạng giả vào các số này; direct handler không gồm HTTP, browser, audit wrapper hoặc D1 cloud. Chưa có số đo Site sau sửa, chưa kết luận hết chậm/quá tải. Lượt thử lại kiểm cùng khóa không ghi thêm dữ liệu. Kiểm CPU/peak memory cloud và responsive desktop/mobile phải thực hiện trên bản QA được cập nhật đúng SHA trước gửi lại Duyên.
+
+### Điều kiện bàn giao
+
+Chưa merge/triển khai MAIN, không sửa DB/Sheet thật. Không tự cập nhật Site QA đang được dùng. Cần phối hợp cập nhật chọn lọc **chính Site QA riêng**, giữ adapter cô lập và dữ liệu giả đã có; tự kiểm browser desktop/mobile và số đo POST/GET thực trước gửi lại link. Lượt này không có browser tool trong executor; ảnh Library tải qua helper thất bại nên không tuyên bố đã xem pixels. Chưa đủ nghiệm thu giao diện chỉ nhờ mounted/JSDOM hoặc build.
+
+Kiểm local chốt lượt này: hợp đồng nhanh19/19; hồi quy rộng25file169/169; kiểm UI sau cùng20/20 (có giao nhau với nhóm rộng, không cộng thành189); TypeScript/build cuối đạt. Worker/assets vừa build kiểm lại qua HTTP loopback1/1 gồm đăng nhập vai trò, lưu lượng, replay, QLSX duyệt, từ chối sai quyền, HR nghỉ và QLSX phụ kho. Không fail/cancel/skip ở các nhóm cuối. CI GitHub của commit mới được theo dõi riêng, chưa lấy kết quả a59740e thay thế.
