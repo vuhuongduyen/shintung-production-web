@@ -26,7 +26,7 @@ function harness(initialActive=true){
  vm.runInNewContext(source,{exports,console,fetch,document:testDocument,window:{setTimeout:()=>1,clearTimeout(){},addEventListener(name,fn){keyHandlers.set(name,fn);},removeEventListener(name){keyHandlers.delete(name);}},require(name){
   if(name.endsWith('action-feedback'))return name.includes('lib/')?actionFeedbackHelpers:actionFeedbackComponentFixture;
   if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;
-  if(name.includes('data-sync'))return{apiFetch:fetch,useDataRefresh:()=>revision,clientSessionGeneration:()=>0,subscribeClientReadInvalidation:fn=>listeners.push(fn),WorkspaceActivityContext:{displayName:'WorkspaceActivityContext'},ClientSessionReadCancelled:class extends Error{}};
+  if(name.includes('data-sync'))return{apiFetch:fetch,sessionFetch:fetch,useDataRefresh:()=>revision,clientSessionGeneration:()=>0,subscribeClientReadInvalidation:fn=>listeners.push(fn),WorkspaceActivityContext:{displayName:'WorkspaceActivityContext'},ClientSessionReadCancelled:class extends Error{}};
   if(name.endsWith('production-request-id.mjs'))return requestId;
   if(name.includes('production-plan.mjs'))return plan;if(name.includes('lib/in-transit.mjs'))return transit;if(name.includes('in-transit-edit-feedback'))return editFeedback;if(name.includes('production-progress-display'))return progress;
   // Display-only child is outside this effect/request harness; no authorization is stubbed.

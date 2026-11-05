@@ -8,7 +8,7 @@ import {ManualPagination} from './onspa-ui/ManualPagination';
 import {DataCell} from './onspa-ui/DataCell';
 import {inTransitCellKind, type InTransitDisplayField} from './onspa-ui/in-transit-semantics';
 import TransitHistoryImport from "./transit-history-import";
-import { apiFetch as fetch } from "../lib/data-sync";
+import { apiFetch as fetch, sessionFetch } from "../lib/data-sync";
 import { useDataRefresh, announceDataChange, clientSessionGeneration, ClientSessionReadCancelled, subscribeClientReadInvalidation, WorkspaceActivityContext } from "../lib/data-sync";
 import { StandardToolbar, toolbar } from "./standard-toolbar/StandardToolbar";
 import { Fragment, FormEvent, useEffect, useMemo, useState, useRef, useContext } from "react";
@@ -27,7 +27,7 @@ let transitGeneration = 0;
 let transitStale = true;
 // Keep an unresolved attempt when this workspace unmounts within the same
 // authenticated page. Never carry it into another login/session.
-let additionalAttempt: {payload: string; token: string} | null = null;
+let additionalAttempt: {payload: string; token: string; creationRevision: string|null|undefined} | null = null;
 export function invalidateInTransitCache() {
   transitGeneration++;
   transitStale = true;
@@ -290,6 +290,9 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
   };
   const session = useRef(clientSessionGeneration()).current;
   const additionalRunning = useRef(false);
+  const creationRevision = useRef<string|null|undefined>(undefined);
+  const additionalAlive = useRef(true);
+  useEffect(()=>{additionalAlive.current=true;return()=>{additionalAlive.current=false;};},[]);
   const [additionalUncertain,setAdditionalUncertain] = useState(!!additionalAttempt);
   const [data, setData] = useState(()=>(typeof window !== 'undefined' && transitCache) || empty),
     [catalog, setCatalog] = useState<any[]>(()=>(typeof window !== 'undefined' && catalogCache) || []),
@@ -578,13 +581,14 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
       if(additionalRunning.current)return null;
       const signature=JSON.stringify(payload);
       if(additionalAttempt&&additionalAttempt.payload!==signature){setError(t('Lượt tạo LSX trước chưa rõ kết quả. Quay lại dòng đã chọn và thử lại lượt đó trước.','上一筆工單建立結果尚未確認，請返回原資料列重試。'));return null;}
-      additionalAttempt ||= {payload:signature,token:productionRequestId()};
-      payload={...payload,requestIdempotency:additionalAttempt.token};
+      additionalAttempt ||= {payload:signature,token:productionRequestId(),creationRevision:creationRevision.current};
+      payload={...payload,requestIdempotency:additionalAttempt.token,expectedCreationRevision:additionalAttempt.creationRevision};
       additionalRunning.current=true;
     }
     setBusy(true);
     setError("");
     setNotice("");
+    let creationConfirmed=false;
     try {
       const response = await fetch("/api/in-transit", {
           method: "POST",
@@ -593,8 +597,9 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
             expectedRevision: data.rows.find((row: Row) => row.id === payload.id)?.revision ?? null }),
         }),
         result = await response.json();
+      if(action==='add-lsx'&&!additionalAlive.current)return null;
       if (!response.ok) {
-        if(action==='add-lsx'&&response.status>=400&&response.status<500&&response.status!==409){additionalAttempt=null;setAdditionalUncertain(false);}
+        if(action==='add-lsx'&&!additionalUncertain&&response.status>=400&&response.status<500&&response.status!==409){additionalAttempt=null;setAdditionalUncertain(false);}
         const d = result.details?.[0];
         throw Error(
           result.error === "lsxExceedsPlan" && d
@@ -603,8 +608,8 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
         );
       }
       if(action==='add-lsx'){
-        if(!result.row?.id)throw Error('Chưa nhận được kết quả tạo LSX.');
-        additionalAttempt=null;setAdditionalUncertain(false);
+        if(result?.ok!==true||typeof result.row?.id!=='string'||!result.row.id||typeof result.creationScopeRevision!=='string'||!/^[a-f0-9]{64}$/.test(result.creationScopeRevision))throw Error('Chưa nhận được kết quả tạo LSX.');
+        creationConfirmed=true;
       }
       if (!["draft-lsx","update-note"].includes(action)) setDialog("");
       const successMessages: Record<string, [string, string]> = {
@@ -648,18 +653,50 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
         setSelected([result.row.id]);
         setHighlightedId(result.row.id);
       }
+      if(action==='add-lsx'&&additionalAlive.current){
+        await acknowledgeCreation(result.row.id,result.creationScopeRevision);
+        if(additionalAlive.current){additionalAttempt=null;setAdditionalUncertain(false);}
+      }
       return result;
     } catch (e) {
+      if(action==='add-lsx'&&!additionalAlive.current)return null;
       const code = e instanceof Error ? e.message : String(e);
-      if(action==='add-lsx'&&additionalAttempt){setAdditionalUncertain(true);setError(t('Chưa xác nhận kết quả tạo LSX. Dữ liệu được giữ lại; bấm Lưu để kiểm tra lại cùng lượt, không tạo lượt mới.','尚未確認工單建立結果。資料已保留，請再次儲存以核對同一筆操作。'));}
+      if(action==='add-lsx'&&additionalAttempt){setAdditionalUncertain(true);setError(creationConfirmed?t('LSX đã được lưu; chưa xác nhận đóng lượt đối soát. Nhấn Tạo thêm LSX để kiểm tra kết quả trước, không tạo lượt mới để thử lại.','工單已儲存，但核對尚未完成；請先檢查原操作結果。'):t('Chưa xác nhận kết quả tạo LSX. Dữ liệu được giữ lại; bấm Lưu để kiểm tra lại cùng lượt, không tạo lượt mới.','尚未確認工單建立結果。資料已保留，請再次儲存以核對同一筆操作。'));}
       else setError(friendlyError(code));
       return null;
     } finally {
       if(action==='add-lsx')additionalRunning.current=false;
-      setBusy(false);
+      if(action!=='add-lsx'||additionalAlive.current)setBusy(false);
     }
   }
+  async function readCreationRecovery(){
+    const unavailable='Chưa kiểm tra được lượt tạo LSX trước. Vui lòng thử lại; chưa tạo lệnh mới.';
+    let response,result;try{response=await fetch('/api/in-transit?creationRecovery=1',{cache:'reload'});result=await response.json();}catch(error){if(error instanceof ClientSessionReadCancelled)throw error;throw Error(unavailable);}
+    if(!response.ok)throw Error(response.status>=500?unavailable:result?.error||unavailable);
+    if(!result||!(result.revision===null||typeof result.revision==='string'&&/^[a-f0-9]{64}$/.test(result.revision))||!(result.pending===null||typeof result.pending?.rowId==='string'&&typeof result.pending?.requestIdempotency==='string'))throw Error('Chưa kiểm tra được lượt tạo LSX trước. Vui lòng thử lại.');
+    return result;
+  }
+  // Retry bookkeeping keeps session/audit protection, without another business-data broadcast.
+  async function acknowledgeCreation(rowId:string,revision:string){
+    let response,result;try{response=await sessionFetch('/api/in-transit',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'ack-add-lsx',id:rowId,expectedCreationRevision:revision})});result=await response.json();}catch(error){if(error instanceof ClientSessionReadCancelled)throw error;throw Error('Chưa xác nhận đóng lượt tạo LSX. Lượt đã lưu vẫn cần được kiểm tra.');}
+    if(!response.ok||result?.ok!==true)throw Error(response.status>=500?'Chưa xác nhận đóng lượt tạo LSX. Lượt đã lưu vẫn cần được kiểm tra.':result?.error||'Chưa xác nhận đóng lượt tạo LSX.');
+  }
   async function createAdditionalLsx() {
+    if(additionalRunning.current)return;
+    additionalRunning.current=true;setBusy(true);setError('');
+    try{
+      const scope=await readCreationRecovery();if(!additionalAlive.current)return;
+      if(scope.pending){
+        await load(true);if(!additionalAlive.current)return;
+        setFilters(emptyFilters);setSelected([scope.pending.rowId]);setHighlightedId(scope.pending.rowId);setDialog('');
+        setNotice(t('Đã tìm thấy LSX được lưu ở lượt trước; không tạo LSX mới.','已找到上一筆操作儲存的工單，不會重複新增。'));
+        await acknowledgeCreation(scope.pending.rowId,scope.revision);if(!additionalAlive.current)return;
+        if(!additionalAttempt||additionalAttempt.token===scope.pending.requestIdempotency){additionalAttempt=null;setAdditionalUncertain(false);}
+        else {additionalAttempt.creationRevision=(await readCreationRecovery()).revision;setAdditionalUncertain(true);}
+        return;
+      }
+      creationRevision.current=scope.revision;
+      if(additionalAttempt)additionalAttempt.creationRevision=scope.revision;
     if (!one) {
       setError(
         t(
@@ -670,6 +707,8 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
       return;
     }
     open("add-lsx");
+    }catch(error){if(additionalAlive.current)setError(friendlyError(error instanceof Error?error.message:String(error)));}
+    finally{additionalRunning.current=false;if(additionalAlive.current)setBusy(false);}
   }
   function inlineDraft(row: Row) {
     return (

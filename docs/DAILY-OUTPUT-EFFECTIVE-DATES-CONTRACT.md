@@ -89,3 +89,8 @@ Các version định mức mới có ngày hiệu lực do người có quyền 
 - HR được nhập muộn trước trả sản lượng, không tự đặt ngày 10 thành hạn cứng. Chưa tự cho phép đổi kỳ đã chốt/đã trả; cách nhận diện và điều chỉnh phần prefix đã bảo toàn còn chờ quyết định.
 
 Các đoạn inventory mô tả rủi ro cần kiểm, không là quyền thay dữ liệu thật hoặc cam kết hoàn tất mọi luồng. Chốt release vẫn theo checklist riêng.
+
+
+## Tạo LSX bổ sung và khôi phục sau reload
+
+Lượt mới qua public API giữ request key + revision của cursor tài khoản; chỉ batch thành công mới ghi LSX/audit/receipt/cursor. Tạo thêm LSX trước hết tra kết quả chưa đối soát của principal server; có kết quả thì hiện/chọn dòng đó và ACK metadata, không tạo dòng khác. Clearing pending không reset revision, nên packet cũ không tạo trùng sau ACK. Không lưu nháp/note/tài khoản/session của cơ chế này ở browser. Dữ liệu chưa từng lưu không thể tự khôi phục và không auto-submit; dữ liệu/receipt cũ không bị ghi đè hoặc tự backfill. Quyền In Transit hiện hành giữ nguyên, recovery không cấp quyền từ việc xem menu hoặc từ dữ liệu client. Tiêu chí/range đo và test ở tài liệu triển khai/loopback QA, không là bảo đảm production đã bật.

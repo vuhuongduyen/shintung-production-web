@@ -22,11 +22,42 @@ const fail = (message, status = 400, details = []) => {
   throw new PlanError(message, status, details);
 };
 const referenceSources=new WeakMap();
-async function readAdditionalAttempt(db,attempt){
-  const saved=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?").bind(attempt.key).first();
+// The journal belongs to the authenticated account, never the mutable display email.
+const creationOwner=actor=>text(actor?.userId||actor?.permissionLogin||actor?.login);
+const scopeConflict='Lượt tạo LSX đã thay đổi hoặc còn kết quả chưa đối soát. Hãy kiểm tra lượt trước, không tạo lượt mới để thử lại.';
+async function creationScope(db,actor,captured=undefined){
+  if(!actor?.login)fail('loginRequired',401);
+  const key=await recordRevision(['additional-lsx-scope',creationOwner(actor)]),row=captured===undefined?await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_scope' AND record_key=?").bind(key).first():captured===null?null:{payload:captured};
+  if(!row)return {key,raw:null,value:null,revision:null,pending:null,receiptRaw:null};
+  let value;try{value=JSON.parse(row.payload);}catch{fail(scopeConflict,409);}
+  if(!value||typeof value!=='object'||Array.isArray(value)||value.owner!==creationOwner(actor)||typeof value.actor!=='string'||typeof value.version!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value.version)||!Object.hasOwn(value,'pending'))fail(scopeConflict,409);
+  const revision=await recordRevision(row.payload);
+  if(value.pending===null)return {key,raw:row.payload,value,revision,pending:null,receiptRaw:null};
+  const p=value.pending;if(!p||typeof p.attemptKey!=='string'||! /^[a-f0-9]{64}$/.test(p.attemptKey)||typeof p.rowId!=='string'||typeof p.requestIdempotency!=='string'||await recordRevision([creationOwner(actor),p.requestIdempotency])!==p.attemptKey)fail(scopeConflict,409);
+  const receipt=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?").bind(p.attemptKey).first();
+  let saved;try{saved=JSON.parse(receipt?.payload);}catch{fail(scopeConflict,409);}
+  if(saved?.key!==p.attemptKey||saved.owner!==creationOwner(actor)||saved.actor!==value.actor||saved.fingerprint!==p.fingerprint||saved.result?.row?.id!==p.rowId||saved.result.row.id!==`lsx:${saved.result.row.planId}:${p.attemptKey}`||saved.result?.creationScopeRevision!==revision)fail(scopeConflict,409);
+  return {key,raw:row.payload,value,revision,receiptRaw:receipt.payload,pending:{rowId:p.rowId,requestIdempotency:p.requestIdempotency,planId:saved.result.row.planId,sku:saved.result.row.sku,line:saved.result.row.line,createdAt:saved.result.row.createdAt}};
+}
+export async function readAdditionalCreationScope(db,actor){const s=await creationScope(db,actor);return {revision:s.revision,pending:s.pending};}
+export async function acknowledgeAdditionalCreation(db,body,actor){
+  if(typeof body.expectedCreationRevision!=='string'||! /^[a-f0-9]{64}$/.test(body.expectedCreationRevision)||typeof body.id!=='string')fail('invalidSelection',422);
+  const s=await creationScope(db,actor),ackKey=`${s.key}:${body.expectedCreationRevision}`;
+  const already=async()=>{const row=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_ack' AND record_key=?").bind(ackKey).first();let value;try{value=JSON.parse(row?.payload);}catch{}return value?.owner===creationOwner(actor)&&value.rowId===body.id&&value.revision===body.expectedCreationRevision;};
+  if(s.revision!==body.expectedCreationRevision||s.pending?.rowId!==body.id){if(await already())return {ok:true,replayed:true};fail(scopeConflict,409);}
+  const now=new Date().toISOString(),payload=JSON.stringify({...s.value,pending:null}),proof=JSON.stringify({owner:creationOwner(actor),actor:actor.login,rowId:body.id,revision:s.revision,at:now});
+  const results=await db.batch([
+    db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit_creation_scope' AND record_key=? AND payload=? AND EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=? AND payload=?) AND NOT EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_ack' AND record_key=?)").bind(payload,actor.login,now,s.key,s.raw,s.value.pending.attemptKey,s.receiptRaw,ackKey),
+    db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_creation_ack',?,?,?,? WHERE changes()=1").bind(ackKey,proof,actor.login,now),
+  ]);
+  if(results[0].meta.changes!==1){if(await already())return {ok:true,replayed:true};fail(scopeConflict,409);}
+  return {ok:true};
+}
+async function readAdditionalAttempt(db,attempt,captured=undefined){
+  const saved=captured===undefined?await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?").bind(attempt.key).first():captured===null?null:{payload:captured};
   if(!saved)return null;
   let value;try{value=JSON.parse(saved.payload);}catch{fail(conflictMessage,409);}
-  if(value.actor!==attempt.actor||value.fingerprint!==attempt.fingerprint||!value.result?.row?.id||value.result.ok!==true)fail(conflictMessage,409);
+  if(!value||typeof value!=='object'||Array.isArray(value)||(value.owner?value.owner!==attempt.owner:value.actor!==attempt.actor)||value.key!==attempt.key||value.fingerprint!==attempt.fingerprint||typeof value.result?.row?.id!=='string'||value.result.row.id!==`lsx:${value.result.row.planId}:${attempt.key}`||value.result.history?.recordId!==value.result.row.id||value.result.history?.actor!==value.actor||value.result.history?.action!=='add-lsx'||value.result.ok!==true)fail(conflictMessage,409);
   return {...value.result,replayed:true};
 }
 const parse = (r) => {
@@ -224,11 +255,23 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
   }
   const action = text(body.action),
     now = new Date().toISOString();
-  let creationAttempt=null;
+  let creationAttempt=null,capturedScope;
   if(action==='add-lsx'&&Object.hasOwn(body,'requestIdempotency')){
     if(typeof body.requestIdempotency!=='string'||!/^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(body.requestIdempotency))fail('invalidSelection',422);
-    creationAttempt={actor:actor.login,key:await recordRevision(JSON.stringify([actor.login,body.requestIdempotency])),fingerprint:await recordRevision(JSON.stringify([body.id,body.planStart,body.planEnd,body.line,body.priority,body.sequence,body.planningNote||'']))};
-    const replay=await readAdditionalAttempt(db,creationAttempt);if(replay)return replay;
+    creationAttempt={actor:actor.login,owner:creationOwner(actor),key:await recordRevision(JSON.stringify([Object.hasOwn(body,'expectedCreationRevision')?creationOwner(actor):actor.login,body.requestIdempotency])),fingerprint:await recordRevision(JSON.stringify([body.id,body.planStart,body.planEnd,body.line,body.priority,body.sequence,body.planningNote||'']))};
+    let capturedAttempt;
+    if(Object.hasOwn(body,'expectedCreationRevision')){
+      const ownerKey=await recordRevision(['additional-lsx-scope',creationOwner(actor)]),captured=await db.prepare("SELECT (SELECT payload FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?) AS attempt,(SELECT payload FROM app_records WHERE entity='in_transit_creation_scope' AND record_key=?) AS creation_scope").bind(creationAttempt.key,ownerKey).first();
+      if(!captured||!Object.hasOwn(captured,'attempt')||!Object.hasOwn(captured,'creation_scope'))fail(scopeConflict,409);
+      capturedAttempt=captured.attempt;capturedScope=captured.creation_scope;
+    }
+    const replay=await readAdditionalAttempt(db,creationAttempt,capturedAttempt);if(replay)return replay;
+  }
+  let creationState=null;
+  if(action==='add-lsx'&&Object.hasOwn(body,'expectedCreationRevision')){
+    if(!creationAttempt||body.expectedCreationRevision!==null&&typeof body.expectedCreationRevision!=='string')fail('invalidSelection',422);
+    creationState=await creationScope(db,actor,capturedScope);
+    if(creationState.revision!==body.expectedCreationRevision||creationState.pending)fail(scopeConflict,409);
   }
   if (
     ![
@@ -510,15 +553,20 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
   if(current&&await recordRevision(existing?.payload)!==body.expectedRevision)fail(conflictMessage,409);
   const {revision: _readRevision, ...storedNext}=next;
   const payload=JSON.stringify(storedNext);
+  // Source, retry proof and the per-account cursor advance atomically. A late
+  // request remains stale after ACK; clearing the pending flag never resets it.
+  const scopePayload=creationState?JSON.stringify({owner:creationOwner(actor),actor:actor.login,version:randomUUID(),pending:{attemptKey:creationAttempt.key,rowId:key,fingerprint:creationAttempt.fingerprint,requestIdempotency:body.requestIdempotency}}):null;
+  const response={ok:true,row:next,history,...(creationState?{creationScopeRevision:await recordRevision(scopePayload)}:{})};
   const update=existing
     ?db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND payload=?").bind(payload,actor.login,now,key,existing.payload)
     :sourceReference
-      ?db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?) AND (SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') IS ? AND (SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') IS ? AND (? IS NULL OR NOT EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?)) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now,sourceReference.key,sourceReference.payload,sourceReference.policy,sourceReference.activation,creationAttempt?.key??null,creationAttempt?.key??null)
+      ?db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?) AND (SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') IS ? AND (SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') IS ? AND (? IS NULL OR NOT EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?)) AND (? IS NULL OR ((? IS NULL AND NOT EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_scope' AND record_key=?)) OR EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_scope' AND record_key=? AND payload=?))) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now,sourceReference.key,sourceReference.payload,sourceReference.policy,sourceReference.activation,creationAttempt?.key??null,creationAttempt?.key??null,creationState?.key??null,creationState?.raw??null,creationState?.key??null,creationState?.key??null,creationState?.raw??null)
       :db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('in_transit',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now);
   const writes=[update];
   writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_audit',?,?,?,? WHERE changes()=1").bind(history.id,JSON.stringify(history),actor.login,now));
-  if(creationAttempt)writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_creation_attempt',?,?,?,? WHERE changes()=1").bind(creationAttempt.key,JSON.stringify({...creationAttempt,result:{ok:true,row:next,history}}),actor.login,now));
+  if(creationAttempt)writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_creation_attempt',?,?,?,? WHERE changes()=1").bind(creationAttempt.key,JSON.stringify({...creationAttempt,result:response}),actor.login,now));
+  if(creationState)writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_creation_scope',?,?,?,? WHERE changes()=1 ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload,updated_by=excluded.updated_by,updated_at=excluded.updated_at WHERE app_records.payload=?").bind(creationState.key,scopePayload,actor.login,now,creationState.raw));
   const result=await db.batch(writes);
   if(result[0].meta.changes!==1){if(creationAttempt){const replay=await readAdditionalAttempt(db,creationAttempt);if(replay)return replay;}fail(conflictMessage,409);}
-  return { ok: true, row: next, history };
+  return response;
 }
