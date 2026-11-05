@@ -35,11 +35,11 @@ Riêng dữ liệu cũ chưa lưu snapshot: phải phân biệt **kết quả đ
 | Nhóm | Điểm đọc/ghi hiện có | Rủi ro và công việc bắt buộc |
 |---|---|---|
 | SX, FINAL và nhập bù | production-workflow, production-stage-live, production-backfill, production-final-limit | Hai mô hình đồng tồn tại; không đổi guard FINAL cũ hoặc giờ legacy. Luồng mới không phụ thuộc staffing; phải cộng đủ sản lượng cũ còn hiệu lực vào trần. |
-| QLSX/xác nhận | production-progress-review, production-review-selection, site-api review | Hiện chặn thiếu hours/pending attendance và chốt hours khi duyệt. Tách kiểm tra theo reportingModel; không nới quyền cho legacy. Snapshot review gồm số lượng/ngày/căn cứ/version. |
+| QLSX/xác nhận | production-progress-review, production-review-selection, site-api review | Luồng sản lượng xác nhận lượng/ngày/căn cứ/version, không yêu cầu hours hoặc attendance. Luồng công đoạn cũ giữ lịch sử và khóa tại cutover; không nới quyền hay xác nhận lại legacy. |
 | In Transit/kho | in-transit, warehouse-confirm, production-corrections | Một dòng/LSX; một phiếu kho/report. Không merge các dòng có Plan ID chung. Xử lý approved/pending/returned/cancelled và sửa/hủy không đếm đôi. |
 | Nhật ký/tiến độ/báo cáo | production-output-summary, report-cumulative, journal-standards, detail-fields, output/payroll export | Phân biệt giờ thực tế legacy với giờ chuẩn kiếm được mới; không biến giờ chuẩn thành hours thực tế hoặc invent nhân viên. Ngày và tổng khớp kho/tháng. |
-| Giờ công/SP | site-api labor-hours, site-labor-hours, production-standards, payroll-month/payroll | Payroll hiện có currentOnly và map mức hiện hành; master chưa có validFrom theo ngày nghiệp vụ. Cần version/snapshot và tổng theo từng phiếu/ngày, không dùng một mức hiện tại nhân cả tháng. Giữ đơn vị HC/TC/quỹ của nhân sự riêng. |
-| Leadtime | transit-leadtime, getTransit, leadtime_versions | Có validFrom/validTo nhưng default at=now và current cancelled có thể chặn lịch sử trước khi xét versions. Cần snapshot/ngày nghiệp vụ đúng; không dựng lại version thiếu từ giá trị hiện hành. |
+| Giờ công/SP | site-api labor-hours, site-labor-hours, production-standards, payroll-month/payroll | Phiếu mới giữ version/snapshot đúng ngày SX, tổng từng phiếu/ngày; thiếu căn cứ chặn tiền, không dùng mức hiện tại cho cả tháng. Legacy dùng anchor giá trị quan sát, không bịa lịch sử mức. Giữ HC/TC/quỹ/phụ kho; kỳ HR đã chốt/đã trả còn cần quy tắc riêng. |
+| Leadtime | transit-leadtime, getTransit, leadtime_versions | Theo quyết định 05/11, Plan mới giữ nguồn Leadtime tại ngày chốt GMT+7; LSX chọn bậc MOQ theo lượng từ nguồn đã giữ. Thiếu hoặc malformed giữ thiếu, không fallback current. Legacy không có field giữ đường cũ/anchor; không tự dựng lịch sử thiếu. |
 | Safety Days | safety_rule_groups/safety_rules trong page/engine | Có effectiveFrom/To, nhưng bản tính lại có thể đọc dữ liệu hiện tại. Cần bảo toàn căn cứ bản Engine/Plan đã lưu và xác định phạm vi áp dụng trước khi đổi. |
 | BOM | bom-lifecycle, bom-bulk, bom-rules, engine | Có ngày hiệu lực, confirmationSnapshot và phiếu thay đổi; không tự sửa BOM đã chốt. Kiểm lookup theo ngày và snapshot kế hoạch cũ, nhất là hủy/khôi phục. |
 | SKU/đơn vị/tên/Line | catalog, getPlan/getTransit enrichment | Join danh mục hiện tại có thể làm nhãn/căn cứ cũ đổi. Ưu tiên snapshot chứng từ đã chốt; dữ liệu mới dùng master hợp lệ, không xóa nguồn cũ. |
@@ -66,15 +66,26 @@ Giữ nút **Báo công** tại cột thao tác đầu bảng. Mở trực tiế
 
 API mới chỉ hoạt động khi có policy được duyệt, đúng mô hình và ngày triển khai đã đến. Source không tạo policy production, không tự bật theo ngày hiện tại. Khi đã bật, các command công đoạn cũ bị từ chối; nghỉ/phụ kho/điều chuyển nhân sự và lịch vẫn giữ nghiệp vụ hiện hành. Lịch sử công đoạn cũ chỉ để tra cứu/đối chiếu, không phải điều kiện để ghi sản lượng mới.
 
-Bản triển khai hiện tại chỉ cho sửa/hủy phiếu sản lượng **chưa xác nhận và chưa liên kết kho**. Phiếu đã xác nhận khóa chỉnh sửa; cần hoàn tất quy trình đối chiếu kho trước khi mở thêm trường hợp. Chưa tự quyết cơ chế đảo kho, sửa Sheet hoặc sửa phiếu kho đã nhận.
+QLSX sửa/hủy theo quyền hiện có khi Kho chưa nhận, kể cả phiếu đã được QLSX xác nhận. Phiếu chưa liên kết kho cập nhật theo guard/revision; phiếu đã có đề nghị kho chờ đi qua intent và ACK đối soát: lượng cũ còn hiệu lực tới ACK, lượng tăng giữ chỗ, không coi gửi request là đã đồng bộ Sheet. Kho đã nhận thì phải thu hồi trước; không tự đảo tồn hoặc sửa lịch sử nhận gốc. Source/tests có giao thức giả, chưa nghiệm thu Google thực tế.
 
 Các version định mức mới có ngày hiệu lực do người có quyền nhập, giữ audit before/after. Không dùng thời gian tải PDF hoặc configuredAt để tự dựng lịch sử. Cùng ngày đã có version thì báo xung đột, không ghi đè version. Cập nhật phiếu cùng ngày giữ cả snapshot thiếu căn cứ; đổi ngày sản xuất thì đối chiếu version ngày mới. Chưa có thao tác tự điền lại căn cứ thiếu vào các phiếu đã ghi.
 
-**Chưa đủ điều kiện phát hành:** cơ chế bảo toàn kết quả payroll legacy chưa có snapshot và các inventory Leadtime/Safety/BOM/nhân sự trên toàn web vẫn cần regression/triển khai tiếp. Không gọi việc thêm version cho phiếu mới là đã giải quyết hồi tố toàn web. Không thay current-only của payroll legacy bằng mức LSX tùy tiện, vì có thể làm đổi ngay kết quả cũ. Cần chốt và kiểm kế hoạch anchor bảo toàn kết quả đang biết, ghi rõ đó không phải lịch sử mức đã chứng minh.
+**Chưa đủ điều kiện phát hành:** source đã có anchor/payroll/cutover-month, regression lịch sử Leadtime/Safety/BOM/nhân sự và inspector chỉ đọc; kết quả CI không thay đối chiếu dữ liệu thật, browser hoặc nghiệm thu Sheet. Chưa adapter ghi production hoặc nguồn trạng thái kỳ HR đáng tin để áp sửa ngược vào phần đã bảo toàn. Anchor giữ giá trị quan sát, không chứng nhận mức quá khứ đã thiếu. Xem DAILY-OUTPUT-ACTIVATION-READINESS.md và DAILY-OUTPUT-DECISIONS-TO-REVIEW.md; không gọi toàn bộ hồi tố web đã hoàn tất.
 
 ## Làm rõ kho và bảo toàn — quyết định bổ sung
 
 - Kho chưa xác nhận: QLSX được sửa/hủy trực tiếp bằng quyền điều chỉnh hiện có, đồng bộ đúng đề xuất chờ kho và giữ audit. Không áp khóa chỉ vì QLSX đã xác nhận phiếu.
 - Kho đã xác nhận: thu hồi trước, luôn giữ lịch sử thu hồi. Sheet giữ dòng và lượng gốc, đánh dấu vô hiệu để công thức tồn không ghi nhận lượng; không xóa hoặc chỉ ẩn dòng.
-- Hai mục trên chưa hoàn tất trong source tại mốc bổ sung này; phải kiểm race/version/replay và lỗi ack trước phát hành. Không thay Sheet production trong quá trình phát triển.
+- Source đã có giao thức intent/ACK, race/version/replay và kiểm ID duy nhất toàn cột bằng dữ liệu giả. Đây không phải bằng chứng Google thật đã sửa công thức/recalculate hoặc ACK/thu hồi thành công; các bước thật vẫn chờ nghiệm thu/quyền riêng. Không thay Sheet production trong phát triển.
 - Anchor kết quả legacy là giá trị current-only đã quan sát, không có ý nghĩa xác nhận đó là định mức đúng lịch sử. Thiếu căn cứ phải thể hiện thiếu; không tự điền giá trị. Chốt snapshot và kích hoạt production là bước riêng sau nghiệm thu, không tự thực thi bởi source mới.
+
+
+## Plan và Leadtime — quyết định 05/11 đã triển khai trên nhánh nháp
+
+- Leadtime theo **ngày chốt Plan**, không ngày mở LSX/ngày SX/master hiện tại. Giữ đầu vào và các bậc MOQ để LSX chọn đúng lượng; không áp mức của tổng Plan cho mọi LSX. Field căn cứ null/hỏng vẫn thiếu, legacy vắng field giữ đường cũ.
+- Plan đi qua hai mức giờ/SP phải **Tách đơn**; KHSX nhập lượng/ngày từng dòng, không tự chia hoặc bình quân. Tổng không bắt buộc bằng đề xuất. Plan ID chung, mã dòng riêng chỉ trong Chi tiết; chỉ tách dòng còn sửa được.
+- Bấm kết quả Giờ công mở công thức, lượng, mức, khoảng ngày/phiên bản chứng minh. Thiếu mức giữ null/cảnh báo, không thành 0; giữ ngoại lệ chốt thiếu labor đã có, không thêm khóa mọi SKU thiếu history.
+- Chốt/transfer giữ căn cứ riêng từng dòng và CAS; LSX bổ sung chỉ sao chép tham chiếu/căn cứ Plan, không nhận nhầm lượng chờ, mã CSV, kho hoặc ngoại lệ nhập lịch sử của nguồn.
+- HR được nhập muộn trước trả sản lượng, không tự đặt ngày 10 thành hạn cứng. Chưa tự cho phép đổi kỳ đã chốt/đã trả; cách nhận diện và điều chỉnh phần prefix đã bảo toàn còn chờ quyết định.
+
+Các đoạn inventory mô tả rủi ro cần kiểm, không là quyền thay dữ liệu thật hoặc cam kết hoàn tất mọi luồng. Chốt release vẫn theo checklist riêng.

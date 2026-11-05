@@ -17,7 +17,7 @@ for(const count of [50,500]){
    const db=new Proxy(c.db,{get(target,key){if(key==='prepare')return sql=>{if(/^\s*(SELECT|WITH)\b/i.test(sql))selects++;return target.prepare(sql);};if(key==='batch')return statements=>{batches++;return target.batch(statements);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});
    output[label]=[];
    for(let i=0;i<3;i++){
-    selects=0;batches=0;const start=performance.now(),result=await create(db,{action:'add-lsx',id:sourceKey,planStart:'2026-11-05',planEnd:'2026-11-06',line:'B',priority:'THƯỜNG',sequence:2},actor);
+    selects=0;batches=0;const start=performance.now(),result=await create(db,{action:'add-lsx',id:sourceKey,planStart:'2026-11-05',planEnd:'2026-11-06',line:'B',priority:'THƯỜNG',sequence:2,requestIdempotency:crypto.randomUUID()},actor);
     output[label].push({ms:+(performance.now()-start).toFixed(2),selects,batches});assert.equal(result.row.pendingReportQty,0);assert.equal(result.row.lsxQty,null);assert.deepEqual(result.row.planLaborBasis,source.planLaborBasis);assert.deepEqual(result.row.planLeadtimeBasis,source.planLeadtimeBasis);
     const value=omit(result.row);if(reference)assert.deepEqual(value,reference);else reference=value;
    }

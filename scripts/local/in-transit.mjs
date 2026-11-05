@@ -22,6 +22,13 @@ const fail = (message, status = 400, details = []) => {
   throw new PlanError(message, status, details);
 };
 const referenceSources=new WeakMap();
+async function readAdditionalAttempt(db,attempt){
+  const saved=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?").bind(attempt.key).first();
+  if(!saved)return null;
+  let value;try{value=JSON.parse(saved.payload);}catch{fail(conflictMessage,409);}
+  if(value.actor!==attempt.actor||value.fingerprint!==attempt.fingerprint||!value.result?.row?.id||value.result.ok!==true)fail(conflictMessage,409);
+  return {...value.result,replayed:true};
+}
 const parse = (r) => {
   try {
     return { ...r, rawPayload:r.payload, payload: JSON.parse(r.payload) };
@@ -217,6 +224,12 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
   }
   const action = text(body.action),
     now = new Date().toISOString();
+  let creationAttempt=null;
+  if(action==='add-lsx'&&Object.hasOwn(body,'requestIdempotency')){
+    if(typeof body.requestIdempotency!=='string'||!/^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(body.requestIdempotency))fail('invalidSelection',422);
+    creationAttempt={actor:actor.login,key:await recordRevision(JSON.stringify([actor.login,body.requestIdempotency])),fingerprint:await recordRevision(JSON.stringify([body.id,body.planStart,body.planEnd,body.line,body.priority,body.sequence,body.planningNote||'']))};
+    const replay=await readAdditionalAttempt(db,creationAttempt);if(replay)return replay;
+  }
   if (
     ![
       "add-lsx",
@@ -247,7 +260,7 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
     if (!planStart || !planEnd || !line || !priority || !(sequence > 0))
       fail("initialFieldsRequired", 422);
     if (planEnd < planStart) fail("dateOrder", 422);
-    key = `lsx:${source.planId}:${randomUUID()}`;
+    key = `lsx:${source.planId}:${creationAttempt?.key||randomUUID()}`;
     next = normalizeTransit({
       // A new LSX shares the planning reference, not the source LSX's output,
       // CSV aliases, receipt state or historical-import privileges.
@@ -500,11 +513,12 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
   const update=existing
     ?db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND payload=?").bind(payload,actor.login,now,key,existing.payload)
     :sourceReference
-      ?db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?) AND (SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') IS ? AND (SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') IS ? ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now,sourceReference.key,sourceReference.payload,sourceReference.policy,sourceReference.activation)
+      ?db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?) AND (SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') IS ? AND (SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') IS ? AND (? IS NULL OR NOT EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?)) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now,sourceReference.key,sourceReference.payload,sourceReference.policy,sourceReference.activation,creationAttempt?.key??null,creationAttempt?.key??null)
       :db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('in_transit',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now);
   const writes=[update];
   writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_audit',?,?,?,? WHERE changes()=1").bind(history.id,JSON.stringify(history),actor.login,now));
+  if(creationAttempt)writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_creation_attempt',?,?,?,? WHERE changes()=1").bind(creationAttempt.key,JSON.stringify({...creationAttempt,result:{ok:true,row:next,history}}),actor.login,now));
   const result=await db.batch(writes);
-  if(result[0].meta.changes!==1)fail(conflictMessage,409);
+  if(result[0].meta.changes!==1){if(creationAttempt){const replay=await readAdditionalAttempt(db,creationAttempt);if(replay)return replay;}fail(conflictMessage,409);}
   return { ok: true, row: next, history };
 }

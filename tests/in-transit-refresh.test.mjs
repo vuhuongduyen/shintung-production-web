@@ -11,6 +11,7 @@ import * as plan from '../lib/production-plan.mjs';
 import * as transit from '../lib/in-transit.mjs';
 import * as editFeedback from '../lib/in-transit-edit-feedback.mjs';
 import * as progress from '../lib/production-progress-display.mjs';
+import * as requestId from '../lib/production-request-id.mjs';
 
 const source=ts.transpileModule(fs.readFileSync(new URL('../components/in-transit.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
@@ -26,6 +27,7 @@ function harness(initialActive=true){
   if(name.endsWith('action-feedback'))return name.includes('lib/')?actionFeedbackHelpers:actionFeedbackComponentFixture;
   if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsx;
   if(name.includes('data-sync'))return{apiFetch:fetch,useDataRefresh:()=>revision,clientSessionGeneration:()=>0,subscribeClientReadInvalidation:fn=>listeners.push(fn),WorkspaceActivityContext:{displayName:'WorkspaceActivityContext'},ClientSessionReadCancelled:class extends Error{}};
+  if(name.endsWith('production-request-id.mjs'))return requestId;
   if(name.includes('production-plan.mjs'))return plan;if(name.includes('lib/in-transit.mjs'))return transit;if(name.includes('in-transit-edit-feedback'))return editFeedback;if(name.includes('production-progress-display'))return progress;
   // Display-only child is outside this effect/request harness; no authorization is stubbed.
   if(name.endsWith('week-visibility.mjs'))return weekVisibility;

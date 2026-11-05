@@ -1,5 +1,6 @@
 "use client";
 import QuantityProgress from './quantity-progress';
+import {productionRequestId} from '../lib/production-request-id.mjs';
 import ProductionStatusLegend from './production-status-legend';
 import {ACTION_FEEDBACK_CLEAR_EVENT,ACTION_FEEDBACK_DURATION,notifyInvalidAction} from '../lib/action-feedback';
 import {FeedbackActionButton} from './action-feedback';
@@ -24,6 +25,9 @@ const empty = { rows: [] as Row[], history: [] as Audit[] };
 let transitCache: typeof empty | null = null;
 let transitGeneration = 0;
 let transitStale = true;
+// Keep an unresolved attempt when this workspace unmounts within the same
+// authenticated page. Never carry it into another login/session.
+let additionalAttempt: {payload: string; token: string} | null = null;
 export function invalidateInTransitCache() {
   transitGeneration++;
   transitStale = true;
@@ -43,6 +47,7 @@ subscribeClientReadInvalidation(reason => {
     return;
   }
   invalidateInTransitCache();
+  additionalAttempt = null;
   catalogCache = null;
   catalogRequest = null;
 });
@@ -284,6 +289,8 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
           );
   };
   const session = useRef(clientSessionGeneration()).current;
+  const additionalRunning = useRef(false);
+  const [additionalUncertain,setAdditionalUncertain] = useState(!!additionalAttempt);
   const [data, setData] = useState(()=>(typeof window !== 'undefined' && transitCache) || empty),
     [catalog, setCatalog] = useState<any[]>(()=>(typeof window !== 'undefined' && catalogCache) || []),
     [selected, setSelected] = useState<string[]>([]),
@@ -301,6 +308,12 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
       "" | "unplanned" | "add-lsx" | "edit" | "cancel" | "delete"
     >("");
   const [historyImport,setHistoryImport]=useState(false);
+  useEffect(()=>{
+    if(!additionalUncertain&&!(busy&&additionalRunning.current))return;
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',warn);
+    return()=>window.removeEventListener('beforeunload',warn);
+  },[additionalUncertain,busy]);
   const [filters, setFilters] = useState(emptyFilters);
   const [searchMode, setSearchMode] =
     useState<keyof typeof emptyFilters>("query");
@@ -553,10 +566,22 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
               sequence: "",
             },
     );
+    if(kind==='add-lsx'&&additionalAttempt&&one){
+      const pending=JSON.parse(additionalAttempt.payload);
+      if(pending.id===one.id)setForm(pending);
+    }
     setSkuQuery("");
     setDialog(kind);
   }
   async function submit(action: string, payload: Record<string, any>) {
+    if(action==='add-lsx'){
+      if(additionalRunning.current)return null;
+      const signature=JSON.stringify(payload);
+      if(additionalAttempt&&additionalAttempt.payload!==signature){setError(t('Lượt tạo LSX trước chưa rõ kết quả. Quay lại dòng đã chọn và thử lại lượt đó trước.','上一筆工單建立結果尚未確認，請返回原資料列重試。'));return null;}
+      additionalAttempt ||= {payload:signature,token:productionRequestId()};
+      payload={...payload,requestIdempotency:additionalAttempt.token};
+      additionalRunning.current=true;
+    }
     setBusy(true);
     setError("");
     setNotice("");
@@ -569,12 +594,17 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
         }),
         result = await response.json();
       if (!response.ok) {
+        if(action==='add-lsx'&&response.status>=400&&response.status<500&&response.status!==409){additionalAttempt=null;setAdditionalUncertain(false);}
         const d = result.details?.[0];
         throw Error(
           result.error === "lsxExceedsPlan" && d
             ? `Plan ID ${d.planId}: Tổng số lượng LSX ${fmt(d.lsxQty)}, số lượng kế hoạch ${fmt(d.remaining)}.`
             : result.error,
         );
+      }
+      if(action==='add-lsx'){
+        if(!result.row?.id)throw Error('Chưa nhận được kết quả tạo LSX.');
+        additionalAttempt=null;setAdditionalUncertain(false);
       }
       if (!["draft-lsx","update-note"].includes(action)) setDialog("");
       const successMessages: Record<string, [string, string]> = {
@@ -600,7 +630,7 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
         sync: ["Đã đồng bộ dữ liệu thành công.", "資料同步成功。"],
       };
       setNotice(
-        t(
+        action==='add-lsx'&&result.replayed ? t('Lượt tạo này đã được lưu trước đó; không tạo LSX mới.','此建立操作已儲存，不會重複新增工單。') : t(
           ...(successMessages[action] || [
             "Thao tác đã hoàn thành thành công.",
             "操作成功完成。",
@@ -621,9 +651,11 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
       return result;
     } catch (e) {
       const code = e instanceof Error ? e.message : String(e);
-      setError(friendlyError(code));
+      if(action==='add-lsx'&&additionalAttempt){setAdditionalUncertain(true);setError(t('Chưa xác nhận kết quả tạo LSX. Dữ liệu được giữ lại; bấm Lưu để kiểm tra lại cùng lượt, không tạo lượt mới.','尚未確認工單建立結果。資料已保留，請再次儲存以核對同一筆操作。'));}
+      else setError(friendlyError(code));
       return null;
     } finally {
+      if(action==='add-lsx')additionalRunning.current=false;
       setBusy(false);
     }
   }
@@ -1445,7 +1477,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
               </>
             )}
             {dialog === "add-lsx" && one && (
-              <fieldset>
+              <fieldset disabled={busy||additionalUncertain}>
                 <legend>
                   {one.planId} · {one.sku} · {one.name}
                 </legend>
@@ -1458,7 +1490,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
                 {initialPlanningFields}
               </fieldset>
             )}
-            {["unplanned","add-lsx","edit"].includes(dialog)&&<label className="wide">{t("Ghi chú (không bắt buộc)", "備註（選填）")}<textarea maxLength={2000} rows={2} value={form.planningNote||""} onChange={e=>setForm({...form,planningNote:e.target.value})}/></label>}
+            {["unplanned","add-lsx","edit"].includes(dialog)&&<label className="wide">{t("Ghi chú (không bắt buộc)", "備註（選填）")}<textarea disabled={dialog==='add-lsx'&&(busy||additionalUncertain)} maxLength={2000} rows={2} value={form.planningNote||""} onChange={e=>setForm({...form,planningNote:e.target.value})}/></label>}
             {dialog === "edit" && one && (
               <fieldset>
                 <legend>
@@ -1596,8 +1628,8 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
               </fieldset>
             )}
             <footer>
-              <FeedbackActionButton type="button" onClick={() => setDialog("")}>
-                {t("Hủy", "取消")}
+              <FeedbackActionButton type="button" disabled={dialog==='add-lsx'&&busy} onClick={() => setDialog("")}>
+                {dialog==='add-lsx'&&additionalUncertain?t('Đóng','關閉'):t("Hủy", "取消")}
               </FeedbackActionButton>
               <FeedbackActionButton className="primary" disabled={busy} disabledExplanation={"Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại."} type="submit">
                 {t("Lưu", "儲存")}

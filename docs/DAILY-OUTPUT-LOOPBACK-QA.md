@@ -46,3 +46,10 @@ Leadtime có bậc MOQ vẫn chọn theo lượng LSX từ các bậc đã giữ
 ## Kiểm LSX bổ sung độc lập
 
 Trên Plan giả mới chuyển, chỉ mở một phần lượng để còn ngân sách LSX, lưu sản lượng chờ cho LSX nguồn rồi tạo LSX bổ sung. Dòng mới phải có mã/SL LSX trống, hoàn thành/chờ bằng 0, cùng Plan ID và căn cứ Plan; không mang mã CSV/trạng thái nhận kho cũ. Nhập lượng còn lại, chuyển đúng Line rồi báo/xác nhận: nguồn và dòng mới giữ lịch sử/số lượng riêng. Không dùng SYNTHETIC-DAILY-A thiếu planQty để suy ra ngân sách nguồn legacy. Handler regression đã kiểm nguồn200/dòng mới400, replay report và đề nghị kho chờ; browser cần kiểm riêng đúng gói/head mới. Không coi đề nghị kho chờ là nhận kho hoặc Sheet đã đối soát.
+
+
+## Kiểm retry tạo LSX sau mất phản hồi
+
+API add-lsx mới bắt buộc requestIdempotency; client giữ cùng key/input cho một lượt, có receipt actor/input trong transaction. Với proxy TEST chủ ý bỏ response sau commit: form và nút Lưu còn, dữ liệu nhập khóa, Lưu lại cùng lượt trả đúng LSX cũ, chỉ một business audit/LSX. Thử502/non-JSON, double click, đóng/mở workspace cùng trang, bàn phím/nút Hủy và cảnh báo rời trang; không tạo lỗi trên mạng hoặc dữ liệu thật. Sau ACK không còn cảnh báo và có thể tạo lượt mới có chủ ý. Full browser reload/đóng trình duyệt không có persistence draft/key; không bỏ qua cảnh báo rồi coi lần nhập mới là retry đã được bảo vệ. Kiểm danh sách đã lưu/đối soát trước khi tạo lượt mới nếu đã rời trang.
+
+Test production-additional-lsx-worker đi qua actual compiled Worker/ordinary KHSX và kiểm HR/QLSX/Line bị từ chối, draft/sync/Line output/QLSX review; in-transit-additional-mounted dùng component thật/JSDOM với transport giả để fault injection. Hai dạng bằng chứng không thay pixel/keyboard/touch trên browser KHSX hoặc Google thật. Gói6b/75 không chứa bản bổ sung này; cần đúng source/build mới.

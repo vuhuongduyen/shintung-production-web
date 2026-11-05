@@ -74,3 +74,32 @@ for(const fault of ['change','delete','policy','activation'])test(`a source ${fa
  };const v=target[key];return typeof v==='function'?v.bind(target):v;}});
  await assert.rejects(()=>mutateTransit(raced,add(original.id),planner),e=>e.status===409);assert.equal(injected,true);assert.deepEqual(await records(c.db),expected);
 }));
+
+const keyed=id=>({...add(id),requestIdempotency:crypto.randomUUID()});
+test('same additional-LSX attempt survives commit-response loss and concurrent retry without another business audit',()=>dailyFixture(async c=>{
+ const original=await source(c),body=keyed(original.id),before=await records(c.db);let committed=false;
+ const lost=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{const result=await target.batch(statements);committed=true;throw Error('Synthetic response lost after commit');};const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ await assert.rejects(()=>mutateTransit(lost,body,planner),/Synthetic response lost/);assert.equal(committed,true);const after=await records(c.db),replayed=await mutateTransit(c.db,body,planner);assert.equal(replayed.replayed,true);assert.deepEqual(await records(c.db),after);
+ for(const entity of ['in_transit','in_transit_audit','in_transit_creation_attempt'])assert.equal(after.filter(r=>r.entity===entity).length-before.filter(r=>r.entity===entity).length,1);
+ const concurrent=keyed(original.id),results=await Promise.all([mutateTransit(c.db,concurrent,planner),mutateTransit(c.db,concurrent,planner)]);assert.equal(results[0].row.id,results[1].row.id);assert.equal(results.filter(r=>r.replayed).length,1);
+}));
+
+test('an additional-LSX key binds the actor and exact input; changed input or damaged receipt never writes',()=>dailyFixture(async c=>{
+ const original=await source(c),body=keyed(original.id),created=await mutateTransit(c.db,body,planner),before=await records(c.db);
+ await assert.rejects(()=>mutateTransit(c.db,{...body,line:'A'},planner),e=>e.status===409);assert.deepEqual(await records(c.db),before);
+ const independent=await mutateTransit(c.db,body,{...planner,login:'SYNTHETIC-OTHER-KHSX'});assert.notEqual(independent.row.id,created.row.id);
+ const receipt=(await records(c.db)).find(r=>r.entity==='in_transit_creation_attempt'&&JSON.parse(r.payload).actor===planner.login);await c.db.prepare("UPDATE app_records SET payload='{}' WHERE entity='in_transit_creation_attempt' AND record_key=?").bind(receipt.record_key).run();const damaged=await records(c.db);
+ await assert.rejects(()=>mutateTransit(c.db,body,planner),e=>e.status===409);assert.deepEqual(await records(c.db),damaged);
+}));
+
+test('creation, business audit and retry receipt roll back together after a batch error',()=>dailyFixture(async c=>{
+ const original=await source(c),body=keyed(original.id),before=await records(c.db);
+ const broken=new Proxy(c.db,{get(target,key){if(key==='batch')return statements=>target.batch([...statements,target.prepare('INSERT INTO SYNTHETIC_TABLE_DOES_NOT_EXIST VALUES(1)')]);const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ await assert.rejects(()=>mutateTransit(broken,body,planner));assert.deepEqual(await records(c.db),before);const saved=await mutateTransit(c.db,body,planner);assert.equal(saved.ok,true);assert.equal(saved.replayed,undefined);
+}));
+
+test('two different payloads racing with one additional-LSX key cannot create two orders or replace the receipt',()=>dailyFixture(async c=>{
+ const original=await source(c),body=keyed(original.id),before=await records(c.db),results=await Promise.allSettled([mutateTransit(c.db,body,planner),mutateTransit(c.db,{...body,sequence:3},planner)]);
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.status,409);const after=await records(c.db);
+ for(const entity of ['in_transit','in_transit_audit','in_transit_creation_attempt'])assert.equal(after.filter(r=>r.entity===entity).length-before.filter(r=>r.entity===entity).length,1);
+}));
