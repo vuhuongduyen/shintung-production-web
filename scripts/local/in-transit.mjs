@@ -21,6 +21,7 @@ import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
 const fail = (message, status = 400, details = []) => {
   throw new PlanError(message, status, details);
 };
+const referenceSources=new WeakMap();
 const parse = (r) => {
   try {
     return { ...r, rawPayload:r.payload, payload: JSON.parse(r.payload) };
@@ -60,9 +61,20 @@ function vietnamDateISO(value = new Date()) {
 }
 
 export async function getTransit(db, filters = {}, catalog = [], options = {}) {
+  // Internal creation path: planning references need no report/event projection.
+  const referenceOnly=Object.hasOwn(options,'referenceId');
+  if(referenceOnly&&(!text(options.referenceId)||typeof options.referenceId!=='string'))fail('invalidSelection',422);
   const [records, audits, reports, leadtimes, events, historyImports, leadVersions] = await Promise.all(
     ["in_transit", "in_transit_audit", "production_report", "leadtime", "production_event", "production_history_import", "leadtime_versions"].map(
-      (e) => (options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly && ['in_transit_audit','leadtime','leadtime_versions'].includes(e)) ? Promise.resolve([]) : read(db, e,options.stageValidation),
+      async(e) => {
+        if(referenceOnly){
+          if(e!=='in_transit')return [];
+          const row=await db.prepare("SELECT entity,record_key,payload,updated_by,updated_at,(SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') AS reference_policy,(SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') AS reference_activation FROM app_records WHERE entity='in_transit' AND record_key=?").bind(options.referenceId).first();
+          return row?[parse(row)]:[];
+        }
+        if(options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly&&['in_transit_audit','leadtime','leadtime_versions'].includes(e))return [];
+        return read(db,e,options.stageValidation);
+      },
     ),
   );
   const masters = new Map(
@@ -107,12 +119,12 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
         spec: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.spec ?? (masterValues.spec || merged.spec ),
         unit: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.unit ?? (masterValues.unit || merged.unit ),
         line: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.line ?? (merged.line || masterValues.line ),
-      }), revision:options.planningOnly ? undefined : await recordRevision(r.rawPayload),updatedBy:r.updated_by};
+      }), revision:options.planningOnly||referenceOnly ? undefined : await recordRevision(r.rawPayload),updatedBy:r.updated_by};
     }));
   const withLeadtime = rows
     .map((row) => {
       const frozenLead=preservedOrderMetadata(row,preserved.get(row.id));
-      const standardLeadtime = options.planningOnly ? null : Object.hasOwn(frozenLead||{},'standardLeadtime') ? frozenLead.standardLeadtime : transitStandardLeadtime(row,
+      const standardLeadtime = options.planningOnly||referenceOnly ? null : Object.hasOwn(frozenLead||{},'standardLeadtime') ? frozenLead.standardLeadtime : transitStandardLeadtime(row,
         leadtimes.flatMap(r=>Array.isArray(r.payload?.rows)?r.payload.rows:[{...r.payload,sku:r.payload?.sku||r.record_key}]),
         leadVersions.map(r=>r.payload).filter(Boolean),options.leadtimeAt);
       return {
@@ -143,7 +155,13 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
     .filter((r) => r.payload && !r.payload._deleted)
     .map((r) => r.payload)
     .sort((a, b) => text(b.at).localeCompare(text(a.at)));
-  return { rows: withLeadtime, history };
+  const result={rows:withLeadtime,history};
+  if(referenceOnly&&records[0]?.rawPayload){
+    const row=records[0];let policy;try{policy=JSON.parse(row.reference_policy);}catch{policy=null;}
+    const historyProtected=Boolean(row.reference_activation)||policy?.mode==='daily-finished-v1'&&policy.approved===true&&dateISO(policy.effectiveFrom)===policy.effectiveFrom&&policy.effectiveFrom<=vietnamDateISO();
+    referenceSources.set(result,{key:row.record_key,payload:row.rawPayload,policy:row.reference_policy??null,activation:row.reference_activation??null,historyProtected});
+  }
+  return result;
 }
 
 function validateOpenFields(row, includeQuantity = false) {
@@ -212,14 +230,15 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
     ].includes(action)
   )
     fail("invalidAction");
-  const state = sharedState || await getTransit(db, {}, catalog),
+  const state = action==='add-lsx' ? await getTransit(db,{},catalog,{referenceId:body.id}) : sharedState || await getTransit(db, {}, catalog),
     all = state.rows;
+  const sourceReference=action==='add-lsx'?referenceSources.get(state):null;
   let current = null,
     key = text(body.id),
     next;
   if (action === "add-lsx") {
     const source = all.find((r) => r.id === body.id);
-    if (!source || source.status === "HỦY") fail("invalidSelection", 422);
+    if (!source || source.status === "HỦY" || !sourceReference) fail("invalidSelection", 422);
     const planStart = dateISO(body.planStart),
       planEnd = dateISO(body.planEnd),
       line = lineOf(body.line),
@@ -230,7 +249,11 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
     if (planEnd < planStart) fail("dateOrder", 422);
     key = `lsx:${source.planId}:${randomUUID()}`;
     next = normalizeTransit({
-      ...source,
+      // A new LSX shares the planning reference, not the source LSX's output,
+      // CSV aliases, receipt state or historical-import privileges.
+      ...Object.fromEntries(['planRowId','planGroupId','groupPlanId','planId','week','sku','name','spec','unit','group','source','sourceIds','planQty','plan','laborHour','planLaborBasis','planLeadtimeBasis'].filter(field=>Object.hasOwn(source,field)).map(field=>[field,source[field]])),
+      ...(sourceReference.historyProtected?{planLaborBasis:source.planLaborBasis&&typeof source.planLaborBasis==='object'?source.planLaborBasis:{status:'missing',reason:'missing-source-plan-confirmation',segments:[]},planLeadtimeBasis:source.planLeadtimeBasis??null}:{}),
+      columns: [],
       id: key,
       isAdditionalLsx: true,
       planRowId: source.planRowId,
@@ -245,6 +268,7 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
       lsxOpenedAt: "",
       cancelReason: "",
       completedQty: 0,
+      pendingReportQty: 0,
       actualStartedAt: "",
       actualCompletedAt: "",
       syncStatus: "CHƯA ĐỒNG BỘ",
@@ -475,7 +499,9 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
   const payload=JSON.stringify(storedNext);
   const update=existing
     ?db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND payload=?").bind(payload,actor.login,now,key,existing.payload)
-    :db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('in_transit',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now);
+    :sourceReference
+      ?db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?) AND (SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') IS ? AND (SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') IS ? ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now,sourceReference.key,sourceReference.payload,sourceReference.policy,sourceReference.activation)
+      :db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('in_transit',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now);
   const writes=[update];
   writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_audit',?,?,?,? WHERE changes()=1").bind(history.id,JSON.stringify(history),actor.login,now));
   const result=await db.batch(writes);

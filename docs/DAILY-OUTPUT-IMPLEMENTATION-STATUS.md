@@ -511,3 +511,16 @@ Ca tích hợp: Plan 1.000 chốt với các mức ≤100=2 ngày, ≤1.000=5 ng
 ## Chốt đường đọc căn cứ hỏng
 
 Fault injection sau bổ sung MOQ: trường planLeadtimeBasis có mặt nhưng null bị coi như chưa từng có, lookup quay về current99 thay vì null; regression fail trước sửa. Reader nay phân biệt field vắng (legacy giữ đường cũ) với field có nhưng hỏng (null/primitive/bậc null/giá trị âm hoặc kiểu sai): giữ thiếu căn cứ, không current fallback/TypeError. Không tự sửa payload nguồn hoặc ghi dữ liệu khi GET. Nhóm basis/handler/Leadtime **14/14** đạt, bổ sung này không đổi UI/fixture hoặc quy tắc MOQ hợp lệ. TypeScript/build/CI head cuối đọc riêng. Đây là kiểm resilience trên dữ liệu giả, không phải xác nhận dữ liệu production đã hỏng.
+
+
+## 05/11 — LSX bổ sung độc lập và đường tạo nhẹ
+
+Đã tái hiện hai lỗi bằng dữ liệu giả: LSX mới nhận nhầm 200 sản lượng chờ từ projection của LSX nguồn; nguồn nhập lịch sử làm mã LSX cũ quay lại qua cột CSV. Constructor nay chỉ giữ tham chiếu Plan và căn cứ đã chốt, không sao chép báo công, trạng thái sản xuất/kho, cột CSV hoặc ngoại lệ historicalImport. LSX nguồn và toàn bộ phiếu cũ giữ nguyên. Sau cutover, nguồn thiếu căn cứ tạo LSX mới với căn cứ thiếu rõ ràng, không tự lấy mức hiện tại; đường đọc nguồn legacy và hành vi trước cutover giữ nguyên.
+
+Tạo LSX bổ sung chỉ đọc bản ghi nguồn theo khóa và hai scalar policy/marker trong một SELECT, không quét báo công, event, lịch sử hoặc Leadtime. Batch ghi kiểm lại payload nguồn và policy/marker; nguồn đổi/xóa hoặc cutover đổi đồng thời trả 409, không để lại LSX hay audit nghiệp vụ dở. Không thay quyền HTTP hoặc miễn kiểm số lượng lúc mở/chuyển LSX.
+
+Kiểm local mã cuối: 85/85 hồi quy trong tám file (gồm chín ca mới), không fail/cancel/skip/todo; TypeScript đạt. Vòng đời giả kiểm tạo → nhập LSX400 → đồng bộ → Line B báo400 → replay cùng report ID → QLSX xác nhận tạo đúng một đề nghị kho chờ400, chưa nhận kho; Line A sai quyền không ghi; số nguồn200 không lẫn, tiền mới theo mức ngày thực tế .2 thay vì mức Plan .1. Đây là direct handler trên Miniflare, không thay HTTP/browser/Sheet acceptance. Build và CI exact head cần đọc tại PR.
+
+Đo riêng Node24.19.0/Miniflare, ba request mỗi fixture mới, seed ngoài thời gian; baseline là cùng constructor đã sửa isolation nhưng còn full-read trước tối ưu, SHA256 module tạm dcfb63daf602afd0f40e55750df228e4730c677360c90a8c6e200be9200e9a10. Với 50 LSX/50 phiếu/100 events: trước 131.98–148.10 ms, sau 22.25–29.20 ms. Với 500/500/1.000: trước 246.58–280.58 ms, sau 18.95–21.72 ms. SELECT prepare từ 10–12 còn một, mỗi request vẫn một batch. Kết quả nghiệp vụ so từng trường trừ ID/thời điểm sinh mới bằng nhau, nguồn và phiếu không đổi. Script tùy chọn scripts/bench/additional-lsx-reference.mjs; biến ONSPA_TEST_TRANSIT_BASELINE_MODULE chỉ trỏ module TEST để so trước/sau. Không đo HTTP/auth/catalog load/browser/Google/CPU Worker/đỉnh RAM/p95; không suy ra SLA hoặc tốc độ production.
+
+Không chứng nhận request tạo LSX bổ sung có idempotency mới; replay đã kiểm là phiếu sản lượng. Không thao tác kho thật, Sheet, dữ liệu thật hoặc kích hoạt production. Câu hỏi kỳ HR đã chốt/đã trả và các chốt nghiệm thu/kích hoạt hiện hữu vẫn còn nguyên.

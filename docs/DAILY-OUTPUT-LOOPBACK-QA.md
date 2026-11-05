@@ -41,3 +41,8 @@ Capacity fixture giờ có availableHours/syncedAt/khsxAcceptedAt và input fact
 Browser kiểm desktop/390 px, không clip/nhảy bảng; button công thức có Tab/Escape/trả focus; sửa ngày đổi basis preview, chưa có căn cứ phải hiện thiếu; chốt qua nhiều mức bị chặn, dòng khóa giữ basis, mỗi dòng chuyển riêng không gộp Plan ID. Mọi thao tác chỉ dữ liệu giả. HTTP/mounted pass không thay nghiệm thu pixel; các gói b5/6a cũ không có UI/fixture này.
 
 Leadtime có bậc MOQ vẫn chọn theo lượng LSX từ các bậc đã giữ ở ngày chốt, không lấy một giá trị của tổng lượng Plan áp cho mọi LSX. Fixture UI mặc định có version phẳng 2 ngày; regression handler riêng dùng các mức 100→2/1.000→5 và LSX50 để chứng minh bậc lượng cũ không đổi. Không coi fixture phẳng là đã nghiệm thu mọi MOQ trên browser.
+
+
+## Kiểm LSX bổ sung độc lập
+
+Trên Plan giả mới chuyển, chỉ mở một phần lượng để còn ngân sách LSX, lưu sản lượng chờ cho LSX nguồn rồi tạo LSX bổ sung. Dòng mới phải có mã/SL LSX trống, hoàn thành/chờ bằng 0, cùng Plan ID và căn cứ Plan; không mang mã CSV/trạng thái nhận kho cũ. Nhập lượng còn lại, chuyển đúng Line rồi báo/xác nhận: nguồn và dòng mới giữ lịch sử/số lượng riêng. Không dùng SYNTHETIC-DAILY-A thiếu planQty để suy ra ngân sách nguồn legacy. Handler regression đã kiểm nguồn200/dòng mới400, replay report và đề nghị kho chờ; browser cần kiểm riêng đúng gói/head mới. Không coi đề nghị kho chờ là nhận kho hoặc Sheet đã đối soát.
