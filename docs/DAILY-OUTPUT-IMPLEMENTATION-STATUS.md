@@ -619,8 +619,22 @@ Checkpoint089e170: CI42010650986 đã completed/success,1.854/1.854 trong298file
 
 Sau7056664, review phát hiện badge/hạn và ghi chú KHSX chưa dùng đủ presentation cũ; export DOM chỉ lấy10dòng đang mount. Source mới dùng lại productionOrderIndex/progressOrderStatus và runtime hiện hữu cùng các class onspa-progress/work-due-today/work-overdue/khsx-planning-note và legend của work-board gốc. Desktop và thẻ mobile có cùng tên/màu/tooltip trạng thái; giữ hạn hôm nay, quá hạn, chờ xác nhận, sớm/trễ, tạm ngưng, sự cố và hủy. Không đổi công thức, quyền hay luồng lưu.
 
+**Đính chính phạm vi Xuất:** `app/page.tsx` vẫn tắt exporter cho `report-work`/`production-report`/`report-review`, giống base d8dbb1e; toolbar SX không có nút xuất. Không bật hoặc thêm nút trong lượt này. Các phép kiểm bật TableReports riêng chỉ chứng minh hợp đồng thành phần/metadata, chưa chứng minh người dùng xuất được từ màn SX.
+
 Bảng vẫn chỉ mount10dòng/trang. Metadata export memo theo **toàn bộ orders đã lọc** được cấp từ màn SX, không lấy các lệnh ngoài bộ lọc và không đọc lại workflow. Bộ xuất chung nhận metadata của bảng đang ẩn do thẻ mobile chỉ khi bảng chủ động opt-in và màn đang active; vẫn chặn bảng trong dialog/bảng con, inactive và quyền xuất. Các menu không opt-in giữ quy tắc visible-table cũ. Không thêm nút xuất hoặc cơ chế xuất riêng.
 
 Bằng chứng local:42/42 nhóm presentation/mounted/legacy-state/global-feedback/export/layout; hợp đồng nhanh19/19; TypeScript/build và Worker đã build1/1 đạt. File mới đối chiếu trực tiếp old ProductionWorkBoardView ở8trạng thái, kiểm47dòng qua nhiều trang, lọcLineA24dòng, xem trước mobile, quyền xuất ba ngôn ngữ. Bổ sung dữ liệu nhiều tuần/kết quả rỗng và chạy lại13/13 của file này. Generic XLSX/PDF và XLSX từ chính metadata daily đều được kiểm. Đây là SSR/mounted/JSDOM và file output, **chưa phải browser responsive geometry**.
 
 CI7056664 trước thay đổi này đã đạt1.855/1.855 trong298file; CI của head bổ sung sẽ đọc riêng. Không đổi Site/hosting, DB/FILES, Sheet, secrets hoặc quyền; không cập nhật mô tả PR đã bị từ chối, không merge/deploy MAIN.
+
+## 05/11 — Trạng thái ngay sau ACK và giới hạn đường xuất của app
+
+Browser review phát hiện lần báo200 đầu tiên chỉ merge report/event nên runtime của dòng lệnh còn unknown. Đã tái hiện **trong actual ProductionManagement mounted**: progress200 nhưng badge Chưa SX khi GET sau lưu đang chờ; trước sửa test thất bại ở kỳ vọng Đang SX.
+
+`mergeProductionSavedResult` nay dùng cùng phép chiếu read-model `mergeProduction` trên report đã ACK và các phiếu hiện có để cập nhật riêng trường sản lượng/trạng thái/ngày của đúng lệnh trong orders/progressOrders. Không tự gán trạng thái theo click, không cập nhật DB, không dùng snapshot lệnh trong phiếu để ghi đè revision/Line/SKU/kế hoạch/hủy. Row không liên quan và historicalOnly giữ nguyên. Chỉ báo cáo Daily mới được chiếu; legacy stage merge giữ đường cũ. ACK/replay phiên bản cũ không thay report phiên bản mới đã đọc; Map chống cộng lặp; GET khởi động trước ACK bị retire theo reader hiện hành. Không thêm GET hoặc đọc workflow.
+
+Đường xuất được kiểm lại ở **Home thực tế**: gate exporter vẫn false cho report-work/production-report/report-review và toolbar ProductionManagement không có nút Xuất. Đây là baseline hiện hành, **không thêm hoặc bật xuất** vì chưa có yêu cầu riêng. Test metadata/XLSX/PDF trước đó là isolated capability với enabled=true, không phải nghiệm thu thao tác xuất ở màn SX; không trình bày là tính năng người dùng đang mở được.
+
+Nhóm39/39 local có actual screen trước/sau ACK + refresh chậm/lỗi, save bị422 giữnháp và waiting/zero, đối chiếu projection với backend read mới, replay, report mới hơn thắng ACK cũ, metadata và lịch sử/LSX khác giữ nguyên, không hồi sinh lệnh đã mất, stage lifecycle/performance vẫn đạt. Các kiểm cuối và CI head mới ghi riêng sau khi chốt. Không thay layout, quyền, luồng kho, ngày hiệu lực, app/page.tsx hoặc export gate. Không sửa PR description bị từ chối, merge hay deploy MAIN.
+
+Chốt local của lượt ACK:39/39 nhóm rộng;6/6 sau guard historicalOnly (có giao nhau); quick19/19; TypeScript/build cuối đạt; Worker/assets vừa build1/1 đạt. App thực trong mounted test vẫn không có nút xuất và gate Home giữfalse. Chờ CI của commit mới và QA browser độc lập; không dùng CIbddc6e9 thay cho bản sửa này.
