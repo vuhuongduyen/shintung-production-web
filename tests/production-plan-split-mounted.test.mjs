@@ -30,7 +30,7 @@ beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];
  return Response.json({revision:2,added:1,existing:0,updated:0,rows:committedRows});
 };});
 after(async()=>{globalThis.fetch=originalFetch;for(const c of channels)c.close();globalThis.BroadcastChannel=OriginalChannel;await vite.close();dom.window.close();});
-async function mount(allowed=true){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(el(ToolbarPermissions.Provider,{value:(_name,label)=>label!=='Tách đơn'||allowed},el(ProductionPlan,{initialWeek:week}))));return{host,async close(){await act(async()=>root.unmount());host.remove();}};}
+async function mount(allowed=true,props={}){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(el(ToolbarPermissions.Provider,{value:(_name,label)=>label!=='Tách đơn'||allowed},el(ProductionPlan,{initialWeek:week,...props}))));return{host,async close(){await act(async()=>root.unmount());host.remove();}};}
 const button=(host,text)=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
 async function click(node){assert.ok(node);await act(async()=>node.click());}
 test('single selected editable row splits once under repeated clicks; blank child/suggestion/details stay distinct',async()=>{
@@ -104,4 +104,16 @@ test('planned hours are plain text and a collapsed header arrow explains the clo
   const note=table.querySelector('thead details.pp-labor-note'),summary=note.querySelector('summary');assert.ok(note);assert.equal(note.open,false);assert.equal(summary.textContent,'Giờ công');summary.focus();await click(summary);assert.equal(note.open,true);assert.match(note.textContent,/ngày chốt/);assert.match(note.textContent,/Không bắt tách/);assert.match(note.textContent,/ngày hoàn thành/);await click(summary);assert.equal(note.open,false);assert.equal(document.activeElement,summary);assert.equal(view.host.querySelector('[role=dialog]'),null);assert.equal(writes.length,0);
   await click(button(view.host,'Chi tiết'));const detail=view.host.querySelector('[role=dialog]');assert.ok(detail);assert.doesNotMatch(detail.textContent,/Tách đơn và nhập lượng/);await click(button(detail,'Đóng'));assert.equal(writes.length,0);
  }finally{await view.close();}
+});
+
+
+test('labor note belongs only to the Plan hours header, never the tracking Start column, in every existing language',async()=>{
+ for(const language of ['vi','zh','en'])for(const tracking of [false,true]){
+  sync.clearClientReads('session');const view=await mount(true,{language,tracking});try{
+   const table=view.host.querySelector('.pp-table table'),headers=[...table.querySelectorAll('thead th')],notes=table.querySelectorAll('thead .pp-labor-note');
+   if(tracking){assert.equal(notes.length,0,'tracking has no hours column');assert.equal(headers.length,10);assert.equal(headers[6].textContent,language==='zh'?'開始':'Bắt đầu');assert.equal(headers[6].querySelector('details'),null);}
+   else{assert.equal(notes.length,1);assert.equal(headers.length,16);assert.equal(notes[0].closest('th'),headers[7]);assert.equal(notes[0].querySelector('summary').textContent,language==='zh'?'工時':'Giờ công');assert.equal(notes[0].open,false);}
+   assert.equal(writes.length,0);
+  }finally{await view.close();}
+ }
 });
