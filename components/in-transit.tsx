@@ -1628,7 +1628,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
               </fieldset>
             )}
             <footer>
-              <FeedbackActionButton type="button" disabled={dialog==='add-lsx'&&busy} onClick={() => setDialog("")}>
+              <FeedbackActionButton type="button" disabled={dialog==='add-lsx'&&busy} disabledExplanation={t('Đang gửi lượt tạo LSX. Vui lòng chờ phản hồi trước khi đóng.','正在提交工單建立操作，請等待回應後再關閉。')} onClick={() => setDialog("")}>
                 {dialog==='add-lsx'&&additionalUncertain?t('Đóng','關閉'):t("Hủy", "取消")}
               </FeedbackActionButton>
               <FeedbackActionButton className="primary" disabled={busy} disabledExplanation={"Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại."} type="submit">

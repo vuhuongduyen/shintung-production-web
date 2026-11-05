@@ -543,3 +543,6 @@ Direct tests bổ sung mất response sau commit/retry, concurrent cùng key, ra
 Contract đã bỏ mô tả hiện hành cũ về khóa mọi phiếu đã QLSX xác nhận, thiếu version lao động và chưa có anchor; cập nhật đúng intent/ACK, anchor quan sát, Leadtime ngày chốt/MOQ, Plan nhiều mức phải tách, ngoại lệ thiếu labor và HR nhập muộn/kỳ bảo toàn. Các giới hạn nghiệm thu/kích hoạt/Sheet thật không thay đổi.
 
 Kiểm local bổ sung: nhóm rộng13file 115/115, không fail/cancel/skip/todo; sau phần chữ Đóng/replayed và kiểm đổi phiên, mounted cuối5/5 có giao nhau, TypeScript đạt. Actual compiled Worker lifecycle1/1 đã đạt trên build WIP có runtime mới; phải build lại và smoke đúng commit sau khi chốt, CI/browser đọc riêng tại PR. Không cộng các nhóm giao nhau hoặc gán CI6b cho bản sửa này.
+
+
+CI checkpoint8b7165e (41964672786) chạy đủ294file/1.806test:1.805pass,1fail, không cancel/skip/todo/timeout/file thiếu summary; TypeScript và ba build đạt. Lỗi global-action-feedback yêu cầu mọi FeedbackActionButton có disabled phải có disabledExplanation: nút đóng trong lúc tạo LSX vừa khóa chưa khai báo lời giải thích. Đã thêm đúng lý do VI/ZH, không thay test hoặc logic quyền/dữ liệu. Nhóm global-feedback/mounted/refresh/edit-feedback44/44 và TypeScript local đạt sau sửa. CI head sửa phải đọc riêng; không rerun cùng SHA chỉ để thử lại.
