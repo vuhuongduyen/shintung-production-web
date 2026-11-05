@@ -69,3 +69,5 @@ Backend/direct tests và mounted JSDOM đã có các nhánh trên; Worker HTTP d
 ## Adapter cho Codespace Private (không thay harness loopback mặc định)
 
 Xem [CODESPACE-PRIVATE-PREVIEW-TEST.md](CODESPACE-PRIVATE-PREVIEW-TEST.md). Adapter chỉ QA, fixed origin HTTPS của Codespace cũ/cổng5173, full Worker/volatile fixtures/normal auth. Không thay Vite/Worker production, dùng local-owner hoặc public port. HTTP Host/Origin mô phỏng ở cloud không chứng minh URL forwarded thực tế hay cookie/browser hoạt động; phải kiểm phiên Codespace được phép trước khi gửi link.
+
+Probe Codespace của Duyên xác nhận Host/Origin bị rewrite; bản sửa adapter có đúng một mapping localhost5173 gắn forwarded-host/proto cố định và bằng chứng Sec-Fetch-Site same-origin, không trust-proxy/wildcard. Không sửa Origin/cookie nhận được; Worker chạy trên đúng URL transport nội bộ cố định. Xem bảng probe và giới hạn trong CODESPACE-PRIVATE-PREVIEW-TEST. Browser phải kiểm đăng nhập/reload/lưu bằng header thực tế; thiếu Fetch Metadata thì dừng với code rõ, không nới guard. Không tự dùng lại b022 như bản đã sửa.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {request as httpRequest} from 'node:http';
 import {spawnSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
-import {codespacePrivatePreview,previewTarget,previewHeaders,previewOrigin} from '../scripts/verification/codespace-private-preview.mjs';
+import {codespacePrivatePreview,previewTarget,previewHeaders,previewOrigin,previewDiagnostic,previewRedirectAllowed} from '../scripts/verification/codespace-private-preview.mjs';
 import {records} from '../scripts/local/database.mjs';
 import {assertRequestAudit} from './helpers/rejected-request-audit.mjs';
 const host=new URL(previewOrigin).host;
@@ -13,7 +13,11 @@ function incoming({method='GET',path='/api/auth/session',headers={},address='127
 test('only the one exact Codespace Host and same HTTPS Origin reach Worker; forwarding claims never override them',()=>{
  for(const method of ['GET','HEAD','POST','PUT','PATCH','DELETE'])assert.equal(previewTarget(incoming({method,headers:{origin:previewOrigin}})).origin,previewOrigin);
  assert.equal(previewTarget(incoming()).href,previewOrigin+'/api/auth/session');
- for(const badHost of ['localhost:5173','127.0.0.1:5173',host+':443',host+'.','evil.app.github.dev',host+'.evil.test',host.toUpperCase()])assert.throws(()=>previewTarget(incoming({headers:{host:badHost,'x-forwarded-host':host,'x-forwarded-proto':'https'}})),{status:403});
+ for(const badHost of ['localhost:5173','127.0.0.1:5173',host+':443',host+'.','evil.app.github.dev',host+'.evil.test',host.toUpperCase()]){
+  assert.throws(()=>previewTarget(incoming({headers:{host:badHost}})),{status:403});
+  if(badHost!=='localhost:5173')assert.throws(()=>previewTarget(incoming({headers:{host:badHost,'x-forwarded-host':host,'x-forwarded-proto':'https'}})),{status:403});
+  else assert.throws(()=>previewTarget(incoming({headers:{host:badHost,'x-forwarded-host':'evil.test','x-forwarded-proto':'https'}})),{status:403});
+ }
  for(const origin of ['null','http://'+host,'https://evil.test',previewOrigin+'/',previewOrigin+':443',previewOrigin+', '+previewOrigin])for(const method of ['GET','POST'])assert.throws(()=>previewTarget(incoming({method,headers:{origin,'x-forwarded-host':host,'x-forwarded-proto':'https'}})),{status:403});
  for(const method of ['POST','PUT','PATCH','DELETE'])assert.throws(()=>previewTarget(incoming({method})),{status:403});
  for(const address of ['192.0.2.1',undefined,''])assert.throws(()=>previewTarget({...incoming(),socket:{remoteAddress:address}}),{status:403});
@@ -82,4 +86,53 @@ test('each adapter has isolated volatile accounts/data and rejects old cookies a
   await first.db.prepare("INSERT INTO app_records VALUES('synthetic_preview_marker','SYNTHETIC-MARKER','{}','SYNTHETIC-QA','now')").run();assert.equal((await first.db.prepare("SELECT count(*) n FROM app_records WHERE entity='synthetic_preview_marker'").first()).n,1);await first.close();first=null;
   second=await codespacePrivatePreview();assert.notEqual(second.password,firstPassword);assert.equal(JSON.parse((await send(second,'/api/auth/session',{headers:{cookie}})).text).authenticated,false);assert.equal((await second.db.prepare("SELECT json_extract(payload,'$.rows[0].plan') qty FROM app_records WHERE entity='production_plan' AND record_key='2026-11-02'").first()).qty,100);assert.equal((await second.db.prepare("SELECT count(*) n FROM app_records WHERE entity='synthetic_preview_marker'").first()).n,0);assert.equal(second.outboundBlocked(),0);
  }finally{await first?.close();await second?.close();}
+});
+
+test('an unobserved mixed tunnel Origin stays rejected and diagnostics never disclose arbitrary metadata',()=>{
+ const sentinel=crypto.randomUUID(),request=incoming({headers:{host:'localhost:5173',origin:previewOrigin,'x-forwarded-host':host,'x-forwarded-proto':'https',cookie:sentinel,authorization:sentinel,'x-original-origin':sentinel}});let code;
+ assert.throws(()=>previewTarget(request),error=>{code=error.code;return error.status===403&&code==='ORIGIN_MISMATCH';});
+ const diagnostic=previewDiagnostic(request,code);assert.equal(diagnostic.transport.host,'localhost-5173');assert.equal(diagnostic.transport.origin,'expected-https');assert.equal(diagnostic.transport.forwardedHost,'expected-codespace');assert.equal(diagnostic.transport.peer,'loopback');assert.equal(diagnostic.transport.originalOrigin,'other');assert.doesNotMatch(JSON.stringify(diagnostic),new RegExp(sentinel));assert.equal(previewDiagnostic(request,sentinel).code,'GUARD_REJECTED');
+ for(const key of ['host','origin','x-forwarded-host','x-forwarded-proto','x-original-host','x-forwarded-origin','x-original-origin']){const d=previewDiagnostic(incoming({headers:{[key]:sentinel},path:'/?probe='+sentinel}),'PATH_INVALID');assert.doesNotMatch(JSON.stringify(d),new RegExp(sentinel));}
+ assert.throws(()=>previewTarget(incoming({headers:{origin:'http://localhost:5173'}})),{status:403,code:'ORIGIN_MISMATCH'});
+});
+
+test('observed Codespace transport has one exact localhost mapping and requires browser same-origin proof for rewritten Origin',()=>{
+ const proxyHeaders={host:'localhost:5173','x-forwarded-host':host,'x-forwarded-proto':'https'},origin='http://localhost:5173';
+ assert.equal(previewTarget(incoming({headers:proxyHeaders})).href,origin+'/api/auth/session','observed navigation is read-only and Origin is absent');
+ for(const method of ['POST','PUT','PATCH','DELETE'])assert.equal(previewTarget(incoming({method,headers:{...proxyHeaders,origin,'sec-fetch-site':'same-origin'}})).origin,origin);
+ assert.equal(previewTarget(incoming({headers:{...proxyHeaders,origin,'sec-fetch-site':'same-origin'}})).origin,origin);
+ for(const site of [undefined,'cross-site','same-site','none','same-origin, same-origin','OTHER']){
+  const headers={...proxyHeaders,origin,...(site===undefined?{}:{'sec-fetch-site':site})};assert.throws(()=>previewTarget(incoming({method:'POST',headers})),{status:403});
+ }
+ for(const headers of [{...proxyHeaders,'x-forwarded-host':'evil.test',origin,'sec-fetch-site':'same-origin'},{...proxyHeaders,'x-forwarded-proto':'http',origin,'sec-fetch-site':'same-origin'},{host:'localhost:5173',origin,'sec-fetch-site':'same-origin'},{...proxyHeaders,host:'127.0.0.1:5173',origin,'sec-fetch-site':'same-origin'},{...proxyHeaders,origin:previewOrigin,'sec-fetch-site':'same-origin'},{...proxyHeaders,origin:'http://localhost:5174','sec-fetch-site':'same-origin'},{...proxyHeaders,origin:'https://evil.test','sec-fetch-site':'same-origin'}])assert.throws(()=>previewTarget(incoming({method:'POST',headers})),{status:403});
+ const headers={...proxyHeaders,origin,'sec-fetch-site':'same-origin'};
+ for(const name of ['x-forwarded-host','x-forwarded-proto','sec-fetch-site'])assert.throws(()=>previewTarget(incoming({method:'POST',headers,rawHeaders:Object.entries(headers).flat().concat(name,headers[name])})),{status:403});
+ assert.throws(()=>previewTarget(incoming({method:'POST',headers,address:'192.0.2.1'})),{status:403});
+});
+
+test('transport-relative redirects stay on the one external origin; absolute localhost or foreign redirects are blocked',()=>{
+ for(const location of ['/login','../login','?reload=1',previewOrigin+'/login'])assert.equal(previewRedirectAllowed(location,'/some/page'),true);
+ for(const location of ['http://localhost:5173/login','https://evil.test/login','//evil.test/login','javascript:alert(1)'])assert.equal(previewRedirectAllowed(location,'/some/page'),false);
+});
+
+test('observed rewritten headers reach real Worker with unchanged Origin/cookies and same-origin proof; cross-site writes never reach it',async()=>{
+ const qa=await codespacePrivatePreview(),proof={host:'localhost:5173','x-forwarded-host':host,'x-forwarded-proto':'https'},origin='http://localhost:5173';
+ const proxy=(path,body,headers={})=>send(qa,path,{method:body===undefined?'GET':'POST',headers:{...proof,...(body===undefined?{}:{origin,'sec-fetch-site':'same-origin'}),...headers},body});
+ try{
+  const home=await proxy('/');assert.equal(home.status,200,home.text);assert.match(home.text,/ONSPA/);assert.equal(home.response.headers.get('access-control-allow-origin'),null);assert.match(home.response.headers.get('vary'),/Sec-Fetch-Site/);
+  const asset=home.text.match(/(?:src|href)="(\/assets\/[^"?]+\.js)/)?.[1];assert.ok(asset);assert.equal((await proxy(asset)).status,200);assert.equal(JSON.parse((await proxy('/api/auth/session')).text).authenticated,false);
+  const cookies={};for(const login of ['QA_KHSX','QA_HR']){
+   const logged=await proxy('/api/auth/login',{login,password:qa.password});assert.equal(logged.status,200,logged.text);assert.match(logged.cookies[0],/^__Host-onspa_session=/);assert.match(logged.cookies[0],/; Secure; HttpOnly; SameSite=Strict;/);assert.doesNotMatch(logged.cookies[0],/Domain=/);cookies[login]=logged.cookies[0].split(';')[0];const user=JSON.parse((await proxy('/api/auth/session',undefined,{cookie:cookies[login]})).text).user;assert.equal(user.login,login);assert.equal(user.isAdmin,false);
+  }
+  const plan=JSON.parse((await proxy('/api/production-plan?week=2026-11-02',undefined,{cookie:cookies.QA_KHSX})).text),body={action:'close',week:'2026-11-02',revision:plan.revision,ids:['SYNTHETIC-QA-PLAN']},before=await records(qa.db),sessions=(await qa.db.prepare('SELECT * FROM auth_sessions ORDER BY token_hash').all()).results;
+  for(const site of [undefined,'cross-site','same-site','none','']){
+   const blocked=await send(qa,'/api/production-plan',{method:'POST',headers:{...proof,origin,cookie:cookies.QA_KHSX,...(site===undefined?{}:{'sec-fetch-site':site})},body});assert.equal(blocked.status,403);assert.equal(JSON.parse(blocked.text).code,site===undefined?'FETCH_METADATA_REQUIRED':'FETCH_METADATA_REJECTED');assert.deepEqual(await records(qa.db),before);assert.deepEqual((await qa.db.prepare('SELECT * FROM auth_sessions ORDER BY token_hash').all()).results,sessions);
+  }
+  for(const bad of [{origin:'https://evil.test'},{origin:previewOrigin},{'x-forwarded-host':'evil.test'},{'x-forwarded-proto':'http'},{host:'127.0.0.1:5173'}]){const blocked=await proxy('/api/production-plan',body,{cookie:cookies.QA_KHSX,...bad});assert.equal(blocked.status,403);assert.deepEqual(await records(qa.db),before);}
+  const denied=await proxy('/api/production-plan',body,{cookie:cookies.QA_HR});assert.equal(denied.status,403);await assertRequestAudit({before,after:await records(qa.db),response:denied.response,actorId:'QA_HR',route:'/api/production-plan',body});
+  let saved=await proxy('/api/production-plan',body,{cookie:cookies.QA_KHSX});if(saved.status===409&&JSON.parse(saved.text).error==='dailyCapacityConfirmation'){const detail=JSON.parse(JSON.parse(saved.text).details.find(d=>d.id==='dailyCapacity').reason);saved=await proxy('/api/production-plan',{...body,dailyCapacityAck:detail.token},{cookie:cookies.QA_KHSX});}
+  assert.equal(saved.status,200,saved.text);const closed=JSON.parse(saved.text).rows[0];assert.equal(closed.closedBy,'QA_KHSX');assert.equal(closed.planLaborBasis.value,.2);await proxy('/',undefined,{cookie:cookies.QA_KHSX});assert.equal(JSON.parse((await proxy('/api/auth/session',undefined,{cookie:cookies.QA_KHSX})).text).user.login,'QA_KHSX');assert.deepEqual(JSON.parse((await proxy('/api/production-plan?week=2026-11-02',undefined,{cookie:cookies.QA_KHSX})).text).rows[0].planLaborBasis,closed.planLaborBasis);
+  const line=await proxy('/api/auth/line-login',{line:'A'});assert.equal(line.status,200);const cookie=line.cookies[0].split(';')[0],work=JSON.parse((await proxy('/api/production-workflow',undefined,{cookie})).text);assert.ok(work.orders.every(r=>r.line==='A'));const order=work.orders.find(o=>o.id==='SYNTHETIC-DAILY-A'),input={action:'daily-output',orderId:order.id,expectedOrderRevision:order.revision,quantity:25,productionDate:'2026-11-04',productionLocalDateTime:'2026-11-04T09:00',requestIdempotency:crypto.randomUUID()},oldReports=(await qa.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='production_report' ORDER BY record_key").all()).results;
+  const first=await proxy('/api/production-workflow',input,{cookie});assert.equal(first.status,200,first.text);const report=JSON.parse(first.text).report,retry=await proxy('/api/production-workflow',input,{cookie});assert.equal(retry.status,200);assert.equal(JSON.parse(retry.text).report.id,report.id);assert.equal(JSON.parse(retry.text).replayed,true);const reports=(await qa.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='production_report' ORDER BY record_key").all()).results;assert.equal(reports.length,oldReports.length+1);assert.deepEqual(reports.filter(r=>r.record_key!==report.id),oldReports);assert.equal(qa.outboundBlocked(),0);
+ }finally{await qa.close();}
 });
