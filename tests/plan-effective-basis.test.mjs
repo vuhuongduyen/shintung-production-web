@@ -40,3 +40,9 @@ test('Plan-date preservation retains the existing LSX quantity tier rule using l
  assert.equal(transitStandardLeadtime({...row,planRowId:row.id,lsxQty:50,planLeadtimeBasis:basis},[{sku:row.sku,leadTime:99}],[]),2,'changing the lookup date must not change the existing MOQ quantity rule');
  assert.equal(transitStandardLeadtime({...row,planRowId:row.id,lsxQty:1000,planLeadtimeBasis:basis},[{sku:row.sku,leadTime:99}],[]),5);
 });
+
+test('an explicitly damaged Plan Leadtime basis never crashes or falls back to the current master',()=>{
+ const row={id:'SYNTHETIC-DAMAGED',planRowId:'SYNTHETIC-DAMAGED',sku:'SYNTHETIC-DAMAGED',lsxQty:50},saved=[{sku:row.sku,leadTime:99}];
+ const base={kind:'plan-close-leadtime-v1',planRowId:row.id,sku:row.sku,closedAt:'2026-11-03T00:00:00Z',value:2};
+ for(const basis of [null,'invalid',{...base,tiers:[null]},{...base,tiers:[{moq:100,value:-1}]},{...base,tiers:[{moq:'100',value:2}]}])assert.equal(transitStandardLeadtime({...row,planLeadtimeBasis:basis},saved,[]),null);
+});
