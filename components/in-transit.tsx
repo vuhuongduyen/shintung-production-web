@@ -1,4 +1,6 @@
 "use client";
+import QuantityProgress from './quantity-progress';
+import {productionRequestId} from '../lib/production-request-id.mjs';
 import ProductionStatusLegend from './production-status-legend';
 import {ACTION_FEEDBACK_CLEAR_EVENT,ACTION_FEEDBACK_DURATION,notifyInvalidAction} from '../lib/action-feedback';
 import {FeedbackActionButton} from './action-feedback';
@@ -6,7 +8,7 @@ import {ManualPagination} from './onspa-ui/ManualPagination';
 import {DataCell} from './onspa-ui/DataCell';
 import {inTransitCellKind, type InTransitDisplayField} from './onspa-ui/in-transit-semantics';
 import TransitHistoryImport from "./transit-history-import";
-import { apiFetch as fetch } from "../lib/data-sync";
+import { apiFetch as fetch, sessionFetch } from "../lib/data-sync";
 import { useDataRefresh, announceDataChange, clientSessionGeneration, ClientSessionReadCancelled, subscribeClientReadInvalidation, WorkspaceActivityContext } from "../lib/data-sync";
 import { StandardToolbar, toolbar } from "./standard-toolbar/StandardToolbar";
 import { Fragment, FormEvent, useEffect, useMemo, useState, useRef, useContext } from "react";
@@ -23,6 +25,9 @@ const empty = { rows: [] as Row[], history: [] as Audit[] };
 let transitCache: typeof empty | null = null;
 let transitGeneration = 0;
 let transitStale = true;
+// Keep an unresolved attempt when this workspace unmounts within the same
+// authenticated page. Never carry it into another login/session.
+let additionalAttempt: {payload: string; token: string; creationRevision: string|null|undefined} | null = null;
 export function invalidateInTransitCache() {
   transitGeneration++;
   transitStale = true;
@@ -42,6 +47,7 @@ subscribeClientReadInvalidation(reason => {
     return;
   }
   invalidateInTransitCache();
+  additionalAttempt = null;
   catalogCache = null;
   catalogRequest = null;
 });
@@ -283,6 +289,11 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
           );
   };
   const session = useRef(clientSessionGeneration()).current;
+  const additionalRunning = useRef(false);
+  const creationRevision = useRef<string|null|undefined>(undefined);
+  const additionalAlive = useRef(true);
+  useEffect(()=>{additionalAlive.current=true;return()=>{additionalAlive.current=false;};},[]);
+  const [additionalUncertain,setAdditionalUncertain] = useState(!!additionalAttempt);
   const [data, setData] = useState(()=>(typeof window !== 'undefined' && transitCache) || empty),
     [catalog, setCatalog] = useState<any[]>(()=>(typeof window !== 'undefined' && catalogCache) || []),
     [selected, setSelected] = useState<string[]>([]),
@@ -300,6 +311,12 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
       "" | "unplanned" | "add-lsx" | "edit" | "cancel" | "delete"
     >("");
   const [historyImport,setHistoryImport]=useState(false);
+  useEffect(()=>{
+    if(!additionalUncertain&&!(busy&&additionalRunning.current))return;
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',warn);
+    return()=>window.removeEventListener('beforeunload',warn);
+  },[additionalUncertain,busy]);
   const [filters, setFilters] = useState(emptyFilters);
   const [searchMode, setSearchMode] =
     useState<keyof typeof emptyFilters>("query");
@@ -552,13 +569,26 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
               sequence: "",
             },
     );
+    if(kind==='add-lsx'&&additionalAttempt&&one){
+      const pending=JSON.parse(additionalAttempt.payload);
+      if(pending.id===one.id)setForm(pending);
+    }
     setSkuQuery("");
     setDialog(kind);
   }
   async function submit(action: string, payload: Record<string, any>) {
+    if(action==='add-lsx'){
+      if(additionalRunning.current)return null;
+      const signature=JSON.stringify(payload);
+      if(additionalAttempt&&additionalAttempt.payload!==signature){setError(t('Lượt tạo LSX trước chưa rõ kết quả. Quay lại dòng đã chọn và thử lại lượt đó trước.','上一筆工單建立結果尚未確認，請返回原資料列重試。'));return null;}
+      additionalAttempt ||= {payload:signature,token:productionRequestId(),creationRevision:creationRevision.current};
+      payload={...payload,requestIdempotency:additionalAttempt.token,expectedCreationRevision:additionalAttempt.creationRevision};
+      additionalRunning.current=true;
+    }
     setBusy(true);
     setError("");
     setNotice("");
+    let creationConfirmed=false;
     try {
       const response = await fetch("/api/in-transit", {
           method: "POST",
@@ -567,13 +597,19 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
             expectedRevision: data.rows.find((row: Row) => row.id === payload.id)?.revision ?? null }),
         }),
         result = await response.json();
+      if(action==='add-lsx'&&!additionalAlive.current)return null;
       if (!response.ok) {
+        if(action==='add-lsx'&&!additionalUncertain&&response.status>=400&&response.status<500&&response.status!==409){additionalAttempt=null;setAdditionalUncertain(false);}
         const d = result.details?.[0];
         throw Error(
           result.error === "lsxExceedsPlan" && d
             ? `Plan ID ${d.planId}: Tổng số lượng LSX ${fmt(d.lsxQty)}, số lượng kế hoạch ${fmt(d.remaining)}.`
             : result.error,
         );
+      }
+      if(action==='add-lsx'){
+        if(result?.ok!==true||typeof result.row?.id!=='string'||!result.row.id||typeof result.creationScopeRevision!=='string'||!/^[a-f0-9]{64}$/.test(result.creationScopeRevision))throw Error('Chưa nhận được kết quả tạo LSX.');
+        creationConfirmed=true;
       }
       if (!["draft-lsx","update-note"].includes(action)) setDialog("");
       const successMessages: Record<string, [string, string]> = {
@@ -599,7 +635,7 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
         sync: ["Đã đồng bộ dữ liệu thành công.", "資料同步成功。"],
       };
       setNotice(
-        t(
+        action==='add-lsx'&&result.replayed ? t('Lượt tạo này đã được lưu trước đó; không tạo LSX mới.','此建立操作已儲存，不會重複新增工單。') : t(
           ...(successMessages[action] || [
             "Thao tác đã hoàn thành thành công.",
             "操作成功完成。",
@@ -617,16 +653,50 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
         setSelected([result.row.id]);
         setHighlightedId(result.row.id);
       }
+      if(action==='add-lsx'&&additionalAlive.current){
+        await acknowledgeCreation(result.row.id,result.creationScopeRevision);
+        if(additionalAlive.current){additionalAttempt=null;setAdditionalUncertain(false);}
+      }
       return result;
     } catch (e) {
+      if(action==='add-lsx'&&!additionalAlive.current)return null;
       const code = e instanceof Error ? e.message : String(e);
-      setError(friendlyError(code));
+      if(action==='add-lsx'&&additionalAttempt){setAdditionalUncertain(true);setError(creationConfirmed?t('LSX đã được lưu; chưa xác nhận đóng lượt đối soát. Nhấn Tạo thêm LSX để kiểm tra kết quả trước, không tạo lượt mới để thử lại.','工單已儲存，但核對尚未完成；請先檢查原操作結果。'):t('Chưa xác nhận kết quả tạo LSX. Dữ liệu được giữ lại; bấm Lưu để kiểm tra lại cùng lượt, không tạo lượt mới.','尚未確認工單建立結果。資料已保留，請再次儲存以核對同一筆操作。'));}
+      else setError(friendlyError(code));
       return null;
     } finally {
-      setBusy(false);
+      if(action==='add-lsx')additionalRunning.current=false;
+      if(action!=='add-lsx'||additionalAlive.current)setBusy(false);
     }
   }
+  async function readCreationRecovery(){
+    const unavailable='Chưa kiểm tra được lượt tạo LSX trước. Vui lòng thử lại; chưa tạo lệnh mới.';
+    let response,result;try{response=await fetch('/api/in-transit?creationRecovery=1',{cache:'reload'});result=await response.json();}catch(error){if(error instanceof ClientSessionReadCancelled)throw error;throw Error(unavailable);}
+    if(!response.ok)throw Error(response.status>=500?unavailable:result?.error||unavailable);
+    if(!result||!(result.revision===null||typeof result.revision==='string'&&/^[a-f0-9]{64}$/.test(result.revision))||!(result.pending===null||typeof result.pending?.rowId==='string'&&typeof result.pending?.requestIdempotency==='string'))throw Error('Chưa kiểm tra được lượt tạo LSX trước. Vui lòng thử lại.');
+    return result;
+  }
+  // Retry bookkeeping keeps session/audit protection, without another business-data broadcast.
+  async function acknowledgeCreation(rowId:string,revision:string){
+    let response,result;try{response=await sessionFetch('/api/in-transit',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'ack-add-lsx',id:rowId,expectedCreationRevision:revision})});result=await response.json();}catch(error){if(error instanceof ClientSessionReadCancelled)throw error;throw Error('Chưa xác nhận đóng lượt tạo LSX. Lượt đã lưu vẫn cần được kiểm tra.');}
+    if(!response.ok||result?.ok!==true)throw Error(response.status>=500?'Chưa xác nhận đóng lượt tạo LSX. Lượt đã lưu vẫn cần được kiểm tra.':result?.error||'Chưa xác nhận đóng lượt tạo LSX.');
+  }
   async function createAdditionalLsx() {
+    if(additionalRunning.current)return;
+    additionalRunning.current=true;setBusy(true);setError('');
+    try{
+      const scope=await readCreationRecovery();if(!additionalAlive.current)return;
+      if(scope.pending){
+        await load(true);if(!additionalAlive.current)return;
+        setFilters(emptyFilters);setSelected([scope.pending.rowId]);setHighlightedId(scope.pending.rowId);setDialog('');
+        setNotice(t('Đã tìm thấy LSX được lưu ở lượt trước; không tạo LSX mới.','已找到上一筆操作儲存的工單，不會重複新增。'));
+        await acknowledgeCreation(scope.pending.rowId,scope.revision);if(!additionalAlive.current)return;
+        if(!additionalAttempt||additionalAttempt.token===scope.pending.requestIdempotency){additionalAttempt=null;setAdditionalUncertain(false);}
+        else {additionalAttempt.creationRevision=(await readCreationRecovery()).revision;setAdditionalUncertain(true);}
+        return;
+      }
+      creationRevision.current=scope.revision;
+      if(additionalAttempt)additionalAttempt.creationRevision=scope.revision;
     if (!one) {
       setError(
         t(
@@ -637,6 +707,8 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
       return;
     }
     open("add-lsx");
+    }catch(error){if(additionalAlive.current)setError(friendlyError(error instanceof Error?error.message:String(error)));}
+    finally{additionalRunning.current=false;if(additionalAlive.current)setBusy(false);}
   }
   function inlineDraft(row: Row) {
     return (
@@ -721,6 +793,7 @@ export function InTransit({ language = "vi", operator = "" }: { language?: "vi" 
         "planQty",
         "lsxQty",
         "completedQty",
+        "pendingReportQty",
         "inTransitQty",
         "progress",
         "planEnd",
@@ -1006,7 +1079,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
       )}
       <section className="data-card it-card">
         <div className="it-table">
-          <table data-no-pagination="true" data-report-source={JSON.stringify({title:t('In transit','在途'),headers:['Nhóm sản phẩm','SKU','Tên sản phẩm','Quy cách','Line','Nguồn lệnh','Ưu tiên KHSX','Thứ tự SX','SL kế hoạch','Ngày bắt đầu KH','Ngày dự kiến HT','Mã LSX','SL LSX','Ngày mở LSX','SL hoàn thành','SL đang đi','Tiến độ','Trạng thái LSX','Trạng thái tiến độ','Đồng bộ','Ghi chú','Plan ID'],rows:filtered.map(r=>[r.group,r.sku,r.name,r.spec,r.line,businessLabel(r.source),businessLabel(r.priority),r.sequence,r.isAdditionalLsx?'':r.planQty,displayDate(r.planStart),displayDate(r.planEnd),r.lsxCode,r.lsxQty,displayDate(r.lsxOpenedAt),r.completedQty,r.inTransitQty,r.progress,businessLabel(r.status),businessLabel(r.progressStatus),businessLabel(r.syncStatus),r.planningNote,r.planId])})}>
+          <table data-no-pagination="true" data-report-source={JSON.stringify({title:t('In transit','在途'),headers:['Nhóm sản phẩm','SKU','Tên sản phẩm','Quy cách','Line','Nguồn lệnh','Ưu tiên KHSX','Thứ tự SX','SL kế hoạch','Ngày bắt đầu KH','Ngày dự kiến HT','Mã LSX','SL LSX','Ngày mở LSX','SL hoàn thành đã duyệt','SL chờ xác nhận','SL đang đi','Tiến độ','Trạng thái LSX','Trạng thái tiến độ','Đồng bộ','Ghi chú','Plan ID'],rows:filtered.map(r=>[r.group,r.sku,r.name,r.spec,r.line,businessLabel(r.source),businessLabel(r.priority),r.sequence,r.isAdditionalLsx?'':r.planQty,displayDate(r.planStart),displayDate(r.planEnd),r.lsxCode,r.lsxQty,displayDate(r.lsxOpenedAt),r.completedQty,r.pendingReportQty||0,r.inTransitQty,r.progress,businessLabel(r.status),businessLabel(r.progressStatus),businessLabel(r.syncStatus),r.planningNote,r.planId])})}>
             <thead>
               <tr>
                 {[
@@ -1025,7 +1098,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
                   t("Mã LSX", "工單號"),
                   t("SL LSX", "工單數量"),
                   t("Ngày mở LSX", "工單開立日"),
-                  t("SL hoàn thành", "完成數量"),
+                  t("SL hoàn thành SX", "生產完成數量"),
                   t("SL đang đi", "在製數量"),
                   t("Tiến độ", "進度"),
                   t("Trạng thái LSX", "工單狀態"),
@@ -1160,7 +1233,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
                       displayDate(r.lsxOpenedAt)
                     )}
                   </DataCell>
-                  <DataCell kind="number" className="num">{fmt(r.completedQty)}</DataCell>
+                  <DataCell kind="number" className="num"><QuantityProgress value={Number(r.completedQty||0)+Number(r.pendingReportQty||0)} total={Number(r.lsxQty)} approved={Number(r.completedQty||0)} pending={Number(r.pendingReportQty||0)}/></DataCell>
                   <DataCell kind="number" className="num">{fmt(r.inTransitQty)}</DataCell>
                   <DataCell className="center">
                     {r.progress === null
@@ -1443,7 +1516,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
               </>
             )}
             {dialog === "add-lsx" && one && (
-              <fieldset>
+              <fieldset disabled={busy||additionalUncertain}>
                 <legend>
                   {one.planId} · {one.sku} · {one.name}
                 </legend>
@@ -1456,7 +1529,7 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
                 {initialPlanningFields}
               </fieldset>
             )}
-            {["unplanned","add-lsx","edit"].includes(dialog)&&<label className="wide">{t("Ghi chú (không bắt buộc)", "備註（選填）")}<textarea maxLength={2000} rows={2} value={form.planningNote||""} onChange={e=>setForm({...form,planningNote:e.target.value})}/></label>}
+            {["unplanned","add-lsx","edit"].includes(dialog)&&<label className="wide">{t("Ghi chú (không bắt buộc)", "備註（選填）")}<textarea disabled={dialog==='add-lsx'&&(busy||additionalUncertain)} maxLength={2000} rows={2} value={form.planningNote||""} onChange={e=>setForm({...form,planningNote:e.target.value})}/></label>}
             {dialog === "edit" && one && (
               <fieldset>
                 <legend>
@@ -1594,8 +1667,8 @@ toolbar.action({"onClick": () => { reset(); setShowSearch(false); }},<>{t("Quay 
               </fieldset>
             )}
             <footer>
-              <FeedbackActionButton type="button" onClick={() => setDialog("")}>
-                {t("Hủy", "取消")}
+              <FeedbackActionButton type="button" disabled={dialog==='add-lsx'&&busy} disabledExplanation={t('Đang gửi lượt tạo LSX. Vui lòng chờ phản hồi trước khi đóng.','正在提交工單建立操作，請等待回應後再關閉。')} onClick={() => setDialog("")}>
+                {dialog==='add-lsx'&&additionalUncertain?t('Đóng','關閉'):t("Hủy", "取消")}
               </FeedbackActionButton>
               <FeedbackActionButton className="primary" disabled={busy} disabledExplanation={"Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại."} type="submit">
                 {t("Lưu", "儲存")}

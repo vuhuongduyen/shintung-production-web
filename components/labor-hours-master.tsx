@@ -143,6 +143,7 @@ export default function LaborHoursMaster({
     >("sku"),
     [formSku, setFormSku] = useState(""),
     [hour, setHour] = useState("0.000"),
+    [effectiveFrom,setEffectiveFrom]=useState(""),
     [note, setNote] = useState(""),
     [reason, setReason] = useState(""),
     [source, setSource] = useState<"PDF" | "Nhập trực tiếp">("Nhập trực tiếp"),
@@ -266,6 +267,7 @@ export default function LaborHoursMaster({
       return;
     }
     setPanel(mode);
+    setEffectiveFrom(new Date(Date.now()+25200000).toISOString().slice(0,10));
     setFormSku(mode === "edit" ? selectedRecord!.sku : "");
     setHour(mode === "edit" ? formatHour(selectedRecord!.laborHour) : "0.000");
     setNote(mode === "edit" ? selectedRecord!.note || "" : "");
@@ -310,6 +312,7 @@ export default function LaborHoursMaster({
           mode: panel,
           sku,
           laborHour: value,
+          effectiveFrom,
           expectedVersion: panel === "edit" ? selectedRecord?.version : 0,
           note,
           reason,
@@ -514,6 +517,7 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
               <div className="leadtime-form-grid">
                 <fieldset>
                   <legend>Thông tin sản phẩm</legend>
+                  <label><span>Ngày hiệu lực *</span><input required type="date" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></label><p>Chỉ nhập ngày có căn cứ áp dụng. Phiếu sản lượng đã ghi giữ nguyên định mức đã lưu; không tự hồi tố lịch sử thiếu.</p>
                   <label>
                     <span>SKU *</span>
                     <input

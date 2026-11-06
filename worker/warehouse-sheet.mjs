@@ -1,3 +1,7 @@
+import {acknowledgePendingDailyCorrection,reconcilePendingReceiptConfirmation} from '../scripts/local/production-daily-pending-correction.mjs';
+import {decideDailyWithdrawalFromSheet,acknowledgeDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
+import {isDailyOutput} from '../lib/production-report-model.mjs';
+const productionTime=report=>isDailyOutput(report)?report.productionDate:report?.completedAt;
 // Scoped bridge: only newly approved receipts explicitly marked for Sheets are exported.
 export const REAL_SHEET='1y5J-G5IoIzEgXsf_2hpqrXOTgvL0RJp5lBjR9bbapk4';
 export const sha=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');
@@ -44,16 +48,34 @@ export async function sheetBridge(request,env){
  await db.prepare("UPDATE app_records SET payload=json_set(payload,'$.lastContactAt',?) WHERE entity='warehouse_sheet_config' AND record_key='connection' AND json_extract(payload,'$.tokenHash')=? AND json_extract(payload,'$.enabled')=1").bind(contactAt,config.tokenHash).run();
  if(b.action==='ping')return reply({ok:true,connected:true,lastContactAt:contactAt});
  if(b.action==='pull'){
- const rows=(await db.prepare("SELECT w.record_key,w.payload,json_extract(r.payload,'$.completedAt') AS latest_completed_at FROM app_records w LEFT JOIN app_records r ON r.entity='production_report' AND r.record_key=json_extract(w.payload,'$.reportId') WHERE w.entity='warehouse_in' AND json_extract(w.payload,'$.sheetSync.status') IS NOT NULL AND (json_extract(w.payload,'$.sheetSync.status') IN ('pending','error') OR COALESCE(json_extract(r.payload,'$.completedAt'),json_extract(w.payload,'$.sourceCompletedAt'),'')<>COALESCE(json_extract(w.payload,'$.sheetSync.exportedCompletedAt'),'')) ORDER BY w.updated_at LIMIT 50").all()).results;
+ const rows=(await db.prepare("SELECT w.record_key,w.payload,CASE WHEN json_extract(r.payload,'$.reportingModel')='daily-finished-v1' AND json_extract(r.payload,'$.quantityOnly')=1 THEN json_extract(r.payload,'$.productionDate') ELSE json_extract(r.payload,'$.completedAt') END AS latest_completed_at FROM app_records w LEFT JOIN app_records r ON r.entity='production_report' AND r.record_key=json_extract(w.payload,'$.reportId') WHERE w.entity='warehouse_in' AND (json_extract(w.payload,'$.sheetSync.command') IS NULL OR json_extract(w.payload,'$.sheetSync.spreadsheetId') IS NULL OR json_extract(w.payload,'$.sheetSync.spreadsheetId')=?) AND json_extract(w.payload,'$.sheetSync.status') IS NOT NULL AND (json_extract(w.payload,'$.sheetSync.status') IN ('pending','error') OR COALESCE(CASE WHEN json_extract(r.payload,'$.reportingModel')='daily-finished-v1' AND json_extract(r.payload,'$.quantityOnly')=1 THEN json_extract(r.payload,'$.productionDate') ELSE json_extract(r.payload,'$.completedAt') END,json_extract(w.payload,'$.sourceCompletedAt'),'')<>COALESCE(json_extract(w.payload,'$.sheetSync.exportedCompletedAt'),'')) ORDER BY w.updated_at LIMIT 50").bind(config.spreadsheetId).all()).results;
  return reply({receipts:rows.map(r=>({...JSON.parse(r.payload),id:r.record_key,...(r.latest_completed_at?{sourceCompletedAt:r.latest_completed_at}:{})})).filter(p=>!p._deleted&&!p.cancelled&&!p.voided)});
  }
  const key=String(b.receiptId||''),stored=await db.prepare("SELECT payload FROM app_records WHERE entity='warehouse_in' AND record_key=?").bind(key).first();
  if(!stored)fail('Không tìm thấy phiếu nhập kho trên web.',404);
  const p=JSON.parse(stored.payload);
- if(!p.sheetSync||p.source!=='Sản xuất'||p.reportId!==b.reportId||p.sku!==b.sku||p._deleted||p.cancelled||p.voided)fail('Phiếu không thuộc kết nối này hoặc đã hủy.',409);
+ if(!p.sheetSync||p.source!=='Sản xuất'||p.reportId!==b.reportId||p.sku!==b.sku||p._deleted)fail('Phiếu không thuộc kết nối này.',409);
+ if(p.sheetSync.command&&p.sheetSync.spreadsheetId&&p.sheetSync.spreadsheetId!==config.spreadsheetId)fail('Lệnh thuộc Sheet gốc khác; cần đối soát, không chuyển ngầm sang kết nối mới.',403);
+ if(b.action==='pending-correction-ack')return reply(await acknowledgePendingDailyCorrection(db,b,{verified:true,spreadsheetId:config.spreadsheetId}));
+ if(b.action==='withdrawal-ack')return reply(await acknowledgeDailyWithdrawal(db,b,{verified:true,spreadsheetId:config.spreadsheetId}));
+ if(['withdrawal-preview','withdrawal-approve','withdrawal-reject'].includes(b.action)){if(!p.withdrawalRequest?.id||p.withdrawalRequest.id!==b.commandId)fail('Yêu cầu thu hồi không khớp dòng Kho.',409);return reply(await decideDailyWithdrawalFromSheet(db,{...b,withdrawalId:p.withdrawalRequest.id},{verified:true,spreadsheetId:config.spreadsheetId,receiptId:key}));}
+ if(p.cancelled||p.voided)fail('Phiếu đã hủy.',409);
  const now=new Date().toISOString();let next;
+ if(b.action==='withdrawal-notice-ack'){
+  const last=p.sheetSync.lastWithdrawalNotice;
+  if(last?.id===b.commandId&&last.revision===Number(b.commandRevision))return reply({ok:true,duplicate:true,pending:last.status==='pending'});
+  const command=p.sheetSync.command,request=command?await read(db,'production_warehouse_withdrawal',command.id):null;
+  if(!request||!['pending','rejected'].includes(request.status)||request.status!==b.markedStatus||request.receiptId!==key||command.id!==b.commandId||command.revision!==Number(b.commandRevision)||request.version!==command.revision)fail('Thông báo thu hồi đã đổi; tải đúng phiên bản lệnh trước khi ghi nhận.',409);
+  if(b.originalRowRetained!==true||b.noQuantityChange!==true||Number(b.originalProposedQuantity)!==Number(p.proposedQuantity)||Number(b.originalReceivedQuantity)!==Number(p.receivedQuantity)||!Number.isSafeInteger(b.sheetRow)||b.sheetRow<2)fail('Chưa đủ căn cứ giữ nguyên dòng và lượng kho.',422);
+  const report=await read(db,'production_report',p.reportId),latest=productionTime(report)||p.sourceCompletedAt||'',notice={id:command.id,revision:command.revision,status:request.status,at:now};
+  next={...p,sheetSync:{...p.sheetSync,status:request.status==='pending'?'waiting-warehouse':'sent',command:request.status==='pending'?command:null,lastWithdrawalNotice:notice,exportedCompletedAt:latest,at:now,error:''}};
+  const result=await db.batch([db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='warehouse_in' AND record_key=? AND payload=?").bind(JSON.stringify(next),'Google Sheet kho',now,key,stored.payload),db.prepare("INSERT INTO app_records SELECT 'warehouse_sheet_audit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=? AND payload=?)").bind(crypto.randomUUID(),JSON.stringify({action:b.action,receiptId:key,withdrawalId:command.id,revision:command.revision,status:request.status,at:now}),'Google Sheet kho',now,key,JSON.stringify(next))]);
+  if(result[0].meta.changes!==1)fail('Lệnh thu hồi vừa đổi; chưa ghi nhận thông báo cũ.',409);return reply({ok:true,pending:request.status==='pending'});
+ }
+
+ if(b.action==='ack'&&p.sheetSync.command)fail('Phiếu có lệnh điều chỉnh/thu hồi đang chờ. Cần mã đồng bộ hỗ trợ đúng lệnh; chưa xác nhận hoàn tất.',409);
  if(b.action==='ack'||b.action==='error'){
-  const report=await read(db,'production_report',p.reportId),latest=report?.completedAt||p.sourceCompletedAt||'';
+  const report=await read(db,'production_report',p.reportId),latest=productionTime(report)||p.sourceCompletedAt||'';
   if(b.action==='ack'&&p.sheetSync.correctionRevision&&(b.correctionRevision!==p.sheetSync.correctionRevision||Number(b.proposedQuantity)!==Number(p.proposedQuantity)))fail('Phiếu đã điều chỉnh số lượng. Cập nhật mã đồng bộ kho và tải lại phiếu mới trước khi xác nhận đồng bộ.',409);
   if(b.action==='ack'&&b.sourceCompletedAt!==latest)fail('Ngày xuất trạm vừa thay đổi. Hệ thống sẽ cập nhật lại.',409);
   next={...p,...(b.action==='ack'?{sourceCompletedAt:latest}:{}),sheetSync:{...p.sheetSync,...(b.action==='ack'?{exportedCompletedAt:latest,exportedCorrectionRevision:p.sheetSync.correctionRevision||null}:{}),status:b.action==='ack'?'sent':'error',at:now,error:b.action==='error'?String(b.error||'Lỗi ghi Sheet').slice(0,1000):'',spreadsheetId:config.spreadsheetId}};
@@ -69,6 +91,7 @@ export async function sheetBridge(request,env){
   if((p.confirmation_status||p.status)!=='Chờ xác nhận')fail('Phiếu đã được xác nhận bằng thông tin khác. Cần đối chiếu trước khi sửa.',409);
   next={...p,receivedQuantity:qty,difference,differenceReason:reason,status:'Đã xác nhận',confirmation_status:'Đã xác nhận',confirmationStatus:'Đã xác nhận',confirmedAt:at,confirmedBy:by,confirmationBasis:'Kho xác nhận tại Google Sheet',sheetConfirmationHash:eventHash,updatedAt:now,updatedBy:by,sheetSync:{...p.sheetSync,status:'sent',at:now,error:''}};
  }else fail('Thao tác không hợp lệ');
+ if(b.action==='confirm'&&p.pendingCorrection?.status==='pending')return reply(await reconcilePendingReceiptConfirmation(db,{receiptId:key,receipt:next,expectedReceiptRaw:stored.payload},{verified:true,spreadsheetId:config.spreadsheetId}));
  const result=await db.batch([
  db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='warehouse_in' AND record_key=? AND payload=?").bind(JSON.stringify(next),next.updatedBy||'Google Sheet kho',now,key,stored.payload),
  db.prepare("INSERT INTO app_records SELECT 'warehouse_sheet_audit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=? AND payload=?)").bind(crypto.randomUUID(),JSON.stringify({action:b.action,receiptId:key,at:now,confirmedBy:next.confirmedBy,receivedQuantity:next.receivedQuantity,error:next.sheetSync.error}),next.updatedBy||'Google Sheet kho',now,key,JSON.stringify(next))]);
@@ -89,10 +112,10 @@ async function sheetBackfill(db,config,body,actor,host){
  const rows=(await db.prepare("SELECT w.record_key,w.payload,r.payload AS report_payload FROM app_records w JOIN app_records r ON r.entity='production_report' AND r.record_key=json_extract(w.payload,'$.reportId') WHERE w.entity='warehouse_in' AND json_extract(w.payload,'$.source')='Sản xuất' ORDER BY w.record_key").all()).results;
  const eligible=[],blocked=[];
  for(const row of rows){
- const p=JSON.parse(row.payload),report=JSON.parse(row.report_payload),day=receiptDay(report.completedAt);
+ const p=JSON.parse(row.payload),report=JSON.parse(row.report_payload),day=receiptDay(productionTime(report));
  if(day<from||day>to||p._deleted||p.cancelled||p.voided||report._deleted||report.cancelled||report.voided)continue;
  if(report.reviewStatus!=='Đã xác nhận'||!Number.isFinite(Number(p.proposedQuantity))||Number(p.proposedQuantity)<=0||Number(p.proposedQuantity)!==Number(report.approvedQuantity??report.reportedQuantity)||report.sku!==p.sku){blocked.push({id:row.record_key,lsxCode:p.lsxCode,reason:'Báo công chưa xác nhận hoặc số lượng/SKU không khớp phiếu.'});continue;}
- eligible.push({...row,p,completedAt:report.completedAt,day});
+ eligible.push({...row,p,completedAt:productionTime(report),day});
  }
  if(eligible.length>500)fail('Có quá 500 phiếu. Chọn khoảng ngày ngắn hơn.');
  const revision=await sha(JSON.stringify([config.spreadsheetId,from,to,eligible.map(r=>[r.record_key,r.payload,r.report_payload])]));

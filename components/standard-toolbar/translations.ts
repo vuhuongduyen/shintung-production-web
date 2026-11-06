@@ -255,3 +255,7 @@ Object.assign(chinese,{'Phân bổ lại NV?':'重新分配員工？'});
 
 Object.assign(english,{'Tách đơn':'Split order'});
 Object.assign(chinese,{'Tách đơn':'拆單'});
+
+// The same table supports current-only legacy, preserved legacy and dated report bases.
+Object.assign(english,{"Σ (SL đã xác nhận × Giờ công chuẩn/SP theo căn cứ của từng dòng). Không phải giờ thực tế báo công.":"Σ (Confirmed output × Standard hours/unit using the basis shown for each row). Not actual reported labor hours."});
+Object.assign(chinese,{"Σ (SL đã xác nhận × Giờ công chuẩn/SP theo căn cứ của từng dòng). Không phải giờ thực tế báo công.":"Σ（已確認產量 × 各列所列依據的每件標準工時）。並非實際報工工時。"});

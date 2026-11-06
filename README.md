@@ -6,6 +6,8 @@ Folder này là nguồn mã chính thức trong giai đoạn phát triển. Khô
 
 **Quy trình làm việc cố định:** đọc [PR → link test full ONSPA → nghiệm thu → merge](docs/ONSPA-DEVELOPMENT-WORKFLOW.md) cùng `AGENTS.md` trước mỗi thay đổi. Tài liệu này quy định các điểm kiểm chứng và bàn giao; không thay thế quyền thực hiện từng bước của người dùng.
 
+**Báo sản lượng ngày (đang phát triển, chưa bật production):** [hợp đồng và inventory](docs/DAILY-OUTPUT-EFFECTIVE-DATES-CONTRACT.md), [trạng thái/kiểm thử/giới hạn](docs/DAILY-OUTPUT-IMPLEMENTATION-STATUS.md).
+
 ## Môi trường
 
 - Windows 10/11, macOS hoặc Linux; Node.js **22.13 trở lên** kèm npm (đã kiểm tra Node 24).

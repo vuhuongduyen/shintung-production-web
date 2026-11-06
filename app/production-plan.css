@@ -48,3 +48,10 @@ html body .pp-workspace .pp-plan-grid :is(input:not([type=checkbox]),select) {
   border-color:#d6dfd7; border-radius:3px; background:#fff;
 }
 .pp-workspace .pp-backlog-open{font:inherit;padding:3px 8px;border:1px solid #86b9a4;border-radius:5px;background:#edf7f2;color:#14604d;cursor:pointer;margin-left:6px}.pp-load-card dl{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.pp-load-card dl>div{border:1px solid #e0e7e1;padding:6px;border-radius:4px}.pp-load-card dl>div:nth-child(2),.pp-load-card dl>div:nth-child(3){background:#fff5df}
+
+
+/* The note stays in the hours header, closed initially; no extra banner row. */
+.pp-labor-note { position: relative; text-align: left; }
+.pp-labor-note > summary { cursor: pointer; min-height: 32px; display: list-item; list-style-position: inside; white-space: nowrap; }
+.pp-labor-note > summary:focus-visible { outline: 2px solid #177451; outline-offset: 2px; }
+.pp-labor-note > p { position: absolute; top: 100%; left: 0; z-index: 2; width: min(300px, 70vw); max-height: 220px; overflow: auto; white-space: normal; margin: 0; padding: 10px; background: #fffbea; color: #263d30; border: 1px solid #a6b9a8; box-shadow: 0 3px 8px #0002; font-weight: normal; }

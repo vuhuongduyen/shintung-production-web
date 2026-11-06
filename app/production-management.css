@@ -452,3 +452,22 @@ html body .app-shell .payroll-help-dialog .payroll-rule-section :is(th,td){width
 .production-labor-overlay .production-labor-table .production-subtext{display:block;font-size:14px;line-height:1.4;margin-top:3px}
 .production-labor-overlay .production-labor-table th{background:#edf3ed!important;color:#174c30!important}
 .production-labor-overlay button{border:1px solid #9db6a2;border-radius:3px;padding:5px 8px;background:#f4f8f4;color:#174c30}
+
+/* Radix/Tailwind supplies individual translate. Keep a single centering offset;
+   plain legacy .production-modal elements still use their original transform. */
+.production-modal[data-slot="dialog-content"]{translate:-50% -50%;transform:none}
+
+/* Daily output uses the established work table/actions/mobile cards. */
+html body .app-shell .production-work-screen .daily-output-table .work-completed-qty{width:8em;min-width:7em;max-width:8em;white-space:normal}
+html body .app-shell .production-work-screen .daily-output-table .work-product{white-space:normal;overflow-wrap:anywhere}
+.report-day-table .daily-report-table{min-width:0!important;width:100%;table-layout:fixed}
+.report-day-table .daily-report-table th,.report-day-table .daily-report-table td{white-space:normal!important;overflow-wrap:anywhere}
+.daily-report-table th:first-child{width:24%}.daily-report-table th:nth-child(2){width:32%}.daily-report-table th:nth-child(3){width:20%}
+.daily-report-details summary{cursor:pointer;min-height:44px;display:list-item;list-style-position:inside}
+.daily-report-details dl{margin:.25rem 0}.daily-report-details dt{font-weight:700}.daily-report-details dd{margin:0 0 .5rem;overflow-wrap:anywhere}
+
+.production-time-correction-dialog .daily-correction-table{width:100%;min-width:0!important;table-layout:fixed}
+.production-time-correction-dialog .daily-correction-table :is(th,td){white-space:normal!important;overflow-wrap:anywhere}
+
+/* Hidden accessible labels stay anchored inside their own scrolled cell. */
+.daily-output-board [data-feedback-button],.production-correction-orders-table [data-feedback-button],.production-time-correction-dialog [data-feedback-button]{position:relative}

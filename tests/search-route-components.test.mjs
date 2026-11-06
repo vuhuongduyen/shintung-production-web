@@ -308,7 +308,8 @@ for(const method of ['enter','click']) {
           assert.match(body(view.host),/LSX-ALPHA/);await search(view.host,dates[1],method);
           assert.doesNotMatch(body(view.host),/LSX-ALPHA/);assert.match(body(view.host),/LSX-BETA/);
         }
-        assert.deepEqual(requests,['/api/production-standards'],'loaded standards only; lookup must not refetch or write');
+        // Labor history derives from events/roster; it does not use product labor rates.
+        assert.deepEqual(requests,[],'labor lookup must neither fetch unused standards nor refetch or write');
       } finally {await view.close();}
     });
   }

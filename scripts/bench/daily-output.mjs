@@ -1,0 +1,17 @@
+// Explicit synthetic local-only benchmark. Never opens configured persistent DB.
+import {performance} from 'node:perf_hooks';import {dailyOutputTotals,dailyOutputTotalsIndex} from '../../lib/production-daily-output.mjs';
+import {dailyFixture,actor} from '../../tests/helpers/daily-output-fixture.mjs';import {mutateProductionWorkflow,readProductionWorkflow} from '../local/production-workflow.mjs';import assert from 'node:assert/strict';
+const timing=async fn=>{const start=performance.now();const value=await fn();return {ms:Number((performance.now()-start).toFixed(3)),value};};
+const orders=Array.from({length:500},(_,i)=>({id:`SYNTHETIC-${i}`,lsxCode:`SYNTHETIC-${i}`,planId:`TEST-PLAN-${i}`,line:'A',lsxQty:1000}));
+const reports=Array.from({length:10000},(_,i)=>({id:`TEST-REPORT-${i}`,transitId:orders[i%orders.length].id,kind:'completion',productionDate:'2026-11-02',reportedQuantity:1,reviewStatus:i%2?'Chờ kiểm tra':'Đã xác nhận',approvedQuantity:i%2?0:1}));
+const naive=[],indexed=[];for(let i=0;i<6;i++){let t=await timing(()=>new Map(orders.map(o=>[o.id,dailyOutputTotals(o,reports)])));if(i)naive.push(t.ms);const expected=t.value;t=await timing(()=>dailyOutputTotalsIndex(orders,reports));if(i)indexed.push(t.ms);assert.deepEqual(t.value,expected);}
+console.log(JSON.stringify({kind:'UI aggregate pure helper; no rendering/network',orders:500,reports:10000,warmup:1,samples:5,beforeMs:naive,afterMs:indexed}));
+await dailyFixture(async c=>{
+ // Synthetic volume in unrelated orders must not require deserializing full workflow.
+ const entries=[...orders.map(o=>['in_transit',o.id,{...o,sku:'SYNTHETIC-SKU',syncStatus:'ĐÃ ĐỒNG BỘ',lsxOpenedAt:'2026-11-01'}]),...reports.map(r=>['production_report',r.id,{...r,line:'A',reportingModel:'daily-finished-v1',quantityOnly:true,legacyCompletedBaseline:0,rateStatus:'missing',rateBasis:null}])];
+ for(let i=0;i<entries.length;i+=200)await c.db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT json_extract(value,'$[0]'),json_extract(value,'$[1]'),json_extract(value,'$[2]'),'SYNTHETIC','2026-11-01' FROM json_each(?)").bind(JSON.stringify(entries.slice(i,i+200))).run();
+ const counts=await c.db.prepare('SELECT entity,count(*) AS n FROM app_records GROUP BY entity').all(),samples=[],replays=[];
+ for(let i=0;i<5;i++){let reads=0,batches=0;const observed=new Proxy(c.db,{get(target,key){if(key==='prepare')return sql=>{if(/^SELECT/i.test(sql))reads++;return target.prepare(sql);};if(key==='batch')return async items=>{batches++;return target.batch(items);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});const body=c.body({quantity:1,productionLocalDateTime:'2026-11-02T09:00'});let t=await timing(()=>mutateProductionWorkflow(observed,body,actor));samples.push({ms:t.ms,selects:reads,batches});t=await timing(()=>mutateProductionWorkflow(observed,body,actor));assert.equal(t.value.replayed,true);replays.push(t.ms);}
+ const full=await timing(()=>readProductionWorkflow(c.db,actor,[],{includeDerivedHours:false}));assert.equal(full.value.orders.length,502);
+ console.log(JSON.stringify({kind:'Miniflare local D1; direct handler, excludes HTTP/browser/audit wrapper',node:process.version,records:counts.results,dailySave:samples,replayMs:replays,fullReadWithoutDerivedHoursMs:full.ms,heapUsedMiB:Number((process.memoryUsage().heapUsed/1048576).toFixed(2)),limits:'Wall time and Node heap only; not production CPU or Worker peak memory. Full read is context, not equivalent save baseline.'}));
+});

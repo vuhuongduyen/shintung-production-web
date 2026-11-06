@@ -63,3 +63,7 @@ test('output quantities stay per event, accumulate before filtering and exclude 
  assert.equal(timeJournalQuantities(events,[]).at(-1).cumulativeQuantity,null);
  assert.equal(timeJournalQuantities(events,reports.map(r=>({...r,reportedQuantity:0}))).at(-1).cumulativeQuantity,0);
 });
+
+test('withdrawal journal preserves each historical phase instead of claiming all events are applied or completed',()=>{for(const [kind,phase,status] of [['daily-output-withdrawal-request','pending','Chờ Kho xử lý thu hồi'],['daily-output-withdrawal-decision','approved-awaiting-sheet','Kho đồng ý, chờ đối soát Sheet'],['daily-output-withdrawal-decision','rejected','Kho từ chối thu hồi'],['daily-output-withdrawal-completed','completed','Đã thu hồi']]){const entry={id:kind+phase,kind,reportingModel:'daily-finished-v1',quantityOnly:true,after:{status:phase}},before=JSON.stringify(entry);assert.equal(journalContext(entry,[]).status,status);assert.equal(JSON.stringify(entry),before);}});
+
+test('pending pre-receipt correction is visible as waiting and a raced warehouse receipt is not shown as an applied edit',()=>{assert.equal(journalContext({kind:'daily-output-pending-request'},[]).status,'Chờ đối soát sửa/hủy');assert.equal(journalContext({kind:'daily-output-pending-conflict'},[]).status,'Kho đã nhận: cần thu hồi trước khi sửa');assert.equal(journalContext({kind:'completion',reviewStatus:'Đã xác nhận',pendingCorrection:{status:'pending'}},[]).status,'Chờ đối soát sửa/hủy');});

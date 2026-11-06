@@ -23,3 +23,22 @@ Nếu SX điều chỉnh ngày xuất trạm hợp lệ: lần đồng bộ ti�
 
 ## Sửa kết nối 24/10/2026
 Nếu đã nhập URL/khóa nhưng cài đặt báo lỗi: thay toàn bộ WEB.gs bằng ONSPA_KHO_WEB.txt mới, lưu rồi chạy ONSPA_khoiPhucKetNoi. Hàm dùng lại khóa đã lưu, kiểm tra kết nối trước khi tạo lịch mỗi phút; không nhập hoặc xác nhận phiếu khi kiểm tra. Không tạo khóa mới chỉ để thử lại. Nếu TOKEN_INVALID, chạy ONSPA_caiDatKetNoi nhập khóa hiện hành. NOT_CONFIGURED: kiểm tra URL; DISABLED: kiểm tra cấu hình Admin.
+
+
+## Source thu hồi sản lượng ngày — chưa triển khai
+
+Phần dưới là hợp đồng bản phát triển PR #7, không phải hướng dẫn chạy ngay trên kho thật. Chưa đủ nghiệm thu: giao diện QLSX và sửa/hủy khi kho chưa nhận còn đang hoàn thiện; chưa tự kiểm browser hoặc recalculate thực tế Google Sheets. Không cấp lại khóa hay tạo kết nối chỉ để thử source này.
+
+- Kho chưa xác nhận: QLSX sửa/hủy theo luồng trực tiếp; không bắt Kho duyệt thu hồi. Kho đã xác nhận: QLSX yêu cầu, Kho quyết định, sau đó mới vô hiệu hóa dòng và đối soát kết quả.
+- Source gồm ba file `KHO_TP_XAC_NHAN.gs`, `ONSPA_KHO_WEB.gs` (TXT cùng nội dung) và helper `ONSPA_STOCK_FORMULAS.gs`. Thêm các hàm menu vào onOpen hiện có; không tạo onOpen thứ hai. Việc cập nhật Apps Script/công thức thật cần bước triển khai được duyệt riêng.
+- Công thức tồn phải loại trạng thái M `ĐÃ HỦY THEO YÊU CẦU SX` và V `KHO ĐỒNG Ý HỦY`. Helper hiện chỉ lập kế hoạch chuyển mẫu hỗ trợ, không tự ghi công thức. Bridge kiểm công thức NHAP tại SKU bị ảnh hưởng và chặn nếu chưa loại trừ, không công nhận chỉ tô màu/ẩn dòng là đã thu hồi.
+- Chọn đúng dòng NHAP, dùng menu Đồng ý/Từ chối thu hồi. Cần email Google hiện hành và quyền sửa dòng; không dùng tài khoản chủ script thay người quyết định. Đọc đối chiếu và xác nhận trước khi gửi.
+- Giữ nguyên dòng, lượng đề xuất E, lượng nhận N, người/thời điểm nhận R/S. Trạng thái và lịch sử quyết định được ghi riêng; ghi chú W giữ mã đối soát cùng ghi chú cũ. Không xóa dòng, đặt lượng bằng 0 hoặc tạo dòng thay thế cho dòng gốc bị mất.
+- Web chỉ coi thu hồi hoàn tất sau bằng chứng đúng phiên bản từ Sheet. Trong lúc chờ, số lượng cũ còn hiệu lực. Lỗi hoặc mất phản hồi giữ mã lượt cũ; thử lại không tạo quyết định/thu hồi thứ hai. Nếu ID trùng, dữ liệu gốc khác, thiếu dòng/công thức, xử lý đối soát riêng, không sửa tay để vượt kiểm tra.
+- TEST phải dùng Sheet sao chép cô lập và khóa TEST hiện có. Kiểm cả nhận thiếu/0, từ chối, quyền, mất phản hồi sau ghi, di chuyển dòng, công thức chưa cập nhật và dữ liệu thay đổi đồng thời trước mọi nghiệm thu thật.
+
+### Source sửa/hủy trước Kho nhận (PR #7, chưa triển khai)
+
+QLSX dùng Sửa / hủy trước Kho nhận; không dùng menu thu hồi của Kho. Web giữ lượng cũ và báo chờ đối soát, Sheet kiểm đúng dòng chưa có N/R/S rồi áp đề xuất/ngày hoặc vô hiệu hủy. Ghi chú W lưu marker và lượng/ngày gốc; không xóa ghi chú này khi còn chờ. Kho chưa được xác nhận nhận hàng nếu marker chưa acknowledged. Nếu đã nhận trước, script gửi sự thật nhận hàng về Web và không áp thay đổi đề xuất; sau đó dùng quy trình thu hồi.
+
+Cần cập nhật cả KHO_TP_XAC_NHAN, ONSPA_KHO_WEB và helper công thức bằng một kế hoạch được nghiệm thu. Thiếu helper thì chặn, không tự bỏ guard. Phiếu gốc chưa xuất lần đầu: chờ đồng bộ rồi sửa/hủy; không tạo dòng thay thế để vượt lỗi. ACK từ dòng luôn kiểm ID duy nhất toàn cột, kể cả retry khi Web không còn trả lệnh trong pull.

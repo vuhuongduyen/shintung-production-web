@@ -1,4 +1,5 @@
 "use client";
+import {isDailyOutput} from '../lib/production-report-model.mjs';
 import {staffTransferDetails} from '../lib/production-staff-transfer-detail.mjs';
 import {DataTable} from './onspa-ui/DataTable';
 import {DataCell} from './onspa-ui/DataCell';
@@ -18,7 +19,8 @@ const kinds:Record<string,string>={"attendance-cancel":"Hủy biến động nh�
 export default function ProductionDetailFields({detail:input,employees,orders,reports=[],events=[]}:{detail:Row;employees:Row[];orders:Row[];reports?:Row[];events?:Row[]}){
  const {detail,source,report,event,destination,affectedOrders}=productionDetailContext(input,orders,reports,events);
  const transfers=staffTransferDetails(events).details.get(detail.id)||[];
- const operational=Boolean(detail.kind&&!['schedule','capacity','hours-adjustment'].includes(detail.kind));
+ const daily=isDailyOutput(detail)||isDailyOutput(report);
+ const operational=!daily&&Boolean(detail.kind&&!['schedule','capacity','hours-adjustment'].includes(detail.kind));
  const section=(heading:string,fields:Array<[string,any]>)=><section className="production-business-detail"><h3>{heading}</h3><dl>{fields.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value||value===0?value:'—'}</dd></div>)}</dl></section>;
  const people=eventEmployees(detail,employees);
  const changes=productionChangeFields(detail.before,detail.after,orders,employees);
@@ -31,9 +33,10 @@ export default function ProductionDetailFields({detail:input,employees,orders,re
  {operational&&section('Nội dung ghi nhận',[
  ['Thời điểm hiệu lực',datetime(detail.effectiveAt||detail.startedAt)],['Đến thời điểm',detail.openArrival?'Chưa đến':datetime(detail.endsAt||detail.completedAt)],...(staffingKinds.includes(detail.kind)?[[['complete','completion'].includes(detail.kind)?'Số người được phân công':'Số người',numeric(detail.count??event?.count)] as [string,any]]:[]),...(['start','transfer','add','reduce','absence','line-absence','attendance-override','complete','completion'].includes(detail.kind)?[['Nhân viên',people.length?people.map(person=>person.name?`${person.name} (${person.id})`:person.id).join(', '):'Chưa ghi nhận nhân viên'] as [string,any]]:[]),...(detail.destinationId?[['Chuyển đến lệnh',destination?.lsxCode] as [string,any],['Line chuyển đến',detail.destinationLine||destination?.line] as [string,any]]:[]),...(detail.affectedOrderIds?.length?[['LSX chịu ảnh hưởng',affectedOrders.map((o:Row)=>o.lsxCode).join(', ')] as [string,any]]:[]),...(detail.absenceType?[['Loại biến động',detail.absenceType] as [string,any]]:[]),...(['complete','completion','report-approval','report-rejection','report-correction','report-cancel'].includes(detail.kind)?[['Sản lượng lần này',numeric(detail.reportedQuantity??report?.reportedQuantity)] as [string,any]]:[]),['Tình trạng duyệt',detail.reviewStatus||report?.reviewStatus|| (detail.approved===false?'Chờ duyệt giờ':detail.approved===true?'Đã duyệt giờ':'—')],['Nội dung / lý do',detail.reason||detail.note]])}
  {transfers.length>0&&<section className="production-business-detail"><h3>Chuyển nhân viên trong thao tác này</h3>{transfers.map((r:Row)=><p key={`${r.employeeId}:${r.fromEventId}:${r.toEventId}`}><strong>{employees.find(p=>String(p.id)===r.employeeId)?.name||r.employeeId}</strong> ({r.employeeId})<br/>Từ lệnh {orders.find(o=>o.id===r.fromOrderId)?.lsxCode||r.fromOrder||'Chưa ghi nhận'} · {r.fromStage||'Chưa ghi công đoạn'} → Lệnh {orders.find(o=>o.id===r.toOrderId)?.lsxCode||r.toOrder||'Chưa ghi nhận'} · {r.toStage||'Chưa ghi công đoạn'}<br/>{datetime(r.at)}{detail.voided?' · Thao tác đã hủy':''}</p>)}</section>}
- {report&&section('Giờ công và xác nhận',[
+ {daily&&report&&section('Sản lượng và xác nhận',[['Ngày giờ sản xuất',report.productionAt?datetime(report.productionAt):date(report.productionDate)],['Sản lượng phát sinh',numeric(report.reportedQuantity)],['Sản lượng đã duyệt',numeric(report.approvedQuantity)],['Trạng thái',report.reviewStatus],['Kho',report.warehouseStatus],['Định mức hiệu lực',report.rateStatus==='resolved'?numeric(report.rateBasis?.value):'Thiếu căn cứ định mức: chưa tính tiền'],['Lý do trễ',report.delayReason],['Người xác nhận',productionConfirmationActorId(report)],['Lúc xác nhận',report.reviewedAt?datetime(report.reviewedAt):'—']])}
+ {report&&!daily&&section('Giờ công và xác nhận',[
  ['Ngày sản lượng',date(report.productionDate||report.completedAt)],['Bắt đầu lần báo công',datetime(report.startedAt)],['Kết thúc lần báo công',datetime(report.completedAt)],['Giờ HC',numeric(report.hours?.hc)],['Giờ TC',numeric(report.hours?.ot)],['Tổng giờ công',numeric(report.hours?.total)],['Sản lượng đã duyệt lần này',numeric(report.approvedQuantity)],['Trạng thái báo công',report.reviewStatus],['Trạng thái nhập kho',report.warehouseStatus],['Lý do trễ',report.delayReason],['Người xác nhận',report.reviewStatus==='Đã xác nhận'?(productionConfirmationActorId(report)||'Chưa ghi nhận'):'—'],['Lúc xác nhận',report.reviewStatus==='Đã xác nhận'?datetime(report.reviewedAt||report.confirmationBasis?.at):'—'],['Lý do trả báo công',report.rejectionReason]])}
- {report&&<ProductionStaffing hours={report.hours} employees={employees}/> }
+ {report&&!daily&&<ProductionStaffing hours={report.hours} employees={employees}/> }
  {report&&report.hours?.perEmployee?.length>0&&<section className="production-business-detail"><h3>Giờ công theo nhân viên</h3>{report.hours.perEmployee.map((p:Row)=><p key={p.id}>{employees.find(e=>e.id===p.id)?.name||p.id} ({p.id}) · HC {numeric(p.hc)} · TC {numeric(p.ot)} · Tổng {numeric(p.total)}</p>)}</section>}
 
  {report?.laborNotes?.length>0&&<section className="production-business-detail"><h3>Ghi chú giờ công thực tế</h3>{report.laborNotes.map((note:Row)=><p key={note.eventId}>{note.text}</p>)}</section>}

@@ -15,13 +15,13 @@ const {ToolbarPermissions}=await vite.ssrLoadModule('/components/standard-toolba
 const sync=await vite.ssrLoadModule('/lib/data-sync.ts');
 const originalFetch=globalThis.fetch,OriginalChannel=globalThis.BroadcastChannel,channels=new Set();
 if(OriginalChannel)globalThis.BroadcastChannel=class extends OriginalChannel{constructor(name){super(name);channels.add(this);}};
-const week='2026-11-02';let rows,writes,release,planReads,holdNextRead,releaseRead,capacityRows;
+const week='2026-11-02';let rows,writes,release,planReads,holdNextRead,releaseRead,capacityRows,effectivePlanning,laborRows;
 const original={id:'ROOT-SYNTHETIC',week,sku:'SYNTHETIC-SKU',name:'Synthetic product',line:'A',start:week,end:week,plan:100,suggested:100,laborHour:0.1,status:'DỰ KIẾN',type:'TUẦN CHÍNH',priority:'THƯỜNG',planId:'SHARED-PLAN',sourceIds:[]};
-beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];release=null;planReads=0;holdNextRead=false;releaseRead=null;capacityRows=[];globalThis.fetch=async(input,init={})=>{
+beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];release=null;planReads=0;holdNextRead=false;releaseRead=null;capacityRows=[];effectivePlanning=false;laborRows=[];globalThis.fetch=async(input,init={})=>{
  const url=new URL(String(input),'https://synthetic.test');
  if((init.method||'GET')==='GET'){
   if(url.pathname==='/api/capacity')return Response.json({requests:[]});
-  assert.equal(url.pathname,'/api/production-plan');if(url.searchParams.has('capacityOnly'))return Response.json({capacity:capacityRows});planReads++;const snapshot=structuredClone({revision:rows.length,rows,sources:[],capacity:capacityRows,transit:[],audit:[],warnings:[],canReopen:false});if(holdNextRead){holdNextRead=false;return await new Promise(resolve=>releaseRead=()=>resolve(Response.json(snapshot)));}return Response.json(snapshot);
+  assert.equal(url.pathname,'/api/production-plan');if(url.searchParams.has('capacityOnly'))return Response.json({capacity:capacityRows});planReads++;const snapshot=structuredClone({revision:rows.length,rows,sources:[],capacity:capacityRows,transit:[],audit:[],warnings:[],canReopen:false,effectivePlanning,labor:laborRows});if(holdNextRead){holdNextRead=false;return await new Promise(resolve=>releaseRead=()=>resolve(Response.json(snapshot)));}return Response.json(snapshot);
  }
  assert.equal(url.pathname,'/api/production-plan');const body=JSON.parse(init.body);writes.push(body);assert.equal(body.action,'split');assert.deepEqual(body.ids,[original.id]);
  rows=[{...original,planGroupId:original.id,groupPlanId:original.planId},{...original,id:'CHILD-SYNTHETIC',planGroupId:original.id,groupPlanId:original.planId,splitFromId:original.id,suggested:null,plan:null}];
@@ -30,7 +30,7 @@ beforeEach(()=>{sync.clearClientReads('session');rows=[{...original}];writes=[];
  return Response.json({revision:2,added:1,existing:0,updated:0,rows:committedRows});
 };});
 after(async()=>{globalThis.fetch=originalFetch;for(const c of channels)c.close();globalThis.BroadcastChannel=OriginalChannel;await vite.close();dom.window.close();});
-async function mount(allowed=true){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(el(ToolbarPermissions.Provider,{value:(_name,label)=>label!=='Tách đơn'||allowed},el(ProductionPlan,{initialWeek:week}))));return{host,async close(){await act(async()=>root.unmount());host.remove();}};}
+async function mount(allowed=true,props={}){const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(el(ToolbarPermissions.Provider,{value:(_name,label)=>label!=='Tách đơn'||allowed},el(ProductionPlan,{initialWeek:week,...props}))));return{host,async close(){await act(async()=>root.unmount());host.remove();}};}
 const button=(host,text)=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
 async function click(node){assert.ok(node);await act(async()=>node.click());}
 test('single selected editable row splits once under repeated clicks; blank child/suggestion/details stay distinct',async()=>{
@@ -94,4 +94,26 @@ test('Capacity notice is compact for actionable drafts and disappears without ad
   assert.equal(view.host.querySelector('[data-plan-notices]'),slot);assert.equal(view.host.querySelector('.pp-plan-grid'),table);assert.equal(slot.querySelector('button').style.visibility,'hidden');assert.equal(view.host.querySelectorAll('.pp-alert').length,0);
   capacityRows=[];rows=[{...original,status:'HỦY'}];await act(async()=>sync.announceDataChange('production_plan'));assert.equal(slot.querySelector('button').style.visibility,'hidden','a cancelled-only list does not warn about closing new plans');assert.equal(writes.length,0);
  }finally{await view.close();}
+});
+
+test('planned hours are plain text and a collapsed header arrow explains the close-day rule without writes',async()=>{
+ effectivePlanning=true;laborRows=[{sku:original.sku,effectiveVersions:[{id:'SYNTHETIC-RATE-1',status:'published',value:.1,validFrom:'2026-11-01'}]}];
+ rows=[{...original,plan:200,laborHour:.1,planLaborBasis:{status:'resolved',value:.1,businessDate:'2026-11-03'}}];
+ const view=await mount();try{
+  const table=view.host.querySelector('.pp-plan-grid'),cell=table.querySelector('tbody>tr').cells[7];assert.match(cell.textContent,/20/);assert.equal(cell.querySelector('button'),null);assert.equal(view.host.querySelector('[aria-label="Xem công thức SYNTHETIC-SKU"]'),null);
+  const note=table.querySelector('thead details.pp-labor-note'),summary=note.querySelector('summary');assert.ok(note);assert.equal(note.open,false);assert.equal(summary.textContent,'Giờ công');summary.focus();await click(summary);assert.equal(note.open,true);assert.match(note.textContent,/ngày chốt/);assert.match(note.textContent,/Không bắt tách/);assert.match(note.textContent,/ngày hoàn thành/);await click(summary);assert.equal(note.open,false);assert.equal(document.activeElement,summary);assert.equal(view.host.querySelector('[role=dialog]'),null);assert.equal(writes.length,0);
+  await click(button(view.host,'Chi tiết'));const detail=view.host.querySelector('[role=dialog]');assert.ok(detail);assert.doesNotMatch(detail.textContent,/Tách đơn và nhập lượng/);await click(button(detail,'Đóng'));assert.equal(writes.length,0);
+ }finally{await view.close();}
+});
+
+
+test('labor note belongs only to the Plan hours header, never the tracking Start column, in every existing language',async()=>{
+ for(const language of ['vi','zh','en'])for(const tracking of [false,true]){
+  sync.clearClientReads('session');const view=await mount(true,{language,tracking});try{
+   const table=view.host.querySelector('.pp-table table'),headers=[...table.querySelectorAll('thead th')],notes=table.querySelectorAll('thead .pp-labor-note');
+   if(tracking){assert.equal(notes.length,0,'tracking has no hours column');assert.equal(headers.length,10);assert.equal(headers[6].textContent,language==='zh'?'開始':'Bắt đầu');assert.equal(headers[6].querySelector('details'),null);}
+   else{assert.equal(notes.length,1);assert.equal(headers.length,16);assert.equal(notes[0].closest('th'),headers[7]);assert.equal(notes[0].querySelector('summary').textContent,language==='zh'?'工時':'Giờ công');assert.equal(notes[0].open,false);}
+   assert.equal(writes.length,0);
+  }finally{await view.close();}
+ }
 });

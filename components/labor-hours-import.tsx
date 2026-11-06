@@ -1,4 +1,5 @@
 "use client";
+import {validBusinessDate} from '../lib/effective-dated-value.mjs';
 import {useRef,useState} from 'react';
 import {ACTION_FEEDBACK_EVENT} from '../lib/action-feedback';
 import {apiFetch} from '../lib/data-sync';
@@ -11,6 +12,7 @@ type PreviewRow={sku:string;laborHour:number;old?:RecordRow;status:string;guidan
 type Preview={rows:PreviewRow[];changes:PreviewRow[];unchanged:number;skipped:number;retained:number};
 export default function LaborHoursImport({masterSkus,onClose,onSaved}:{masterSkus:Master[];onClose:()=>void;onSaved:()=>Promise<void>}) {
   const [text,setText]=useState(''),[source,setSource]=useState(''),[preview,setPreview]=useState<Preview|null>(null);
+  const [effectiveFrom,setEffectiveFrom]=useState('');
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
   const lock=useRef(false);
   const fileInput=useRef<HTMLInputElement>(null);
@@ -66,14 +68,14 @@ export default function LaborHoursImport({masterSkus,onClose,onSaved}:{masterSku
     window.dispatchEvent(new CustomEvent(ACTION_FEEDBACK_EVENT,{detail:{message,kind:success?'success':'error',...(success?{onDismiss:onClose}:{})}}));
   }
   async function apply() {
-    if(lock.current||!preview?.changes.length)return;lock.current=true;setBusy(true);
+    if(lock.current||!preview?.changes.length)return;if(!validBusinessDate(effectiveFrom)){setMessage('Nhập ngày hiệu lực có căn cứ trước khi lưu.');return;}lock.current=true;setBusy(true);
     let saved=0;const failures:string[]=[];
     try {
       // Freeze the reviewed versions. The existing API checks permissions and CAS
       // for each row and writes its history/audit under the signed-in web user.
       for(const row of preview.changes) {
         setMessage(`Đang lưu ${saved+1}/${preview.changes.length}: ${row.sku}`);
-        const response=await apiFetch('/api/labor-hours',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:row.old?'edit':'create',sku:row.sku,laborHour:row.laborHour,expectedVersion:row.old?.version||0,note:row.old?.note||'',reason:`Đối chiếu PDF: ${source.trim()}`,source:'PDF'})});
+        const response=await apiFetch('/api/labor-hours',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:row.old?'edit':'create',sku:row.sku,laborHour:row.laborHour,expectedVersion:row.old?.version||0,note:row.old?.note||'',reason:`Đối chiếu PDF: ${source.trim()}`,source:'PDF',effectiveFrom})});
         const data=await response.json();
         if(!response.ok){
           if(response.status===401||response.status===403||response.status>=500)throw Error(`${row.sku}: ${data.error||'Không thể lưu.'}`);
@@ -100,6 +102,7 @@ export default function LaborHoursImport({masterSkus,onClose,onSaved}:{masterSku
     <p>Giờ công đã có sẽ cập nhật theo PDF; chưa có sẽ thêm mới nếu SKU Master hợp lệ. Mã không có trong PDF giữ nguyên trên web. Giá trị 0 trong PDF được ghi nhận; ô trống không thay thế dữ liệu.</p>
     <input ref={fileInput} type="file" accept=".pdf,application/pdf" hidden onChange={event=>void readPdf(event.target.files?.[0])}/>
     <StandardToolbar name="LaborHoursMaster" items={[toolbar.action({disabled:busy,onClick:()=>fileInput.current?.click()},'Chọn file PDF',true,'action')]}/>
+    <label>Ngày hiệu lực của mức trong PDF<input type="date" required disabled={busy} value={effectiveFrom} onChange={event=>setEffectiveFrom(event.target.value)}/></label><p>Chọn ngày có căn cứ áp dụng; không dùng ngày tải PDF để suy ra lịch sử.</p>
     {source&&<p>File đã chọn: <strong>{source}</strong></p>}
     {message&&<p role="status">{message}</p>}
     {preview&&<>

@@ -1,3 +1,4 @@
+import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
 import {stageValidationPayload} from './production-stage-read.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {transitStandardLeadtime} from '../../lib/transit-leadtime.mjs';
@@ -20,6 +21,45 @@ import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
 const fail = (message, status = 400, details = []) => {
   throw new PlanError(message, status, details);
 };
+const referenceSources=new WeakMap();
+// The journal belongs to the authenticated account, never the mutable display email.
+const creationOwner=actor=>text(actor?.userId||actor?.permissionLogin||actor?.login);
+const scopeConflict='Lượt tạo LSX đã thay đổi hoặc còn kết quả chưa đối soát. Hãy kiểm tra lượt trước, không tạo lượt mới để thử lại.';
+async function creationScope(db,actor,captured=undefined){
+  if(!actor?.login)fail('loginRequired',401);
+  const key=await recordRevision(['additional-lsx-scope',creationOwner(actor)]),row=captured===undefined?await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_scope' AND record_key=?").bind(key).first():captured===null?null:{payload:captured};
+  if(!row)return {key,raw:null,value:null,revision:null,pending:null,receiptRaw:null};
+  let value;try{value=JSON.parse(row.payload);}catch{fail(scopeConflict,409);}
+  if(!value||typeof value!=='object'||Array.isArray(value)||value.owner!==creationOwner(actor)||typeof value.actor!=='string'||typeof value.version!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value.version)||!Object.hasOwn(value,'pending'))fail(scopeConflict,409);
+  const revision=await recordRevision(row.payload);
+  if(value.pending===null)return {key,raw:row.payload,value,revision,pending:null,receiptRaw:null};
+  const p=value.pending;if(!p||typeof p.attemptKey!=='string'||! /^[a-f0-9]{64}$/.test(p.attemptKey)||typeof p.rowId!=='string'||typeof p.requestIdempotency!=='string'||await recordRevision([creationOwner(actor),p.requestIdempotency])!==p.attemptKey)fail(scopeConflict,409);
+  const receipt=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?").bind(p.attemptKey).first();
+  let saved;try{saved=JSON.parse(receipt?.payload);}catch{fail(scopeConflict,409);}
+  if(saved?.key!==p.attemptKey||saved.owner!==creationOwner(actor)||saved.actor!==value.actor||saved.fingerprint!==p.fingerprint||saved.result?.row?.id!==p.rowId||saved.result.row.id!==`lsx:${saved.result.row.planId}:${p.attemptKey}`||saved.result?.creationScopeRevision!==revision)fail(scopeConflict,409);
+  return {key,raw:row.payload,value,revision,receiptRaw:receipt.payload,pending:{rowId:p.rowId,requestIdempotency:p.requestIdempotency,planId:saved.result.row.planId,sku:saved.result.row.sku,line:saved.result.row.line,createdAt:saved.result.row.createdAt}};
+}
+export async function readAdditionalCreationScope(db,actor){const s=await creationScope(db,actor);return {revision:s.revision,pending:s.pending};}
+export async function acknowledgeAdditionalCreation(db,body,actor){
+  if(typeof body.expectedCreationRevision!=='string'||! /^[a-f0-9]{64}$/.test(body.expectedCreationRevision)||typeof body.id!=='string')fail('invalidSelection',422);
+  const s=await creationScope(db,actor),ackKey=`${s.key}:${body.expectedCreationRevision}`;
+  const already=async()=>{const row=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_ack' AND record_key=?").bind(ackKey).first();let value;try{value=JSON.parse(row?.payload);}catch{}return value?.owner===creationOwner(actor)&&value.rowId===body.id&&value.revision===body.expectedCreationRevision;};
+  if(s.revision!==body.expectedCreationRevision||s.pending?.rowId!==body.id){if(await already())return {ok:true,replayed:true};fail(scopeConflict,409);}
+  const now=new Date().toISOString(),payload=JSON.stringify({...s.value,pending:null}),proof=JSON.stringify({owner:creationOwner(actor),actor:actor.login,rowId:body.id,revision:s.revision,at:now});
+  const results=await db.batch([
+    db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit_creation_scope' AND record_key=? AND payload=? AND EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=? AND payload=?) AND NOT EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_ack' AND record_key=?)").bind(payload,actor.login,now,s.key,s.raw,s.value.pending.attemptKey,s.receiptRaw,ackKey),
+    db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_creation_ack',?,?,?,? WHERE changes()=1").bind(ackKey,proof,actor.login,now),
+  ]);
+  if(results[0].meta.changes!==1){if(await already())return {ok:true,replayed:true};fail(scopeConflict,409);}
+  return {ok:true};
+}
+async function readAdditionalAttempt(db,attempt,captured=undefined){
+  const saved=captured===undefined?await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?").bind(attempt.key).first():captured===null?null:{payload:captured};
+  if(!saved)return null;
+  let value;try{value=JSON.parse(saved.payload);}catch{fail(conflictMessage,409);}
+  if(!value||typeof value!=='object'||Array.isArray(value)||(value.owner?value.owner!==attempt.owner:value.actor!==attempt.actor)||value.key!==attempt.key||value.fingerprint!==attempt.fingerprint||typeof value.result?.row?.id!=='string'||value.result.row.id!==`lsx:${value.result.row.planId}:${attempt.key}`||value.result.history?.recordId!==value.result.row.id||value.result.history?.actor!==value.actor||value.result.history?.action!=='add-lsx'||value.result.ok!==true)fail(conflictMessage,409);
+  return {...value.result,replayed:true};
+}
 const parse = (r) => {
   try {
     return { ...r, rawPayload:r.payload, payload: JSON.parse(r.payload) };
@@ -59,9 +99,20 @@ function vietnamDateISO(value = new Date()) {
 }
 
 export async function getTransit(db, filters = {}, catalog = [], options = {}) {
+  // Internal creation path: planning references need no report/event projection.
+  const referenceOnly=Object.hasOwn(options,'referenceId');
+  if(referenceOnly&&(!text(options.referenceId)||typeof options.referenceId!=='string'))fail('invalidSelection',422);
   const [records, audits, reports, leadtimes, events, historyImports, leadVersions] = await Promise.all(
     ["in_transit", "in_transit_audit", "production_report", "leadtime", "production_event", "production_history_import", "leadtime_versions"].map(
-      (e) => (options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly && ['in_transit_audit','leadtime','leadtime_versions'].includes(e)) ? Promise.resolve([]) : read(db, e,options.stageValidation),
+      async(e) => {
+        if(referenceOnly){
+          if(e!=='in_transit')return [];
+          const row=await db.prepare("SELECT entity,record_key,payload,updated_by,updated_at,(SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') AS reference_policy,(SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') AS reference_activation FROM app_records WHERE entity='in_transit' AND record_key=?").bind(options.referenceId).first();
+          return row?[parse(row)]:[];
+        }
+        if(options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly&&['in_transit_audit','leadtime','leadtime_versions'].includes(e))return [];
+        return read(db,e,options.stageValidation);
+      },
     ),
   );
   const masters = new Map(
@@ -88,6 +139,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
     // Pending history contributes a status only. Keep its timestamps/hours in the workflow source.
     .filter(report => ['Chờ kiểm tra','Lịch sử chờ đối chiếu'].includes(report.reviewStatus))
     .map(({id,transitId,kind,reviewStatus,reportedQuantity,voided,cancelled}) => ({id,transitId,kind,reviewStatus,reportedQuantity,voided,cancelled})));
+  const preserved=new Map((options.preservedOrders||[]).map(b=>[b.orderId,b]));
   const rows = await Promise.all(records
     .filter((r) => r.payload && !r.payload._deleted)
     .map(async (r) => {
@@ -100,18 +152,19 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
       );
       return {...normalizeTransit({
         ...merged,
-        group: masterValues.group || merged.group,
-        name: masterValues.name || merged.name,
-        spec: masterValues.spec || merged.spec,
-        unit: masterValues.unit || merged.unit,
-        line: merged.line || masterValues.line,
-      }), revision:options.planningOnly ? undefined : await recordRevision(r.rawPayload),updatedBy:r.updated_by};
+        group: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.group ?? (masterValues.group || merged.group),
+        name: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.name ?? (masterValues.name || merged.name ),
+        spec: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.spec ?? (masterValues.spec || merged.spec ),
+        unit: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.unit ?? (masterValues.unit || merged.unit ),
+        line: preservedOrderMetadata(r.payload,preserved.get(merged.id))?.line ?? (merged.line || masterValues.line ),
+      }), revision:options.planningOnly||referenceOnly ? undefined : await recordRevision(r.rawPayload),updatedBy:r.updated_by};
     }));
   const withLeadtime = rows
     .map((row) => {
-      const standardLeadtime = options.planningOnly ? null : transitStandardLeadtime(row,
+      const frozenLead=preservedOrderMetadata(row,preserved.get(row.id));
+      const standardLeadtime = options.planningOnly||referenceOnly ? null : Object.hasOwn(frozenLead||{},'standardLeadtime') ? frozenLead.standardLeadtime : transitStandardLeadtime(row,
         leadtimes.flatMap(r=>Array.isArray(r.payload?.rows)?r.payload.rows:[{...r.payload,sku:r.payload?.sku||r.record_key}]),
-        leadVersions.map(r=>r.payload).filter(Boolean));
+        leadVersions.map(r=>r.payload).filter(Boolean),options.leadtimeAt);
       return {
         ...row,
         standardLeadtime,
@@ -140,7 +193,13 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
     .filter((r) => r.payload && !r.payload._deleted)
     .map((r) => r.payload)
     .sort((a, b) => text(b.at).localeCompare(text(a.at)));
-  return { rows: withLeadtime, history };
+  const result={rows:withLeadtime,history};
+  if(referenceOnly&&records[0]?.rawPayload){
+    const row=records[0];let policy;try{policy=JSON.parse(row.reference_policy);}catch{policy=null;}
+    const historyProtected=Boolean(row.reference_activation)||policy?.mode==='daily-finished-v1'&&policy.approved===true&&dateISO(policy.effectiveFrom)===policy.effectiveFrom&&policy.effectiveFrom<=vietnamDateISO();
+    referenceSources.set(result,{key:row.record_key,payload:row.rawPayload,policy:row.reference_policy??null,activation:row.reference_activation??null,historyProtected});
+  }
+  return result;
 }
 
 function validateOpenFields(row, includeQuantity = false) {
@@ -196,6 +255,24 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
   }
   const action = text(body.action),
     now = new Date().toISOString();
+  let creationAttempt=null,capturedScope;
+  if(action==='add-lsx'&&Object.hasOwn(body,'requestIdempotency')){
+    if(typeof body.requestIdempotency!=='string'||!/^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(body.requestIdempotency))fail('invalidSelection',422);
+    creationAttempt={actor:actor.login,owner:creationOwner(actor),key:await recordRevision(JSON.stringify([Object.hasOwn(body,'expectedCreationRevision')?creationOwner(actor):actor.login,body.requestIdempotency])),fingerprint:await recordRevision(JSON.stringify([body.id,body.planStart,body.planEnd,body.line,body.priority,body.sequence,body.planningNote||'']))};
+    let capturedAttempt;
+    if(Object.hasOwn(body,'expectedCreationRevision')){
+      const ownerKey=await recordRevision(['additional-lsx-scope',creationOwner(actor)]),captured=await db.prepare("SELECT (SELECT payload FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?) AS attempt,(SELECT payload FROM app_records WHERE entity='in_transit_creation_scope' AND record_key=?) AS creation_scope").bind(creationAttempt.key,ownerKey).first();
+      if(!captured||!Object.hasOwn(captured,'attempt')||!Object.hasOwn(captured,'creation_scope'))fail(scopeConflict,409);
+      capturedAttempt=captured.attempt;capturedScope=captured.creation_scope;
+    }
+    const replay=await readAdditionalAttempt(db,creationAttempt,capturedAttempt);if(replay)return replay;
+  }
+  let creationState=null;
+  if(action==='add-lsx'&&Object.hasOwn(body,'expectedCreationRevision')){
+    if(!creationAttempt||body.expectedCreationRevision!==null&&typeof body.expectedCreationRevision!=='string')fail('invalidSelection',422);
+    creationState=await creationScope(db,actor,capturedScope);
+    if(creationState.revision!==body.expectedCreationRevision||creationState.pending)fail(scopeConflict,409);
+  }
   if (
     ![
       "add-lsx",
@@ -209,14 +286,15 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
     ].includes(action)
   )
     fail("invalidAction");
-  const state = sharedState || await getTransit(db, {}, catalog),
+  const state = action==='add-lsx' ? await getTransit(db,{},catalog,{referenceId:body.id}) : sharedState || await getTransit(db, {}, catalog),
     all = state.rows;
+  const sourceReference=action==='add-lsx'?referenceSources.get(state):null;
   let current = null,
     key = text(body.id),
     next;
   if (action === "add-lsx") {
     const source = all.find((r) => r.id === body.id);
-    if (!source || source.status === "HỦY") fail("invalidSelection", 422);
+    if (!source || source.status === "HỦY" || !sourceReference) fail("invalidSelection", 422);
     const planStart = dateISO(body.planStart),
       planEnd = dateISO(body.planEnd),
       line = lineOf(body.line),
@@ -225,9 +303,13 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
     if (!planStart || !planEnd || !line || !priority || !(sequence > 0))
       fail("initialFieldsRequired", 422);
     if (planEnd < planStart) fail("dateOrder", 422);
-    key = `lsx:${source.planId}:${randomUUID()}`;
+    key = `lsx:${source.planId}:${creationAttempt?.key||randomUUID()}`;
     next = normalizeTransit({
-      ...source,
+      // A new LSX shares the planning reference, not the source LSX's output,
+      // CSV aliases, receipt state or historical-import privileges.
+      ...Object.fromEntries(['planRowId','planGroupId','groupPlanId','planId','week','sku','name','spec','unit','group','source','sourceIds','planQty','plan','laborHour','planLaborBasis','planLeadtimeBasis'].filter(field=>Object.hasOwn(source,field)).map(field=>[field,source[field]])),
+      ...(sourceReference.historyProtected?{planLaborBasis:source.planLaborBasis&&typeof source.planLaborBasis==='object'?source.planLaborBasis:{status:'missing',reason:'missing-source-plan-confirmation',segments:[]},planLeadtimeBasis:source.planLeadtimeBasis??null}:{}),
+      columns: [],
       id: key,
       isAdditionalLsx: true,
       planRowId: source.planRowId,
@@ -242,6 +324,7 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
       lsxOpenedAt: "",
       cancelReason: "",
       completedQty: 0,
+      pendingReportQty: 0,
       actualStartedAt: "",
       actualCompletedAt: "",
       syncStatus: "CHƯA ĐỒNG BỘ",
@@ -470,12 +553,20 @@ export async function mutateTransit(db, body, actor, catalog = [], sharedState =
   if(current&&await recordRevision(existing?.payload)!==body.expectedRevision)fail(conflictMessage,409);
   const {revision: _readRevision, ...storedNext}=next;
   const payload=JSON.stringify(storedNext);
+  // Source, retry proof and the per-account cursor advance atomically. A late
+  // request remains stale after ACK; clearing the pending flag never resets it.
+  const scopePayload=creationState?JSON.stringify({owner:creationOwner(actor),actor:actor.login,version:randomUUID(),pending:{attemptKey:creationAttempt.key,rowId:key,fingerprint:creationAttempt.fingerprint,requestIdempotency:body.requestIdempotency}}):null;
+  const response={ok:true,row:next,history,...(creationState?{creationScopeRevision:await recordRevision(scopePayload)}:{})};
   const update=existing
     ?db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND payload=?").bind(payload,actor.login,now,key,existing.payload)
-    :db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('in_transit',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now);
+    :sourceReference
+      ?db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?) AND (SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') IS ? AND (SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') IS ? AND (? IS NULL OR NOT EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_attempt' AND record_key=?)) AND (? IS NULL OR ((? IS NULL AND NOT EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_scope' AND record_key=?)) OR EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit_creation_scope' AND record_key=? AND payload=?))) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now,sourceReference.key,sourceReference.payload,sourceReference.policy,sourceReference.activation,creationAttempt?.key??null,creationAttempt?.key??null,creationState?.key??null,creationState?.raw??null,creationState?.key??null,creationState?.key??null,creationState?.raw??null)
+      :db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('in_transit',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key,payload,actor.login,now);
   const writes=[update];
   writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_audit',?,?,?,? WHERE changes()=1").bind(history.id,JSON.stringify(history),actor.login,now));
+  if(creationAttempt)writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_creation_attempt',?,?,?,? WHERE changes()=1").bind(creationAttempt.key,JSON.stringify({...creationAttempt,result:response}),actor.login,now));
+  if(creationState)writes.push(db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'in_transit_creation_scope',?,?,?,? WHERE changes()=1 ON CONFLICT(entity,record_key) DO UPDATE SET payload=excluded.payload,updated_by=excluded.updated_by,updated_at=excluded.updated_at WHERE app_records.payload=?").bind(creationState.key,scopePayload,actor.login,now,creationState.raw));
   const result=await db.batch(writes);
-  if(result[0].meta.changes!==1)fail(conflictMessage,409);
-  return { ok: true, row: next, history };
+  if(result[0].meta.changes!==1){if(creationAttempt){const replay=await readAdditionalAttempt(db,creationAttempt);if(replay)return replay;}fail(conflictMessage,409);}
+  return response;
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // Only receipts independently checked for a particular rejected request may be
 // added to the snapshot. Existing audit rows are never filtered out.
 export async function assertRejectedRequestAudit(options){assert.ok(options.response.status>=400,'request must have failed');return assertRequestAudit(options);}
-export async function assertRequestAudit({before,after,response,actorId,route,body,receipt=true,mutableEntities=[]}) {
+export async function assertRequestAudit({before,after,response,actorId,route,body,receipt=true,mutableEntities=[],replayed=false}) {
  const id=response.headers.get('X-ONSPA-Action-ID');
  if(!receipt){assert.equal(id,null);assert.deepEqual(after,before);return null;}
  assert.match(id||'',/^[0-9a-f-]{36}$/);
@@ -17,13 +17,14 @@ export async function assertRequestAudit({before,after,response,actorId,route,bo
  assert.deepEqual(protectedRows(after.filter(r=>r!==row)),protectedRows(before),'every protected business record and pre-existing audit must be byte-for-byte unchanged');
  assert.equal(row.updated_by,actorId);assert.equal(p.id,id);assert.equal(p.actorId,actorId);assert.equal(p.actor,actorId);
  assert.equal(p.route,route);
- const entities={'/api/production-plan':'production_plan','/api/production-report':'production_report','/api/production-workflow':'production_event','/api/capacity':'capacity','/api/production-correction':'production_report','/api/employees':'employees'};
+ const entities={'/api/in-transit':'in_transit','/api/production-plan':'production_plan','/api/production-report':'production_report','/api/production-workflow':'production_event','/api/capacity':'capacity','/api/production-correction':'production_report','/api/employees':'employees'};
  assert.equal(p.entity,entities[route]||body.entity||route.replace('/api/',''));
  assert.equal(p.line,typeof body.line==='string'?body.line:'');
  assert.equal(p.httpStatus,response.status);assert.equal(p.evidence,'server');
  const result=await response.clone().json();
- assert.equal(p.outcome,response.status<400?'succeeded':[401,403].includes(response.status)?'denied':'failed');
- assert.equal(p.reason,response.status<400?'Máy chủ xác nhận xử lý thành công.':result.error);
+ if(response.status<400)assert.equal(Boolean(result.replayed),replayed);
+ assert.equal(p.outcome,response.status<400?(replayed?'replayed':'succeeded'):[401,403].includes(response.status)?'denied':'failed');
+ assert.equal(p.reason,response.status<400?(replayed?'Yêu cầu đã xử lý trước đó; không ghi lặp.':'Máy chủ xác nhận xử lý thành công.'):result.error);
  assert.ok(Number.isFinite(Date.parse(p.at)));assert.ok(Date.parse(p.finishedAt)>=Date.parse(p.at));assert.ok(Date.parse(row.updated_at)>=Date.parse(p.finishedAt));
  assert.deepEqual(p.submittedInput,{fields:body,limited:false});
  assert.equal(p.record,body.orderId||body.reportId||body.key||body.id||body.week||'');

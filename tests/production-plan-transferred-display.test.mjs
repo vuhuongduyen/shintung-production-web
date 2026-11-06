@@ -12,6 +12,7 @@ import React from 'react';
 import * as jsxRuntime from 'react/jsx-runtime';
 import {renderToStaticMarkup} from 'react-dom/server';
 import * as rules from '../lib/production-plan.mjs';
+import * as effectivePlan from '../lib/plan-effective-basis.mjs';
 import {mkdtempSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {openDatabase,migrate,records,root} from '../scripts/local/database.mjs';
@@ -54,6 +55,7 @@ export function fixture(initial,props={},options={}) {
   if(name==='react')return hooks;if(name==='react/jsx-runtime')return jsxRuntime;
   if(name.includes('data-sync'))return {apiFetch:fetch,useDataRefresh:()=>revision,clientSessionGeneration:()=>0,subscribeClientReadInvalidation:()=>{},WorkspaceActivityContext:{}};
   if(name.includes('production-plan.mjs'))return rules;
+  if(name.endsWith('plan-effective-basis.mjs'))return effectivePlan;
   if(name.includes('plan-capacity-confirmation.mjs'))return capacityConfirmation;
   if(name.endsWith('plan-transit-backlog.mjs'))return backlog;
   // Display-only dialogs are not mounted by this hook/request harness.

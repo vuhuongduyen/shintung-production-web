@@ -117,6 +117,8 @@ function KHO_TP_taoMenuKho_() {
       "Xác nhận dòng đang chọn",
       "KHO_TP_xacNhanDongDangChon"
     )
+    .addItem("Đồng ý thu hồi dòng đang chọn", "ONSPA_dongYThuHoiDongDangChon")
+    .addItem("Từ chối thu hồi dòng đang chọn", "ONSPA_tuChoiThuHoiDongDangChon")
     .addToUi();
 }
 
@@ -287,6 +289,11 @@ const reportId =
 
     if (source === "ONSPA_WEB" && !Session.getActiveUser().getEmail()) {
       throw new Error("Không xác định được email người xác nhận. Đăng nhập tài khoản Google của kho trước khi xác nhận.");
+    }
+    if (source === "ONSPA_WEB") {
+      if (typeof ONSPA_choPhepXacNhanKho_ !== 'function' || typeof ONSPA_kiemTraDongDuyNhat_ !== 'function') throw new Error('Cập nhật đầy đủ bộ mã đồng bộ ONSPA trước khi xác nhận Kho.');
+      ONSPA_kiemTraDongDuyNhat_(sh, row, reportId);
+      ONSPA_choPhepXacNhanKho_(sh, row);
     }
     const proposedQuantity =
       KHO_TP_chuanHoaSoLuongKho_(

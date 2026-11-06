@@ -57,12 +57,13 @@ import BomBulkForm from "../components/bom-bulk-form";
 import BomHierarchy from "../components/bom-hierarchy";
 import BomReconciliation from "../components/bom-reconciliation";
 import BomCodeSuggestions from "../components/bom-code-suggestions";
-import { bomLineActive } from "../lib/bom-rules.mjs";
+import { bomLineActive,bomDate } from "../lib/bom-rules.mjs";
 import { BomChangeSkus } from "../components/bom-change-skus";
 import { canBomAction } from "../lib/bom-permissions.mjs";
 import { normalizeBomWaste } from "../lib/bom-waste.mjs";
 import { bomMetadataResolver, bomClassifications } from "../lib/bom-metadata.mjs";
 import { bomSourceResolver, bomSourceLabel, projectBomSources, syncBomSources, syncBomCatalogSources } from "../lib/bom-source.mjs";
+import {bomHistoricalMeasure} from '../lib/bom-historical-measure.mjs';
 const StorageHandover = deferredScreen(() => import("../components/storage-handover"));
 import {
   useSkuApproval,
@@ -1074,9 +1075,9 @@ const activeSafetyRuleFor = (weekStart: string, rules = safetyRuleSets) =>
     .filter(
       (rule) =>
         !rule._deleted &&
-        ["Đã xác nhận", "Đang áp dụng", "Sắp có hiệu lực"].includes(
+        (["Đã xác nhận", "Đang áp dụng", "Sắp có hiệu lực"].includes(
           rule.status,
-        ) &&
+        ) || (rule.status === "Hết hiệu lực" && !!rule.confirmedAt && Number.isFinite(Date.parse(rule.confirmedAt)))) &&
         rule.effectiveFrom <= weekStart &&
         (!rule.effectiveTo || rule.effectiveTo >= weekStart),
     )
@@ -1491,6 +1492,7 @@ type BomItem = {
   setup?: string;
   effective?: string;
   expiry?: string;
+  historyNote?: string;
 };
 
 const finishedBom: BomItem[] = [
@@ -2836,10 +2838,10 @@ toolbarConfig.note(<span>
     ? changeHistory
         .filter(
           (record) =>
-            record.sku === selected.sku && record.status === "Đã xác nhận",
+            (Array.isArray(record.skus)&&record.skus.length?record.skus:[record.sku]).includes(selected.sku) && record.status === "Đã xác nhận",
         )
         .sort((a, b) =>
-          `${b.effective} ${b.id}`.localeCompare(`${a.effective} ${a.id}`),
+          `${bomDate(b.effective)||''} ${b.id}`.localeCompare(`${bomDate(a.effective)||''} ${a.id}`),
         )
     : [];
   const latestChange = selectedChanges[0];
@@ -2855,7 +2857,8 @@ toolbarConfig.note(<span>
           !selected?.items.some(
             (item) =>
               item.code === line.code &&
-              !bomLineActive(item),
+              Boolean(bomDate(record.effective)) &&
+              bomDate(item.expiry) === bomDate(record.effective),
           ),
       )
       .map((line, index) => ({
@@ -2863,14 +2866,11 @@ toolbarConfig.note(<span>
         code: line.code,
         name: line.name,
         spec: line.spec,
-        waste: line.waste || "—",
         qty: line.oldQty,
-        denominator: line.denominator || "1",
         setup: record.setup,
         effective: "—",
         expiry: record.effective,
-        unit:
-          bomMasterOptions.find((item) => item.code === line.code)?.unit || "—",
+        ...bomHistoricalMeasure(record, selected?.sku || record.sku, line),
         source:
           originalBomMasterOptions.find((item) => item.code === line.code)?.source ||
           "",
@@ -2888,7 +2888,7 @@ toolbarConfig.note(<span>
       )
     : [];
   const visibleSelectedItems: BomItem[] = projectBomSources({items: (mode === "create" || mode === "edit") ? selected?.items || [] : allSelectedItems}, sourceSkus).items.filter((item: BomItem) => {
-    const stopped = !bomLineActive(item);
+    const stopped = Boolean(item.historyNote) || !bomLineActive(item);
     if (itemStatusFilter === "Tất cả") return true;
     return itemStatusFilter === "Ngưng sử dụng" ? stopped : !stopped;
   });
@@ -3318,7 +3318,7 @@ toolbarConfig.note(<span>
                           item.qty
                         )}
                       </DataCell>
-                      <DataCell>
+                      <DataCell title={item.historyNote}>
                         {editable ? (
                           <input
                             className="bom-cell-input number"
@@ -3343,7 +3343,7 @@ toolbarConfig.note(<span>
                         )}
                       </DataCell>
                       <DataCell kind="date">{item.expiry ?? "—"}</DataCell>
-                      <DataCell kind="code">{item.unit}</DataCell>
+                      <DataCell kind="code" title={item.historyNote} aria-label={item.historyNote?`${item.unit}. ${item.historyNote}`:undefined}>{item.unit}</DataCell>
                       <DataCell>
                         {item.source ? (
                           <span
