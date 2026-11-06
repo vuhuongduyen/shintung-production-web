@@ -7,12 +7,12 @@ const evaluate=(expression,needs,cancelled=false)=>Function('needs','always','ca
 
 test('source-sync pushes have one PR validation, while draft PR updates and main pushes remain covered',()=>{
  assert.deepEqual(ci.on.push,{branches:['main']});
- assert.deepEqual(ci.on.pull_request,{branches:['main'],types:['opened','synchronize','reopened']});
+ assert.deepEqual(ci.on.pull_request,{branches:['main','staging'],types:['opened','synchronize','reopened']});
  const triggered=(event,branch,action)=>event==='push'?ci.on.push.branches.includes(branch):ci.on.pull_request.branches.includes(branch)&&ci.on.pull_request.types.includes(action);
  assert.equal(Number(triggered('push','source-sync/live-v807-20261102'))+Number(triggered('pull_request','main','synchronize')),1);
- for(const action of ['opened','synchronize','reopened'])assert.equal(triggered('pull_request','main',action),true);
+ for(const branch of ['main','staging'])for(const action of ['opened','synchronize','reopened'])assert.equal(triggered('pull_request',branch,action),true);
  for(const action of ['ready_for_review','edited'])assert.equal(triggered('pull_request','main',action),false);
- assert.equal(triggered('push','main'),true);assert.equal(triggered('pull_request','other','opened'),false);
+ assert.equal(triggered('push','main'),true);assert.equal(triggered('push','staging'),false);assert.equal(triggered('push','feature/example'),false);assert.equal(triggered('pull_request','other','opened'),false);
  assert.ok(!source.includes('pull_request.draft'),'draft PRs must not be excluded');
 });
 
@@ -29,7 +29,7 @@ test('all four existing check identities remain stable, with three complete shar
 test('quick contracts and TypeScript gate the expensive shards without weakening the final suite',()=>{
  const steps=ci.jobs.typecheck.steps,quick=steps.findIndex(s=>s.run==='npm run test:ci-contract'),types=steps.findIndex(s=>s.run==='npm run typecheck');
  assert.ok(quick>=0&&types>quick);assert.ok(!steps.some(s=>/npm run build|run-tests\.mjs/.test(s.run||'')));
- assert.equal(pkg.scripts['test:ci-contract'],'node --test --test-concurrency=1 tests/ci-workflow.test.mjs tests/global-action-feedback.test.mjs tests/test-export-isolation.test.mjs');
+ assert.equal(pkg.scripts['test:ci-contract'],'node --test --test-concurrency=1 tests/ci-workflow.test.mjs tests/ci-provenance.test.mjs tests/global-action-feedback.test.mjs tests/test-export-isolation.test.mjs');
  assert.equal(ci.jobs['build-test'].needs,'typecheck');
  assert.equal(ci.jobs['build-test'].steps[0].if,"${{ needs.typecheck.result != 'success' }}");
  assert.match(ci.jobs['build-test'].steps[0].run,/exit 1\s*$/);
@@ -50,9 +50,9 @@ test('failed, skipped or timed-out prechecks report failing shard checks before 
 test('a passing gate reaches the unchanged install, build and full-runner commands',()=>{
  const job=ci.jobs['build-test'],needs={typecheck:{result:'success'}};
  assert.equal(evaluate(job.if,needs),true);assert.equal(evaluate(job.steps[0].if,needs),false);
- assert.deepEqual(job.steps.filter(s=>s.run).slice(1).map(s=>s.run),['npm ci --no-audit --no-fund','npm run build','node scripts/ci/run-tests.mjs ${{ matrix.shard }} 3']);
+ assert.deepEqual(job.steps.filter(s=>s.run).slice(1).map(s=>s.run),['node scripts/ci/provenance.mjs','npm ci --no-audit --no-fund','npm run build','node scripts/ci/run-tests.mjs ${{ matrix.shard }} 3']);
  assert.equal(job['timeout-minutes'],45);assert.equal(ci.jobs.typecheck['timeout-minutes'],15);
- for(const config of Object.values(ci.jobs))assert.equal(config['continue-on-error'],undefined);
+ for(const config of Object.values(ci.jobs)){assert.equal(config['continue-on-error'],undefined);const runs=config.steps.map(s=>s.run);assert.ok(runs.indexOf('node scripts/ci/provenance.mjs')>=0&&runs.indexOf('node scripts/ci/provenance.mjs')<runs.indexOf('npm ci --no-audit --no-fund'));}
 });
 
 test('new revisions cancel only older work for that PR or main, not unrelated PRs',()=>{

@@ -2,6 +2,8 @@
 
 Folder này là nguồn mã chính thức trong giai đoạn phát triển. Không push, kết nối GitHub/Vercel, tạo Site hoặc xuất bản nếu chưa được yêu cầu. Giữ nguyên `.openai/hosting.json`.
 
+**Web thử cố định và nhánh staging:** [quy trình PR → staging → web thử → nghiệm thu → main](docs/STAGING-WORKFLOW.md). Hướng dẫn local bên dưới không phải lệnh khởi tạo/reset dữ liệu của web thử đang chạy.
+
 **Quy trình làm việc cố định:** đọc [PR → link test full ONSPA → nghiệm thu → merge](docs/ONSPA-DEVELOPMENT-WORKFLOW.md) cùng `AGENTS.md` trước mỗi thay đổi. Tài liệu này quy định các điểm kiểm chứng và bàn giao; không thay thế quyền thực hiện từng bước của người dùng.
 
 **Báo sản lượng ngày (đang phát triển, chưa bật production):** [hợp đồng và inventory](docs/DAILY-OUTPUT-EFFECTIVE-DATES-CONTRACT.md), [trạng thái/kiểm thử/giới hạn](docs/DAILY-OUTPUT-IMPLEMENTATION-STATUS.md).

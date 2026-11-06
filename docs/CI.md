@@ -1,14 +1,16 @@
 # CI tự động
 
-## Trigger và tránh chạy trùng — bản nháp 05/11
+## Trigger cho main và staging — thiết lập 06/11
 
-Workflow `.github/workflows/ci.yml` chạy khi PR vào `main` được mở/cập nhật commit/mở lại (kể cả draft), và khi push vào `main`. Không chạy thêm push nhánh `source-sync/live-v807-20261102`; cùng lần cập nhật nhánh có PR chỉ cần lượt PR. Chuyển draft sang ready hoặc sửa mô tả không đổi commit nên không tự chạy lại. Nhánh chưa có PR cần kiểm local trước; mở PR mới sẽ chạy CI. Push main sau merge vẫn kiểm riêng commit main mới, không bỏ bước này để tiết kiệm.
+Workflow `.github/workflows/ci.yml` chạy khi PR vào `main` hoặc `staging` được mở/cập nhật commit/mở lại (kể cả draft), và khi push vào `main`. Không chạy thêm push nhánh `source-sync/live-v807-20261102`; cùng lần cập nhật nhánh có PR chỉ cần lượt PR. Chuyển draft sang ready hoặc sửa mô tả không đổi commit nên không tự chạy lại. Nhánh chưa có PR cần kiểm local trước; mở PR mới sẽ chạy CI. Push main sau merge vẫn kiểm riêng commit main mới, không bỏ bước này để tiết kiệm.
 
 Concurrency dùng workflow + số PR, hoặc ref main khi không có PR; commit mới hủy lượt cũ của cùng PR/main, không hủy PR khác. Không dùng skip-ci, lọc paths hoặc đổi assertions. Workflow mới chỉ có hiệu lực trên nhánh chứa nó; main và các nhánh cũ chưa thay đổi cho tới khi merge/cập nhật được phép, không gọi bản nháp là cấu hình toàn repo đã phát hành. Cơ chế nhóm/hủy theo [GitHub Docs](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 
 ## Bước nhanh trước các shard
 
-Node.js 24, `npm ci` theo lockfile giữ nguyên. Job **Kiểm tra kiểu dữ liệu** chạy `npm run test:ci-contract` rồi `npm run typecheck`. Lệnh nhanh gồm test cấu hình CI, chuẩn phản hồi nút dùng chung và cách ly snapshot TEST; không cần build, có Miniflare rỗng cho kiểm migration. Bản chuẩn bị local 19/19 trong khoảng 1,8–2,2 giây, không phải số phút billing GitHub.
+Nhánh `staging` dùng quy trình [web thử cố định](STAGING-WORKFLOW.md). Không có auto-deploy; main chỉ nhận cấu hình mới sau bước hợp nhất được phép.
+
+Node.js 24, `npm ci` theo lockfile giữ nguyên. Job **Kiểm tra kiểu dữ liệu** chạy `npm run test:ci-contract` rồi `npm run typecheck`. Lệnh nhanh gồm test cấu hình CI, nhận diện checkout/merge-tree, chuẩn phản hồi nút dùng chung và cách ly snapshot TEST; không cần build, có Miniflare rỗng cho kiểm migration. Bản chuẩn bị local 19/19 trong khoảng 1,8–2,2 giây, không phải số phút billing GitHub.
 
 Ba job **Build và kiểm thử (1/3)**, **(2/3)**, **(3/3)** chờ job trên. Nếu kiểm nhanh/TypeScript không đạt, mỗi shard chạy một bước báo lỗi rồi kết thúc trước checkout/cài deps/build; không trả success do skipped. Run đã bị cancel không khởi động thêm shard. Nếu đạt, cả ba vẫn `npm ci` → `npm run build` → runner đầy đủ; giữ fail-fast:false, timeout và tất cả tests. Quan hệ needs/if theo [GitHub Docs](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-jobs).
 
@@ -24,7 +26,7 @@ Không lọc bỏ các test kế thừa, không dùng `continue-on-error`. Đặ
 
 Phạm vi chưa bao phủ: lint, file benchmark/capture không mang đuôi `.test.mjs`, kiểm thử trình duyệt thật, production, và độ đầy đủ của mọi yêu cầu nghiệp vụ. Có test dùng DOM giả lập và Miniflare local; kết quả này không thay thế QA trình duyệt. Local pass không đồng nghĩa GitHub Actions pass.
 
-Workflow chỉ có `contents: read`, không dùng `pull_request_target`, secrets production, bước deploy/merge/import dữ liệu hoặc thay quyền. Checkout không giữ credential. Không tải lên artifact chứa source/dữ liệu/log; log chuẩn của Actions nằm trong repo riêng tư. Việc chạy kiểm thử có thể tạo dữ liệu synthetic và bản build tạm trong runner, không nối DB production.
+Workflow chỉ có `contents: read`, không dùng `pull_request_target`, secrets production, bước deploy/merge/import dữ liệu hoặc thay quyền. Checkout không giữ credential. Không tải lên artifact chứa source/dữ liệu/log; repo hiện public theo lựa chọn người dùng; log CI không được chứa dữ liệu thật, source credential hoặc nội dung bí mật. Việc chạy kiểm thử có thể tạo dữ liệu synthetic và bản build tạm trong runner, không nối DB production.
 
 ## Kiểm chứng thay đổi quy trình
 
@@ -32,3 +34,10 @@ Workflow chỉ có `contents: read`, không dùng `pull_request_target`, secrets
 - Fault injection local tạo tạm component synthetic có FeedbackActionButton disabled thiếu reason: test nhanh báo18pass/1fail đúng nguyên nhân; file được dọn bằng finally, sau đó19/19 đạt. Không sửa/skip test hoặc đẩy fixture lỗi. Kiểm nhanh hỏng chưa phải kết quả full suite.
 - Checkpoint ứng dụng a74ace7 đạt CI41965631284,1.806/1.806 trong294file; TypeScript/ba build/bốn checks success. Thay đổi quy trình không sửa app/handler/fixtures nghiệp vụ. CI đúng head workflow mới cần đọc riêng; browser có thể kiểm gói ứng dụng a74 song song, không chờ để chỉnh UI thêm.
 - Gộp thay đổi liên quan sau quick/targeted/typecheck local vào một push. Không đẩy docs tiến độ thành nhiều commit trong khi đang chờ CI; cập nhật PR mô tả phù hợp. Không manual rerun cùng SHA nếu chưa có lý do hạ tầng cụ thể hoặc bản sửa. Không thay billing, quota hoặc mua thêm.
+
+
+## Nguồn thực sự được kiểm
+
+Mỗi job sau checkout/setup Node chạy `node scripts/ci/provenance.mjs`, ghi `CI SOURCE` vào log và Step Summary: event, checkout, tree, base/head và nhánh đích. PR phải checkout đúng GITHUB_SHA và có hai parents đúng base/head trong event; push chỉ chấp nhận main. Không in event body/title, token hoặc nội dung file. Test synthetic kiểm sai checkout, sai base/head, branch/event không hỗ trợ và lọc dữ liệu nhạy cảm. CI checkout SHA có thể khác PR head nhưng cùng tree; đối chiếu tree trước khi quyết định có cần kiểm lại.
+
+Checkout mặc định depth=1 che parents khi duyệt lịch sử bằng `git show --format=%P`. Lượt đầu PR thiết lập đã phát hiện lỗi này ở gate trước install/build. Bộ đọc đã chuyển sang headers của commit object bằng `git cat-file commit HEAD`, vẫn đối chiếu đủ base/head và không fetch thêm lịch sử. Hồi quy clone file:// depth=1 tái hiện trước sửa và đạt sau sửa; không dùng tăng fetch-depth hoặc bỏ kiểm parents để che lỗi.

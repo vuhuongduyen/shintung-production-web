@@ -2,7 +2,7 @@ name: Kiểm tra mã nguồn ONSPA
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, staging]
     types: [opened, synchronize, reopened]
   push:
     branches: [main]
@@ -34,6 +34,8 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Ghi nhận commit và cây mã được kiểm tra
+        run: node scripts/ci/provenance.mjs
       - name: Cài dependencies theo lockfile
         run: npm ci --no-audit --no-fund
       - name: Kiểm tra hợp đồng nhanh trước khi dùng các shard
@@ -66,6 +68,8 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Ghi nhận commit và cây mã được kiểm tra
+        run: node scripts/ci/provenance.mjs
       - name: Cài dependencies theo lockfile
         run: npm ci --no-audit --no-fund
       - name: Build để kiểm thử cả Worker đã biên dịch

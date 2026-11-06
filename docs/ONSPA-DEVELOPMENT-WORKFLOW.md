@@ -1,8 +1,10 @@
-# Quy trình thay đổi ONSPA: PR → link test → nghiệm thu → merge
+# Quy trình thay đổi ONSPA: PR → staging → web thử → nghiệm thu → main
 
 Quy trình này là điểm tham chiếu cố định cho các lần làm việc sau. Assistant phải đọc tài liệu này và `AGENTS.md` khi bắt đầu, kiểm tra trạng thái thực tế rồi thực hiện trong phạm vi người dùng yêu cầu. Không thay cách làm, tạo nền tảng hoặc cuộc trò chuyện mới chỉ vì phiên làm việc thay đổi.
 
 **Quy trình không phải quyền thường trực để sửa mã, cấp quyền, tạo credentials, merge hoặc deploy.** Chỉ dẫn cụ thể mới nhất của người dùng quyết định phạm vi mỗi lần. Lưu trên GitHub, CI đạt, preview hoạt động, người dùng nghiệm thu, merge và deployment là các trạng thái riêng biệt.
+
+**Cập nhật 06/11:** dùng [nhánh/web thử cố định](STAGING-WORKFLOW.md). PR mới vào `staging`; hợp nhất nhánh thử sau CI trong phạm vi được phép, triển khai QA riêng, Duyên nghiệm thu rồi mới xét PR vào main và deployment MAIN. Codespaces bên dưới là lịch sử/phương án dự phòng được cho phép riêng, không còn là mặc định để gửi link. Không retarget hoặc merge PR #7 trong lượt thiết lập.
 
 ## 1. Chốt yêu cầu và nguồn mã
 
@@ -30,7 +32,7 @@ Quy trình này là điểm tham chiếu cố định cho các lần làm việc
 
 ## 4. Preview toàn bộ ONSPA từ đúng commit
 
-Mặc định ưu tiên tái sử dụng **GitHub Codespaces có sẵn, cổng 5173 Private**, chạy full app với Miniflare DB/FILES TEST local. Không dùng web trial cũ, mockup/component fixture hoặc giao diện sao chép để thay cho bản PR cần nghiệm thu. Không mặc định yêu cầu tài khoản Cloudflare riêng hoặc tạo Site/DB cloud mới.
+Mặc định dùng **Site thử cố định** trong [STAGING-WORKFLOW.md](STAGING-WORKFLOW.md), D1/R2 và tài khoản bền vững. Chỉ dùng lại **GitHub Codespaces có sẵn, cổng 5173 Private** với Miniflare TEST nếu được yêu cầu riêng. Không dùng web trial cũ, mockup/component fixture hoặc giao diện sao chép để thay cho bản PR cần nghiệm thu. Không mặc định yêu cầu tài khoản Cloudflare riêng hoặc tạo Site/DB cloud mới.
 
 ### Mốc lịch sử để tìm lại, không phải xác nhận hiện trạng
 
@@ -54,9 +56,10 @@ Adapter QA cố định cho Codespace cũ và giới hạn Host/Origin/role: [CO
 
 Assistant chịu trách nhiệm chuẩn bị và xác minh rồi gửi link; không mặc định đẩy các lệnh kỹ thuật cho người dùng. Chỉ yêu cầu người dùng bước đăng nhập, cấp access hoặc quyết định thật sự còn thiếu, giải thích ngắn vì sao cần bước đó.
 
-## 5. Người dùng nghiệm thu rồi mới xét merge
+## 5. Phân biệt merge staging với merge main
 
-- Người dùng phải mở **full-app test link của đúng commit** và xác nhận các tiêu chí đã thống nhất. Ghi nhận lỗi/giới hạn còn chấp nhận hay chưa; nếu có commit mới sau nghiệm thu, nêu thay đổi và kiểm lại phần bị ảnh hưởng.
+- Merge vào staging để chuẩn bị QA cần CI và phạm vi cho phép; chưa là nghiệm thu hoặc quyền merge main.
+- Trước merge main, người dùng phải mở **full-app test link của đúng commit** và xác nhận các tiêu chí đã thống nhất. Ghi nhận lỗi/giới hạn còn chấp nhận hay chưa; nếu có commit mới sau nghiệm thu, nêu thay đổi và kiểm lại phần bị ảnh hưởng.
 - Trước merge, đọc mới PR/head/base và trạng thái CI; xác nhận yêu cầu merge dành cho đúng PR tại thời điểm thực hiện. Nghiệm thu preview không tự đồng nghĩa cho phép merge. Không tự Approve PR hoặc coi quy trình này là lời cho phép merge tương lai.
 - Nếu CI còn fail hoặc chưa đủ điều kiện nghiệm thu, giữ draft và báo blockers. Không lách branch protection/settings hoặc bỏ checks. Không tự merge trong lượt chỉ lưu snapshot/tài liệu.
 

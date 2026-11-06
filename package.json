@@ -23,7 +23,7 @@
     "test:account": "node scripts/local/account.mjs",
     "handoff": "node scripts/handoff/prepare.mjs",
     "test:action-feedback": "node --test tests/action-feedback-mounted.test.mjs",
-    "test:ci-contract": "node --test --test-concurrency=1 tests/ci-workflow.test.mjs tests/global-action-feedback.test.mjs tests/test-export-isolation.test.mjs"
+    "test:ci-contract": "node --test --test-concurrency=1 tests/ci-workflow.test.mjs tests/ci-provenance.test.mjs tests/global-action-feedback.test.mjs tests/test-export-isolation.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
