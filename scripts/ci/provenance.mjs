@@ -13,7 +13,9 @@ export function ciSource({cwd=process.cwd(),environment=process.env,event}={}){
  if(name==='pull_request'){
   const pr=event?.pull_request;
   if(!pr||!['main','staging'].includes(pr.base?.ref)||!sha(pr.base?.sha)||!sha(pr.head?.sha))throw Error('Invalid CI pull request source');
-  const parents=git('show','--no-patch','--format=%P','HEAD').split(' ');
+  // Revision walking treats a depth-one checkout as a root. Read the actual
+  // commit object headers instead; no extra fetch or altered validation needed.
+  const parents=git('cat-file','commit','HEAD').split('\n\n',1)[0].split('\n').filter(line=>/^parent [a-f0-9]{40}$/.test(line)).map(line=>line.slice(7));
   if(parents.length!==2||parents[0]!==pr.base.sha||parents[1]!==pr.head.sha)throw Error('CI merge parents do not match the pull request');
   return {event:name,checkout,tree,base:pr.base.sha,baseBranch:pr.base.ref,head:pr.head.sha};
  }

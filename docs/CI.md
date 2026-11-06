@@ -39,3 +39,5 @@ Workflow chỉ có `contents: read`, không dùng `pull_request_target`, secrets
 ## Nguồn thực sự được kiểm
 
 Mỗi job sau checkout/setup Node chạy `node scripts/ci/provenance.mjs`, ghi `CI SOURCE` vào log và Step Summary: event, checkout, tree, base/head và nhánh đích. PR phải checkout đúng GITHUB_SHA và có hai parents đúng base/head trong event; push chỉ chấp nhận main. Không in event body/title, token hoặc nội dung file. Test synthetic kiểm sai checkout, sai base/head, branch/event không hỗ trợ và lọc dữ liệu nhạy cảm. CI checkout SHA có thể khác PR head nhưng cùng tree; đối chiếu tree trước khi quyết định có cần kiểm lại.
+
+Checkout mặc định depth=1 che parents khi duyệt lịch sử bằng `git show --format=%P`. Lượt đầu PR thiết lập đã phát hiện lỗi này ở gate trước install/build. Bộ đọc đã chuyển sang headers của commit object bằng `git cat-file commit HEAD`, vẫn đối chiếu đủ base/head và không fetch thêm lịch sử. Hồi quy clone file:// depth=1 tái hiện trước sửa và đạt sau sửa; không dùng tăng fetch-depth hoặc bỏ kiểm parents để che lỗi.

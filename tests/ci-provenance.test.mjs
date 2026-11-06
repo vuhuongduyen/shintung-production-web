@@ -4,6 +4,7 @@ import {mkdtempSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
 import {ciSource,reportCiSource} from '../scripts/ci/provenance.mjs';
 
 function fixture(){
@@ -53,5 +54,16 @@ test('main pushes are identified without inventing a PR or accepting an unvalida
   const environment={GITHUB_SHA:f.checkout,GITHUB_EVENT_NAME:'push',GITHUB_REF:'refs/heads/main'};
   assert.deepEqual(ciSource({...f,environment}),{event:'push',checkout:f.checkout,tree:f.tree,base:null,baseBranch:'main',head:f.checkout});
   assert.throws(()=>ciSource({...f,environment:{...environment,GITHUB_REF:'refs/heads/staging'}}),/Unexpected/);
+ }finally{f.close();}
+});
+
+test('CI validates the default depth-one checkout without fetching more history',()=>{
+ const f=fixture();try{
+  const cwd=join(f.cwd,'depth-one');
+  execFileSync('git',['clone','--depth=1','--branch','main','--no-tags',pathToFileURL(f.cwd).href,cwd],{stdio:['ignore','pipe','pipe']});
+  const git=(...args)=>execFileSync('git',args,{cwd,encoding:'utf8'}).trim();
+  assert.equal(git('rev-parse','--is-shallow-repository'),'true');
+  assert.equal(git('show','--no-patch','--format=%P','HEAD'),'','revision walking hides shallow boundary parents');
+  assert.deepEqual(ciSource({...f,cwd}),{event:'pull_request',checkout:f.checkout,tree:f.tree,base:f.base,baseBranch:'staging',head:f.head});
  }finally{f.close();}
 });
