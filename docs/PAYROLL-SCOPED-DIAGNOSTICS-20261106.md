@@ -4,7 +4,7 @@
 
 Tài khoản chỉ xem Line A không được trả lịch B hoặc ngày làm việc của người B. Backend vẫn trả id/tên/Line/trạng thái tối thiểu của người B có điều chuyển liên quan đến A để đối chiếu. Bộ tính tháng trước đây tính diagnostics cho cả A+B từ payload đã giới hạn, rồi ghép các cảnh báo B và coi ngày nhân sự bị ẩn là thiếu thật. Ví dụ synthetic trước sửa đồng thời báo thiếu lịch B, thiếu phân công B và thiếu ngày bắt đầu người B trong màn A.
 
-Bản sửa xuất phát từ nhánh staging `ce4636b804f02f031fce70a7b3fcd83df575742f`, độc lập với PR #7. Hai module ứng dụng khớp initial remix v810 trong manifest nguồn đã đối chiếu. Lỗi được tái hiện bằng fixture; chưa kiểm màn này trên MAIN và không khẳng định dữ liệu MAIN hiện gặp đúng tình huống.
+Bản sửa được tái hiện độc lập từ nhánh staging `ce4636b804f02f031fce70a7b3fcd83df575742f`. Hai module nền khớp initial remix v810 trong manifest nguồn đã đối chiếu. Sau đó sửa được chuyển chọn lọc vào ứng viên PR #7, giữ các nhánh bảo toàn lịch sử đã có trong PR này; không dùng nguyên file nền v810 ghi đè PR #7. Lỗi được tái hiện bằng fixture; chưa kiểm màn này trên MAIN và không khẳng định dữ liệu MAIN hiện gặp đúng tình huống.
 
 ## Thay đổi
 
@@ -21,9 +21,10 @@ Không sửa JSX/CSS, layout, backend projection, quyền, cấu hình, dữ li�
 - Worker đã build, xác thực mật khẩu bình thường của tài khoản synthetic chỉ xem A và tài khoản đủ quyền; query yêu cầu B không mở phạm vi. Payload vẫn chỉ trả lịch A và thông tin tối thiểu của người B liên quan, không thêm người B không liên quan. GET/tính toán không ghi lại business records, quyền hoặc audit cũ.
 - Mounted component thật với transport giả kiểm cảnh báo, selector Line bị khóa, tiêu đề bảng không đổi và tài khoản đủ quyền. Đây là JSDOM, không thay kiểm browser/pixel trên Site.
 - Kiểm các bài hiện có về vắng/phụ kho, điều chuyển, điều kiện nhận, quỹ, xuất và quyền Line. TypeScript/build và CI được báo theo commit cuối; không cộng các nhóm kiểm bị trùng thành số test độc lập.
+- Hồi quy riêng cho tháng cũ có snapshot chỉ của Line được xem và tháng chuyển đổi có người điều chuyển bị ẩn ngày nhân sự; không đòi snapshot Line ngoài quyền, không coi ngày bị ẩn là thay đổi điều kiện nhận. Thiếu snapshot Line được phép vẫn chặn. Tài khoản đầy đủ hai Line giữ nguyên mọi kết quả, kể cả tiền, nhãn và thứ tự tích lũy cả tháng.
 
 ## Đưa lên web thử
 
-Chỉ cập nhật chọn lọc hai module ứng dụng trong source Site QA hiện có `appgprj_6aed30807a6c8191bfcc31f6ec1d4291`. Trước áp dụng phải so hash base; giữ hosting identity, guard QA, dữ liệu snapshot, tài khoản/quyền, DB/FILES, cấu hình tích hợp và các tệp đang chờ. Không seed, import, migration hay sửa dữ liệu để chứng minh lỗi. PR/CI, deployment và browser là ba trạng thái riêng.
+Đưa cùng ứng viên PR #7 đã kiểm vào nhánh thử, rồi ghép thay đổi ứng dụng trong source Site QA hiện có `appgprj_6aed30807a6c8191bfcc31f6ec1d4291`. Riêng sửa cảnh báo chỉ đổi hai module nêu trên; phần sản lượng ngày vẫn theo manifest PR #7. Trước áp dụng phải so hash base; giữ hosting identity, guard QA, dữ liệu snapshot, tài khoản/quyền, DB/FILES, cấu hình tích hợp và các tệp đang chờ. Không seed, import, migration hay sửa dữ liệu để chứng minh lỗi. PR/CI, deployment và browser là ba trạng thái riêng.
 
-Sau build/publish QA, đọc lại source/version/deployment active và dùng browser với tài khoản Line A cùng tài khoản đủ quyền. Kiểm màn Hiệu suất/nhân viên/lịch sử quỹ, cảnh báo thật, ngày/Line, người điều chuyển, không xuất tiền từ dữ liệu bị giới hạn; kiểm desktop/mobile giữ bố cục. Chưa báo hoàn tất hoặc gửi bản mới cho người dùng nếu deployment/browser chưa có bằng chứng. MAIN và PR #7/#8 không được hợp nhất hoặc triển khai trong lượt sửa này.
+Sau build/publish QA, đọc lại source/version/deployment active và dùng browser với tài khoản Line A cùng tài khoản đủ quyền. Kiểm màn Hiệu suất/nhân viên/lịch sử quỹ, cảnh báo thật, ngày/Line, người điều chuyển, không xuất tiền từ dữ liệu bị giới hạn; kiểm desktop/mobile giữ bố cục. Chưa báo hoàn tất hoặc gửi bản mới cho người dùng nếu deployment/browser chưa có bằng chứng. Yêu cầu đưa PR #7 lên nhánh/web thử không cấp quyền merge vào `main`, merge PR #8 vào `main` hoặc triển khai MAIN.

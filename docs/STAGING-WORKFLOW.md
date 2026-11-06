@@ -11,7 +11,7 @@ Quy trình từ 06/11/2026: **PR → nhánh `staging` → web thử → Duyên n
 | Web thử cố định | `https://onspa-thu-nghiem.shintung-vn-4458.chatgpt.site` | Site `appgprj_6aed30807a6c8191bfcc31f6ec1d4291`, DB/FILES riêng; giữ quyền chủ sở hữu hiện có |
 | Web chính | `https://sanxuat.shintung-vn-4458.chatgpt.site` | Site `appgprj_6a8f9b8b6bc48191b07d8293bcb8402a`; không triển khai trong bước QA |
 
-Trước mỗi thay đổi, đọc mới ref và working tree, bảo toàn công việc dở dang. Mốc khảo sát ban đầu: GitHub main `d8dbb1e031e540fec892509b577cd49c3d2cc442`, MAIN v810 source `d8d938c6f5804ba1cb13a38bda7d38414120e7bf`; hai SHA không giống nhau nên phải đối chiếu file/tree, không tự coi là khác nghiệp vụ hoặc tương đương. Báo cáo đối chiếu nguồn được ghi riêng khi có manifest kiểm chứng. Web thử v8 source `accf9e79c6a80b488f7a775c9e31cd090d09d374` là bản đang chạy tại lúc khảo sát, không phải bằng chứng đã nhận PR #7 hoặc nhánh mới. Đợt thiết lập này không retarget, merge hoặc sửa PR #7.
+Trước mỗi thay đổi, đọc mới ref và working tree, bảo toàn công việc dở dang. Mốc khảo sát ban đầu: GitHub main `d8dbb1e031e540fec892509b577cd49c3d2cc442`, MAIN v810 source `d8d938c6f5804ba1cb13a38bda7d38414120e7bf`; hai SHA không giống nhau nên phải đối chiếu file/tree, không tự coi là khác nghiệp vụ hoặc tương đương. Báo cáo đối chiếu nguồn được ghi riêng khi có manifest kiểm chứng. Web thử v8 source `accf9e79c6a80b488f7a775c9e31cd090d09d374` là bản đang chạy tại lúc khảo sát, không phải bằng chứng đã nhận PR #7 hoặc nhánh mới. Đợt bootstrap ban đầu giữ nguyên PR #7. Yêu cầu sau đó đưa PR #7 lên web thử được thực hiện bằng ứng viên có CI nhắm `staging`, giữ lớp triển khai QA riêng; trạng thái GitHub và Site phải được đọc lại độc lập.
 
 ## Một lần thay đổi
 
