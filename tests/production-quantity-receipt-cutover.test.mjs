@@ -95,3 +95,10 @@ test('a legacy review started before cutover cannot commit across the new receip
  assert.deepEqual(JSON.parse((await c.db.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(report.id).first()).payload),report);
  assert.equal((await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='warehouse_in'").first()).n,0);assert.equal((await readDailyOutputPolicy(c.db)).policy.active,true);
 }));
+test('a frozen legacy row without an embedded ID retains its source key in review, audit and warehouse links',()=>dailyFixture(async c=>{
+ const key='SYNTHETIC-SOURCE-KEY';await c.put('production_report',key,{kind:'completion',transitId:c.order.id,lsxCode:c.order.lsxCode,sku:c.order.sku,line:'A',reportedQuantity:200,reviewStatus:'Chờ kiểm tra',version:1,startedAt:'2026-11-02T01:00:00Z',completedAt:'2026-11-02T03:00:00Z',hours:{hc:2,ot:0,total:2}});
+ await activate(c);const call=await reviewer(c),result=await call('/api/production-report',{action:'review',reportId:key,approve:true,expectedVersion:1});
+ assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(result.body.payload.id,key);
+ const rows=await records(c.db),approval=rows.filter(r=>r.entity==='production_event').map(r=>JSON.parse(r.payload)).find(r=>r.kind==='report-approval');assert.equal(approval.reportId,key);
+ const warehouse=JSON.parse(rows.find(r=>r.entity==='warehouse_in').payload);assert.equal(warehouse.reportId,key);
+}));

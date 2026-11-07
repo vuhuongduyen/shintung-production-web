@@ -15,6 +15,13 @@ const click=async node=>{assert.ok(node);await act(async()=>node.click());};
 const dialog=()=>document.querySelector('[role="dialog"]');
 const setInput=async(node,value)=>{await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new window.Event('input',{bubbles:true}));node.dispatchEvent(new window.Event('change',{bubbles:true}));});};
 const submit=async()=>{await act(async()=>dialog().querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));};
+test('an unapproved increase reserves capacity without increasing the visible confirmed amount or export',async()=>{
+ const view=await mount();try{
+  await view.render({reports:[{id:'SYNTHETIC-CONFIRMED',transitId:order.id,kind:'completion',reportingModel:'daily-finished-v1',quantityOnly:true,reportedQuantity:200,approvedQuantity:200,reviewStatus:'Đã xác nhận',pendingQuantityReservation:100,pendingCorrection:{status:'pending'}}]});
+  const bars=[...view.host.querySelectorAll('[role="progressbar"]')];assert.ok(bars.length);for(const bar of bars){assert.equal(bar.getAttribute('aria-valuenow'),'200');assert.match(bar.getAttribute('aria-valuetext'),/Đã xác nhận 200/);}
+  const exported=JSON.parse(view.host.querySelector('[data-report-source]').getAttribute('data-report-source'));assert.equal(exported.rows[0][8],200);
+ }finally{await view.close();}
+});
 test('receipt mode keeps the same action/table and allows a production date before activation with a narrow quantity input',async()=>{
  const view=await mount();try{
   await view.render({policy:{active:true,intakeModel:'server-receipt-quantity-v1',effectiveFrom:'2026-11-07'}});

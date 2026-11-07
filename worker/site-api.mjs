@@ -409,6 +409,7 @@ async function handleSiteApi(request,env,timing){
    const receiptLegacy=reviewPolicy?.intakeModel==='server-receipt-quantity-v1'&&await frozenPendingReport(productionDb,reviewPolicy,String(body.reportId));
    if(reviewPolicy?.cutoverReached&&!receiptLegacy)return json({error:'Chỉ duyệt phiếu cũ đang chờ trong tập dữ liệu đã chốt.'},409);
    if(receiptLegacy&&body.expectedVersion===undefined)return json({error:'Thiếu phiên bản phiếu cũ cần kiểm tra.'},409);
+   if(receiptLegacy)report.id=String(body.reportId); // Frozen storage key is the canonical legacy identity.
    // One request-scoped, byte-bounded read per entity, shared with workflow/transit.
    // Independent reads overlap; the original cursor and payload guards still fence the commit.
    const [eventRecords,reviewRecords,transitStored,reviewWorkflow]=await Promise.all([
