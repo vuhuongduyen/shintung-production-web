@@ -164,3 +164,10 @@ test('an old-day receipt can be corrected and saved without re-entering legacy s
  assert.equal(result.report.reportedQuantity,300);assert.equal(result.report.productionDate,'2026-10-30');assert.equal(result.report.productionLocalDateTime,'2026-10-30T10:10');assert.equal(result.report.version,2);
  assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_report'").first()).n,1);
 }));
+
+for(const finished of [false,true])test(`stage-format completion retries preserve the original receipt (${finished?'finished':'intermediate'})`,()=>dailyFixture(async c=>{
+ const token=crypto.randomUUID(),report={id:'SYNTHETIC-STAGE-REPLAY',kind:'completion',stageReporting:true,stageQuantity:200,transitId:c.order.id,lsxCode:c.order.lsxCode,line:'A',reportedQuantity:finished?200:0,productionDate:'2026-10-30',completedAt:'2026-10-30T02:00:00Z',reportedBy:actor.login,reviewStatus:'Chờ kiểm tra'},event={id:'SYNTHETIC-STAGE-EVENT',kind:'stage-work',stageReporting:true,stageAction:'complete',sourceId:c.order.id,line:'A',actor:actor.login,reportId:report.id,effectiveAt:report.completedAt,requestIdempotency:token};
+ await c.put('production_report',report.id,report);await c.put('production_event',event.id,event);await activate(c);const before=await records(c.db);
+ const result=await mutateProductionWorkflow(c.db,{action:'complete',orderId:c.order.id,stageEntries:[{stage:finished?'FINAL':'ASSY',quantity:200}],effectiveAt:event.effectiveAt,requestIdempotency:token},actor);
+ assert.equal(result.replayed,true);assert.equal(result.report.id,report.id);assert.equal(result.report.reportedQuantity,finished?200:0);assert.deepEqual(await records(c.db),before);
+}));
