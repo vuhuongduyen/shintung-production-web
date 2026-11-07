@@ -117,3 +117,50 @@ for(const sourceShape of ['field','columns'])for(const dailyFirst of [false,true
  if(!dailyFirst)await saveDaily();
  const reports=(await records(c.db)).filter(r=>r.entity==='production_report').map(r=>JSON.parse(r.payload));assert.equal(dailyOutputTotals(order,reports).approved,600);assert.equal(dailyOutputTotals(order,reports).reported,900);
 }));
+
+test('daily confirmation persists the frozen completed balance even for the first new receipt',()=>dailyFixture(async c=>{
+ await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.completedQty',400) WHERE entity='in_transit' AND record_key=?").bind(c.order.id).run();
+ await activate(c);const {recordRevision}=await import('../lib/record-revision.mjs'),raw=await c.db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(c.order.id).first();
+ const saved=await mutateProductionWorkflow(c.db,c.body({quantity:300,expectedOrderRevision:await recordRevision(raw.payload)}),actor),call=await reviewer(c);
+ const result=await call('/api/production-report',{action:'review',reportId:saved.report.id,approve:true,expectedVersion:1});assert.equal(result.status,200,JSON.stringify(result.body));
+ assert.equal(JSON.parse((await c.db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(c.order.id).first()).payload).completedQty,700);
+ assert.equal(result.body.payload.completedQty,700);
+}));
+test('public quantity totals exclude the reserved increase until acknowledgement',()=>{
+ const report={id:'SYNTHETIC-CONFIRMED',transitId:'SYNTHETIC-ORDER',kind:'completion',reportingModel:'daily-finished-v1',quantityOnly:true,reportedQuantity:200,approvedQuantity:200,reviewStatus:'Đã xác nhận',pendingQuantityReservation:100};
+ const total=dailyOutputTotals({id:'SYNTHETIC-ORDER',lsxQty:1000},[report]);assert.equal(total.approved,200);assert.equal(total.reported,200);assert.equal(total.reserved,100);
+});
+test('a previously committed legacy completion replays after activation without creating output',()=>dailyFixture(async c=>{
+ const token=crypto.randomUUID(),report={id:'SYNTHETIC-LEGACY-REPLAY',kind:'completion',transitId:c.order.id,lsxCode:c.order.lsxCode,line:'A',reportedQuantity:200,productionDate:'2026-10-30',completedAt:'2026-10-31T02:00:00Z',reportedBy:actor.login,reviewStatus:'Chờ kiểm tra'},event={id:'SYNTHETIC-LEGACY-EVENT',kind:'complete',sourceId:c.order.id,line:'A',actor:actor.login,reportId:report.id,effectiveAt:report.completedAt,requestIdempotency:token};
+ await c.put('production_report',report.id,report);await c.put('production_event',event.id,event);await activate(c);const before=await records(c.db);
+ const result=await mutateProductionWorkflow(c.db,{action:'complete',orderId:c.order.id,quantity:200,productionDate:'2026-10-30',effectiveAt:event.effectiveAt,requestIdempotency:token},actor);
+ assert.equal(result.replayed,true);assert.equal(result.report.id,report.id);assert.deepEqual(await records(c.db),before);
+ await assert.rejects(()=>mutateProductionWorkflow(c.db,{action:'complete',orderId:c.order.id,quantity:201,productionDate:'2026-10-30',effectiveAt:event.effectiveAt,requestIdempotency:token},actor),{status:409});
+}));
+test('legacy quantity adapter preserves the explicit production day independently of effective timestamp',()=>{
+ const body=quantityCompletion({action:'complete',quantity:300,productionDate:'2026-10-30',effectiveAt:'2026-10-31T02:20:00Z'});
+ assert.equal(body.productionDate,'2026-10-30');assert.equal(body.productionLocalDateTime,'2026-10-30T09:20');
+ assert.throws(()=>quantityCompletion({quantity:300,productionDate:'2026-10-30',productionLocalDateTime:'2026-10-31T09:20'}),{status:422});
+});
+test('progress quantities include the frozen balance and the new receipt exactly once',()=>{
+ const basis={model:quantityCutoverModel,snapshotId,approved:200,receivedAt:'2026-11-07T00:00:00Z'},order={id:'SYNTHETIC-ORDER',lsxQty:1000,completedQty:200};
+ const daily={id:'SYNTHETIC-NEW',kind:'completion',transitId:order.id,reportingModel:'daily-finished-v1',quantityOnly:true,quantityBaseline:basis,reportedQuantity:300,approvedQuantity:300,reviewStatus:'Đã xác nhận',productionDate:'2026-10-30'};
+ assert.equal(progressReviewSummary(order,[daily]).qty,500);
+});
+test('a time-log import cannot commit across quantity activation',()=>dailyFixture(async c=>{
+ const {importSourceTimeLog}=await import('../scripts/local/production-source-time-import.mjs');await c.db.prepare("DELETE FROM app_records WHERE entity IN ('production_reporting_policy','production_reporting_activation')").run();
+ const input={timeLog:[{sourceEventId:'TIME-SYNTHETIC-RACE-0001',planId:c.order.planId,lsxCode:c.order.lsxCode,sku:c.order.sku,line:'A',operation:'BẮT ĐẦU',effectiveAt:'2026-10-30T01:00:00Z',recordedAt:'2026-10-30T01:00:00Z',cumulativeHours:0,source:'TỰ ĐỘNG',actor:'SYNTHETIC',note:''}]};
+ const preview=await importSourceTimeLog(c.db,{action:'preview'},input,admin,[]);let injected=false;
+ const wrapped=new Proxy(c.db,{get(db,key){if(key==='prepare')return sql=>{const stmt=db.prepare(sql);if(!sql.startsWith('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT \'production_history_import\''))return stmt;return {bind(...args){const bound=stmt.bind(...args);return {async run(){if(!injected){injected=true;await activateQuantityCutover(db,{snapshotId},admin,{sourceId});}return bound.run();}};}};};const value=db[key];return typeof value==='function'?value.bind(db):value;}});
+ await assert.rejects(()=>importSourceTimeLog(wrapped,{action:'save',revision:preview.revision},input,admin,[]),{status:409});assert.equal(injected,true);
+ assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_history_import' AND json_extract(payload,'$.source')='Google Sheet SX_TIME_LOG'").first()).n,0);
+ await assert.rejects(()=>importSourceTimeLog(c.db,{action:'save',revision:preview.revision},input,admin,[]),{status:409});
+}));
+
+test('an old-day receipt can be corrected and saved without re-entering legacy stage history',()=>dailyFixture(async c=>{
+ await activate(c);const saved=await mutateProductionWorkflow(c.db,c.body({productionDate:'2026-10-30',quantity:200}),actor),{correctDailyOutput}=await import('../scripts/local/production-daily-correction.mjs');
+ const body={action:'preview',operation:'daily-output-edit',reportId:saved.report.id,quantity:300,productionDate:'2026-10-30',productionLocalDateTime:'2026-10-30T10:10',reason:'Synthetic correction',requestIdempotency:crypto.randomUUID(),expectedVersion:1};
+ const preview=await correctDailyOutput(c.db,body,admin),result=await correctDailyOutput(c.db,{...body,action:'apply',expectedRevision:preview.expectedRevision},admin);
+ assert.equal(result.report.reportedQuantity,300);assert.equal(result.report.productionDate,'2026-10-30');assert.equal(result.report.productionLocalDateTime,'2026-10-30T10:10');assert.equal(result.report.version,2);
+ assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_report'").first()).n,1);
+}));

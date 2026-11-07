@@ -1,3 +1,4 @@
+import {quantitySourceDatabase} from './production-quantity-cutover.mjs';
 import {quantityCompletion} from '../../lib/production-quantity-intake.mjs';
 import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
 import {attendancePrefixModel,checkAttendancePrefix} from '../../lib/production-attendance-prefix.mjs';
@@ -415,7 +416,22 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   if(requestId && !/^[a-zA-Z0-9-]{16,80}$/.test(requestId)) fail("Mã thao tác không hợp lệ.");
   if(action==='daily-output'){const result=await writeDailyOutput(db,body,actor,commitEvents);responseScope.committedDaily=true;return result;}
   const activation=await readDailyOutputPolicy(db);
-  if(activation.policy?.active&&activation.policy.intakeModel==='server-receipt-quantity-v1'&&(action==='complete'||action==='start'&&body.backfill?.to&&['save','apply'].includes(body.backfill.mode))){const result=await writeDailyOutput(db,quantityCompletion(body),actor,commitEvents,{legacySubmission:true});responseScope.committedDaily=true;return result;}
+  if(activation.policy?.active&&activation.policy.intakeModel==='server-receipt-quantity-v1'&&(action==='complete'||action==='start'&&body.backfill?.to&&['save','apply'].includes(body.backfill.mode))){
+    // Replays retain their original receipt identity across a model change. Only
+    // an existing completion backed by the frozen source may use this path.
+    if(requestId){const row=await db.prepare("SELECT payload FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(requestId).first();
+      if(row){const event=JSON.parse(row.payload);if(!isDailyOutput(event)){
+        if(event.actor!==actor.login||actor.line&&actor.line!==event.line)fail('Mã thao tác không khớp người hoặc Line đã ghi nhận.',409);
+        const frozen=quantitySourceDatabase(db,activation.policy.legacySnapshotId),source=event.reportId?await frozen.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(event.reportId).first():null;
+        const original=source?JSON.parse(source.payload):null,input=quantityCompletion(body);
+        if(action!=='complete'||event.kind!=='complete'||event.sourceId!==body.orderId||!original||original.kind!=='completion'||original.transitId!==body.orderId||Number(original.reportedQuantity)!==input.quantity||original.productionDate!==input.productionDate||Date.parse(event.effectiveAt)!==Date.parse(body.effectiveAt))fail('Mã thao tác không khớp nội dung phiếu cũ đã chốt.',409);
+        const current=await db.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(event.reportId).first();if(!current)fail('Thiếu phiếu cũ để đối chiếu lượt gửi lại.',409);
+        const report=JSON.parse(current.payload);if(report.transitId!==body.orderId||actor.line&&actor.line!==report.line)fail('Phiếu hiện tại không còn thuộc phạm vi Line của lượt gửi.',403);
+        responseScope.committedDaily=true; // Receipt-only replay: never recalculate historical labor.
+        return {event,report:{...report,id:event.reportId},replayed:true};
+      }}
+    }
+    const result=await writeDailyOutput(db,quantityCompletion(body),actor,commitEvents,{legacySubmission:true});responseScope.committedDaily=true;return result;}
   if(activation.policy?.cutoverReached&&!activation.policy.active)fail(activation.policy.blockedReason||'Thiếu mốc bảo toàn lịch sử, chưa cho phép ghi.',409);
   if(activation.policy?.cutoverReached&&(['start','extra','complete','pause','resume','transfer','add','reduce','preview-report','approve-hours','recalculate-attendance-hours'].includes(action)||body.stageEntries||body.backfill))fail('Đã chuyển sang báo sản lượng thành phẩm theo ngày. Lịch sử công đoạn chỉ để tra cứu; không ghi hoặc tính lại giờ theo lệnh.',409);
   if(requestId&&(!body.backfill||['apply','save'].includes(body.backfill.mode))){const match=await db.prepare("SELECT payload FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(requestId).first();const existing=match?{payload:JSON.parse(match.payload)}:null;
