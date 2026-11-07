@@ -171,3 +171,16 @@ for(const finished of [false,true])test(`stage-format completion retries preserv
  const result=await mutateProductionWorkflow(c.db,{action:'complete',orderId:c.order.id,stageEntries:[{stage:finished?'FINAL':'ASSY',quantity:200}],effectiveAt:event.effectiveAt,requestIdempotency:token},actor);
  assert.equal(result.replayed,true);assert.equal(result.report.id,report.id);assert.equal(result.report.reportedQuantity,finished?200:0);assert.deepEqual(await records(c.db),before);
 }));
+
+test('ARRAY history import is fenced at commit when activation occurs after API precheck',()=>dailyFixture(async c=>{
+ await c.db.prepare("DELETE FROM app_records WHERE entity IN ('production_reporting_policy','production_reporting_activation')").run();
+ // Keep the synthetic import unambiguous despite the fixture's split sibling.
+ await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.planId','OTHER-PLAN') WHERE entity='in_transit' AND record_key='OTHER-LSX'").run();
+ const text=JSON.stringify([{planId:c.order.planId,sku:c.order.sku,line:'A',startedAt:'2026-10-30T01:00:00Z',completedAt:'2026-10-30T02:00:00Z',quantity:200,count:1,cumulativeHours:1}]);
+ let armed=false,injected=false;
+ const wrapped=new Proxy(c.db,{get(db,key){if(key==='prepare')return sql=>{const stmt=db.prepare(sql);if(!sql.startsWith('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT \'production_history_import\''))return stmt;return {bind(...args){const bound=stmt.bind(...args);return {async run(){if(armed){armed=false;injected=true;await activateQuantityCutover(db,{snapshotId},admin,{sourceId});}return bound.run();}};}};};const v=db[key];return typeof v==='function'?v.bind(db):v;}});
+ const call=await reviewer(c,(request,env)=>siteApi(request,{...env,DB:wrapped})),preview=await call('/api/production-history-import',{action:'preview',text});assert.equal(preview.status,200,JSON.stringify(preview.body));
+ armed=true;const saved=await call('/api/production-history-import',{action:'save',text,revision:preview.body.revision});assert.equal(injected,true);assert.equal(saved.status,409,JSON.stringify(saved.body));
+ assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_history_import' AND record_key=?").bind(preview.body.batch.id).first()).n,0);
+ assert.equal((await readDailyOutputPolicy(c.db)).policy.active,true);
+}));
