@@ -2,7 +2,8 @@
 // Freezes source bytes with INSERT SELECT; it never derives legacy labor/payroll.
 import {dailyOutputModel} from '../../lib/production-report-model.mjs';
 export const quantityCutoverModel='server-receipt-quantity-v1';
-const sources=['in_transit','production_report','production_history_import','warehouse_in'];
+export const quantityCutoverSources=Object.freeze(['in_transit','production_report','production_history_import','warehouse_in']);
+const sources=quantityCutoverSources;
 const fail=(message,status=409)=>{throw Object.assign(Error(message),{status});};
 const prefix=id=>JSON.stringify([id]).slice(0,-1)+',';
 export function quantitySourceDatabase(db,id){
