@@ -4,7 +4,7 @@ import {attendancePrefixModel} from '../../lib/production-attendance-prefix.mjs'
 const borrowedAttendanceFields=['id','name','line','active','include','calendarHc','calendarOt','absentHc','absentOt','hc','ot','helper','otherWork','transferFromHours'];
 const projectMonth=(m,line)=>{if(!line)return m;const allowed=m.lines[line];return {...m,lines:{[line]:m.kind===attendancePrefixModel&&allowed?{...allowed,people:allowed.people.map(p=>p.line===line?p:Object.fromEntries(borrowedAttendanceFields.filter(k=>p[k]!==undefined).map(k=>[k,p[k]])))}:allowed}};};
 export async function readLegacyPreservation(db,policy,actor,{full=true}={}){
- if(!policy?.active||!policy.legacySnapshotId)return null;
+ if(!policy?.active||!policy.legacySnapshotId||policy.intakeModel==='server-receipt-quantity-v1')return null;
  const snapshotId=policy.legacySnapshotId,prefix=snapshotId+':',upper=snapshotId+';';
  const read=async entity=>(await readRecordPages(db,{where:'entity=? AND record_key>=? AND record_key<?',args:[entity,prefix,upper]})).map(r=>JSON.parse(r.payload));
  const [basis,monthly,orders]=await Promise.all([full?read('production_legacy_basis'):[],full?read('production_legacy_month'):[],read('production_legacy_order')]);

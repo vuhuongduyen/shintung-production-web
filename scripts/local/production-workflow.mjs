@@ -1,3 +1,4 @@
+import {quantityCompletion} from '../../lib/production-quantity-intake.mjs';
 import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
 import {attendancePrefixModel,checkAttendancePrefix} from '../../lib/production-attendance-prefix.mjs';
 import {productionHistoryOrder} from '../../lib/production-history-order.mjs';
@@ -414,6 +415,7 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   if(requestId && !/^[a-zA-Z0-9-]{16,80}$/.test(requestId)) fail("Mã thao tác không hợp lệ.");
   if(action==='daily-output'){const result=await writeDailyOutput(db,body,actor,commitEvents);responseScope.committedDaily=true;return result;}
   const activation=await readDailyOutputPolicy(db);
+  if(activation.policy?.active&&activation.policy.intakeModel==='server-receipt-quantity-v1'&&(action==='complete'||action==='start'&&body.backfill?.to&&['save','apply'].includes(body.backfill.mode))){const result=await writeDailyOutput(db,quantityCompletion(body),actor,commitEvents,{legacySubmission:true});responseScope.committedDaily=true;return result;}
   if(activation.policy?.cutoverReached&&!activation.policy.active)fail(activation.policy.blockedReason||'Thiếu mốc bảo toàn lịch sử, chưa cho phép ghi.',409);
   if(activation.policy?.cutoverReached&&(['start','extra','complete','pause','resume','transfer','add','reduce','preview-report','approve-hours','recalculate-attendance-hours'].includes(action)||body.stageEntries||body.backfill))fail('Đã chuyển sang báo sản lượng thành phẩm theo ngày. Lịch sử công đoạn chỉ để tra cứu; không ghi hoặc tính lại giờ theo lệnh.',409);
   if(requestId&&(!body.backfill||['apply','save'].includes(body.backfill.mode))){const match=await db.prepare("SELECT payload FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(requestId).first();const existing=match?{payload:JSON.parse(match.payload)}:null;
