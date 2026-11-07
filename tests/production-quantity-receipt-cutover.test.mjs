@@ -184,3 +184,37 @@ test('ARRAY history import is fenced at commit when activation occurs after API 
  assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_history_import' AND record_key=?").bind(preview.body.batch.id).first()).n,0);
  assert.equal((await readDailyOutputPolicy(c.db)).policy.active,true);
 }));
+
+async function pendingLegacyBalance(c){
+ const order={...c.order,completedQty:400};await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='in_transit' AND record_key=?").bind(JSON.stringify(order),order.id).run();
+ const report={id:'SYNTHETIC-LEGACY-BALANCE',kind:'completion',transitId:order.id,lsxCode:order.lsxCode,sku:order.sku,line:'A',reportedQuantity:200,reviewStatus:'Chờ kiểm tra',version:1,startedAt:'2026-11-02T01:00:00Z',completedAt:'2026-11-02T03:00:00Z',hours:{hc:2,ot:0,total:2}};
+ await c.put('production_report',report.id,report);await activate(c);await mutateProductionWorkflow(c.db,c.body({quantity:300,expectedOrderRevision:await (await import('../lib/record-revision.mjs')).recordRevision(JSON.stringify(order))}),actor);
+ return report;
+}
+const rawBalance=async c=>JSON.parse((await c.db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(c.order.id).first()).payload);
+function assertDeniedReviewUnchanged(before,after,except=[]){
+ // Failed API attempts retain their execution audit; business rows must not change.
+ const business=rows=>rows.filter(r=>r.entity!=='website_action_audit'&&!except.includes(r.entity));assert.deepEqual(business(after),business(before));
+ const newAudit=after.filter(r=>r.entity==='website_action_audit'&&!before.some(old=>old.entity===r.entity&&old.record_key===r.record_key));assert.equal(newAudit.length,1);const receipt=JSON.parse(newAudit[0].payload);assert.equal(receipt.httpStatus,409);assert.equal(receipt.outcome,'failed');assert.equal(receipt.actorId,'SYNTHETIC-REVIEWER');
+}
+test('frozen legacy approval persists raw balance atomically, keeps daily pending separate and cannot count a retry twice',()=>dailyFixture(async c=>{
+ const report=await pendingLegacyBalance(c),call=await reviewer(c);assert.equal((await rawBalance(c)).completedQty,400);
+ const body={action:'review',reportId:report.id,approve:true,expectedVersion:1},result=await call('/api/production-report',body);assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(result.body.payload.completedQty,600);
+ const raw=await rawBalance(c);assert.equal(raw.completedQty,600);assert.equal(raw.pendingReportQty,300);
+ const context=(await call('/api/production-workflow?view=work')).body;assert.equal(context.orders.find(o=>o.id===c.order.id).completedQty,600);
+ const warehouse=JSON.parse((await c.db.prepare("SELECT payload FROM app_records WHERE entity='warehouse_in' AND record_key=?").bind('SX:'+report.id).first()).payload);assert.equal(warehouse.reportId,report.id);assert.equal(warehouse.proposedQuantity,200);
+ const before=await records(c.db);assert.equal((await call('/api/production-report',body)).status,409);assertDeniedReviewUnchanged(before,await records(c.db));
+}));
+test('competing legacy reviews have one winner and persist only the approved quantity once',()=>dailyFixture(async c=>{
+ const report=await pendingLegacyBalance(c),call=await reviewer(c),body={action:'review',reportId:report.id,approve:true,expectedVersion:1};
+ const results=await Promise.all([call('/api/production-report',body),call('/api/production-report',body)]);assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);assert.equal((await rawBalance(c)).completedQty,600);assert.equal((await rawBalance(c)).pendingReportQty,300);
+ assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='warehouse_in'").first()).n,1);
+}));
+test('a concurrent In Transit edit loses no data or partial legacy approval at commit',()=>dailyFixture(async c=>{
+ const report=await pendingLegacyBalance(c);let armed=false;
+ const wrapped=new Proxy(c.db,{get(db,key){if(key==='batch')return async statements=>{if(armed){armed=false;await db.prepare("UPDATE app_records SET payload=json_set(payload,'$.planningNote','SYNTHETIC-CONCURRENT-EDIT') WHERE entity='in_transit' AND record_key=?").bind(c.order.id).run();}return db.batch(statements);};const v=db[key];return typeof v==='function'?v.bind(db):v;}});
+ const call=await reviewer(c,(request,env)=>siteApi(request,{...env,DB:wrapped})),body={action:'review',reportId:report.id,approve:true,expectedVersion:1};armed=true;
+ const before=await records(c.db),result=await call('/api/production-report',body);assert.equal(result.status,409);const after=await records(c.db);assertDeniedReviewUnchanged(before,after,['in_transit']);
+ assert.equal((await rawBalance(c)).completedQty,400);assert.equal((await rawBalance(c)).planningNote,'SYNTHETIC-CONCURRENT-EDIT');
+ const retried=await call('/api/production-report',body);assert.equal(retried.status,200,JSON.stringify(retried.body));assert.equal((await rawBalance(c)).completedQty,600);assert.equal((await rawBalance(c)).planningNote,'SYNTHETIC-CONCURRENT-EDIT');
+}));

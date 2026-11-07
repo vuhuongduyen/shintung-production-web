@@ -107,3 +107,17 @@ for(const finish of ['08:30','08:39','08:40'])test(`legacy B PHAO repair exits a
  const r=w.reports.find(r=>r.backfillBatch);assert.equal(r.completedAt,new Date(to).toISOString());assert.equal(r.stageQuantity,1000);assert.ok(Math.abs(r.hours.total-(170+Number(finish.slice(3)))/60)<0.0001);
  const atExit=projectLiveStages(w.orders,w.reports,w.events,Date.parse(to));assert.deepEqual(atExit[key].people,[]);if(finish!=='08:40')assert.deepEqual(atExit['["O","ASSY"]'].people,['B']);
 }));
+
+for(const mode of ['apply','save'])test(`committed closed backfill replays after quantity activation without reopening station writes (${mode})`,()=>fixture(async({db,catalog})=>{
+ const {activateQuantityCutover}=await import('../scripts/local/production-quantity-cutover.mjs'),{records}=await import('../scripts/local/database.mjs');
+ for(const item of catalog)item.processes=['FINAL'];
+ const requestIdempotency=crypto.randomUUID(),input={stage:'FINAL',from:at('08:00'),to:at('09:00'),people:['A'],quantity:200,resolveAssignments:true,confirmedAllocations:[]};
+ const preview=await mutateProductionWorkflow(db,{action:'start',orderId:'O',requestIdempotency,backfill:{...input,mode:'preview'}},actor,catalog),body={action:'start',orderId:'O',requestIdempotency,backfill:{...input,mode,expectedRevision:preview.expectedRevision}};
+ const first=await mutateProductionWorkflow(db,body,actor,catalog);assert.equal(first.report.reportedQuantity,200);assert.equal((await mutateProductionWorkflow(db,body,actor,catalog)).replayed,true);
+ await activateQuantityCutover(db,{snapshotId:'SYNTHETIC-CLOSED-BACKFILL-REPLAY'},actor,{sourceId:'a'.repeat(64)});const before=await records(db);
+ const replay=await mutateProductionWorkflow(db,body,actor,catalog);assert.equal(replay.replayed,true);assert.equal(replay.event.id,first.event.id);assert.equal(replay.report.id,first.report.id);assert.equal(replay.report.reportedQuantity,200);assert.equal(replay.closed,true);assert.deepEqual(await records(db),before);
+ await assert.rejects(()=>mutateProductionWorkflow(db,{action:'start',orderId:'O',requestIdempotency:crypto.randomUUID(),effectiveAt:at('10:00'),stageEntries:[{stage:'FINAL',people:['A']}]},actor,catalog),{status:409});
+ await assert.rejects(()=>mutateProductionWorkflow(db,{...body,requestIdempotency:crypto.randomUUID(),backfill:{...body.backfill,to:undefined}},actor,catalog),{status:409});
+ await assert.rejects(()=>mutateProductionWorkflow(db,{...body,backfill:{...body.backfill,quantity:201}},actor,catalog),{status:409});
+ await assert.rejects(()=>mutateProductionWorkflow(db,body,{...actor,login:'SYNTHETIC-OTHER-ACTOR'},catalog),{status:409});assert.deepEqual(await records(db),before);
+}));

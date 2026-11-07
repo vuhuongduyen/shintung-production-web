@@ -422,14 +422,25 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
     if(requestId){const row=await db.prepare("SELECT payload FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(requestId).first();
       if(row){const event=JSON.parse(row.payload);if(!isDailyOutput(event)){
         if(event.actor!==actor.login||actor.line&&actor.line!==event.line)fail('Mã thao tác không khớp người hoặc Line đã ghi nhận.',409);
-        const frozen=quantitySourceDatabase(db,activation.policy.legacySnapshotId),source=event.reportId?await frozen.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(event.reportId).first():null;
-        const original=source?JSON.parse(source.payload):null,input=quantityCompletion(body);
-        const legacyComplete=event.kind==='complete'||event.kind==='stage-work'&&event.stageReporting===true&&event.stageAction==='complete';
-        if(action!=='complete'||!legacyComplete||event.sourceId!==body.orderId||!original||original.kind!=='completion'||original.transitId!==body.orderId||Number(original.stageReporting?original.stageQuantity:original.reportedQuantity)!==input.quantity||original.productionDate!==input.productionDate||Date.parse(event.effectiveAt)!==Date.parse(body.effectiveAt))fail('Mã thao tác không khớp nội dung phiếu cũ đã chốt.',409);
-        const current=await db.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(event.reportId).first();if(!current)fail('Thiếu phiếu cũ để đối chiếu lượt gửi lại.',409);
+        const frozen=quantitySourceDatabase(db,activation.policy.legacySnapshotId);
+        let source,closedReplay=false;
+        if(action==='start'){
+          const input=body.backfill;
+          if(event.kind!=='stage-work'||event.stageReporting!==true||event.stageAction!=='start'||!event.backfillBatch||!event.backfillWindow?.to||!input?.to)fail('Mã thao tác không khớp lần nhập bù đã chốt.',409);
+          const rows=await frozen.prepare("SELECT record_key,payload FROM app_records WHERE entity='production_report' AND json_extract(payload,'$.backfillBatch')=? AND json_extract(payload,'$.transitId')=? AND json_extract(payload,'$.stageName')=?").bind(event.backfillBatch,body.orderId,input.stage).all();
+          if(rows.results.length!==1)fail('Không tìm thấy duy nhất phiếu nhập bù đã chốt.',409);
+          source=rows.results[0];const original=JSON.parse(source.payload),people=values=>JSON.stringify([...new Set((values||[]).map(String))].sort());
+          if(original.kind!=='completion'||!original.stageReporting||event.sourceId!==body.orderId||original.transitId!==body.orderId||original.line!==event.line||original.reportedBy!==event.actor||original.stageName!==input.stage||Number(original.stageQuantity)!==Number(input.quantity)||!Array.isArray(input.people)||people(original.employees)!==people(input.people)||Date.parse(original.startedAt)!==Date.parse(input.from)||Date.parse(original.completedAt)!==Date.parse(input.to)||Date.parse(event.backfillWindow.from)!==Date.parse(input.from)||Date.parse(event.backfillWindow.to)!==Date.parse(input.to))fail('Mã thao tác không khớp nội dung phiếu nhập bù đã chốt.',409);
+          closedReplay=true;
+        }else{
+          source=event.reportId?await frozen.prepare("SELECT record_key,payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(event.reportId).first():null;
+          const original=source?JSON.parse(source.payload):null,input=quantityCompletion(body),legacyComplete=event.kind==='complete'||event.kind==='stage-work'&&event.stageReporting===true&&event.stageAction==='complete';
+          if(!legacyComplete||event.sourceId!==body.orderId||!original||original.kind!=='completion'||original.transitId!==body.orderId||Number(original.stageReporting?original.stageQuantity:original.reportedQuantity)!==input.quantity||original.productionDate!==input.productionDate||Date.parse(event.effectiveAt)!==Date.parse(body.effectiveAt))fail('Mã thao tác không khớp nội dung phiếu cũ đã chốt.',409);
+        }
+        const reportId=source.record_key,current=await db.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(reportId).first();if(!current)fail('Thiếu phiếu cũ để đối chiếu lượt gửi lại.',409);
         const report=JSON.parse(current.payload);if(report.transitId!==body.orderId||actor.line&&actor.line!==report.line)fail('Phiếu hiện tại không còn thuộc phạm vi Line của lượt gửi.',403);
         responseScope.committedDaily=true; // Receipt-only replay: never recalculate historical labor.
-        return {event,report:{...report,id:event.reportId},replayed:true};
+        return {event,report:{...report,id:reportId},replayed:true,...(closedReplay?{ok:true,closed:true,checkedThrough:JSON.parse(source.payload).completedAt}:{})};
       }}
     }
     const result=await writeDailyOutput(db,quantityCompletion(body),actor,commitEvents,{legacySubmission:true});responseScope.committedDaily=true;return result;}
