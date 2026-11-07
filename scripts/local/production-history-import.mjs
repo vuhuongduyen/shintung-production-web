@@ -1,3 +1,4 @@
+import {readDailyOutputPolicy} from './production-daily-output.mjs';
 import {closeHistoricalQuantity} from './production-quantity-close.mjs';
 import {normalizeStoredAssy} from './production-assy-normalization.mjs';
 import {importErpStages} from './production-erp-stage-import.mjs';
@@ -12,9 +13,11 @@ import {allocateHistory} from '../../lib/production-history-allocation.mjs';
 import {siteLaborHours} from '../../lib/site-labor-hours.mjs';
 import {productionActorId} from '../../lib/production-actor.mjs';
 const fail=(m,s=422)=>{throw new PlanError(m,s);};
+const importEntities="('in_transit','production_event','production_report','capacity','production_schedule','employees','labor_hours','production_history_import','production_reporting_policy','production_reporting_activation','production_legacy_manifest')";
 const digest=async text=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))),b=>b.toString(16).padStart(2,'0')).join('');
 export async function productionHistoryImport(db,body,actor,catalog){
  if(!actor.isAdmin||actor.line)fail('Chỉ Admin toàn quyền được nhập lịch sử.',403);
+ if((await readDailyOutputPolicy(db)).policy?.cutoverReached)fail('Lịch sử đã khóa tại mốc chuyển đổi; không nhập đè dữ liệu cũ.',409);
  if(!['preview','save'].includes(body.action))fail('Thao tác không hợp lệ.');
  let input;try{input=JSON.parse(String(body.text||''));}catch{fail('Dữ liệu JSON không hợp lệ.');}
  if(input?.quantityOnlyClose)return closeHistoricalQuantity(db,body,input,actor,catalog);
@@ -23,7 +26,7 @@ export async function productionHistoryImport(db,body,actor,catalog){
  if(input?.reconcileSource)return reconcileProductionSheet(db,body,input,actor,catalog);
  if(input&&typeof input==='object'&&!Array.isArray(input)&&Array.isArray(input.timeLog))return importSourceTimeLog(db,body,input,actor,catalog);
  if(!Array.isArray(input)||!input.length||input.length>100)fail('Nhập từ 1 đến 100 dòng.');
- const records=(await db.prepare("SELECT entity,record_key,payload FROM app_records WHERE entity IN ('in_transit','production_event','production_report','capacity','production_schedule','employees','labor_hours','production_history_import') ORDER BY entity,record_key").all()).results;
+ const records=(await db.prepare(`SELECT entity,record_key,payload FROM app_records WHERE entity IN ${importEntities} ORDER BY entity,record_key`).all()).results;
  const revision=await digest(JSON.stringify(records)),batchId=await digest(JSON.stringify(input));
  const already=records.find(r=>r.entity==='production_history_import'&&r.record_key===batchId);if(already)return {ok:true,replayed:true,saved:true,batch:JSON.parse(already.payload)};
  const state=await readProductionWorkflow(db,actor,catalog),standards=new Map(siteLaborHours(records.filter(r=>r.entity==='labor_hours').map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}))).map(r=>[r.key,r.payload.cancelled?null:r.payload.laborHour]));
@@ -65,7 +68,7 @@ export async function productionHistoryImport(db,body,actor,catalog){
  if(body.action==='preview')return {ok:true,revision,batch};
  if(body.revision!==revision)fail('Dữ liệu nguồn vừa thay đổi; đối chiếu lại trước khi lưu.',409);
  // Atomic snapshot comparison includes both modified rows and phantom inserts.
- const expected=JSON.stringify(records),entities="('in_transit','production_event','production_report','capacity','production_schedule','employees','labor_hours','production_history_import')";
+ const expected=JSON.stringify(records),entities=importEntities;
  const result=await db.prepare(`INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'production_history_import',?,?,?,? WHERE (SELECT count(*) FROM app_records WHERE entity IN ${entities})=json_array_length(?) AND NOT EXISTS(SELECT 1 FROM json_each(?) e WHERE NOT EXISTS(SELECT 1 FROM app_records a WHERE a.entity=json_extract(e.value,'$.entity') AND a.record_key=json_extract(e.value,'$.record_key') AND a.payload=json_extract(e.value,'$.payload'))) ON CONFLICT(entity,record_key) DO NOTHING`).bind(batchId,JSON.stringify(batch),actor.login,now,expected,expected).run();
  if(result.meta.changes!==1)fail('Dữ liệu đã thay đổi hoặc đã được nhập; hãy đối chiếu lại.',409);
  return {ok:true,saved:true,batch};

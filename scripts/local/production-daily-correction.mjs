@@ -1,9 +1,10 @@
+import {mergeProduction} from '../../lib/in-transit.mjs';
 import {queuePendingDailyCorrection} from './production-daily-pending-correction.mjs';
 import {buildCorrectedDailyReport} from './production-daily-correction-value.mjs';
 import {canCorrectProduction} from '../../lib/production-correction-access.mjs';
 import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
 import {isDailyOutput,dailyOutputModel} from '../../lib/production-daily-output.mjs';
-import {readDailyOrderReports,readDailyOutputPolicy} from './production-daily-output.mjs';
+import {readDailyOrderReports,readDailyOutputPolicy,dailyPolicyGuards} from './production-daily-output.mjs';
 const fail=(message,status=409)=>{throw Object.assign(Error(message),{status});};
 const rawRow=(db,entity,key)=>db.prepare('SELECT payload FROM app_records WHERE entity=? AND record_key=?').bind(entity,key).first();
 export async function correctDailyOutput(db,body,actor){
@@ -29,15 +30,18 @@ export async function correctDailyOutput(db,body,actor){
  if(['line','sku','lsxCode'].some(k=>order[k]!==old[k]))fail('Lệnh đã đổi Line/SKU/LSX so với phiếu. Cần đối chiếu trước khi điều chỉnh.');
  const scoped=await readDailyOrderReports(db,order),now=new Date().toISOString();
  const next=buildCorrectedDailyReport({old,body,actor,order,scoped,policy,rateRow,now,reason});
- const cursorRaw=cursor?.payload||JSON.stringify({version:0,token:''}),expectedRevision=await recordRevision(JSON.stringify([fingerprint,cursorRaw,reportRow.payload,orderRow.payload,policy.raw,policy.manifestRaw,rateRow?.payload??null,scoped.guards]));
+ const cursorRaw=cursor?.payload||JSON.stringify({version:0,token:''}),expectedRevision=await recordRevision(JSON.stringify([fingerprint,cursorRaw,reportRow.payload,orderRow.payload,policy.raw,policy.activationRaw,policy.manifestRaw,rateRow?.payload??null,scoped.guards]));
  if(body.action==='preview')return {ok:true,expectedRevision,before:old,after:next};
  if(body.expectedRevision!==expectedRevision||Number(body.expectedVersion)!==Number(old.version||0))fail(conflictMessage);
  const event={id:crypto.randomUUID(),kind:'daily-output-correction',reportingModel:dailyOutputModel,quantityOnly:true,sourceId:old.transitId,line:old.line,reportId:old.id,operation:body.operation,before:old,after:next,reason,actor:actor.login,recordedAt:now,effectiveAt:now,requestIdempotency:token,requestFingerprint:fingerprint};
  const guard=(entity,key,raw)=>raw==null?{sql:'NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)',args:[entity,key]}:{sql:'EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)',args:[entity,key,raw]};
- const guards=[guard('production_report',old.id,reportRow.payload),guard('in_transit',old.transitId,orderRow.payload),guard('production_reporting_policy','global',policy.raw),...(policy.manifestKey?[guard('production_legacy_manifest',policy.manifestKey,policy.manifestRaw)]:[]),guard('labor_hours',String(old.sku||'').trim().toUpperCase(),rateRow?.payload??null),...scoped.guards,{sql:warehouseSql,args:warehouseArgs}],nextCursor=JSON.stringify({version:Number(JSON.parse(cursorRaw).version||0)+1,token:crypto.randomUUID()});
+ const guards=[guard('production_report',old.id,reportRow.payload),guard('in_transit',old.transitId,orderRow.payload),...dailyPolicyGuards(policy),guard('labor_hours',String(old.sku||'').trim().toUpperCase(),rateRow?.payload??null),...scoped.guards,{sql:warehouseSql,args:warehouseArgs}],nextCursor=JSON.stringify({version:Number(JSON.parse(cursorRaw).version||0)+1,token:crypto.randomUUID()});
  const writes=[db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key='global' AND payload=? AND ${guards.map(g=>g.sql).join(' AND ')}`).bind(nextCursor,actor.login,now,cursorRaw,...guards.flatMap(g=>g.args))];
  const gate="EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key='global' AND payload=?)";
  writes.push(db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_report' AND record_key=? AND ${gate}`).bind(JSON.stringify(next),actor.login,now,old.id,nextCursor));
  writes.push(db.prepare(`INSERT INTO app_records SELECT 'production_event',?,?,?,? WHERE ${gate}`).bind(event.id,JSON.stringify(event),actor.login,now,nextCursor));
+ // Refresh existing materialized totals; retain admission revisions on never-reviewed rows.
+ if(Object.hasOwn(order,'pendingReportQty')){const merged=mergeProduction(order,scoped.reports.map(r=>r.id===old.id?next:r)),nextOrder={...JSON.parse(orderRow.payload),completedQty:merged.completedQty,pendingReportQty:merged.pendingReportQty,productionState:merged.productionState,actualCompletedAt:merged.actualCompletedAt,updatedAt:now,updatedBy:actor.login};
+ writes.push(db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND ${gate}`).bind(JSON.stringify(nextOrder),actor.login,now,old.transitId,nextCursor));}
  const result=await db.batch(writes);if(result[0].meta.changes!==1)fail(conflictMessage);return {ok:true,report:next,event};
 }

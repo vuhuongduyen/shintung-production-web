@@ -2,7 +2,7 @@ import {canCorrectProduction} from '../../lib/production-correction-access.mjs';
 import {hasMenuPermission} from '../../lib/menu-action-access.mjs';
 import {isDailyOutput} from '../../lib/production-report-model.mjs';
 import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
-import {readDailyOutputPolicy} from './production-daily-output.mjs';
+import {readDailyOutputPolicy,dailyPolicyGuards} from './production-daily-output.mjs';
 const fail=(message,status=409)=>{throw Object.assign(Error(message),{status});};
 const raw=(db,entity,key)=>db.prepare('SELECT payload FROM app_records WHERE entity=? AND record_key=?').bind(entity,key).first();
 const token=value=>{if(typeof value!=='string'||!/^[A-Za-z0-9-]{16,80}$/.test(value))fail('Thiếu mã thao tác ổn định.',422);return value;};
@@ -15,7 +15,6 @@ export async function commitDailyRecords(db,actor,cursor,checks,changes){
  const result=await db.batch(statements);if(result[0].meta.changes!==1)fail(conflictMessage);
 }
 const receiptReview=p=>JSON.stringify(Object.fromEntries(Object.entries(p).filter(([k])=>!['sheetSync','updatedAt','updatedBy'].includes(k))));
-const policyGuards=p=>[dailyRecordGuard('production_reporting_policy','global',p.raw),dailyRecordGuard('production_legacy_manifest',p.manifestKey,p.manifestRaw)];
 export async function requestDailyWithdrawal(db,body,actor){
  if(!canCorrectProduction(actor))fail('Không có quyền Điều chỉnh báo công để yêu cầu thu hồi.',403);
  if(!['preview','apply'].includes(body.action))fail('Yêu cầu thu hồi không hợp lệ.',422);
@@ -36,13 +35,13 @@ export async function requestDailyWithdrawal(db,body,actor){
  if(!receipt.confirmedBy||!Number.isFinite(Date.parse(receipt.confirmedAt))||!Number.isFinite(Number(receipt.receivedQuantity))||receipt.receivedQuantity===null||receipt.receivedQuantity===''||Number(receipt.receivedQuantity)<0)fail('Thiếu căn cứ số lượng kho đã nhận; cần đối chiếu, không tự gán số.',422);
  if(!receipt.sheetSync?.spreadsheetId||!receipt.sheetSync.exportedCompletedAt)fail('Chờ đồng bộ và đối soát phiếu gốc đúng Sheet trước khi yêu cầu thu hồi.');
  if(['pending','approved-awaiting-sheet'].includes(receipt.withdrawalRequest?.status))fail('Phiếu đang có yêu cầu thu hồi; đối chiếu lượt cũ.');
- const revision=await recordRevision(JSON.stringify([fingerprint,reportRow.payload,receiptReview(receipt),receipt.sheetSync.spreadsheetId,receipt.sheetSync.exportedCompletedAt,policy.raw,policy.manifestRaw]));
+ const revision=await recordRevision(JSON.stringify([fingerprint,reportRow.payload,receiptReview(receipt),receipt.sheetSync.spreadsheetId,receipt.sheetSync.exportedCompletedAt,policy.raw,policy.activationRaw,policy.manifestRaw]));
  if(body.action==='preview')return {ok:true,expectedRevision:revision,report,receipt,requiresWarehouse:true};
  if(body.expectedRevision!==revision||Number(body.expectedVersion)!==Number(report.version||0))fail(conflictMessage);
  const now=new Date().toISOString(),request={id,reportId:report.id,receiptId:receiptRow.record_key,transitId:report.transitId,line:report.line,originalSpreadsheetId:receipt.sheetSync.spreadsheetId,operation:'withdrawal',status:'pending',fingerprint,requestedBy:actor.login,requestedAt:now,reason,beforeReport:report,beforeReceipt:receipt,version:1};
  const nextReceipt={...receipt,withdrawalRequest:{id,status:'pending',requestedBy:actor.login,requestedAt:now,reason},sheetSync:{...receipt.sheetSync,status:'pending',command:{kind:'withdrawal-request',id,revision:1}},updatedBy:actor.login,updatedAt:now};
  const event={id:crypto.randomUUID(),kind:'daily-output-withdrawal-request',quantityOnly:true,reportingModel:report.reportingModel,reportId:report.id,sourceId:report.transitId,line:report.line,withdrawalId:id,actor:actor.login,recordedAt:now,effectiveAt:now,reason,requestIdempotency:id,before:{warehouseQuantity:receipt.receivedQuantity,reportedQuantity:report.reportedQuantity,approvedQuantity:report.approvedQuantity},after:{status:'Chờ Kho xử lý thu hồi',warehouseQuantity:receipt.receivedQuantity,reportedQuantity:report.reportedQuantity,approvedQuantity:report.approvedQuantity}};
- await commitDailyRecords(db,actor,cursor,[dailyRecordGuard('production_warehouse_withdrawal',id,null),dailyRecordGuard('production_report',report.id,reportRow.payload),dailyRecordGuard('warehouse_in',receiptRow.record_key,receiptRow.payload),...policyGuards(policy)],[{entity:'production_warehouse_withdrawal',key:id,value:request,old:null},{entity:'warehouse_in',key:receiptRow.record_key,value:nextReceipt,old:receiptRow.payload},{entity:'production_event',key:event.id,value:event,old:null}]);
+ await commitDailyRecords(db,actor,cursor,[dailyRecordGuard('production_warehouse_withdrawal',id,null),dailyRecordGuard('production_report',report.id,reportRow.payload),dailyRecordGuard('warehouse_in',receiptRow.record_key,receiptRow.payload),...dailyPolicyGuards(policy)],[{entity:'production_warehouse_withdrawal',key:id,value:request,old:null},{entity:'warehouse_in',key:receiptRow.record_key,value:nextReceipt,old:receiptRow.payload},{entity:'production_event',key:event.id,value:event,old:null}]);
  return {ok:true,pending:true,request,event,report};
 }
 export async function decideDailyWithdrawal(db,body,actor){
@@ -58,7 +57,7 @@ async function decideWithdrawalInternal(db,body,actor,decisionSource,expectedRec
  const decisionToken=body.action==='withdrawal-preview'?null:token(body.requestIdempotency),fingerprint=decisionToken?await recordRevision(JSON.stringify([id,body.action,reason])):null;
  if(decisionToken&&request.decisionToken===decisionToken){if(request.decidedBy!==actor.login||request.decisionSource!==decisionSource||request.decisionFingerprint!==fingerprint)fail('Mã quyết định không khớp người/nội dung.');const receipt=await raw(db,'warehouse_in',request.receiptId);return {ok:true,replayed:true,pending:request.status==='approved-awaiting-sheet',request,receipt:receipt?JSON.parse(receipt.payload):null};}
  const [receiptRow,reportRow,cursor,policy]=await Promise.all([raw(db,'warehouse_in',request.receiptId),raw(db,'production_report',request.reportId),raw(db,'production_cursor','global'),readDailyOutputPolicy(db)]);
- if(!receiptRow||!reportRow)fail('Phiếu nguồn đã thay đổi.');const receipt=JSON.parse(receiptRow.payload),report=JSON.parse(reportRow.payload),revision=await recordRevision(JSON.stringify([row.payload,receiptReview(receipt),reportRow.payload,policy.raw,policy.manifestRaw]));
+ if(!receiptRow||!reportRow)fail('Phiếu nguồn đã thay đổi.');const receipt=JSON.parse(receiptRow.payload),report=JSON.parse(reportRow.payload),revision=await recordRevision(JSON.stringify([row.payload,receiptReview(receipt),reportRow.payload,policy.raw,policy.activationRaw,policy.manifestRaw]));
  if(body.action==='withdrawal-preview')return {ok:true,expectedRevision:revision,request,receipt,report};
  if(!policy.policy?.active)fail('Policy hiện chưa cho phép quyết định thu hồi mới.');
  if(await db.prepare("SELECT record_key FROM app_records WHERE entity='production_event' AND json_extract(payload,'$.requestIdempotency')=? LIMIT 1").bind(decisionToken).first())fail('Mã quyết định đã dùng cho thao tác khác.');
@@ -67,7 +66,7 @@ async function decideWithdrawalInternal(db,body,actor,decisionSource,expectedRec
  if(JSON.stringify(report)!==JSON.stringify(request.beforeReport)||['source','reportId','sourceReportId','sku','line','lsxCode','planId','proposedQuantity','receivedQuantity','confirmedBy','confirmedAt','status','confirmationStatus','confirmation_status','cancelled','voided','_deleted'].some(k=>receipt[k]!==request.beforeReceipt[k]))fail('Số liệu nguồn thay đổi; cần đối chiếu lại yêu cầu.');
  const approve=body.action==='withdrawal-approve';if(!approve&&!reason)fail('Nhập ý kiến từ chối thu hồi.',422);if(body.expectedRevision!==revision||approve&&body.checked!==true)fail('Kiểm tra phiếu và số lượng trước khi quyết định.');
  const now=new Date().toISOString(),status=approve?'approved-awaiting-sheet':'rejected',next={...request,status,version:request.version+1,decidedBy:actor.login,decidedAt:now,decisionSource,decisionReason:reason,decisionToken,decisionFingerprint:fingerprint},nextReceipt={...receipt,withdrawalRequest:{...receipt.withdrawalRequest,status,decidedBy:actor.login,decidedAt:now,decisionSource,decisionReason:reason},sheetSync:{...receipt.sheetSync,status:'pending',command:{kind:approve?'withdrawal-approved':'withdrawal-rejected',id,revision:next.version}},updatedBy:actor.login,updatedAt:now},event={id:crypto.randomUUID(),kind:'daily-output-withdrawal-decision',quantityOnly:true,reportingModel:report.reportingModel,reportId:report.id,sourceId:report.transitId,line:report.line,withdrawalId:id,actor:actor.login,recordedAt:now,effectiveAt:now,reason,requestIdempotency:decisionToken,before:{status:request.status},after:{status},warehouseQuantity:receipt.receivedQuantity};
- await commitDailyRecords(db,actor,cursor,[dailyRecordGuard('production_warehouse_withdrawal',id,row.payload),dailyRecordGuard('warehouse_in',request.receiptId,receiptRow.payload),dailyRecordGuard('production_report',request.reportId,reportRow.payload),...policyGuards(policy)],[{entity:'production_warehouse_withdrawal',key:id,value:next,old:row.payload},{entity:'warehouse_in',key:request.receiptId,value:nextReceipt,old:receiptRow.payload},{entity:'production_event',key:event.id,value:event,old:null}]);return {ok:true,pending:approve,request:next,receipt:nextReceipt,event};
+ await commitDailyRecords(db,actor,cursor,[dailyRecordGuard('production_warehouse_withdrawal',id,row.payload),dailyRecordGuard('warehouse_in',request.receiptId,receiptRow.payload),dailyRecordGuard('production_report',request.reportId,reportRow.payload),...dailyPolicyGuards(policy)],[{entity:'production_warehouse_withdrawal',key:id,value:next,old:row.payload},{entity:'warehouse_in',key:request.receiptId,value:nextReceipt,old:receiptRow.payload},{entity:'production_event',key:event.id,value:event,old:null}]);return {ok:true,pending:approve,request:next,receipt:nextReceipt,event};
 }
 
 // Internal bridge completion only; connection is constructed AFTER existing bridge authentication.
