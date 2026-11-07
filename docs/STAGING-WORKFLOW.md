@@ -1,6 +1,6 @@
 # Nhánh và web thử ONSPA cố định
 
-Quy trình từ 06/11/2026: **PR → nhánh `staging` → web thử → Duyên nghiệm thu → PR vào `main` → Website cập nhật web chính**. Tài liệu này không cấp quyền merge, approve hoặc triển khai thường trực. Phải kiểm tra phạm vi được người dùng cho phép ở từng lượt; không đổi branch protection, quyền truy cập, secrets hoặc billing để thực hiện quy trình.
+Quy trình từ 06/11/2026, bổ sung 07/11/2026: **PR → dot kiểm đủ toàn bộ yêu cầu → merge `staging` khi được phép → đồng bộ web thử → dot kiểm thực tế sau merge → bàn giao Duyên nghiệm thu → PR vào `main` → Website cập nhật web chính khi được phép**. Tài liệu này không cấp quyền merge, approve hoặc triển khai thường trực. Phải kiểm tra phạm vi được người dùng cho phép ở từng lượt; không đổi branch protection, quyền truy cập, secrets hoặc billing để thực hiện quy trình.
 
 ## Các đích riêng biệt
 
@@ -15,13 +15,14 @@ Trước mỗi thay đổi, đọc mới ref và working tree, bảo toàn công
 
 ## Một lần thay đổi
 
-1. Tạo nhánh tính năng từ baseline đã kiểm chứng, mở PR vào `staging`. Nếu có thay đổi đồng thời, đọc lại base, không reset/force-push hoặc đè nhánh của người khác.
-2. Kiểm local theo tác động, gom push. Chờ bốn check CI đúng revision kết thúc: gate nhanh + TypeScript, ba build/test đầy đủ. Không coi check của revision/base cũ là kiểm bản mới.
-3. Khi được phép merge vào nhánh thử và CI đạt, hợp nhất vào `staging`. Đọc lại SHA/tree thật sau merge. CI pull_request kiểm merge commit; chỉ tái sử dụng kết quả nếu cây mã đã kiểm trùng cây mã ứng viên. Nếu cây khác vì base thay đổi hoặc xử lý xung đột, cần kiểm ứng viên đó trước QA, không gán CI cũ.
-4. Chuẩn bị bản QA bằng workflow Sites trong **checkout của Site thử hiện có**. Lấy đúng thay đổi ứng dụng đã kiểm, giữ nguyên hosting identity, guard QA, kết nối bị chặn và dữ liệu của Site thử. Build/publish riêng vào đúng Site QA, rồi đọc lại version/source/deployment đến `succeeded`. GitHub push hoặc merge không tự cập nhật Site.
-5. Assistant kiểm Worker và browser trước khi gửi link, gồm dữ liệu, quyền, chức năng tác động, desktop/mobile và lỗi mạng liên quan. Gửi cùng URL cố định, version, source SHA, provenance và giới hạn; Duyên nghiệm thu đúng bản đó. Không thay app đang nghiệm thu mà không thông báo.
-6. Khi được phép đưa bản đã nghiệm thu vào GitHub main, tạo PR promotion riêng. So sánh diff của chính bản đã nghiệm thu; không gom thêm thay đổi chưa thử chỉ vì đang nằm trên `staging`. Không tự approve PR. CI PR vào `main` vẫn chạy đầy đủ; merge main và triển khai MAIN là hai quyền/bước riêng.
-7. Website lấy chọn lọc mã ứng dụng đã nghiệm thu, giữ cấu hình MAIN, dữ liệu, quyền và secrets; triển khai sau phê duyệt phù hợp. Đọc lại version/commit active. Nếu staging thay đổi sau nghiệm thu, kiểm lại phần tác động; không tự coi bản mới đã được duyệt.
+1. Gom yêu cầu gốc, bổ sung và lỗi đã báo thành một checklist của cùng yêu cầu/PR. Ghi expected, cách kiểm và bằng chứng cần có cho từng mục. Tạo nhánh tính năng từ baseline đã kiểm chứng, mở PR vào `staging`; dùng lại nhánh/PR đang làm khi tiếp tục cùng việc. Đọc lại base, không reset/force-push hoặc đè công việc khác.
+2. Kiểm local theo tác động, gom push. Chờ bốn check CI đúng revision kết thúc: gate nhanh + TypeScript, ba build/test đầy đủ. dot kiểm cả nghiệp vụ/giao diện candidate theo **toàn bộ checklist**, không chỉ lỗi mới sửa. Mỗi mục ghi Đạt / Chưa đạt / Chưa kiểm / Bị chặn theo [mục 5.1 quy trình đầy đủ](ONSPA-DEVELOPMENT-WORKFLOW.md#51-điều-kiện-bắt-buộc-trước-mọi-lần-merge). CI xanh không thay thế nghiệm thu yêu cầu; còn mục trong phạm vi chưa đạt hoặc chưa kiểm thì chưa merge.
+3. Chỉ khi dot xác nhận đủ yêu cầu, CI đúng candidate đạt và đã có quyền merge, hợp nhất vào `staging`. Đọc lại SHA/tree thật sau merge. CI pull_request kiểm merge commit; chỉ tái sử dụng kết quả nếu cây mã đã kiểm trùng cây mã ứng viên. Nếu cây khác vì base thay đổi hoặc xử lý xung đột, phải kiểm lại ứng viên thực tế; không gán CI cũ.
+4. **Sau merge phải đồng bộ đúng bản lên web thử trước bàn giao.** Chuẩn bị bản QA bằng workflow Sites trong **checkout của Site thử hiện có**, theo phạm vi triển khai QA được phép. Lấy đúng thay đổi ứng dụng đã kiểm, giữ hosting identity, guard QA, kết nối bị chặn và dữ liệu của Site thử. Build/publish riêng vào đúng Site QA, chờ `succeeded`, rồi đọc lại version/source active và đối chiếu manifest với commit sau merge. GitHub push hoặc merge không tự cập nhật Site.
+5. **dot kiểm thực tế trên chính URL QA sau đồng bộ**, đối chiếu toàn bộ checklist, gồm luồng nghiệp vụ trong phạm vi, dữ liệu sau lưu/reload, quyền UI/API, số liệu/lịch sử/ngày hiệu lực, nhánh lỗi/điều chỉnh khi có và desktop/mobile cho UI. Kiểm hồi quy phần liên quan; ghi version/source/commit, thời điểm, expected/actual và bằng chứng. Còn lỗi, dữ liệu thiếu, tính năng chưa bật hoặc mục chưa kiểm thì chưa bàn giao; sửa qua nhánh/PR rồi lặp lại bước kiểm và đồng bộ.
+6. Chỉ sau khi dot tự kiểm đạt mới bàn giao URL cố định, version, source SHA, provenance, checklist và giới hạn để Duyên nghiệm thu đúng bản. Không thay app đang nghiệm thu mà không thông báo; không gọi link điều tra hoặc bản chưa tự kiểm là bản hoàn tất.
+7. Khi được phép đưa bản đã nghiệm thu vào GitHub main, tạo PR promotion riêng. So sánh diff của chính bản đã nghiệm thu; không gom thêm thay đổi chưa thử chỉ vì đang nằm trên `staging`. Áp dụng lại gate trước merge tại mục 5.1; CI PR vào `main` vẫn chạy đầy đủ. Không tự approve PR; merge main và triển khai MAIN là hai quyền/bước riêng.
+8. Sau merge main, đọc lại commit/tree và CI main, đối chiếu với ứng dụng đã nghiệm thu trên QA. Nếu có khác biệt, chưa phát hành: đồng bộ QA đúng bản và kiểm lại trong phạm vi được phép. Nếu trùng, ghi bằng chứng và kiểm chạy lại luồng chính trên QA, không cần publish lại cùng mã. Website chỉ triển khai MAIN khi được phép, giữ cấu hình MAIN, dữ liệu, quyền và secrets; đọc lại version/commit active. Có thay đổi sau nghiệm thu thì không tự coi bản mới đã được duyệt.
 
 ## Tách cấu hình, dữ liệu và tài khoản
 
@@ -41,7 +42,7 @@ PR cũ vẫn giữ nguyên đích cho đến khi có quyết định chuyển. N
 
 ## Bằng chứng và quay lui
 
-Mỗi bản QA ghi: GitHub head/base/merge-tree đã kiểm và run; source MAIN làm baseline; danh sách/hash thay đổi ứng dụng; danh sách/hash overlay QA được giữ; Site QA source/version/deployment và dữ liệu snapshot; kết quả tự kiểm/browser; Duyên đã nghiệm thu gì; main/production còn chờ quyền nào. Metadata source Site khác GitHub vì có lớp QA phải được giải thích, không gọi byte-identical.
+Mỗi bản QA ghi: checklist toàn bộ yêu cầu và bằng chứng từng mục; kết luận kiểm trước merge của dot; GitHub head/base/merge-tree đã kiểm và run; commit/tree thực tế sau merge; source MAIN làm baseline; danh sách/hash thay đổi ứng dụng; danh sách/hash overlay QA được giữ; Site QA source/version/deployment đang active và dữ liệu snapshot; kết quả kiểm thực tế sau đồng bộ, thời điểm và phần chưa kiểm; Duyên đã nghiệm thu gì; main/production còn chờ quyền nào. Không dùng kết quả trước merge thay cho kết quả kiểm web thử sau đồng bộ. Metadata source Site khác GitHub vì có lớp QA phải được giải thích, không gọi byte-identical.
 
 Lưu version QA trước khi cập nhật. Quay lui source chỉ dùng version tương thích schema/dữ liệu hiện tại; không tự restore DB, xóa snapshot hoặc đảo các thao tác nghiệp vụ. MAIN có kế hoạch quay lui riêng do Website kiểm tra. Nếu thiếu nguồn, file, quyền/công cụ hoặc deployment thất bại, giữ đúng Site/branch và báo chính xác; không tạo lại Site, đổi nền tảng hoặc gửi link chưa tự kiểm.
 
