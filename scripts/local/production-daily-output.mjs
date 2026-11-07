@@ -1,10 +1,11 @@
-import {quantityCutoverModel,quantityManifestValid} from './production-quantity-cutover.mjs';
+import {normalizeTransit} from '../../lib/in-transit.mjs';
+import {quantityCutoverModel,quantityManifestValid,quantitySourceDatabase} from './production-quantity-cutover.mjs';
 import {readSummaryScope,summaryByteBudget} from './production-summary-scope.mjs';
 import {preservationManifestValid} from './production-legacy-preservation.mjs';
 import {normalized} from '../../lib/production-plan.mjs';
 import {recordRevision} from '../../lib/record-revision.mjs';
 import {productionActorId} from '../../lib/production-actor.mjs';
-import {buildDailyOutput,dailyOutputModel,isDailyOutput} from '../../lib/production-daily-output.mjs';
+import {buildDailyOutput,dailyOutputModel,isDailyOutput,dailyOutputTotals} from '../../lib/production-daily-output.mjs';
 import {validBusinessDate} from '../../lib/effective-dated-value.mjs';
 const fail=(message,status=422)=>{throw Object.assign(new Error(message),{status});};
 export const dailyToday=()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10);
@@ -20,7 +21,7 @@ export async function readDailyOutputPolicy(db,snapshot=null){
  const protectedHistory=receipt||approved&&preservationManifestValid(manifest,p);
  return {snapshotGuard,activationRaw:configuration.activation??null,raw:row?.payload??null,manifestRaw:manifestRow?.payload??null,manifestKey:p?.legacySnapshotId||null,policy:approved?{mode:dailyOutputModel,effectiveFrom:p.effectiveFrom,revision:p.revision??1,...(receipt?{intakeModel:quantityCutoverModel,receivedAt:p.receivedAt}:{}),legacySnapshotId:p.legacySnapshotId||null,cutoverReached:activation?.intakeModel===quantityCutoverModel||p.effectiveFrom<=dailyToday(),active:protectedHistory&&p.effectiveFrom<=dailyToday(),...(!protectedHistory?{blockedReason:'Chưa có mốc bảo toàn kết quả lịch sử được kiểm chứng; chưa bật báo sản lượng ngày.'}:{})}:null};
 }
-const fields=['pendingQuantityReservation','reportingModel','quantityOnly','legacyCompletedBaseline','orderCode','mo','reportedAt','updatedAt','eventAt','startedAt','productionAt','completedAt','productionDate','actualStartedAt','actualCompletedAt','productionState','status','transitId','lsxCode','planId','kind','reviewStatus','reportedQuantity','approvedQuantity','completedQty','quantityCompleted','cancelled','voided','replacedByStageBatch','stageReporting'];
+const fields=['quantityBaseline','quantityAfterCutover','pendingQuantityReservation','reportingModel','quantityOnly','legacyCompletedBaseline','orderCode','mo','reportedAt','updatedAt','eventAt','startedAt','productionAt','completedAt','productionDate','actualStartedAt','actualCompletedAt','productionState','status','transitId','lsxCode','planId','kind','reviewStatus','reportedQuantity','approvedQuantity','completedQty','quantityCompleted','cancelled','voided','replacedByStageBatch','stageReporting'];
 const summary=(value,id)=>`json_object('id',${id},${fields.flatMap(key=>[`'${key}'`,key==='quantityOnly'?`json(CASE json_type(${value},'$.quantityOnly') WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE 'null' END)`:`json_extract(${value},'$.${key}')`]).join(',')})`;
 const sourceCode=value=>`CAST(coalesce(nullif(nullif(json_extract(${value},'$.lsxCode'),''),0),nullif(nullif(json_extract(${value},'$.orderCode'),''),0),nullif(nullif(json_extract(${value},'$.mo'),''),0),'') AS TEXT)`;
 const complexSql=value=>`(${value} GLOB '*[^ -~]*' OR instr(${value},'  ')>0)`;
@@ -40,6 +41,13 @@ export async function readDailyOrderReports(db,order){
  if(snapshots.reduce((n,s)=>n+s.pages,0)>32||snapshots.reduce((n,s)=>n+s.bytes,0)>summaryByteBudget)fail('Phạm vi phiếu vượt giới hạn đối chiếu an toàn; chưa lưu, cần chia phạm vi kiểm tra.',409);
  return {reports:[...new Map([...snapshots[1].reports,...snapshots[0].reports].map(r=>[r.id,r])).values()],guards:snapshots.map(s=>s.guard)};
 }
+export async function quantityBaselineForOrder(db,policy,order){
+ if(policy?.intakeModel!==quantityCutoverModel)return null;
+ const frozen=quantitySourceDatabase(db,policy.legacySnapshotId),row=await frozen.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(order.id).first();
+ let approved=0;if(row){const original=normalizeTransit({...JSON.parse(row.payload),id:order.id});approved=Math.max(Number(original.completedQty||0),dailyOutputTotals(original,(await readDailyOrderReports(frozen,original)).reports).approved);}
+ if(!Number.isSafeInteger(approved)||approved<0)fail('Thiếu số lượng nguồn hợp lệ; cần đối chiếu trước khi ghi.',409);
+ return {model:quantityCutoverModel,snapshotId:policy.legacySnapshotId,receivedAt:policy.receivedAt,approved};
+}
 export async function writeDailyOutput(db,body,actor,commitEvents,{legacySubmission=false}={}){
  if(['stageEntries','stage','stageName','backfill','employees','hours','count'].some(key=>body[key]!==undefined))fail('Phiếu sản lượng ngày chỉ nhận lệnh, ngày và số thành phẩm phát sinh; không nhận công đoạn hoặc giờ theo lệnh.');
  const token=String(body.requestIdempotency||'');if(!/^[a-zA-Z0-9-]{16,80}$/.test(token))fail('Thiếu mã thao tác ổn định.');
@@ -56,10 +64,11 @@ export async function writeDailyOutput(db,body,actor,commitEvents,{legacySubmiss
  if(!activation.policy?.active)fail('Báo sản lượng ngày chưa được bật theo mốc triển khai đã duyệt.',409);
  if(!(legacySubmission&&activation.policy.intakeModel===quantityCutoverModel&&body.expectedOrderRevision===undefined)&&body.expectedOrderRevision!==await recordRevision(orderRow.payload))fail('Lệnh đã thay đổi. Tải lại để đối chiếu trước khi ghi.',409);
  const [context,rateRow]=await Promise.all([readDailyOrderReports(db,order),db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(String(order.sku||'').trim().toUpperCase()).first()]);
- const reports=context.reports,rate=rateRow?JSON.parse(rateRow.payload):null,now=new Date().toISOString();
+ const reports=context.reports,rate=rateRow?JSON.parse(rateRow.payload):null,now=new Date().toISOString(),quantityBaseline=await quantityBaselineForOrder(db,activation.policy,order);
  if(typeof body.productionLocalDateTime!=='string')fail('Thiếu ngày giờ sản xuất (GMT+7).');
- const report=buildDailyOutput({order,reports,quantity:body.quantity,productionDate:body.productionDate,productionLocalDateTime:body.productionLocalDateTime,cutoverDate:activation.policy.effectiveFrom,intakeModel:activation.policy.intakeModel,today:dailyToday(),rateVersions:rate?.effectiveVersions||[],id:crypto.randomUUID(),actor:actor.login,recordedAt:now});
+ const report=buildDailyOutput({order:quantityBaseline?{...order,quantityBaseline}:order,reports,quantity:body.quantity,productionDate:body.productionDate,productionLocalDateTime:body.productionLocalDateTime,cutoverDate:activation.policy.effectiveFrom,intakeModel:activation.policy.intakeModel,today:dailyToday(),rateVersions:rate?.effectiveVersions||[],id:crypto.randomUUID(),actor:actor.login,recordedAt:now});
  report.sourceOrderRevision=await recordRevision(orderRow.payload);
+ if(quantityBaseline)report.quantityBaseline=quantityBaseline;
  if(activation.policy.intakeModel===quantityCutoverModel)report.intake={model:quantityCutoverModel,receivedAt:now,snapshotId:activation.manifestKey,legacySubmission};
  const event={id:crypto.randomUUID(),kind:'daily-output',reportingModel:dailyOutputModel,quantityOnly:true,sourceId:order.id,line:order.line,planId:order.planId,lsxCode:order.lsxCode,sku:order.sku,reportId:report.id,quantity:report.reportedQuantity,productionDate:report.productionDate,productionLocalDateTime:report.productionLocalDateTime,productionAt:report.productionAt,effectiveAt:now,recordedAt:now,actor:actor.login,requestIdempotency:token,requestFingerprint:fingerprint};
  const rawGuard=(entity,key,raw)=>({sql:raw===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)":"EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)",args:raw===null?[entity,key]:[entity,key,raw]});

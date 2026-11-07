@@ -64,6 +64,11 @@ test('activation failure and concurrent activation cannot leave a partial policy
 test('legacy adapters reject ambiguous malformed lists instead of silently summing stages',()=>{
  assert.throws(()=>quantityCompletion({stageEntries:{}}),{status:422});assert.throws(()=>quantityCompletion({quantity:0,effectiveAt:new Date().toISOString()}),{status:422});
 });
+test('malformed or conflicting quantity evidence cannot fall back to zero or a different snapshot',()=>{
+ const order={id:'SYNTHETIC-ORDER',lsxQty:1000,completedQty:400},basis={model:quantityCutoverModel,snapshotId,approved:400,receivedAt:'2026-11-07T00:00:00Z'};
+ for(const value of [{...basis,approved:null},{...basis,model:'unknown'},{...basis,receivedAt:'invalid'}])assert.throws(()=>dailyOutputTotals({...order,quantityBaseline:value},[]),{status:409});
+ assert.throws(()=>dailyOutputTotals({...order,quantityBaseline:basis},[{id:'SYNTHETIC',transitId:order.id,kind:'completion',reportedQuantity:200,reviewStatus:'Chờ kiểm tra',quantityBaseline:{...basis,snapshotId:'SYNTHETIC-OTHER-SNAPSHOT'}}]),{status:409});
+});
 test('a legacy closed backfill submitted after cutover is one quantity receipt, not old station labor',()=>dailyFixture(async c=>{
  await activate(c);const body={action:'start',orderId:c.order.id,requestIdempotency:crypto.randomUUID(),backfill:{mode:'apply',stage:'FINAL',from:'2026-10-30T01:00:00Z',to:'2026-10-31T02:20:00Z',quantity:200,people:['SYNTHETIC-EMPLOYEE'],expectedRevision:'OLD-STAGE-REVISION'}};
  const saved=await mutateProductionWorkflow(c.db,body,actor);assert.equal(saved.report.productionDate,'2026-10-31');assert.equal(saved.report.productionAt,'2026-10-31T02:20:00.000Z');assert.equal(saved.report.reportedQuantity,200);assert.equal(saved.report.hours,undefined);assert.equal(saved.report.backfillBatch,undefined);
@@ -101,4 +106,14 @@ test('a frozen legacy row without an embedded ID retains its source key in revie
  assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(result.body.payload.id,key);
  const rows=await records(c.db),approval=rows.filter(r=>r.entity==='production_event').map(r=>JSON.parse(r.payload)).find(r=>r.kind==='report-approval');assert.equal(approval.reportId,key);
  const warehouse=JSON.parse(rows.find(r=>r.entity==='warehouse_in').payload);assert.equal(warehouse.reportId,key);
+}));
+for(const sourceShape of ['field','columns'])for(const dailyFirst of [false,true])test(`aggregate baseline plus approved frozen pending stays additive (${sourceShape}, daily first: ${dailyFirst})`,()=>dailyFixture(async c=>{
+ const columns=Array(18).fill(null);columns[17]=400;const order={...c.order,...(sourceShape==='field'?{completedQty:400}:{columns})};await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='in_transit' AND record_key=?").bind(JSON.stringify(order),order.id).run();
+ const key='SYNTHETIC-AGGREGATE-PENDING';await c.put('production_report',key,{id:key,kind:'completion',transitId:order.id,lsxCode:order.lsxCode,sku:order.sku,line:'A',reportedQuantity:200,reviewStatus:'Chờ kiểm tra',version:1,startedAt:'2026-11-02T01:00:00Z',completedAt:'2026-11-02T03:00:00Z',hours:{hc:2,ot:0,total:2}});
+ await activate(c);const {recordRevision}=await import('../lib/record-revision.mjs');
+ const saveDaily=async()=>{const current=JSON.parse((await c.db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(order.id).first()).payload);await mutateProductionWorkflow(c.db,c.body({quantity:300,expectedOrderRevision:await recordRevision(JSON.stringify(current))}),actor);};
+ if(dailyFirst)await saveDaily();const call=await reviewer(c),result=await call('/api/production-report',{action:'review',reportId:key,approve:true,expectedVersion:1});assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(result.body.payload.completedQty,600);
+ const context=(await call('/api/production-workflow?view=work')).body;assert.equal(context.orders.find(o=>o.id===order.id).completedQty,600);
+ if(!dailyFirst)await saveDaily();
+ const reports=(await records(c.db)).filter(r=>r.entity==='production_report').map(r=>JSON.parse(r.payload));assert.equal(dailyOutputTotals(order,reports).approved,600);assert.equal(dailyOutputTotals(order,reports).reported,900);
 }));

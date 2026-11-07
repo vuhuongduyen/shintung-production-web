@@ -5,6 +5,12 @@ export const quantityCutoverModel='server-receipt-quantity-v1';
 const sources=['in_transit','production_report','production_history_import','warehouse_in'];
 const fail=(message,status=409)=>{throw Object.assign(Error(message),{status});};
 const prefix=id=>JSON.stringify([id]).slice(0,-1)+',';
+export function quantitySourceDatabase(db,id){
+ if(!/^[A-Za-z0-9-]{16,80}$/.test(id||''))fail('Định danh nguồn đã chốt không hợp lệ.');
+ const start=prefix(id),literal=value=>"'"+value.replaceAll("'","''")+"'";
+ const source=`(SELECT json_extract(record_key,'$[1]') AS entity,json_extract(record_key,'$[2]') AS record_key,payload,updated_by,updated_at FROM app_records WHERE entity='production_quantity_source' AND record_key>=${literal(start)} AND record_key<${literal(start+'\uffff')})`;
+ return {prepare(sql){if(!/^\s*SELECT\b/i.test(sql)||!/\bapp_records\b/i.test(sql))fail('Nguồn số lượng chỉ hỗ trợ đọc.');return db.prepare(sql.replace(/\bapp_records\b/gi,source));},batch(){fail('Không ghi qua nguồn số lượng đã chốt.');}};
+}
 export function quantityManifestValid(manifest,policy,activation){
  return policy?.intakeModel===quantityCutoverModel&&activation?.intakeModel===quantityCutoverModel&&
  manifest?.kind===quantityCutoverModel&&manifest.status==='complete'&&manifest.id===policy.legacySnapshotId&&
