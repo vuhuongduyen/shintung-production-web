@@ -928,7 +928,7 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
 }
 
 async function commitEvents(db, actor, now, events, report = null, state = null, expectedCursor = null, extraRecords = [],readGuards=[]) {
-  const quantityOnly=events.length>0&&events.every(e=>isDailyOutput(e)&&e.kind==='daily-output'&&!e.employees?.length&&!e.stageReporting&&!e.destinationId)&&!state&&!extraRecords.length;
+  const quantityOnly=events.length>0&&events.every(e=>isDailyOutput(e)&&e.kind==='daily-output'&&!e.employees?.length&&!e.stageReporting&&!e.destinationId)&&!state&&extraRecords.every(r=>r.quantityProjection===true&&r.entity==='in_transit'&&r.key===report?.transitId);
   if(!quantityOnly)await assertLegacyAllocationWrite(db,events);
   const key = "global", initial = JSON.stringify({ version: 0, token: "" });
   const initializeCursor=db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('production_cursor',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key, initial, actor.login, now);

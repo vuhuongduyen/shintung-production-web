@@ -1,3 +1,4 @@
+import {mergeProduction} from '../../lib/in-transit.mjs';
 import {queuePendingDailyCorrection} from './production-daily-pending-correction.mjs';
 import {buildCorrectedDailyReport} from './production-daily-correction-value.mjs';
 import {canCorrectProduction} from '../../lib/production-correction-access.mjs';
@@ -39,5 +40,8 @@ export async function correctDailyOutput(db,body,actor){
  const gate="EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key='global' AND payload=?)";
  writes.push(db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_report' AND record_key=? AND ${gate}`).bind(JSON.stringify(next),actor.login,now,old.id,nextCursor));
  writes.push(db.prepare(`INSERT INTO app_records SELECT 'production_event',?,?,?,? WHERE ${gate}`).bind(event.id,JSON.stringify(event),actor.login,now,nextCursor));
+ // Refresh existing materialized totals; retain admission revisions on never-reviewed rows.
+ if(Object.hasOwn(order,'pendingReportQty')){const merged=mergeProduction(order,scoped.reports.map(r=>r.id===old.id?next:r)),nextOrder={...JSON.parse(orderRow.payload),completedQty:merged.completedQty,pendingReportQty:merged.pendingReportQty,productionState:merged.productionState,actualCompletedAt:merged.actualCompletedAt,updatedAt:now,updatedBy:actor.login};
+ writes.push(db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND ${gate}`).bind(JSON.stringify(nextOrder),actor.login,now,old.transitId,nextCursor));}
  const result=await db.batch(writes);if(result[0].meta.changes!==1)fail(conflictMessage);return {ok:true,report:next,event};
 }

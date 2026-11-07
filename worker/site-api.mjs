@@ -456,6 +456,7 @@ async function handleSiteApi(request,env,timing){
    if(delayError)return json({error:delayError},422);
    const quantityBaseline=reviewQuantityBaseline;
    const updated={...report,...(quantityBaseline?{quantityBaseline,quantityAfterCutover:quantityBaseline.snapshotId}:{}),version:Number(report.version||0)+1,...(current?.hours?{hours:current.hours}:{}),hourStatus:approve?(isDailyOutput(report)?"Không áp dụng giờ theo lệnh":"Đã xác nhận giờ"):report.hourStatus,confirmationBasis:approve?(isDailyOutput(report)?{at:now,by:actor.login,productionDate:report.productionDate,quantity:approvedQuantity,rateBasis:report.rateBasis,rateStatus:report.rateStatus}:{at:now,by:actor.login,hours:current?.hours||report.hours,laborNotes:current?.laborNotes||[]}):report.confirmationBasis,delayReason,...(adjustedHours?{hours:adjustedHours,hourStatus:'Đã duyệt điều chỉnh'}:{}),reviewStatus:approve?'Đã xác nhận':'Cần điều chỉnh',approvedQuantity,completedQty:cumulative,productionState:completed?'Hoàn thành sản xuất':'Đang sản xuất',actualStartedAt:transit.actualStartedAt||(isDailyOutput(report)?workflow.orders.find(o=>o.id===report.transitId)?.actualStartedAt||report.productionDate:report.startedAt)||'',actualCompletedAt:finalAt,reviewedBy:actor.login,reviewedById:productionActorId(actor),reviewedAt:now,rejectionReason:reason,warehouseStatus:approve?(approvedQuantity>0?'Chờ Kho xác nhận':'Không nhập kho tại công đoạn này'):'Chưa tạo phiếu',updatedAt:now,updatedBy:actor.login};
+   const reviewPendingQty=receiptLegacy?dailyOutputTotals({...transit,id:report.transitId,quantityBaseline},dailyContext.reports.map(r=>r.id===report.id?updated:r)).pending:undefined;
    const cursorKey='global',initial=JSON.stringify({version:0,token:''});
    await productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('production_cursor',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(cursorKey,initial,actor.login,now).run();
    const cursor=await productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key=?").bind(cursorKey).first();
@@ -476,8 +477,7 @@ async function handleSiteApi(request,env,timing){
     productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'admin_audit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)").bind(crypto.randomUUID(),JSON.stringify({entity:'production_report',key:body.reportId,before:report,after:updated,actor:actor.login,at:now}),actor.login,now,body.reportId,JSON.stringify(updated))
    ];
    if(receiptLegacy){
-    const nextReports=dailyContext.reports.map(r=>r.id===report.id?updated:r),totals=dailyOutputTotals({...transit,id:report.transitId,quantityBaseline},nextReports);
-    const nextTransit={...transit,quantityBaseline,completedQty:cumulative,pendingReportQty:totals.pending,productionState:updated.productionState,actualStartedAt:updated.actualStartedAt,actualCompletedAt:updated.actualCompletedAt,delayReason:delayReason||transit.delayReason||'',updatedAt:now,updatedBy:actor.login};
+    const nextTransit={...transit,quantityBaseline,completedQty:cumulative,pendingReportQty:reviewPendingQty,productionState:updated.productionState,actualStartedAt:updated.actualStartedAt,actualCompletedAt:updated.actualCompletedAt,delayReason:delayReason||transit.delayReason||'',updatedAt:now,updatedBy:actor.login};
     statements.push(productionDb.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND payload=? AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)").bind(JSON.stringify(nextTransit),actor.login,now,report.transitId,transitStored.payload,cursorKey,nextCursor,body.reportId,JSON.stringify(updated)));
    }
    const reviewEvent={id:crypto.randomUUID(),kind:approve?'report-approval':'report-rejection',sourceId:report.transitId,line:report.line,reportId:report.id,...(isDailyOutput(report)?{reportingModel:report.reportingModel,quantityOnly:true,productionDate:report.productionDate}:{}),effectiveAt:isDailyOutput(report)?now:report.completedAt,recordedAt:now,actor:actor.login,actorId:productionActorId(actor),reason:approve?delayReason:reason,before:{quantity:report.approvedQuantity||0,status:report.reviewStatus},after:{quantity:approvedQuantity,status:updated.reviewStatus},employees:report.hours?.perEmployee?.map(p=>p.id)||[]};
@@ -488,7 +488,7 @@ async function handleSiteApi(request,env,timing){
    }
    const changed=await productionDb.batch(statements);
    if(changed[0].meta.changes!==1||changed[1].meta.changes!==1||changed.slice(2).some(row=>row.meta.changes!==1))return json({error:'Báo công vừa được xử lý đồng thời; tải lại và kiểm tra.'},409);
-   return json({ok:true,payload:updated});
+   return json({ok:true,payload:updated,...(receiptLegacy?{pendingReportQty:reviewPendingQty}:{})});
   }
   if(path==='/api/engine-run'){
    if(!canWrite(actor,'Production Engine'))return json({error:'Không có quyền cập nhật dữ liệu tuần'},403);

@@ -1,4 +1,4 @@
-import {normalizeTransit} from '../../lib/in-transit.mjs';
+import {normalizeTransit,mergeProduction} from '../../lib/in-transit.mjs';
 import {quantityCutoverModel,quantityManifestValid,quantitySourceDatabase} from './production-quantity-cutover.mjs';
 import {readSummaryScope,summaryByteBudget} from './production-summary-scope.mjs';
 import {preservationManifestValid} from './production-legacy-preservation.mjs';
@@ -73,6 +73,10 @@ export async function writeDailyOutput(db,body,actor,commitEvents,{legacySubmiss
  const event={id:crypto.randomUUID(),kind:'daily-output',reportingModel:dailyOutputModel,quantityOnly:true,sourceId:order.id,line:order.line,planId:order.planId,lsxCode:order.lsxCode,sku:order.sku,reportId:report.id,quantity:report.reportedQuantity,productionDate:report.productionDate,productionLocalDateTime:report.productionLocalDateTime,productionAt:report.productionAt,effectiveAt:now,recordedAt:now,actor:actor.login,requestIdempotency:token,requestFingerprint:fingerprint};
  const rawGuard=(entity,key,raw)=>({sql:raw===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)":"EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)",args:raw===null?[entity,key]:[entity,key,raw]});
  const guards=[...(activation.snapshotGuard?[activation.snapshotGuard]:[]),rawGuard('in_transit',order.id,orderRow.payload),rawGuard('production_reporting_policy','global',activation.raw),rawGuard('production_reporting_activation','global',activation.activationRaw),...(activation.manifestKey?[rawGuard('production_legacy_manifest',activation.manifestKey,activation.manifestRaw)]:[]),rawGuard('labor_hours',String(order.sku||'').trim().toUpperCase(),rateRow?.payload??null),...context.guards];
- await commitEvents(db,actor,now,[event],report,null,cursorRaw,[],guards);
+ // Preserve the append-only admission revision on legacy rows without a materialized
+ // pending field. An existing projection must be refreshed with the receipt atomically.
+ const merged=Object.hasOwn(order,'pendingReportQty')?mergeProduction({...order,...(quantityBaseline?{quantityBaseline}:{})},[...reports,report]):null;
+ const projections=merged?[{entity:'in_transit',key:order.id,expected:orderRow.payload,payload:{...order,completedQty:merged.completedQty,pendingReportQty:merged.pendingReportQty},quantityProjection:true}]:[];
+ await commitEvents(db,actor,now,[event],report,null,cursorRaw,projections,guards);
  return {event:{...event,actorId:productionActorId(actor)},report:{...report,actorId:productionActorId(actor),reportedById:productionActorId(actor)}};
 }
