@@ -65,3 +65,8 @@
 
 ## Phạm vi triển khai từ 31/10/2026
 - Người dùng chuyển sang thao tác trên web chính: từ nay chỉ sửa và triển khai MAIN appgprj_6a8f9b8b6bc48191b07d8293bcb8402a. Không cập nhật web thử trừ khi người dùng yêu cầu riêng. Quy tắc này thay thế mặc định đồng bộ hai môi trường ở trên.
+
+## Quy trình GitHub và nghiệm thu từ 07/11/2026
+- Trước mỗi việc ONSPA, đọc `docs/ONSPA-DEVELOPMENT-WORKFLOW.md` và `docs/STAGING-WORKFLOW.md`, rồi kiểm trạng thái repo/PR/Site thực tế. Đây là quy trình hiện có được bổ sung, không tạo quy trình thay thế.
+- dot phải kiểm đủ toàn bộ yêu cầu trước merge; sau merge phải đồng bộ đúng bản lên web thử và kiểm thử thực tế trước bàn giao. Còn mục chưa đạt/chưa kiểm/bị chặn thì dừng tại gate tương ứng và báo rõ.
+- Với luồng GitHub đã được yêu cầu, quy trình staging/QA này thay hướng dẫn mặc định MAIN-only ngày 31/10 ở trên. Giữ giới hạn dữ liệu/cấu hình và quyền từng môi trường; tài liệu không cấp quyền merge hoặc deploy thường trực, triển khai MAIN vẫn cần phạm vi được người dùng cho phép riêng.
