@@ -23,7 +23,7 @@ for(const screen of ['journal','output'])for(const mode of ['stored','missing','
     if(screen==='journal'){assert.equal(data.rows[0][data.headers.indexOf('Lệch giờ chuẩn')],'0%');await act(async()=>[...table.querySelectorAll('button')].find(b=>b.textContent==='Chi tiết').click());assert.equal(opened[0].standardLaborHours,1);assert.equal(opened[0].laborDeviation,0);}
     else assert.equal(data.rows[0][data.headers.indexOf('Giờ công chuẩn HT')],1);
    }else{
-    assert.equal(data.rows[0][unit],'Thiếu căn cứ định mức');assert.equal(cells[unit].textContent,'—');assert.ok(cells[unit].querySelector('[aria-label="Thiếu căn cứ định mức"]'));
+    assert.equal(data.rows[0][unit],'Thiếu căn cứ định mức');assert.equal(cells[unit].textContent,'—');assert.match(host.textContent,/Mở Chi tiết phiếu/);assert.match(host.textContent,/menu Giờ công/);assert.match(host.textContent,/Lịch sử/);assert.ok(cells[unit].querySelector('[aria-label="Thiếu căn cứ định mức"]'));
     if(screen==='journal'){await act(async()=>[...table.querySelectorAll('button')].find(b=>b.textContent==='Chi tiết').click());assert.equal(opened[0].standardLaborHours,null);assert.equal(opened[0].laborDeviation,null);}
     else assert.equal(data.rows[0][data.headers.indexOf('Giờ công chuẩn HT')],null);
    }

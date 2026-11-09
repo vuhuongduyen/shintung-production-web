@@ -3603,6 +3603,7 @@ const normalizePlanRow = (row: Partial<PlanRow>, index = 0): PlanRow => ({
 });
 
 type EngineMetric = {
+  standardHours?: number;
   warnings?: string[];
   defaults?: string[];
   weekLabel: string;
@@ -6816,6 +6817,8 @@ toolbarConfig.action({"onClick": () => {
           const base = m
             ? baseRows.find((x) => x.sku === calcSku && x.month === m.month)
             : undefined;
+          const laborRow=savedEngine?.payload.week===engineWeek?savedEngine.payload.rows.find(x=>x.sku===calcSku):undefined;
+          const laborMetric=laborRow?savedEngine?.payload.metrics?.find(([id])=>id===laborRow.id)?.[1]:undefined;
           const legacy = forecastData[calcSku];
           if (!r) return null;
           const f =
@@ -6949,8 +6952,9 @@ toolbarConfig.action({"onClick": () => {
                   <div>
                     <span>Tổng giờ công dự kiến</span>
                     <b>
-                      Thiếu căn cứ Giờ công/SP đã lưu
+                      {typeof laborMetric?.standardHours==='number'&&Number.isFinite(laborMetric.standardHours)&&laborMetric.standardHours>=0&&typeof laborRow?.suggested==='number' ? `${(laborRow.suggested*laborMetric.standardHours).toLocaleString('vi-VN',{maximumFractionDigits:10})} giờ (${laborMetric.standardHours.toLocaleString('vi-VN',{maximumFractionDigits:10})} giờ/SP · căn cứ đã lưu)` : 'Thiếu căn cứ Giờ công/SP đã lưu'}
                     </b>
+                    {!(typeof laborMetric?.standardHours==='number'&&Number.isFinite(laborMetric.standardHours)&&laborMetric.standardHours>=0)&&<small>Không đọc được mức giờ/SP trong căn cứ của bản Engine này. Kiểm tra bản tính đã lưu và SKU trong menu Giờ công → Lịch sử. Với kế hoạch mới, cập nhật dữ liệu tuần để lập bản mới theo dữ liệu phù hợp; không ghi đè bản đã chốt để lấp chỗ thiếu.</small>}
                   </div>
                 </section>
               </aside>
