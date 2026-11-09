@@ -70,9 +70,11 @@
 
 ## Quy trình PR và QA bắt buộc (09/11/2026)
 
+- Mỗi việc có một đầu mối, một cloud công việc và PR riêng; dùng lại đúng nơi đang làm, không tạo trùng. Khi đổi ưu tiên/phương án, chuyển chỉ đạo ngay, xác minh việc cũ đã dừng thật hoặc tiếp tục đúng phạm vi rồi báo lại; giữ công việc dở dang.
 - Mỗi việc độc lập có PR riêng vào `staging`; cùng việc tiếp tục PR hiện hữu, không tạo trùng hoặc trộn việc khác. Lỗi phát hiện sau merge dùng PR sửa riêng.
 - Trước merge: đối chiếu đầy đủ yêu cầu, rà diff, kiểm lỗi/hồi quy và review, đọc đúng head/base/merge-tree và CI. Không coi CI xanh là đủ khi còn yêu cầu thiếu hoặc chưa kiểm. Chỉ merge trong phạm vi được người dùng cho phép.
 - Sau merge staging: chủ động tiếp tục đồng bộ web thử khi đã được phép, xác minh deployment và version/source active, rồi kiểm thực tế chức năng, dữ liệu và giao diện trên đúng web thử trước bàn giao. Còn lỗi hoặc chưa kiểm thì báo chưa đạt/chưa hoàn tất và tiếp tục xử lý trong phạm vi được phép.
-- Không chờ người dùng nhắc mới theo dõi và báo kết quả; nếu thiếu quyền hoặc công cụ, nêu chính xác blocker và đầu vào cần thêm. Không suy quyền sửa/push thành quyền merge/deploy.
+- Chọn và giải thích ngắn phương án ít bước, nhanh và an toàn dựa trên phụ thuộc; PR riêng không bắt buộc dựng bản ứng dụng tách rời. Chỉ hỏi khi cần quyết định hoặc quyền còn thiếu.
+- Không chờ người dùng nhắc mới theo dõi và báo kết quả; nếu thiếu quyền hoặc công cụ, nêu chính xác blocker và đầu vào cần thêm. Báo đúng đang làm hay đang chờ và bước tiếp theo; không nói đang kiểm khi chưa kiểm. Không suy quyền sửa/push thành quyền merge/deploy.
 - Tuyệt đối không đồng bộ web chính đối với phần chưa đạt QA web thử. Sau khi đạt QA và được nghiệm thu, vẫn cần Duyên yêu cầu riêng cho đúng phạm vi MAIN. Không gom phần khác chưa thử chỉ vì đã nằm trên staging.
 - Giữ nguyên identity, DB/FILES, dữ liệu, tài khoản, quyền và guard của từng môi trường. Thay đổi tài liệu không phải lý do để triển khai ứng dụng. Chi tiết và mẫu bàn giao nằm trong hai tài liệu quy trình ở trên.

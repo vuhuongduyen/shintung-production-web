@@ -25,7 +25,9 @@ Trước mỗi thay đổi, đọc mới ref và working tree, bảo toàn công
 6. Chỉ khi phần cần đưa lên đã đạt QA web thử, Duyên đã nghiệm thu và có yêu cầu riêng đưa đúng phần đó vào GitHub main, tạo PR promotion riêng. So sánh diff của chính bản đã nghiệm thu; không gom thêm thay đổi chưa thử chỉ vì đang nằm trên `staging`. Không tự approve PR. CI PR vào `main` vẫn chạy đầy đủ; merge main và triển khai MAIN là hai quyền/bước riêng.
 7. Chỉ khi Duyên yêu cầu riêng cập nhật web chính cho phần đã đạt QA, Website lấy chọn lọc mã ứng dụng đã nghiệm thu, giữ cấu hình MAIN, dữ liệu, quyền và secrets rồi triển khai đúng phạm vi. Đọc lại version/source active và kiểm chức năng/giao diện bị tác động. Nếu staging thay đổi sau nghiệm thu, kiểm lại phần tác động; không tự coi bản mới đã được duyệt.
 
-Chủ động theo dõi và báo các mốc có ý nghĩa: lưu PR, kết quả kiểm/blocker, merge staging, deploy QA và QA thực tế. Không chờ Duyên hỏi mới tiếp tục bước đã được phép; không hỏi lại quyền đã rõ, không mở rộng sang MAIN. Thay đổi thuần tài liệu ghi rõ không đổi ứng dụng, không cần deploy hay QA giao diện chỉ để lưu quy trình.
+Mỗi việc giữ một đầu mối, một cloud công việc và PR riêng; không tạo lại việc đang có. Khi đổi ưu tiên/phương án, chuyển chỉ đạo tới các cloud liên quan, xác minh việc cũ đã dừng hoặc tiếp tục đúng phạm vi rồi báo lại. Chọn phương án ít bước và an toàn dựa trên phụ thuộc; PR riêng không bắt buộc dựng bản ứng dụng tách rời. Chi tiết tại [điều phối công việc](ONSPA-DEVELOPMENT-WORKFLOW.md#điều-phối-công-việc-ưu-tiên-và-phương-án).
+
+Chủ động theo dõi và báo các mốc có ý nghĩa: lưu PR, kết quả kiểm/blocker, merge staging, deploy QA và QA thực tế. Không chờ Duyên hỏi mới tiếp tục bước đã được phép; không hỏi lại quyền đã rõ, không mở rộng sang MAIN. Phân biệt đang làm với đang chờ, nêu bước tiếp theo và chỉ hỏi khi cần quyết định hoặc quyền còn thiếu. Thay đổi thuần tài liệu ghi rõ không đổi ứng dụng, không cần deploy hay QA giao diện chỉ để lưu quy trình.
 
 ## Tách cấu hình, dữ liệu và tài khoản
 

@@ -18,6 +18,16 @@ Quy trình này là điểm tham chiếu cố định cho các lần làm việc
 - Lập checklist đầy đủ từ yêu cầu và các điều chỉnh sau đó: từng mục ghi kết quả mong đợi, phần giữ nguyên, cách kiểm và bằng chứng. Kiểm cả dữ liệu/lịch sử, ngày áp dụng, quyền và màn hình liên quan nếu bị tác động; không rút yêu cầu xuống chỉ còn phần test hiện có.
 - Trong phạm vi đã được phép, chủ động tiếp tục đến bước kế tiếp và báo kết quả từng mốc có ý nghĩa; không chờ Duyên nhắc mới đọc CI, xử lý lỗi, triển khai QA hoặc kiểm sau triển khai. Không hỏi lại quyền đã rõ, nhưng không suy quyền sửa/push thành quyền merge/deploy. Khi thiếu quyền, dữ liệu, công cụ hoặc quyết định nghiệp vụ, nêu đúng bước bị chặn, phần đã xong và đầu vào cần thêm; không tự coi việc đã hoàn tất.
 
+### Điều phối công việc, ưu tiên và phương án
+
+- Mỗi việc có **một đầu mối chịu trách nhiệm, một cloud công việc và một PR riêng**. Dùng lại đúng cloud/PR đang làm việc đó; không mở bản trùng, chuyển sang cloud khác hoặc tạo thêm nền tảng khiến thông tin bị chia nhỏ. Việc tách PR để theo dõi không có nghĩa phải dựng một bản ứng dụng tách rời.
+- Đầu mối phải nắm trạng thái thực của các việc đang chạy, phần phụ thuộc nhau, người/bước đang chờ và bước tiếp theo. Khi phát hiện phụ thuộc hoặc lỗi ngăn bàn giao, báo ngay tác động và phương án xử lý; không để Duyên tự phát hiện rồi nhắc.
+- Khi Duyên đổi ưu tiên, chọn phương án mới hoặc yêu cầu dừng, chuyển chỉ đạo ngay tới các cloud liên quan. Xác định rõ phần nào dừng, phần nào tiếp tục và phần nào không còn cần. Giữ công việc dở dang, không xóa hoặc triển khai để “kết thúc” việc đã bị dừng.
+- Đọc lại phản hồi và trạng thái thao tác để xác nhận việc cũ **đã dừng thật** hoặc tiếp tục đúng phạm vi; gửi lệnh dừng chưa phải bằng chứng đã dừng. Nếu một thao tác đã bắt đầu chưa kết thúc, báo đang chờ dừng an toàn và xác minh kết quả trước khi báo hoàn tất. Không để cloud tiếp tục phương án cũ chỉ vì chưa được nhắc lần nữa.
+- Trong công việc đã được giao thực hiện trọn quy trình, đầu mối chủ động đi tiếp **sửa → kiểm đủ yêu cầu → merge staging khi đủ điều kiện → đồng bộ web thử → kiểm thao tác và giao diện thực tế → báo kết quả**. Có lỗi thì tiếp tục sửa và kiểm lại trong phạm vi đã được phép. Không dừng chờ Duyên ở mỗi mốc khi quyền đã rõ; các thao tác cần quyền/quyết định còn thiếu phải hỏi đúng phần đó, MAIN vẫn theo mục 6.
+- Báo từng mốc có ý nghĩa hoặc blocker, nêu việc đã làm, đang làm thật, đang chờ gì và bước tiếp theo. Không nói “đang kiểm” khi đang chờ CI, quyền, dữ liệu hoặc chưa có thao tác kiểm chạy; không hứa hoàn tất khi trạng thái chưa được xác minh.
+- Khi có nhiều cách, chọn và giải thích ngắn phương án **ít bước, nhanh và an toàn**, dựa trên phụ thuộc, khối lượng làm lại, rủi ro dữ liệu và khả năng kiểm. Ưu tiên xử lý nguyên nhân rồi kiểm chung các luồng liên quan trên web thử, vẫn giữ PR riêng; không dựng thêm bản tách hoặc thêm tầng công việc nếu không cần. Chỉ hỏi Duyên khi còn quyết định nghiệp vụ, đánh đổi đáng kể hoặc quyền cần cấp; không đổi phương án đã chọn mà không báo.
+
 ## 2. Thực hiện và kiểm tra có mục tiêu
 
 - Chỉ sửa phần đã được yêu cầu. Giữ DB, uploads, tài khoản, quyền, khóa Sheet, Site identity và production ngoài phạm vi thay đổi nếu chưa được phép riêng.
@@ -99,6 +109,7 @@ Mỗi lần bàn giao phải điền riêng từng trạng thái, dùng “chưa
 
 | Mục | Nội dung cần ghi |
 |---|---|
+| Điều phối | Đầu mối/cloud công việc/PR đang dùng, ưu tiên mới nhất, xác nhận dừng hoặc tiếp tục, phụ thuộc và bước tiếp theo; không ghi định danh hội thoại riêng tư |
 | Yêu cầu và phạm vi | Checklist từng yêu cầu, đạt/không đạt/chưa kiểm và bằng chứng; việc được phép/hoãn |
 | Nguồn/GitHub | Repo và visibility đã đọc, branch, PR riêng, head/base/merge-tree, readback; provenance nếu sync |
 | Kiểm tra | Lệnh/phạm vi, local hay CI, run link, pass/fail/cancel/skip/timeout; phần chưa kiểm |
