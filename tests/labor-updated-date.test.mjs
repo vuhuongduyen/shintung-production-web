@@ -50,3 +50,14 @@ test('excluding same-day replacement does not reactivate its superseded explicit
  const r=laborRateTimeline({sku,effectiveVersions:[{id:'V1',revision:1,status:'published',value:.1,validFrom:'2026-11-01'},{id:'V2',revision:2,status:'published',value:.2,validFrom:'2026-11-01',supersedesVersionId:'V1'}]},[h(2,.2,'2026-11-01',{isTest:true})]);
  assert.equal(value(r.versions,'2026-11-02'),null);
 });
+
+for(const marker of ['audit','explicit','master'])test('dated menu reports missing when all revisions are test-marked in '+marker,()=>{
+ const record={key:sku,payload:{sku,version:1,laborHour:16,updatedAt:'2026-11-01',effectiveVersions:[{id:'ONLY',revision:1,status:'published',value:16,validFrom:'2026-11-01'}]}};
+ const history=[h(1,16,'2026-11-01')];
+ if(marker==='audit')history[0].isTest=true;
+ if(marker==='explicit')record.payload.effectiveVersions[0].isTest=true;
+ if(marker==='master')record.payload.isTest=true;
+ const before=structuredClone({record,history}),menu=siteLaborHours([record],'2026-11-09',history).find(r=>r.key===sku).payload;
+ assert.deepEqual(menu.resolvedRateVersions,[]);assert.equal(menu.laborHour,null);assert.equal(menu.currentRateIssue,'missing');assert.equal(menu.currentRateDate,'2026-11-09');assert.ok(menu.rateTimelineIssues.some(x=>x.startsWith('excluded-test:')));
+ assert.equal(value(menu.resolvedRateVersions,'2026-11-09'),null);assert.deepEqual({record,history},before);
+});

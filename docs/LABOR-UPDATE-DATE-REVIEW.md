@@ -33,3 +33,5 @@ Preview có lịch sử giá trị, ngày hiệu lực, ngày thao tác, lý do 
 - Dấu `isTest`, `usage=test`, `status=test` được đối chiếu theo SKU/revision trên cả master, audit và explicit; không hồi sinh bản explicit cùng ngày đã bị thay thế. Không suy test theo trị số 16.
 - Đọc master và lịch sử cùng một SELECT. CAS so sánh đủ khóa, payload nguyên bản, updated_at và số bản ghi bằng JSON snapshot với 3 tham số cố định; phát hiện thêm, xóa, thay khóa cùng số lượng và sửa payload/timestamp. Snapshot vượt 512 KiB trả 409 trước ghi để giữ giới hạn an toàn.
 - Kiểm D1 giả với 35 revisions lưu thành công và chọn đúng ngày hoàn thành. Có kiểm các race nêu trên, giữ snapshot Plan/phiếu cũ và ngân sách 4 SELECT.
+
+- Projection menu theo ngày luôn chạy cả khi timeline rỗng: nếu toàn bộ revision bị loại vì test, trả `laborHour=null`, `currentRateIssue=missing` và giữ `rateTimelineIssues`; không rơi về scalar đang lưu. Có kiểm hồi quy cả audit/explicit/master tại hàm projection và API menu so với phiếu mới, cùng kiểm nguyên trạng master/audit.

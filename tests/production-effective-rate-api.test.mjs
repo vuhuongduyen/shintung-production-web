@@ -95,3 +95,17 @@ test('new output uses current V2 update date alongside explicit V1',()=>dailyFix
  const before=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor),after=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-04'}),actor);
  assert.equal(before.report.rateBasis.value,.1);assert.equal(after.report.rateBasis.value,.2);assert.equal(after.report.rateBasis.dateBasis,'updated-date');
 }));
+
+for(const marker of ['audit','explicit','master'])test('menu API and output agree when sole revision is test-marked in '+marker,()=>dailyFixture(async c=>{
+ const sku=c.order.sku,master={sku,version:1,laborHour:16,updatedAt:'2026-11-01',effectiveVersions:[{id:'ONLY',revision:1,status:'published',value:16,validFrom:'2026-11-01'}]},history={sku,version:1,newLaborHour:16,at:'2026-11-01'};
+ if(marker==='audit')history.isTest=true;
+ if(marker==='explicit')master.effectiveVersions[0].isTest=true;
+ if(marker==='master')master.isTest=true;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify(master),sku).run();
+ await c.put('labor_hours_history','ONLY-H',history);
+ const before=(await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),call=await reviewer(c),read=await call('/api/records?entity=labor_hours');
+ assert.equal(read.status,200);const menu=read.body.records.find(r=>r.key===sku).payload;
+ assert.equal(menu.laborHour,null);assert.equal(menu.currentRateIssue,'missing');assert.deepEqual(menu.resolvedRateVersions,[]);assert.ok(menu.rateTimelineIssues.some(x=>x.startsWith('excluded-test:')));
+ const output=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor);assert.equal(output.report.rateBasis??null,null);assert.equal(output.report.standardUnit??null,null);
+ assert.deepEqual((await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),before);
+}));
