@@ -366,7 +366,7 @@ export default function LaborHoursMaster({
       );
       if (!response.ok) throw Error();
       const data = await response.json();
-      setHistory(data.records.map((r: ApiRecord<LaborHistory>) => r.payload));
+      setHistory(data.records.map((r: ApiRecord<LaborHistory>) => ({...r.payload, at: r.payload.at || r.updatedAt})));
       setPanel("history");
     } catch {
       setError("Không thể tải lịch sử Giờ công.");

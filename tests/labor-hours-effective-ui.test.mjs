@@ -90,7 +90,7 @@ function reset({records = [], history = [], pdfHour = 0.75, onPost} = {}) {
         return Response.json({records: harness.records.map(payload => ({key: payload.sku, payload}))});
       }
       if (url === '/api/records?entity=labor_hours_history&sku=123ABC') {
-        return Response.json({records: harness.history.map(payload => ({key: payload.id, payload}))});
+        return Response.json({records: harness.history.map(row => row.payload ? row : ({key: row.id, payload: row}))});
       }
       if (url === '/api/labor-hours' && method === 'POST' && onPost) return onPost(body);
       throw Error(`Unexpected synthetic request: ${method} ${url}`);
@@ -363,4 +363,17 @@ test('editing an unconfigured master rate leaves it blank and requires an explic
     assert.equal(posts()[0].body.effectiveFrom, '2026-01-01');
     assert.match(view.host.textContent, /Đã lưu 123ABC: 0.000 giờ\/sản phẩm/);
   } finally { await view.close(); }
+});
+
+test('history uses outer updatedAt when payload has no audit timestamp', async () => {
+  reset({records:[{sku:'123ABC',laborHour:.03,version:1}],history:[{key:'OUTER',updatedAt:'2026-11-08T17:30:00Z',payload:{id:'OUTER',sku:'123ABC',version:1,newLaborHour:.03,reason:'Synthetic outer timestamp'}}]});
+  const view=await mountMaster();
+  try {
+    await click(view.host.querySelector('.labor-hours-card tbody tr'));
+    await click([...view.host.querySelectorAll('button')].find(node=>/Lịch sử/.test(node.textContent)));
+    const panel=view.host.querySelector('.labor-history-panel'),row=panel.querySelector('tbody tr'),cells=[...row.querySelectorAll('td')].map(node=>node.textContent.trim());
+    assert.equal(cells[1],'09/11/2026 (ngày cập nhật)');assert.equal(cells[8],'09/11/2026 00:30:00');
+    await click(row);assert.match(panel.querySelector('.labor-history-detail').textContent,/09\/11\/2026 \(ngày cập nhật\)/);
+    assert.equal(posts().length,0);
+  } finally {await view.close();}
 });

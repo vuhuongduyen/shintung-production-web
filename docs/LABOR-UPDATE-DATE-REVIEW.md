@@ -40,3 +40,8 @@ Preview có lịch sử giá trị, ngày hiệu lực, ngày thao tác, lý do 
 Dòng PDF V1 tự sinh mang provenance riêng `rateSource=pdf-baseline` ở lớp đọc, không thuộc chuỗi revision của master/audit đang lưu. Không dùng số V1 của PDF để loại fallback current V1 hoặc triệt tiêu lịch sử nền khi current bị đánh dấu test. Chỉ gộp bản current trùng PDF khi revision, giá trị và timestamp đều khớp.
 
 Regression dùng DB giả: SKU có PDF 0,017 ngày 17/09, master V1 0,03 cập nhật 09/11, không có audit riêng. Menu và phiếu 09/11 lấy 0,03; phiếu 08/11 giữ 0,017. Có kiểm ưu tiên ngày hiệu lực riêng, explicit V1, dấu test không lan nhầm sang PDF, và master/audit không thay đổi. Đây là tái hiện shape dữ liệu giả, chưa kết luận QA thật có shape này. Không yêu cầu nhập lại ngày đã có.
+
+## Timestamp lịch sử và cặp CI
+UI lịch sử và preview dùng `payload.at`, thiếu thì dùng `updatedAt` của bản ghi ngoài, giống resolver. Không ghi timestamp suy ra trở lại dữ liệu. Regression kiểm mốc 08/11 17:30 UTC hiển thị 09/11 00:30 GMT+7, ngày áp dụng 09/11 và preview giữ timestamp nguyên bản.
+
+Đồng bộ staging `fc5e892d4b6d99b49c61539112e0fcfa5bd2b12c` (chỉ thay tài liệu quy trình) vào nhánh PR để tạo event CI với đúng base/head. Giữ nguyên workflow và guard kiểm merge parents; run cũ `42579643859` fail ở provenance trước tests không phải bằng chứng kiểm ứng dụng.

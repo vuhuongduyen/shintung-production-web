@@ -1,5 +1,7 @@
 # ONSPA local development
 
+- Quy trình làm việc chính duy nhất: đọc `docs/ONSPA-DEVELOPMENT-WORKFLOW.md` trước mỗi việc. Toàn bộ trình tự, điều phối, kiểm thử, merge và triển khai được cập nhật tại đó; không tạo hoặc duy trì bản quy trình song song trong tệp này.
+
 - Khi người dùng yêu cầu thiết lập menu Sản xuất/Báo công, đọc `docs/PRODUCTION-REPORTING-DESIGN-2026-09-23.md` cùng `docs/CAPACITY-DESIGN-DECISIONS-2026-09-23.md`; đây là thiết kế đã thảo luận, chưa mặc nhiên là chức năng đang chạy. Kiểm tra source và yêu cầu mới nhất trước khi sửa.
 
 - This folder is the authoritative source. Save application, API, schema and migration changes here.
@@ -60,8 +62,6 @@
 - Giữ quyền cá nhân đã cấp; không tự xóa hoặc thay bằng mẫu bộ phận khi chưa đối chiếu dữ liệu phân quyền/lịch sử. Rà toàn bộ user từ bảng quyền, không yêu cầu người dùng nhắc lại từng tài khoản.
 - Không báo đã kiểm tra toàn bộ quyền thực tế khi chỉ kiểm thử mẫu quyền hoặc chưa đọc được bảng phân quyền bằng phiên Admin.
 
-## Đồng bộ hai môi trường (22/10/2026)
-- Theo yêu cầu người dùng: mọi điều chỉnh website mặc định triển khai cả web chính và môi trường thử, trừ khi người dùng giới hạn rõ một môi trường. Giữ project, DB/FILES, dữ liệu, banner và hạn thử nghiệm riêng; không sao chép dữ liệu nghiệp vụ giữa hai bên.
+## Quy trình và phạm vi triển khai hiện hành
 
-## Phạm vi triển khai từ 31/10/2026
-- Người dùng chuyển sang thao tác trên web chính: từ nay chỉ sửa và triển khai MAIN appgprj_6a8f9b8b6bc48191b07d8293bcb8402a. Không cập nhật web thử trừ khi người dùng yêu cầu riêng. Quy tắc này thay thế mặc định đồng bộ hai môi trường ở trên.
+Đọc [Quy trình thay đổi ONSPA](docs/ONSPA-DEVELOPMENT-WORKFLOW.md), tài liệu chính duy nhất đã gom quy trình cũ và các điều chỉnh ngày 09/11/2026. Các mặc định đồng bộ hai môi trường ngày 22/10 và chỉ MAIN ngày 31/10 là lịch sử đã được thay thế, không dùng làm chỉ dẫn triển khai hiện tại. Hướng dẫn kỹ thuật/nghiệp vụ khác trong tệp này vẫn giữ nguyên.
