@@ -1,24 +1,25 @@
 "use client";
 import {validBusinessDate} from '../lib/effective-dated-value.mjs';
-import {useRef,useState} from 'react';
+import {useMemo,useRef,useState} from 'react';
 import {ACTION_FEEDBACK_EVENT} from '../lib/action-feedback';
 import {apiFetch} from '../lib/data-sync';
 import {parseLaborHoursText,reconcileLaborHours} from '../lib/labor-hours-reconcile.mjs';
 import {StandardToolbar,toolbar} from './standard-toolbar/StandardToolbar';
 
 type Master={code:string;[key:string]:unknown};
-type RecordRow={sku:string;laborHour:number;version:number;note?:string};
+type RecordRow={sku:string;laborHour:number|null;version:number;note?:string};
 type PreviewRow={sku:string;laborHour:number;old?:RecordRow;status:string;guidance?:string;change:boolean};
 type Preview={rows:PreviewRow[];changes:PreviewRow[];unchanged:number;skipped:number;retained:number};
 export default function LaborHoursImport({masterSkus,onClose,onSaved}:{masterSkus:Master[];onClose:()=>void;onSaved:()=>Promise<void>}) {
-  const [text,setText]=useState(''),[source,setSource]=useState(''),[preview,setPreview]=useState<Preview|null>(null);
+  const [text,setText]=useState(''),[source,setSource]=useState(''),[records,setRecords]=useState<RecordRow[]|null>(null);
   const [effectiveFrom,setEffectiveFrom]=useState('');
+  const preview:Preview|null=useMemo(()=>text&&records&&validBusinessDate(effectiveFrom)?reconcileLaborHours(parseLaborHoursText(text),masterSkus,records,effectiveFrom):null,[text,masterSkus,records,effectiveFrom]);
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
   const lock=useRef(false);
   const fileInput=useRef<HTMLInputElement>(null);
   async function readPdf(file?:File) {
     if(!file||lock.current)return;
-    lock.current=true;setBusy(true);setPreview(null);setMessage('');setText('');setSource('');
+    lock.current=true;setBusy(true);setRecords(null);setMessage('');setText('');setSource('');
     try {
       if(!file.name.toLowerCase().endsWith('.pdf')||file.size>20*1024*1024)throw Error('Chọn file PDF không quá 20 MB.');
       const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -52,8 +53,8 @@ export default function LaborHoursImport({masterSkus,onClose,onSaved}:{masterSku
       if(!rows.length)throw Error('Không đọc được bảng giờ công. Hãy chọn PDF xuất trực tiếp có cột Mã sản phẩm và Giờ công chuẩn (giờ/SP).');
       const parsed=parseLaborHoursText(rows.join('\n'));
       setText(rows.join('\n'));setSource(file.name);
-      setPreview(reconcileLaborHours(parsed,masterSkus,await readRecords()));
-      setMessage('Đã đọc '+parsed.length+' mã có giờ công; bỏ qua '+missing+' mã trống giờ công. Nhấn Lưu ở cuối trang để ghi các mã hợp lệ. Chưa thay đổi dữ liệu.');
+      setRecords(await readRecords());
+      setMessage('Đã đọc '+parsed.length+' mã có giờ công; bỏ qua '+missing+' mã trống giờ công. Chọn ngày hiệu lực để đối chiếu rồi nhấn Lưu. Chưa thay đổi dữ liệu.');
     } catch(error) {setMessage(error instanceof Error?error.message:'Không đọc được PDF.');}
     finally {lock.current=false;setBusy(false);if(fileInput.current)fileInput.current.value='';}
   }
@@ -83,8 +84,8 @@ export default function LaborHoursImport({masterSkus,onClose,onSaved}:{masterSku
         }
         saved++;
       }
-      const checked=reconcileLaborHours(parseLaborHoursText(text),masterSkus,await readRecords());
-      setPreview(checked);
+      const refreshed=await readRecords(),checked=reconcileLaborHours(parseLaborHoursText(text),masterSkus,refreshed,effectiveFrom);
+      setRecords(refreshed);
       await onSaved();
       if(failures.length||checked.changes.length) {
         showResult(`Đã lưu ${saved} mã. Chưa lưu đầy đủ: ${failures.join('; ')||`${checked.changes.length} mã còn cần cập nhật`}. Kiểm tra thông tin mã và chọn lại PDF trước khi lưu tiếp.`);
@@ -92,7 +93,7 @@ export default function LaborHoursImport({masterSkus,onClose,onSaved}:{masterSku
         showResult(`Đã cập nhật giờ công thành công: ${saved} mã đã lưu. Giữ nguyên ${checked.retained} mã không có trong PDF.${checked.skipped?` Bỏ qua ${checked.skipped} mã không hợp lệ như danh sách đã thông báo; bổ sung SKU Master rồi tải lại PDF để cập nhật các mã này.`:''}`,true);
       }
     } catch(error) {
-      setPreview(null);
+      setRecords(null);
       showResult(`Đã lưu ${saved} mã. Đã dừng: ${error instanceof Error?error.message:'Lỗi lưu dữ liệu'}. Chọn lại PDF trước khi tiếp tục; các mã đã lưu sẽ không ghi trùng.`);
       try {await onSaved();} catch {/* Keep the original failure visible; allow retry from the same import screen. */}
     } finally {lock.current=false;setBusy(false);}
@@ -102,7 +103,7 @@ export default function LaborHoursImport({masterSkus,onClose,onSaved}:{masterSku
     <p>Giờ công đã có sẽ cập nhật theo PDF; chưa có sẽ thêm mới nếu SKU Master hợp lệ. Mã không có trong PDF giữ nguyên trên web. Giá trị 0 trong PDF được ghi nhận; ô trống không thay thế dữ liệu.</p>
     <input ref={fileInput} type="file" accept=".pdf,application/pdf" hidden onChange={event=>void readPdf(event.target.files?.[0])}/>
     <StandardToolbar name="LaborHoursMaster" items={[toolbar.action({disabled:busy,onClick:()=>fileInput.current?.click()},'Chọn file PDF',true,'action')]}/>
-    <label>Ngày hiệu lực của mức trong PDF<input type="date" required disabled={busy} value={effectiveFrom} onChange={event=>setEffectiveFrom(event.target.value)}/></label><p>Chọn ngày có căn cứ áp dụng; không dùng ngày tải PDF để suy ra lịch sử.</p>
+    <label>Ngày hiệu lực của mức trong PDF<input type="date" required disabled={busy} value={effectiveFrom} onChange={event=>setEffectiveFrom(event.target.value)}/></label><p>Đối chiếu theo ngày hiệu lực đã chọn, không theo mức hiện tại hoặc ngày tải PDF. Sửa cùng ngày tạo phiên bản mới; phiếu và kế hoạch đã lưu giữ căn cứ cũ.</p>
     {source&&<p>File đã chọn: <strong>{source}</strong></p>}
     {message&&<p role="status">{message}</p>}
     {preview&&<>

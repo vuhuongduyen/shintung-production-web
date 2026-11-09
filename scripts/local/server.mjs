@@ -31,6 +31,7 @@ import { getPlan,getPlanCapacity,getPlanCapacityDetail,mutatePlan,PlanError } fr
 import { getTransit,mutateTransit } from './in-transit.mjs';
 import {isSuperAdmin,storageStatus,storeFile,createExport} from './storage.mjs';
 import {siteLaborHours,siteLaborHoursHistory} from '../../lib/site-labor-hours.mjs';
+import {buildLaborHoursRevision,laborBusinessDate} from '../../lib/labor-hours-revision.mjs';
 import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
 
 const allowed=new Set(['users','permissions','departments','department_permissions','versions','sku','sku_history','leadtime','leadtime_versions','leadtime_audit','safety_days','safety_rules','safety_rule_groups','safety_rule_audit','labor_hours','labor_hours_history','production_engine_snapshot','inventory','warehouse_in','warehouse_out','warehouse_transfer','warehouse_docs','warehouse_count','inventory_snapshot','inventory_snapshot_audit','bom','bom_change','forecast','forecast_import_history','demand_event','production_engine','production_plan','in_transit','in_transit_audit','production_report','labor_adjustment','capacity']);
@@ -79,7 +80,7 @@ export function localTestPlugin(testOptions = {}){
     if(url.pathname==='/api/employees'&&req.method==='GET')return send(200,await readEmployees(connection.db,authenticated?{...session,isAdmin:true}:null));
     if(url.pathname==='/api/production-plan'&&req.method==='GET')return send(200,url.searchParams.get('capacityDetail')==='1'?await getPlanCapacityDetail(connection.db,url.searchParams.get('week'),url.searchParams.get('line')):url.searchParams.get('capacityOnly')==='1'?{capacity:await getPlanCapacity(connection.db,url.searchParams.get('week'))}:await getPlan(connection.db,url.searchParams.get('week'),!!(authenticated&&session.canReopenPlan)));
     if(url.pathname==='/api/in-transit'&&req.method==='GET'){const sku=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}));return send(200,await getTransit(connection.db,Object.fromEntries(url.searchParams),sku));}
-    if(url.pathname==='/api/production-standards'&&req.method==='GET'){if(!authenticated)return send(401,{error:'Vui lòng đăng nhập.'});const rows=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;return send(200,{records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}))).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});}
+    if(url.pathname==='/api/production-standards'&&req.method==='GET'){if(!authenticated)return send(401,{error:'Vui lòng đăng nhập.'});const rows=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;return send(200,{records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})),laborBusinessDate()).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});}
     if(url.pathname==='/api/production-hr-hours'&&req.method==='GET')return send(200,await readHrMonth(connection.db,url.searchParams.get('month'),authenticated?{...session,isAdmin:true}:null,url.searchParams.get('examples')==='1'));
     if(url.pathname==='/api/production-workflow'&&req.method==='GET'){const actor=authenticated?{...session,isAdmin:true}:null,workflow=await readProductionWorkflow(connection.db,actor,[],{includeDerivedHours:url.searchParams.get('unassignedAlerts')!=='1'});return send(200,url.searchParams.get('unassignedAlerts')==='1'?await productionUnassignedReminder(connection.db,actor,workflow):workflow);}
     if(adminReadPaths.has(url.pathname)){
@@ -96,7 +97,7 @@ export function localTestPlugin(testOptions = {}){
      if(entity==='sku'&&url.searchParams.has('stock'))return send(200,await readSkuStock(connection.db,url.searchParams.get('stock')));
      if(entity==='bom'){const masters=(await connection.db.prepare("SELECT payload FROM app_records WHERE entity='sku'").all()).results.map(row=>JSON.parse(row.payload));return send(200,{records:records.map(row=>({...row,payload:syncBomSources(row.payload,masters)}))});}
      if(entity==='leadtime')return send(200,{records:records.map(row=>({...row,payload:projectCancelledMaster('leadtime',row.payload)}))});
-     if(entity==='labor_hours')return send(200,{records:siteLaborHours(records)});
+     if(entity==='labor_hours')return send(200,{records:siteLaborHours(records,laborBusinessDate())});
      if(entity==='labor_hours_history')return send(200,{records:siteLaborHoursHistory(records,url.searchParams.get('sku')||'')});
      return send(200,{records});
     }
@@ -138,11 +139,12 @@ export function localTestPlugin(testOptions = {}){
     if(url.pathname==='/api/labor-hours'){
      if(!authenticated)return send(401,{error:'Đăng nhập tài khoản TEST để lưu dữ liệu.'});
      const sku=String(body.sku||'').trim().toUpperCase(),value=Number(body.laborHour),mode=body.mode==='edit'?'edit':'create',reason=String(body.reason||'').trim(),note=String(body.note||'').trim(),source=body.source==='PDF'?'PDF':'Nhập trực tiếp';
-     if(!sku||!Number.isFinite(value)||value<0)return send(400,{error:'SKU hoặc Giờ công/SP không hợp lệ.'});if(mode==='edit'&&!reason)return send(400,{error:'Vui lòng nhập lý do thay đổi.'});
+     if(!sku||!['number','string'].includes(typeof body.laborHour)||String(body.laborHour).trim()===''||!Number.isFinite(value)||value<0)return send(400,{error:'SKU hoặc Giờ công/SP không hợp lệ.'});if(mode==='edit'&&!reason)return send(400,{error:'Vui lòng nhập lý do thay đổi.'});
      const skuRows=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results,master=skuRows.find(r=>r.record_key.toUpperCase()===sku);if(!master)return send(409,{error:'SKU không tồn tại trong SKU Master TEST.'});
      const saved=await connection.db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(sku).first(),base=siteLaborHours([]).find(r=>r.key===sku)?.payload||null,old=saved?JSON.parse(saved.payload):base;if(mode==='create'&&old)return send(409,{error:'SKU đã có Giờ công/SP đang hiệu lực.'});if(mode==='edit'&&!old)return send(409,{error:'SKU chưa có Giờ công/SP để sửa.'});
      if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==Number(old?.version||0))return send(409,{error:conflictMessage,current:old});
-     const now=new Date().toISOString(),version=Number(old?.version||0)+1,current={sku,laborHour:value,note,source,configuredAt:old?.configuredAt||now,updatedAt:now,updatedBy:session.login,version},history={id:randomBytes(16).toString('hex'),sku,version,oldLaborHour:old?.laborHour??null,newLaborHour:value,oldNote:old?.note||'',newNote:note,reason:mode==='edit'?reason:'Thêm mới Giờ công/SP',actor:session.login,at:now,source};
+     const now=new Date().toISOString();let current,history;
+     try{({current,history}=buildLaborHoursRevision({old,sku,value,effectiveFrom:body.effectiveFrom,note,source,reason,actor:session.login,now,mode}));}catch(error){return send(error.status||409,{error:error.message});}
      const write=saved?connection.db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='labor_hours' AND record_key=? AND payload=?").bind(JSON.stringify(current),session.login,now,sku,saved.payload):connection.db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('labor_hours',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(sku,JSON.stringify(current),session.login,now);
      const changes=await connection.db.batch([write,connection.db.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE changes()=1').bind('labor_hours_history',history.id,JSON.stringify(history),session.login,now)]);
      if(changes[0].meta.changes!==1)return send(409,{error:conflictMessage});return send(200,{ok:true,payload:current,history});
@@ -151,7 +153,7 @@ export function localTestPlugin(testOptions = {}){
     if(['capacity','employees','inventory','forecast_import_history'].includes(body.entity))return send(403,{error:'Sử dụng API nghiệp vụ để bảo vệ dữ liệu và lịch sử.'});
     if(!authenticated)return send(401,{error:'Đăng nhập tài khoản TEST để lưu dữ liệu.'});
     if(['users','permissions','departments','department_permissions'].includes(body.entity)&&!await isSuperAdmin(connection.db,session))return send(403,{error:'Chỉ Super Admin được thay đổi người dùng, bộ phận hoặc phân quyền.'});
-    if(['sku','sku_history','production_plan','production_plan_audit','in_transit','in_transit_audit','production_report','production_event','production_schedule','production_cursor'].includes(body.entity))return send(409,{error:'Dùng API nghiệp vụ chuyên biệt để bảo đảm giao dịch và lịch sử.'});
+    if(['sku','sku_history','labor_hours','labor_hours_history','production_plan','production_plan_audit','in_transit','in_transit_audit','production_report','production_event','production_schedule','production_cursor'].includes(body.entity))return send(409,{error:'Dùng API nghiệp vụ chuyên biệt để bảo đảm giao dịch và lịch sử.'});
     if(!allowed.has(body.entity)||typeof body.key!=='string'||!body.key||body.payload===undefined)return send(400,{error:'Dữ liệu không hợp lệ'});
     const original=await connection.db.prepare('SELECT payload FROM app_records WHERE entity=? AND record_key=?').bind(body.entity,body.key).first();
     if(['leadtime','leadtime_versions','safety_rules','safety_rule_groups','safety_days'].includes(body.entity)&&original&&JSON.parse(original.payload).cancelled)return send(409,{error:'Dữ liệu đã Hủy; không được áp dụng lại bằng thao tác sửa/xác nhận.'});

@@ -4,7 +4,7 @@ import {decideDailyWithdrawal} from '../scripts/local/production-warehouse-withd
 import {readLegacyPreservation} from '../scripts/local/production-legacy-preservation.mjs';
 import {dailyAttendanceActions} from '../lib/production-report-model.mjs';
 import {reviewDailyOutput} from '../scripts/local/production-daily-review.mjs';
-import {publishEffectiveValue,validBusinessDate,effectiveValueOn} from '../lib/effective-dated-value.mjs';
+import {buildLaborHoursRevision,laborBusinessDate} from '../lib/labor-hours-revision.mjs';
 import {isDailyOutput,dailyOutputTotals} from '../lib/production-daily-output.mjs';
 import {readDailyOrderReports,readDailyOutputPolicy,quantityBaselineForOrder} from '../scripts/local/production-daily-output.mjs';
 import {reviewSnapshot} from '../lib/production-review-selection.mjs';
@@ -183,7 +183,7 @@ async function handleSiteApi(request,env,timing){
    if(!hasGrant(actor,'Quản lý sản xuất',['Xem']))return json({error:'Không có quyền xem giờ công sản xuất.'},403);
    const rows=(await env.DB.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;
    const allowedSkus=hasQuickLineReadScope(actor)?new Set((await readProductionWorkflow(env.DB,actor)).orders.map(row=>row.sku)):null;
-   return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}))).filter(r=>!allowedSkus||allowedSkus.has(r.payload.sku||r.key)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});
+   return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})),laborBusinessDate()).filter(r=>!allowedSkus||allowedSkus.has(r.payload.sku||r.key)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});
   }
   if(path==='/api/production-hr-hours'){
    const hrExample=url.searchParams.get('examples')==='1';
@@ -260,7 +260,7 @@ async function handleSiteApi(request,env,timing){
    }
    if(entity==='sku'&&url.searchParams.get('view')!=='stored')return json({records:await loadCatalog()});
    const rows=await Promise.all((await env.DB.prepare('SELECT record_key,payload,updated_by,updated_at FROM app_records WHERE entity=? ORDER BY updated_at DESC').bind(entity).all()).results.map(async r=>({...r,revision:await recordRevision(r.payload)})));
-   if(entity==='labor_hours')return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at}))),importSummary:laborHoursImportSummary});
+   if(entity==='labor_hours')return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at})),laborBusinessDate()),importSummary:laborHoursImportSummary});
    if(entity==='labor_hours_history')return json({records:siteLaborHoursHistory(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at})),url.searchParams.get('sku')||'')});
    if(url.searchParams.get('view')==='stored'){if(!await isSuperAdmin(env.DB,actor))return json({error:'Forbidden'},403);return json({records:rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at}))});}
    if(entity==='demand_event')return json({records:siteDemand(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision})))});
@@ -320,7 +320,7 @@ async function handleSiteApi(request,env,timing){
    const canManage=canWrite(actor,'Dữ liệu cơ bản / Giờ công')||canWrite(actor,'Dữ liệu cơ bản / SKU Master');
    if(!canManage)return json({error:'Không có quyền cập nhật Giờ công.'},403);
    const sku=String(body.sku||'').trim().toUpperCase(),value=Number(body.laborHour),mode=body.mode==='edit'?'edit':'create',reason=String(body.reason||'').trim(),note=String(body.note||'').trim(),source=body.source==='PDF'?'PDF':'Nhập trực tiếp';
-   if(!sku||!Number.isFinite(value)||value<0)return json({error:'SKU hoặc Giờ công/SP không hợp lệ.'},400);
+   if(!sku||!['number','string'].includes(typeof body.laborHour)||String(body.laborHour).trim()===''||!Number.isFinite(value)||value<0)return json({error:'SKU hoặc Giờ công/SP không hợp lệ.'},400);
    if(mode==='edit'&&!reason)return json({error:'Vui lòng nhập lý do thay đổi.'},400);
    const catalog=await loadCatalog(),master=catalog.find(row=>String(row.key).toUpperCase()===sku&&usableSku(row.payload));if(!master)return json({error:'SKU không tồn tại hoặc chưa được xác nhận trong SKU Master.'},409);
    const saved=await env.DB.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(sku).first();
@@ -330,18 +330,8 @@ async function handleSiteApi(request,env,timing){
    if(mode==='edit'&&!old)return json({error:'SKU chưa có Giờ công/SP để sửa.'},409);
    if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==Number(old?.version||0))
     return json({error:conflictMessage,current:old,updatedBy:old?.updatedBy||null,updatedAt:old?.updatedAt||null},409);
-   const now=new Date().toISOString(),version=Number(old?.version||0)+1,effectiveFrom=body.effectiveFrom;
-   const dailyPolicy=await readDailyOutputPolicy(env.DB);
-   if(dailyPolicy.policy?.active&&!validBusinessDate(effectiveFrom))return json({error:'Vui lòng nhập ngày hiệu lực được chứng minh của Giờ công/SP.'},422);
-   let effectiveVersions=old?.effectiveVersions||[];
-   if(effectiveFrom!==undefined){
-    if(!validBusinessDate(effectiveFrom))return json({error:'Ngày hiệu lực không hợp lệ.'},422);
-    try{effectiveVersions=publishEffectiveValue(effectiveVersions,{id:crypto.randomUUID(),status:'published',validFrom:effectiveFrom,value,revision:version,source,reason:reason||'Thêm mới Giờ công/SP',publishedAt:now,publishedBy:actor.login});}catch(e){return json({error:e.message},409);}
-   }
-   const today=new Date(Date.now()+25200000).toISOString().slice(0,10),resolved=effectiveValueOn(effectiveVersions,today);
-   const currentValue=effectiveFrom&&effectiveFrom>today?(resolved.ok?resolved.basis.value:old?.laborHour??null):value;
-   const current={...old,sku,laborHour:currentValue,note,source,configuredAt:old?.configuredAt||now,updatedAt:now,updatedBy:actor.login,version,...(effectiveVersions.length?{effectiveVersions}:{})};
-   const history={id:crypto.randomUUID(),sku,version,oldLaborHour:old?.laborHour??null,newLaborHour:value,oldNote:old?.note||'',newNote:note,reason:mode==='edit'?reason:'Thêm mới Giờ công/SP',actor:actor.login,at:now,source,...(effectiveFrom?{effectiveFrom,effectiveVersionsBefore:old?.effectiveVersions||[],effectiveVersionsAfter:effectiveVersions}:{})};
+   const now=new Date().toISOString();let current,history;
+   try{({current,history}=buildLaborHoursRevision({old,sku,value,effectiveFrom:body.effectiveFrom,note,source,reason,actor:actor.login,now,mode}));}catch(e){return json({error:e.message},e.status||409);}
    const write=saved
     ?env.DB.prepare('UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity=? AND record_key=? AND payload=?').bind(JSON.stringify(current),actor.login,now,'labor_hours',sku,saved.payload)
     :env.DB.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING').bind('labor_hours',sku,JSON.stringify(current),actor.login,now);
