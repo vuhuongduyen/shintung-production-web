@@ -523,7 +523,7 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
               <div className="leadtime-form-grid">
                 <fieldset>
                   <legend>Thông tin sản phẩm</legend>
-                  <label><span>Ngày hiệu lực *</span><input required type="date" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></label><p>Chỉ nhập ngày có căn cứ áp dụng. Sửa cùng ngày tạo phiên bản mới; phiếu sản lượng và kế hoạch đã chốt giữ nguyên căn cứ đã lưu.</p>
+                  <label><span>Ngày hiệu lực *</span><input required type="date" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></label><p>Ngày hiệu lực là mốc áp dụng nghiệp vụ, có thể sửa khi có căn cứ. Bản cũ chưa có ngày hiệu lực dùng ngày cập nhật của từng phiên bản. Thời điểm thao tác thật vẫn lưu trong lịch sử; phiếu và kế hoạch đã chốt giữ căn cứ cũ.</p>
                   <label>
                     <span>SKU *</span>
                     <input
@@ -739,7 +739,7 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
                     {history.map((h) => (
                       <tr key={h.id} onClick={() => setDetail(h)}>
                         <DataCell kind="code">V{h.version}</DataCell>
-                        <DataCell>{h.effectiveFrom ? formatDate(h.effectiveFrom) : "Chưa ghi nhận"}</DataCell>
+                        <DataCell>{h.effectiveFrom ? formatDate(h.effectiveFrom) : `${formatDate(h.at)} (ngày cập nhật)`}</DataCell>
                         <DataCell kind="code">{masterMap.get(h.sku)?.group || "—"}</DataCell>
                         <DataCell>{masterMap.get(h.sku)?.name || "—"}</DataCell>
                         <DataCell>
@@ -760,7 +760,7 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
                 <section className="labor-history-detail">
                   <h3>Chi tiết trước và sau</h3>
                   <dl>
-                    <div><dt>Ngày hiệu lực</dt><dd>{detail.effectiveFrom ? formatDate(detail.effectiveFrom) : "Chưa ghi nhận"}</dd></div>
+                    <div><dt>Ngày hiệu lực</dt><dd>{detail.effectiveFrom ? formatDate(detail.effectiveFrom) : `${formatDate(detail.at)} (ngày cập nhật)`}</dd></div>
                     <div><dt>Loại cập nhật</dt><dd>{detail.supersedesVersionId ? "Sửa mức cùng ngày, giữ phiên bản trước" : "Mức theo ngày hiệu lực"}</dd></div>
                     <div>
                       <dt>SKU</dt>

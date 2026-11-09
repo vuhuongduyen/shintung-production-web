@@ -46,3 +46,20 @@ test('historical PDF publication keeps current display at the active date and ne
  const report=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor);assert.equal(report.report.rateBasis.value,.15);
  const {effectiveValueOn}=await import('../lib/effective-dated-value.mjs');assert.equal(effectiveValueOn(result.body.payload.effectiveVersions,'2026-10-31').reason,'missing');
 }));
+
+test('new output resolves legacy menu revisions by update date without backdating the latest value or rewriting old reports',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:.2,version:2,updatedAt:'2026-11-03T03:00:00Z'}),sku).run();
+ await c.put('labor_hours_history','SYNTHETIC-H1',{id:'SYNTHETIC-H1',sku,version:1,newLaborHour:.1,at:'2026-11-01T03:00:00Z'});
+ await c.put('labor_hours_history','SYNTHETIC-H2',{id:'SYNTHETIC-H2',sku,version:2,newLaborHour:.2,at:'2026-11-03T03:00:00Z'});
+ const before=await records(c.db),earlier=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor),later=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-04'}),actor);
+ assert.equal(earlier.report.rateBasis.value,.1);assert.equal(later.report.rateBasis.value,.2);assert.equal(earlier.report.rateBasis.dateBasis,'updated-date');
+ assert.deepEqual((await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),before.filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)));
+}));
+
+test('a concurrent change to fallback history aborts output without saving a mixed rate',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:.1,version:1,updatedAt:'2026-11-01T03:00:00Z'}),sku).run();
+ await c.put('labor_hours_history','SYNTHETIC-RACE',{id:'SYNTHETIC-RACE',sku,version:1,newLaborHour:.1,at:'2026-11-01T03:00:00Z'});
+ let injected=false;const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{if(!injected){injected=true;await target.prepare("UPDATE app_records SET payload=json_set(payload,'$.newLaborHour',9) WHERE entity='labor_hours_history' AND record_key='SYNTHETIC-RACE'").run();}return target.batch(statements);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});
+ await assert.rejects(()=>mutateProductionWorkflow(db,c.body({quantity:1}),actor),{status:409});assert.equal(injected,true);assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_report'").first()).n,0);
+}));

@@ -287,7 +287,7 @@ test('master history separates effective day from recorded time and distinguishe
     assert.equal(cells[5], '0.000');
     assert.equal(cells[8], '10/11/2026 03:30:00', 'Recorded time is shown in Vietnam, independent of effective day');
     const legacyCells = [...legacy.querySelectorAll('td')].map(node => node.textContent.trim());
-    assert.equal(legacyCells[1], 'Chưa ghi nhận', 'Do not infer effective day from recorded time');
+    assert.equal(legacyCells[1], '31/10/2026 (ngày cập nhật)', 'Legacy version explicitly falls back to its update date');
     assert.equal(legacyCells[4], '—');
     assert.equal(legacyCells[5], '—');
     await click(revision);

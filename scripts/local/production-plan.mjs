@@ -1,3 +1,4 @@
+import {readLaborHistory} from './labor-rate-source.mjs';
 import {canPlanAction} from '../../lib/production-plan-permissions.mjs';
 import {acceptedCapacity} from '../../lib/capacity-accepted.mjs';
 import {capacityDailyBudgets} from '../../lib/plan-week-load.mjs';
@@ -51,7 +52,8 @@ export async function getPlanCapacity(db, week, effectivePlanning, sources={}) {
     const record=await db.prepare("SELECT payload FROM app_records WHERE entity='capacity' AND record_key=?").bind(week).first();
     const envelope=record?JSON.parse(record.payload):null;
     const [calendarRecords,planRecords,laborRecords]=await Promise.all([read(db,'capacity'),sources.plans||read(db,'production_plan'),sources.labor||read(db,'labor_hours')]);
-    const laborModel=siteLaborHours(laborRecords.map(r=>({key:r.key,payload:r.payload,updatedAt:r.updatedAt})));
+    const laborHistory=sources.laborHistory||await readLaborHistory(db);
+    const laborModel=siteLaborHours(laborRecords.map(r=>({key:r.key,payload:r.payload,updatedAt:r.updatedAt})),null,laborHistory);
     const backlog=await readPlanTransitBacklog(db,week,laborModel.map(r=>r.payload));
     const calendars=unpack(calendarRecords),standards=new Map(laborModel.map(r=>[text(r.payload.sku).toUpperCase(),numberOrNull(r.payload.laborHour)]));
     const datedStandards=new Map(laborModel.map(r=>[text(r.payload.sku).toUpperCase(),r.payload]));
@@ -71,8 +73,9 @@ export async function getPlan(db, week, canReopen = false, catalog = null) {
         fail('invalidWeek');
     const policy=await readDailyOutputPolicy(db),effectivePlanning=policy.policy?.cutoverReached===true,planningBlocked=effectivePlanning&&policy.policy?.active!==true;
     const [plans, engines, transit, labor, audits] = await Promise.all(['production_plan', 'production_engine', 'in_transit', 'labor_hours', 'production_plan_audit'].map(e => read(db, e)));
+    const laborHistory=await readLaborHistory(db);
     const planningDate=planReferenceDate();
-    const capacity=await getPlanCapacity(db,week,effectivePlanning,{plans,labor,planningDate});
+    const capacity=await getPlanCapacity(db,week,effectivePlanning,{plans,labor,laborHistory,planningDate});
     const masters = catalog || await read(db,'sku');
     const masterPayloads=masters.map(record=>record?.payload&&typeof record.payload==='object'?record.payload:record);
     const masterBySku=new Map(masterPayloads.map(master=>[text(master?.code).toUpperCase(),master]));
@@ -83,7 +86,7 @@ export async function getPlan(db, week, canReopen = false, catalog = null) {
     const current = candidates.find(r => r.key === week);
     const envelope = current?.payload;
     const deletedRows = candidates.flatMap(r => Array.isArray(r.payload.rows) ? r.payload.rows : []).filter(r => r && r._deleted);
-    const effectiveLabor=siteLaborHours(labor.map(r=>({key:r.key,payload:r.payload,updatedAt:r.updatedAt}))).map(r=>r.payload);
+    const effectiveLabor=siteLaborHours(labor.map(r=>({key:r.key,payload:r.payload,updatedAt:r.updatedAt})),null,laborHistory).map(r=>r.payload);
     const laborBySku=new Map(effectiveLabor.map(item=>[text(item.sku).toUpperCase(),numberOrNull(item.laborHour)]));
     const datedStandards=new Map(effectiveLabor.map(item=>[text(item.sku).toUpperCase(),item]));
     // Draft plans follow the current SKU standard; confirmed/transferred plans retain their historical basis.
@@ -118,14 +121,14 @@ export async function mutatePlan(db, body, actor) {
     const extra = [];
     let closingBasis=null;
     if(action==='close'&&state.effectivePlanning){
-        const policy=planPolicies.get(state),scope="entity IN ('labor_hours','leadtime','leadtime_versions') OR (entity='production_reporting_policy' AND record_key='global') OR (entity='production_legacy_manifest' AND record_key=?)";
-        const {results}=await db.prepare(`SELECT entity,record_key,payload FROM app_records WHERE ${scope}`).bind(policy.manifestKey).all();
+        const policy=planPolicies.get(state),scope="entity IN ('labor_hours','labor_hours_history','leadtime','leadtime_versions') OR (entity='production_reporting_policy' AND record_key='global') OR (entity='production_legacy_manifest' AND record_key=?)";
+        const {results}=await db.prepare(`SELECT entity,record_key,payload,updated_at FROM app_records WHERE ${scope}`).bind(policy.manifestKey).all();
         if(results.find(r=>r.entity==='production_reporting_policy')?.payload!==policy.raw||results.find(r=>r.entity==='production_legacy_manifest')?.payload!==policy.manifestRaw)fail('Căn cứ chuyển đổi vừa thay đổi; tải lại trước khi chốt.',409);
-        const expected=JSON.stringify(results.map(r=>[r.entity,r.record_key,r.payload]));
+        const expected=JSON.stringify(results.map(r=>[r.entity,r.record_key,r.payload,r.updated_at]));
         if(new TextEncoder().encode(expected).length>8*1024*1024)fail('Căn cứ chốt kế hoạch vượt giới hạn đối chiếu; chưa chốt.',422);
-        extra.push(db.prepare(`INSERT INTO app_records SELECT entity,record_key,payload,updated_by,updated_at FROM app_records WHERE entity='production_plan' AND record_key=? AND NOT (((SELECT count(*) FROM app_records WHERE ${scope})=?) AND NOT EXISTS(SELECT 1 FROM json_each(?) j LEFT JOIN app_records a ON a.entity=json_extract(j.value,'$[0]') AND a.record_key=json_extract(j.value,'$[1]') WHERE a.payload IS NOT json_extract(j.value,'$[2]')))` ).bind(week,policy.manifestKey,results.length,expected));
-        const values=e=>results.filter(r=>r.entity===e).map(r=>({...JSON.parse(r.payload),_recordKey:r.record_key}));
-        closingBasis={labor:new Map(siteLaborHours(values('labor_hours').map(p=>({key:p._recordKey,payload:p}))).map(r=>[text(r.payload.sku).toUpperCase(),r.payload])),leadtime:values('leadtime').flatMap(p=>Array.isArray(p.rows)?p.rows:[{...p,sku:p.sku||p._recordKey}]),versions:values('leadtime_versions')};
+        extra.push(db.prepare(`INSERT INTO app_records SELECT entity,record_key,payload,updated_by,updated_at FROM app_records WHERE entity='production_plan' AND record_key=? AND NOT (((SELECT count(*) FROM app_records WHERE ${scope})=?) AND NOT EXISTS(SELECT 1 FROM json_each(?) j LEFT JOIN app_records a ON a.entity=json_extract(j.value,'$[0]') AND a.record_key=json_extract(j.value,'$[1]') WHERE a.payload IS NOT json_extract(j.value,'$[2]') OR a.updated_at IS NOT json_extract(j.value,'$[3]')))` ).bind(week,policy.manifestKey,results.length,expected));
+        const values=e=>results.filter(r=>r.entity===e).map(r=>({...JSON.parse(r.payload),_recordKey:r.record_key,_updatedAt:r.updated_at}));
+        closingBasis={labor:new Map(siteLaborHours(values('labor_hours').map(p=>({key:p._recordKey,payload:p,updatedAt:p._updatedAt})),null,values('labor_hours_history').map(p=>({key:p._recordKey,payload:p,updatedAt:p._updatedAt}))).map(r=>[text(r.payload.sku).toUpperCase(),r.payload])),leadtime:values('leadtime').flatMap(p=>Array.isArray(p.rows)?p.rows:[{...p,sku:p.sku||p._recordKey}]),versions:values('leadtime_versions')};
     }
     const details = [];
     let splitRowIds=[];
