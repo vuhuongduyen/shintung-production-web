@@ -1,3 +1,4 @@
+import {confirmationDateError} from '../../lib/leadtime-confirmation.mjs';
 import {randomUUID} from 'node:crypto';
 import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
 import {usableSku} from '../../lib/sku-state.mjs';
@@ -56,6 +57,7 @@ export async function commitLinkedRecords(db,body,actor,{authorize=()=>true,tran
     old.push(row?.payload??null);
   }
   const guardKey=randomUUID(),now=new Date().toISOString();
+  for(let index=0;index<ops.length;index++){const error=confirmationDateError(ops[index].entity,ops[index].payload,old[index]===null?null:JSON.parse(old[index]),now);if(error)fail(error,409);}
   const checks=ops.map((op,index)=>old[index]===null
     ?'NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)'
     :'EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)');

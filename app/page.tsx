@@ -1,4 +1,5 @@
 "use client";
+import {resolveLeadtimeVersion} from "../lib/leadtime-effective.mjs";
 import {SkuTransfer} from '../components/sku-transfer';
 import {hasMenuPermission} from '../lib/menu-action-access.mjs';
 import {DepartmentChangeRequests,useChangeRequests,requestDepartment,requestWorkspace,canReplyDepartments} from "../components/department-change-requests";
@@ -999,6 +1000,7 @@ type DemandSituationRule = {
   note: string;
 };
 type SafetyRuleSet = {
+  cancelled?: boolean;
   id: string;
   code: string;
   name: string;
@@ -1070,11 +1072,15 @@ const browserId = () =>
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const defaultSafetyRuleSet = basicDefaultSafetyRuleSet as SafetyRuleSet;
 let safetyRuleSets: SafetyRuleSet[] = [];
-const activeSafetyRuleFor = (weekStart: string, rules = safetyRuleSets) =>
-  rules
+const activeSafetyRuleFor = (weekStart: string, rules = safetyRuleSets) => {
+  const validDate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
+  if (!validDate(weekStart)) return undefined;
+  return rules
     .filter(
       (rule) =>
-        !rule._deleted &&
+        !rule._deleted && !rule.cancelled && validDate(rule.effectiveFrom) &&
+        (!rule.effectiveTo || (validDate(rule.effectiveTo) && rule.effectiveTo >= rule.effectiveFrom)) &&
         (["Đã xác nhận", "Đang áp dụng", "Sắp có hiệu lực"].includes(
           rule.status,
         ) || (rule.status === "Hết hiệu lực" && !!rule.confirmedAt && Number.isFinite(Date.parse(rule.confirmedAt)))) &&
@@ -1086,6 +1092,7 @@ const activeSafetyRuleFor = (weekStart: string, rules = safetyRuleSets) =>
         b.effectiveFrom.localeCompare(a.effectiveFrom) ||
         b.version.localeCompare(a.version),
     )[0];
+};
 const safetyBreakdown = (leadTime: number, rule?: SafetyRuleSet) => {
   if (!leadTime || leadTime < 1)
     return { leadTimeDays: 0, forecastDays: 0, situationDays: 0, total: 0 };
@@ -14368,6 +14375,8 @@ function LegacySafetyRulesView() {
     });
   };
   const confirmRule = async (rule: SafetyRuleSet) => {
+    const now = new Date().toISOString();
+    rule = {...rule,effectiveFrom:vietnamDate(now)};
     const validation = validateLeadTimeRules(rule.leadTimeRules);
     if (validation) {
       setNotice(validation);
@@ -14391,7 +14400,6 @@ function LegacySafetyRulesView() {
       rule.changeReason,
     );
     if (!reason) return;
-    const now = new Date().toISOString();
     await persist(
       {
         ...rule,
@@ -14866,15 +14874,8 @@ function SafetyRuleEditor({
             />
           </label>
           <label>
-            <span>NGÀY HIỆU LỰC *</span>
-            <input
-              type="date"
-              required
-              value={draft.effectiveFrom}
-              onChange={(e) =>
-                setDraft({ ...draft, effectiveFrom: e.target.value })
-              }
-            />
+            <span>NGÀY HIỆU LỰC</span>
+            <input value="Từ ngày xác nhận (GMT+7)" readOnly />
           </label>
           <label>
             <span>NGÀY HẾT HIỆU LỰC</span>
@@ -14962,8 +14963,8 @@ function SafetyRuleEditor({
             <FeedbackActionButton
               className="primary-button"
               disabled={
-                saving || !draft.effectiveFrom || !draft.changeReason.trim()
-              } disabledExplanation={saving ? "Thao tác đang được xử lý. Vui lòng chờ hoàn tất rồi thử lại." : !draft.effectiveFrom ? "Chọn ngày hiệu lực trước khi lưu bản nháp." : "Nhập lý do thay đổi trước khi lưu bản nháp."}
+                saving || !draft.changeReason.trim()
+              } disabledExplanation={saving ? "Thao tác đang được xử lý. Vui lòng chờ hoàn tất rồi thử lại." : "Nhập lý do thay đổi trước khi lưu bản nháp."}
               onClick={() => onSave(draft)}
             >
               {saving ? "Đang lưu..." : "Lưu bản nháp"}
@@ -15240,7 +15241,7 @@ function SafetyRulesView() {
       label = "Gửi xác nhận";
     }
     if (kind === "confirm") {
-      const confirmedDate = now.slice(0, 10);
+      const confirmedDate = vietnamDate(now);
       next = {
         ...next,
         effectiveFrom: confirmedDate,
@@ -16794,25 +16795,8 @@ const normalizeSkuCode = (value: string) => value.trim().toUpperCase();
 const skuStableId = (sku: Sku) => `sku:${normalizeSkuCode(sku.code)}`;
 const leadTimeVersionNumber = (versions: LeadTimeVersion[], sku: string) =>
   `V${versions.filter((item) => item.sku === sku).length + 1}`;
-const activeLeadTimeAt = (
-  versions: LeadTimeVersion[],
-  sku: string,
-  at: string,
-) =>
-  versions
-    .filter(
-      (item) =>
-        !item._deleted &&
-        normalizeSkuCode(item.sku) === normalizeSkuCode(sku) &&
-        (item.status === "Đang áp dụng" ||
-          (item.status === "Hết hiệu lực" && !!item.confirmedAt)) &&
-        !!item.validFrom &&
-        Date.parse(item.validFrom) <= Date.parse(at) &&
-        (!item.validTo || Date.parse(at) < Date.parse(item.validTo)),
-    )
-    .sort(
-      (a, b) => Date.parse(b.validFrom || "") - Date.parse(a.validFrom || ""),
-    )[0];
+const activeLeadTimeAt = (versions: LeadTimeVersion[], sku: string, at: string): LeadTimeVersion | undefined =>
+  resolveLeadtimeVersion(versions, sku, at).selected;
 
 type LeadtimeDataSnapshot = {
   leadRows: LeadtimeRow[];
@@ -16860,7 +16844,7 @@ const currentLeadtimeSettingForSku = (
     (row) => normalizeSkuCode(row.sku) === normalizedSku,
   );
   const leadTime = activeVersion?.leadTime ?? legacy?.leadTime ?? 0;
-  const rule = activeSafetyRuleFor(at.slice(0, 10), snapshot.rules);
+  const rule = activeSafetyRuleFor(vietnamDate(at), snapshot.rules);
   return {
     leadTime,
     safety: safetyBreakdown(leadTime, rule),
@@ -16932,7 +16916,7 @@ function LeadtimeMasterView({
       );
   }, [dataRevision]);
 
-  const currentSafetyRule = activeSafetyRuleFor(now.slice(0, 10), rules);
+  const currentSafetyRule = activeSafetyRuleFor(vietnamDate(now), rules);
 
   const masterMap = useMemo(
     () => new Map(masterSkus.map((sku) => [normalizeSkuCode(sku.code), sku])),
@@ -17667,7 +17651,7 @@ toolbarConfig.action({"onClick": () => {
                 {
                   safetyBreakdown(
                     selectedPending.leadTime,
-                    activeSafetyRuleFor(now.slice(0, 10)),
+                    activeSafetyRuleFor(vietnamDate(now)),
                   ).total
                 }
               </b>

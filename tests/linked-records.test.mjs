@@ -10,6 +10,7 @@ const context=async()=>{const base=resolve(root,'.local-data/tests');mkdirSync(b
 const row=async(db,entity,key)=>db.prepare('SELECT payload FROM app_records WHERE entity=? AND record_key=?').bind(entity,key).first();
 const count=async(db,entity)=>(await db.prepare('SELECT count(*) AS n FROM app_records WHERE entity=?').bind(entity).first()).n;
 const actor={login:'test-admin'};
+const confirmedAt=new Date().toISOString(),effectiveFrom=new Date(Date.now()+25200000).toISOString().slice(0,10);
 const save=(db,kind,operations,catalog=[])=>commitLinkedRecords(db,{kind,operations},actor,{catalog});
 
 test('BOM confirmation saves change and BOM together and rejects a stale source with no partial commit',async()=>{
@@ -40,7 +41,7 @@ test('Leadtime transition and audit commit together, including concurrent confli
   const draft={id:'LT-1',sku:'SKU-1',status:'Chờ xác nhận',leadTime:4};
   await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('leadtime_versions','LT-1',JSON.stringify(draft),'fixture','fixture').run();
   const revisions=await recordRevision(JSON.stringify(draft));
-  const body=[{entity:'leadtime_versions',key:'LT-1',payload:{...draft,status:'Đang áp dụng'},expectedRevision:revisions,audit:{action:'Xác nhận'}},{entity:'leadtime_versions',key:'LT-2',payload:{id:'LT-2',sku:'SKU-1',leadTime:5,status:'Hết hiệu lực'},expectedRevision:null,audit:{action:'Hết hiệu lực'}}];
+  const body=[{entity:'leadtime_versions',key:'LT-1',payload:{...draft,status:'Đang áp dụng',confirmedAt,validFrom:confirmedAt},expectedRevision:revisions,audit:{action:'Xác nhận'}},{entity:'leadtime_versions',key:'LT-2',payload:{id:'LT-2',sku:'SKU-1',leadTime:5,status:'Hết hiệu lực'},expectedRevision:null,audit:{action:'Hết hiệu lực'}}];
   const results=await Promise.allSettled([save(c.db,'leadtime',body,catalog),save(c.db,'leadtime',body,catalog)]);
   assert.equal(results.filter(x=>x.status==='fulfilled').length,1);
   assert.equal(results.filter(x=>x.status==='rejected'&&x.reason.status===409).length,1);
@@ -54,12 +55,20 @@ test('Safety group transaction rejects stale linked rule without changing confir
  const c=await context();try{
   const linked={id:'S-1',status:'Đang áp dụng'};
   await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('safety_rules','S-1',JSON.stringify(linked),'fixture','fixture').run();
-  const ops=[{entity:'safety_rule_groups',key:'S-1',payload:{id:'S-1',status:'Đang áp dụng'},expectedRevision:null,audit:{type:'Xác nhận'}},{entity:'safety_rules',key:'S-1',payload:{...linked,status:'Hết hiệu lực'},expectedRevision:'stale',audit:{type:'Kết thúc'}}];
+  const ops=[{entity:'safety_rule_groups',key:'S-1',payload:{id:'S-1',status:'Đang áp dụng',confirmedAt,effectiveFrom},expectedRevision:null,audit:{type:'Xác nhận'}},{entity:'safety_rules',key:'S-1',payload:{...linked,status:'Hết hiệu lực'},expectedRevision:'stale',audit:{type:'Kết thúc'}}];
   await assert.rejects(save(c.db,'safety-group',ops),error=>error.status===409);
   assert.equal(await row(c.db,'safety_rule_groups','S-1'),null);
   assert.equal(await count(c.db,'safety_rule_audit'),0);
   ops[1].expectedRevision=await recordRevision(JSON.stringify(linked));
   await save(c.db,'safety-group',ops);
   assert.equal(await count(c.db,'safety_rule_audit'),2);
+ }finally{await c.close();}
+});
+
+test('Safety confirmation with backdated effect rolls back the whole group and both audits',async()=>{
+ const c=await context();try{
+  const operations=['safety_rule_groups','safety_rules'].map(entity=>({entity,key:'SYNTHETIC-DATE',expectedRevision:null,payload:{id:'SYNTHETIC-DATE',status:'Đang áp dụng',confirmedAt:new Date().toISOString(),effectiveFrom:'2000-01-01'},audit:{type:'Xác nhận'}}));
+  await assert.rejects(save(c.db,'safety-group',operations),error=>error.status===409&&error.message.includes('Ngày hiệu lực'));
+  for(const entity of ['safety_rule_groups','safety_rules','safety_rule_audit','admin_audit','linked_write_guard'])assert.equal(await count(c.db,entity),0);
  }finally{await c.close();}
 });

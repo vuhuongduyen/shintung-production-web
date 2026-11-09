@@ -125,6 +125,12 @@ test('Site APIs use trusted identity, isolate bindings, retain D1/R2 data and ne
   assert.equal((await call('/api/labor-hours',{mode:'edit',sku:'TEST-SITE',laborHour:0.1,note:'',reason:'',source:'Nhập trực tiếp'})).status,400);
   const leadtimePayload={id:'LT-TEST-SITE-1',sku:'TEST-SITE',skuId:'sku:TEST-SITE',version:'V1',leadTime:3,status:'Nháp',setupAt:new Date().toISOString(),createdBy:'spoof',updatedBy:'spoof'};
   assert.equal((await call('/api/records',{entity:'leadtime_versions',key:leadtimePayload.id,payload:leadtimePayload,operation:'create'})).status,200);
+  const dateBefore=(await records(c.db));
+  const dateBody={entity:'leadtime_versions',key:leadtimePayload.id,payload:{...leadtimePayload,status:'Đang áp dụng',confirmedAt:new Date().toISOString(),validFrom:'2000-01-01'}};
+  dateBody.expectedRevision=await recordRevision((await c.db.prepare("SELECT payload FROM app_records WHERE entity='leadtime_versions' AND record_key=?").bind(leadtimePayload.id).first()).payload);
+  const dateRejected=await call('/api/records',dateBody);
+  assert.equal(dateRejected.status,409);assert.match((await dateRejected.clone().json()).error,/Ngày hiệu lực/);
+  await assertRejectedRequestAudit({before:dateBefore,after:await records(c.db),response:dateRejected,actorId:email,route:'/api/records',body:dateBody});
   const beforeConflictAudit=(await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='admin_audit'").first()).n;
   assert.equal((await call('/api/records',{entity:'leadtime_versions',key:leadtimePayload.id,payload:{...leadtimePayload,leadTime:999},expectedRevision:null})).status,409);
   assert.equal(JSON.parse((await c.db.prepare("SELECT payload FROM app_records WHERE entity='leadtime_versions' AND record_key=?").bind(leadtimePayload.id).first()).payload).leadTime,3);
