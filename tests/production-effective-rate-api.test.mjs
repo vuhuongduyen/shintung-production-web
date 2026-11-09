@@ -109,3 +109,14 @@ for(const marker of ['audit','explicit','master'])test('menu API and output agre
  const output=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor);assert.equal(output.report.rateBasis??null,null);assert.equal(output.report.standardUnit??null,null);
  assert.deepEqual((await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),before);
 }));
+
+test('legacy live V1 uses its existing update date despite generated PDF V1 in menu and output',()=>dailyFixture(async c=>{
+ const sku='106TG01';await c.put('labor_hours',sku,{sku,version:1,laborHour:.03,updatedAt:'2026-11-09T03:00:00Z'});
+ await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.sku',?) WHERE entity='in_transit' AND record_key=?").bind(sku,c.order.id).run();
+ const raw=(await c.db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(c.order.id).first()).payload,{recordRevision}=await import('../lib/record-revision.mjs'),expectedOrderRevision=await recordRevision(raw);
+ const before=(await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),call=await reviewer(c),read=await call('/api/records?entity=labor_hours');
+ assert.equal(read.status,200);assert.equal(read.body.records.find(r=>r.key===sku).payload.laborHour,.03);
+ const old=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-08',expectedOrderRevision}),actor),now=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-09',expectedOrderRevision}),actor);
+ assert.equal(old.report.rateBasis.value,.017);assert.equal(now.report.rateBasis.value,.03);assert.equal(now.report.rateBasis.dateBasis,'updated-date');assert.equal(now.report.rateBasis.recordedAt,'2026-11-09T03:00:00Z');
+ assert.deepEqual((await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),before);
+}));

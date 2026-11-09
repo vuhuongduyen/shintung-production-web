@@ -35,3 +35,8 @@ Preview có lịch sử giá trị, ngày hiệu lực, ngày thao tác, lý do 
 - Kiểm D1 giả với 35 revisions lưu thành công và chọn đúng ngày hoàn thành. Có kiểm các race nêu trên, giữ snapshot Plan/phiếu cũ và ngân sách 4 SELECT.
 
 - Projection menu theo ngày luôn chạy cả khi timeline rỗng: nếu toàn bộ revision bị loại vì test, trả `laborHour=null`, `currentRateIssue=missing` và giữ `rateTimelineIssues`; không rơi về scalar đang lưu. Có kiểm hồi quy cả audit/explicit/master tại hàm projection và API menu so với phiếu mới, cùng kiểm nguyên trạng master/audit.
+
+## Phân biệt PDF nền và revision đang dùng
+Dòng PDF V1 tự sinh mang provenance riêng `rateSource=pdf-baseline` ở lớp đọc, không thuộc chuỗi revision của master/audit đang lưu. Không dùng số V1 của PDF để loại fallback current V1 hoặc triệt tiêu lịch sử nền khi current bị đánh dấu test. Chỉ gộp bản current trùng PDF khi revision, giá trị và timestamp đều khớp.
+
+Regression dùng DB giả: SKU có PDF 0,017 ngày 17/09, master V1 0,03 cập nhật 09/11, không có audit riêng. Menu và phiếu 09/11 lấy 0,03; phiếu 08/11 giữ 0,017. Có kiểm ưu tiên ngày hiệu lực riêng, explicit V1, dấu test không lan nhầm sang PDF, và master/audit không thay đổi. Đây là tái hiện shape dữ liệu giả, chưa kết luận QA thật có shape này. Không yêu cầu nhập lại ngày đã có.

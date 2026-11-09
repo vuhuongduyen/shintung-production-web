@@ -61,3 +61,19 @@ for(const marker of ['audit','explicit','master'])test('dated menu reports missi
  assert.deepEqual(menu.resolvedRateVersions,[]);assert.equal(menu.laborHour,null);assert.equal(menu.currentRateIssue,'missing');assert.equal(menu.currentRateDate,'2026-11-09');assert.ok(menu.rateTimelineIssues.some(x=>x.startsWith('excluded-test:')));
  assert.equal(value(menu.resolvedRateVersions,'2026-11-09'),null);assert.deepEqual({record,history},before);
 });
+
+for(const effectiveFrom of [undefined,'2026-11-05'])test('PDF baseline V1 does not hide live V1 '+(effectiveFrom||'updated date'),()=>{
+ const key='106TG01',record={key,updatedAt:'2026-11-09T03:00:00Z',payload:{sku:key,version:1,laborHour:.03,...(effectiveFrom?{effectiveFrom}:{})}},before=structuredClone(record);
+ const boundary=effectiveFrom||'2026-11-09';
+ const projected=date=>siteLaborHours([record],date).find(r=>r.key===key).payload;
+ assert.equal(projected('2026-09-16').laborHour,null);assert.equal(projected('2026-09-17').laborHour,.017);
+ assert.equal(projected('2026-11-04').laborHour,.017);assert.equal(projected(boundary).laborHour,.03);assert.equal(projected('2026-11-10').laborHour,.03);
+ assert.equal(value(projected(boundary).resolvedRateVersions,boundary),.03);assert.deepEqual(record,before);
+});
+test('explicit live V1 and test-marked live V1 cannot suppress an unrelated PDF baseline V1',()=>{
+ const key='106TG01',record={key,payload:{sku:key,version:1,laborHour:.03,updatedAt:'2026-11-09',effectiveVersions:[{id:'LIVE-V1',revision:1,status:'published',value:.03,validFrom:'2026-11-09'}]}};
+ let menu=siteLaborHours([record],'2026-11-09').find(r=>r.key===key).payload;
+ assert.equal(value(menu.resolvedRateVersions,'2026-11-08'),.017);assert.equal(menu.laborHour,.03);
+ record.payload.isTest=true;menu=siteLaborHours([record],'2026-11-09').find(r=>r.key===key).payload;
+ assert.equal(menu.laborHour,.017);assert.ok(menu.rateTimelineIssues.some(i=>i.startsWith('excluded-test:')));
+});
