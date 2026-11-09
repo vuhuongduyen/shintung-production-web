@@ -17,9 +17,9 @@ test('closed missing-basis report gets dated comparison without changing actual 
  assert.deepEqual(reportStandardHours([r]),{unit:null,earned:null});assert.equal(reportStandardHours([r],{reference:true}).unit,.016);
  const journal=journalStandardHours([r],orders,null,new Set(['R']),new Map([['R',{orderCumulativeHours:4}]]),[r],{reference:true}).get('R');assert.equal(journal.standardUnitHours,.016);assert.equal(journal.laborReferences.length,1);
 });
-test('only October missing bases receive a reference; September and November remain unchanged',()=>{
- const reports=['2026-09-30','2026-10-01','2026-10-31','2026-11-01'].map((date,i)=>({...report,id:String(i),completedAt:date+'T03:00:00Z'})),before=structuredClone(reports),rows=attachLaborReferences(reports,orders,menu());
- assert.deepEqual(rows.map(r=>referenceReportBasis(r).unit),[null,.017,.016,null]);assert.equal(rows[0],reports[0]);assert.equal(rows[3],reports[3]);assert.deepEqual(reports,before);
+test('missing bases from October onward receive dated references; September remains unchanged',()=>{
+ const reports=['2026-09-30','2026-10-01','2026-10-31','2026-11-01','2026-11-09','2026-12-01'].map((date,i)=>({...report,id:String(i),completedAt:date+'T03:00:00Z'})),before=structuredClone(reports),rows=attachLaborReferences(reports,orders,menu());
+ assert.deepEqual(rows.map(r=>referenceReportBasis(r).unit),[null,.017,.016,.016,.016,.016]);assert.equal(rows[0],reports[0]);assert.deepEqual(reports,before);
 });
 test('saved, stale, invalid and daily bases are not replaced by a reference',()=>{
  for(const r of [{...report,legacyEarnedBasis:undefined,standardUnit:.02},{...report,legacyEarnedBasis:{...report.legacyEarnedBasis,status:'resolved',unit:.025,earned:2.5}},{...report,legacyEarnedBasis:{...report.legacyEarnedBasis,status:'stale'}},{...report,standardUnit:-1},{...report,rateBasis:{value:99}}])assert.equal(attachLaborReferences([r],orders,menu())[0],r);
@@ -34,4 +34,9 @@ test('missing dates and test-only timelines remain missing, and preserved SKU wi
  const [bad]=attachLaborReferences([{...report,completedAt:''}],orders,menu());assert.equal(referenceReportBasis(bad).unit,null);
  const testMenu=siteLaborHours([{key:sku,payload:{sku,version:1,laborHour:16,isTest:true,updatedAt:'2026-09-17'}}]);assert.equal(referenceReportBasis(attachLaborReferences([report],orders,testMenu)[0]).unit,null);
  assert.equal(referenceReportBasis(attachLaborReferences([report],[{...orders[0],sku:'CHANGED'}],menu())[0]).unit,.016);
+});
+
+test('October cutoff uses production date and Vietnam completion date without changing source',()=>{
+ const input=[{...report,completedAt:'2026-09-30T16:59:59Z'},{...report,completedAt:'2026-09-30T17:00:00Z'},{...report,productionDate:'2026-09-30',completedAt:'2026-11-05T03:00:00Z'},{...report,productionDate:'2026-11-05',completedAt:'2026-09-30T03:00:00Z'}],before=structuredClone(input);
+ const rows=attachLaborReferences(input,orders,menu());assert.deepEqual(rows.map(r=>referenceReportBasis(r).unit),[null,.017,null,.016]);assert.deepEqual(input,before);
 });
