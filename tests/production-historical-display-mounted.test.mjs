@@ -106,3 +106,20 @@ test('unfinished order without final does not warn about final labor rate or alt
  assert.doesNotMatch(host.textContent,/Chưa xác định được Giờ công\/SP cho|Chưa xác định được căn cứ Giờ công\/SP/);assert.equal(JSON.stringify(value),before);assert.deepEqual(value.hours,{hc:1,ot:0,total:1});
  }}finally{await act(async()=>root.unmount());host.remove();}
 });
+
+for(const mode of ['no-final','resolved-final','missing-final'])test(`LSX warning excludes zero-output CUT: ${mode}`,async()=>{
+ const o={...order,processes:['CUT','FINAL'],actualCompletedAt:mode==='no-final'?undefined:'2026-11-02T04:00:00Z'};
+ const cut={...report,id:'SYNTHETIC-CUT-ZERO',stageName:'CUT',productionDate:'2026-11-02',completedAt:'2026-11-02T03:00:00Z',reportedQuantity:0,approvedQuantity:0,standardUnit:undefined,hours:{hc:2,ot:0,total:2}},final={...report,id:'SYNTHETIC-FINAL',stageName:'FINAL',productionDate:'2026-11-02',completedAt:'2026-11-02T04:00:00Z',standardUnit:mode==='resolved-final'?.016:undefined,hours:{hc:.5,ot:0,total:.5}};
+ const values=mode==='no-final'?[cut]:[cut,final],before=JSON.stringify({o,values}),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(React.createElement(Output,{orders:[o],reports:values,events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+ const warning=host.querySelector('details.production-inline-message');if(mode==='missing-final'){assert.ok(warning);assert.match(warning.textContent,/SYNTHETIC-FINAL/);assert.doesNotMatch(warning.textContent,/SYNTHETIC-CUT-ZERO/);}else assert.equal(warning,null);
+ if(mode!=='no-final'){const data=JSON.parse(host.querySelector('table[data-report-source]').dataset.reportSource),row=data.rows[0];assert.equal(row[data.headers.indexOf('Tổng giờ LSX')],2.5);assert.equal(row[data.headers.indexOf('Giờ công chuẩn HT')],mode==='resolved-final'?1.6:null);assert.equal(row[data.headers.indexOf('Giờ công chuẩn/SP')],mode==='resolved-final'?.016:'Thiếu căn cứ định mức');}
+ assert.equal(JSON.stringify({o,values}),before);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+test('each final contribution with missing basis is identified, not just the last final',async()=>{
+ const o={...order,processes:['CUT','FINAL']},first={...report,id:'SYNTHETIC-FIRST-FINAL',stageName:'FINAL',productionDate:'2026-11-02',completedAt:'2026-11-02T03:00:00Z',reportedQuantity:50,approvedQuantity:50,standardUnit:undefined},last={...first,id:'SYNTHETIC-LAST-FINAL',completedAt:'2026-11-02T04:00:00Z',standardUnit:.016};
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(React.createElement(Output,{orders:[o],reports:[first,last],events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());const warning=host.querySelector('details.production-inline-message');assert.match(warning.textContent,/SYNTHETIC-FIRST-FINAL/);assert.doesNotMatch(warning.textContent,/SYNTHETIC-LAST-FINAL/);}finally{await act(async()=>root.unmount());host.remove();}
+});
