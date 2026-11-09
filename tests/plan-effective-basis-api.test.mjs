@@ -102,3 +102,16 @@ test('a concurrent labor publication cannot commit a mixed Plan-close basis or a
  let expected,injected=false;const raced=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{assert.equal(injected,false);injected=true;await target.prepare("UPDATE app_records SET payload=json_set(payload,'$.effectiveVersions[1].value',77) WHERE entity='labor_hours' AND record_key=?").bind(sku).run();expected=await records(target);return target.batch(statements);};const value=target[key];return typeof value==='function'?value.bind(target):value;}});
  await assert.rejects(()=>send(raced,req('close',0,['SYNTHETIC-PLAN'])),e=>e.status===409);assert.equal(injected,true);assert.deepEqual(await records(c.db),expected);
 }));
+
+
+test('same-day labor correction through public API keeps an already closed Plan at its original rate',async t=>fixture(async c=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-04T03:00:00Z')});try{
+  await c.put('labor_hours',sku,{sku,version:2,laborHour:.2,effectiveVersions:versions});
+  const closed=await send(c.db,req('close',0,['SYNTHETIC-PLAN']));assert.equal(closed.rows[0].laborHour,.2);
+  const saved=(await c.db.prepare("SELECT payload FROM app_records WHERE entity='production_plan' AND record_key=?").bind(week).first()).payload;
+  const call=await reviewer(c),revision=await call('/api/labor-hours',{mode:'edit',sku,laborHour:.3,expectedVersion:2,effectiveFrom:'2026-11-04',reason:'Synthetic same-day correction'});
+  assert.equal(revision.status,200,JSON.stringify(revision.body));
+  const after=await getPlan(c.db,week,true);assert.equal(after.rows[0].laborHour,.2);assert.deepEqual(after.rows[0].planLaborBasis,closed.rows[0].planLaborBasis);
+  assert.equal((await c.db.prepare("SELECT payload FROM app_records WHERE entity='production_plan' AND record_key=?").bind(week).first()).payload,saved);
+ }finally{t.mock.timers.reset();}
+}));

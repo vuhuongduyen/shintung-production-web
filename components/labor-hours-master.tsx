@@ -9,7 +9,7 @@ import { apiFetch as fetch } from "../lib/data-sync";
 import { useDataRefresh } from "../lib/data-sync";
 import { StandardToolbar, toolbar } from "./standard-toolbar/StandardToolbar";
 import { UiLabel } from "./standard-toolbar/UiLabel";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usableSku } from "../lib/sku-state.mjs";
 import { invalidateLaborPlanCache } from "./production-plan";
 
@@ -30,7 +30,7 @@ type LaborRecord = {
   retainedLaborHour?:number;
   status?:string;
   sku: string;
-  laborHour: number;
+  laborHour: number | null;
   note: string;
   source: string;
   version: number;
@@ -50,6 +50,8 @@ type LaborHistory = {
   actor: string;
   at: string;
   source: string;
+  effectiveFrom?: string;
+  supersedesVersionId?: string | null;
 };
 type ApiRecord<T> = {
   key: string;
@@ -82,7 +84,7 @@ const formatTime = (value?: string) => {
     : timeFormatter.format(d).replace(",", "");
 };
 const formatDate = (value?: string) => formatTime(value).split(" ")[0];
-const formatHour = (value: number) => Number(value || 0).toFixed(3);
+const formatHour = (value?: number | null) => value == null ? "—" : Number(value).toFixed(3);
 const PAGE_SIZE = 25;
 let laborRecordsCache: LaborRecord[] | null = null;
 let laborRecordsRequest: Promise<LaborRecord[]> | null = null;
@@ -269,7 +271,7 @@ export default function LaborHoursMaster({
     setPanel(mode);
     setEffectiveFrom(new Date(Date.now()+25200000).toISOString().slice(0,10));
     setFormSku(mode === "edit" ? selectedRecord!.sku : "");
-    setHour(mode === "edit" ? formatHour(selectedRecord!.laborHour) : "0.000");
+    setHour(mode === "edit" ? selectedRecord!.laborHour == null ? "" : formatHour(selectedRecord!.laborHour) : "0.000");
     setNote(mode === "edit" ? selectedRecord!.note || "" : "");
     setReason("");
     setSource(
@@ -283,8 +285,10 @@ export default function LaborHoursMaster({
     setDiscardIntent(null);
     setError("");
   };
+  const saving = useRef(false);
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if(saving.current)return;
     const sku = formSku.trim().toUpperCase(),
       value = Number(hour),
       skuError = validateFormSku(sku);
@@ -292,7 +296,7 @@ export default function LaborHoursMaster({
       setError(skuError);
       return;
     }
-    if (!Number.isFinite(value) || value < 0) {
+    if (!hour.trim() || !Number.isFinite(value) || value < 0) {
       setError(
         message("Giờ công/SP phải là số không âm.", "每件工時必須為非負數。"),
       );
@@ -302,6 +306,7 @@ export default function LaborHoursMaster({
       setError(message("Vui lòng nhập lý do thay đổi.", "請輸入變更原因。"));
       return;
     }
+    saving.current=true;
     setBusy(true);
     setError("");
     try {
@@ -343,6 +348,7 @@ export default function LaborHoursMaster({
           : message("Không thể lưu Giờ công/SP.", "無法儲存每件工時。"),
       );
     } finally {
+      saving.current=false;
       setBusy(false);
     }
   };
@@ -517,7 +523,7 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
               <div className="leadtime-form-grid">
                 <fieldset>
                   <legend>Thông tin sản phẩm</legend>
-                  <label><span>Ngày hiệu lực *</span><input required type="date" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></label><p>Chỉ nhập ngày có căn cứ áp dụng. Phiếu sản lượng đã ghi giữ nguyên định mức đã lưu; không tự hồi tố lịch sử thiếu.</p>
+                  <label><span>Ngày hiệu lực *</span><input required type="date" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></label><p>Chỉ nhập ngày có căn cứ áp dụng. Sửa cùng ngày tạo phiên bản mới; phiếu sản lượng và kế hoạch đã chốt giữ nguyên căn cứ đã lưu.</p>
                   <label>
                     <span>SKU *</span>
                     <input
@@ -719,6 +725,7 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
                   <thead>
                     <tr>
                       <th>PHIÊN BẢN</th>
+                      <th>NGÀY HIỆU LỰC</th>
                       <th>NHÓM SẢN PHẨM</th>
                       <th>TÊN SẢN PHẨM</th>
                       <th>GIỜ CŨ</th>
@@ -732,6 +739,7 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
                     {history.map((h) => (
                       <tr key={h.id} onClick={() => setDetail(h)}>
                         <DataCell kind="code">V{h.version}</DataCell>
+                        <DataCell>{h.effectiveFrom ? formatDate(h.effectiveFrom) : "Chưa ghi nhận"}</DataCell>
                         <DataCell kind="code">{masterMap.get(h.sku)?.group || "—"}</DataCell>
                         <DataCell>{masterMap.get(h.sku)?.name || "—"}</DataCell>
                         <DataCell>
@@ -752,6 +760,8 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
                 <section className="labor-history-detail">
                   <h3>Chi tiết trước và sau</h3>
                   <dl>
+                    <div><dt>Ngày hiệu lực</dt><dd>{detail.effectiveFrom ? formatDate(detail.effectiveFrom) : "Chưa ghi nhận"}</dd></div>
+                    <div><dt>Loại cập nhật</dt><dd>{detail.supersedesVersionId ? "Sửa mức cùng ngày, giữ phiên bản trước" : "Mức theo ngày hiệu lực"}</dd></div>
                     <div>
                       <dt>SKU</dt>
                       <dd>{detail.sku}</dd>

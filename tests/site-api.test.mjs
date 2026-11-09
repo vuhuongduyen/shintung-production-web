@@ -113,10 +113,10 @@ test('Site APIs use trusted identity, isolate bindings, retain D1/R2 data and ne
   assert.equal(unitImport.status,200);assert.equal((await unitImport.json()).changedUnits,1);
   const unitSku=JSON.parse((await records(c.db)).find(r=>r.entity==='sku'&&r.record_key==='UNITTEST1').payload);
   assert.equal(unitSku.unit,'SỢI');assert.equal(unitSku.confirmation_status,'Đã xác nhận');
-  const laborCreate=await call('/api/labor-hours',{mode:'create',sku:'TEST-SITE',laborHour:0,note:'TEST',source:'Nhập trực tiếp'});assert.equal(laborCreate.status,200);
+  const laborCreate=await call('/api/labor-hours',{mode:'create',sku:'TEST-SITE',effectiveFrom:'2026-01-01',laborHour:0,note:'TEST',source:'Nhập trực tiếp'});assert.equal(laborCreate.status,200);
   assert.equal((await call('/api/labor-hours',{mode:'create',sku:'TEST-SITE',laborHour:0.2,note:'Trùng',source:'Nhập trực tiếp'})).status,409,'existing labor-hours SKU must use edit');
   assert.equal((await call('/api/labor-hours',{mode:'create',sku:'NOT-IN-MASTER',laborHour:0.2,note:'',source:'Nhập trực tiếp'})).status,409,'orphan labor-hours SKU is rejected');
-  const laborEdit=await call('/api/labor-hours',{mode:'edit',sku:'TEST-SITE',laborHour:0.063,note:'Đã đổi',reason:'Kiểm thử lịch sử',source:'Nhập trực tiếp'});assert.equal(laborEdit.status,200);
+  const laborEdit=await call('/api/labor-hours',{mode:'edit',sku:'TEST-SITE',effectiveFrom:'2026-01-01',laborHour:0.063,note:'Đã đổi',reason:'Kiểm thử lịch sử',source:'Nhập trực tiếp'});assert.equal(laborEdit.status,200);
   const staleLabor=await call('/api/labor-hours',{mode:'edit',sku:'TEST-SITE',laborHour:9,reason:'Phiên cũ',expectedVersion:1});
   assert.equal(staleLabor.status,409);
   assert.equal(JSON.parse((await c.db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key='TEST-SITE'").first()).payload).laborHour,0.063);
