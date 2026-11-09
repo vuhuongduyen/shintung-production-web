@@ -1,3 +1,4 @@
+import {safetyLinkedPairError} from '../../lib/safety-linked-pair.mjs';
 import {resolveLeadtimeVersion} from '../../lib/leadtime-effective.mjs';
 import {confirmationDateError} from '../../lib/leadtime-confirmation.mjs';
 import {randomUUID} from 'node:crypto';
@@ -50,7 +51,7 @@ export async function commitLinkedRecords(db,body,actor,{authorize=()=>true,tran
       if(hasBaseLeadtime(sku)||duplicate)fail(`SKU ${sku} đã có Leadtime. Vui lòng chọn dòng và dùng chức năng Sửa.`,409);
     }
   }
-  const publicationEntities=[...permitted];
+  const publicationEntities=kind==='safety-rule'?['safety_rules','safety_rule_groups']:[...permitted];
   const publicationRows=kind==='bom-change'?[]:(await db.prepare(`SELECT entity,record_key,payload FROM app_records WHERE entity IN (${publicationEntities.map(()=>'?').join(',')})`).bind(...publicationEntities).all()).results;
   const publicationExpected=JSON.stringify(publicationRows.map(r=>[r.entity,r.record_key,r.payload]));
   if(new TextEncoder().encode(publicationExpected).length>8*1024*1024)fail('Lịch sử phiên bản vượt giới hạn đối chiếu; chưa lưu.',422);
@@ -76,6 +77,10 @@ export async function commitLinkedRecords(db,body,actor,{authorize=()=>true,tran
   }
   const guardKey=randomUUID(),now=new Date().toISOString();
   for(let index=0;index<ops.length;index++){const error=confirmationDateError(ops[index].entity,ops[index].payload,old[index]===null?null:JSON.parse(old[index]),now);if(error)fail(error,409);}
+  if(kind==='safety-rule'||kind==='safety-group'){
+    const pairError=safetyLinkedPairError(ops,publicationRows);
+    if(pairError)fail(pairError,409);
+  }
   if(kind==='leadtime'){
     const final=publicationRows.filter(r=>!ops.some(op=>op.entity===r.entity&&op.key===r.record_key)).map(r=>({...JSON.parse(r.payload),id:r.record_key})).concat(ops.map(op=>op.payload));
     for(const op of ops.filter(op=>op.payload.status==='Đang áp dụng')){

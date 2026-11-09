@@ -1,4 +1,5 @@
 "use client";
+import {previousSafetyGroup} from "../lib/safety-linked-pair.mjs";
 import {LeadtimeTiers} from "../components/leadtime-tiers";
 import {validLeadtimeTiers} from "../lib/leadtime-tiers.mjs";
 import {resolveLeadtimeVersion} from "../lib/leadtime-effective.mjs";
@@ -15269,8 +15270,7 @@ function SafetyRulesView() {
       label = "Hủy xác nhận";
     }
     if (kind === "confirm" && tab === "leadtime") {
-      const previous = versions.find(x => x.id === selected.sourceId) ||
-        versions.find(x => x.group === selected.group && x.id !== selected.id && x.status === "Đang áp dụng");
+      const previous = previousSafetyGroup(versions,selected,(id:string)=>Boolean(knownRecordRevision("safety_rule_groups",id))) as SafetyGroupVersion | undefined;
       const extras: Array<{entity:string;key:string;payload:Record<string,unknown>;audit:Record<string,unknown>}> = [];
       let closedPrevious: SafetyGroupVersion | null = null;
       let closedLinked: SafetyRuleSet | null = null;
