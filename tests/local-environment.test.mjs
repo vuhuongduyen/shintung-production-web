@@ -61,6 +61,13 @@ test('HTTP login, origin guard, durable writes and logout work without any LIVE 
   const pending=(await(await request('/api/records?entity=sku')).json()).records[0];
   assert.equal((await request('/api/records',row,cookie)).status,400);
   assert.equal((await request('/api/sku-confirm',{items:[{key:pending.key,updatedAt:pending.updatedAt}]},cookie)).status,200);
+  const labor={mode:'create',sku:'TEST-HTTP-SKU',laborHour:.1,expectedVersion:0};
+  assert.equal((await request('/api/labor-hours',labor,cookie)).status,422,'local TEST requires the same dated contract');
+  const first=await request('/api/labor-hours',{...labor,effectiveFrom:'2026-01-01'},cookie);assert.equal(first.status,200);
+  const revised=await request('/api/labor-hours',{...labor,mode:'edit',laborHour:.2,expectedVersion:1,effectiveFrom:'2026-01-01',reason:'Synthetic same-day correction'},cookie);assert.equal(revised.status,200);
+  const laborSaved=(await revised.json()).payload;assert.equal(laborSaved.effectiveVersions.length,2);assert.equal(laborSaved.effectiveVersions[0].value,.1);assert.equal(laborSaved.effectiveVersions[1].supersedesVersionId,laborSaved.effectiveVersions[0].id);
+  assert.equal((await request('/api/labor-hours',{...labor,mode:'edit',laborHour:'',expectedVersion:2,effectiveFrom:'2026-01-01',reason:'Invalid blank'},cookie)).status,400);
+  assert.equal((await request('/api/records',{entity:'labor_hours',key:row.payload.sku,payload:{laborHour:99}},cookie)).status,409,'generic route cannot erase dated history');
   for(const payload of [{...row.payload,qty:0},{...row.payload,delivery:'14/09/2026'},{...row.payload,delivery:'31/02/2026'}])assert.equal((await request('/api/records',{...row,payload},cookie)).status,400);
   assert.equal((await request('/api/records',{...row,createOnly:true},cookie)).status,200);
   const retry=await request('/api/records',{...row,createOnly:true,payload:{...row.payload,qty:99}},cookie);assert.equal(retry.status,409);
