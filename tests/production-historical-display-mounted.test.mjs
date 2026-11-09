@@ -42,7 +42,7 @@ for(const locale of ['en','zh'])for(const screen of ['journal','output'])test(`$
  }finally{await act(async()=>root.unmount());host.remove();document.documentElement.lang='vi';}
 });
 
-for(const rate of [.016,0])for(const screen of ['journal','output'])test(`${screen} displays and exports dated reference ${rate} explicitly without changing stored evidence`,async()=>{
+for(const rate of [.016,.0006,0])for(const screen of ['journal','output'])test(`${screen} displays and exports dated reference ${rate} explicitly without changing stored evidence`,async()=>{
  const {attachLaborReferences}=await import('../lib/production-labor-reference.mjs'),{siteLaborHours}=await import('../lib/site-labor-hours.mjs');
  const value={...report,standardUnit:undefined,legacyEarnedBasis:{kind:'observed-legacy-earned-v1',status:'missing',sku:order.sku,line:'A',journalPresentation:{standardUnitHours:null,standardLaborHours:null,laborDeviation:null}}};
  const menu=siteLaborHours([{key:order.sku,payload:{sku:order.sku,version:1,laborHour:rate,updatedAt:'2026-10-16T03:00:00Z'}}]),projected=attachLaborReferences([value],[order],menu),before=JSON.stringify(projected);
@@ -54,6 +54,10 @@ for(const rate of [.016,0])for(const screen of ['journal','output'])test(`${scre
   assert.ok(table.querySelector('tbody').textContent.includes(rate.toLocaleString('vi-VN',{minimumFractionDigits:4})));assert.match(table.querySelector('tbody').textContent,/Đối chiếu, chưa chốt/);assert.match(JSON.stringify(data.rows),/Đối chiếu lịch sử, chưa chốt/);
   assert.equal(data.rows[0][unit],rate);
   const {tableExportReport}=await import('../lib/table-report.mjs'),{payrollXlsx}=await import('../lib/production-payroll-export.mjs'),{unzipSync,strFromU8}=await import('fflate');
+  const exportReport=tableExportReport({...data,compactHeader:true}),{displayPayrollCell}=await import('../lib/production-payroll-export.mjs');
+  assert.equal(displayPayrollCell(exportReport.sheets[0].rows.at(-1).values[unit]),rate.toLocaleString('vi-VN',{maximumFractionDigits:10}));
+  const {default:Preview}=await vite.ssrLoadModule('/components/report-preview.tsx');const previewHost=document.createElement('div');document.body.append(previewHost);const previewRoot=createRoot(previewHost);
+  try{await act(async()=>previewRoot.render(React.createElement(Preview,{report:exportReport,close:()=>{}})));const cells=document.querySelector('.onspa-report-overlay tbody').lastElementChild.children;assert.equal(cells[unit].textContent,rate.toLocaleString('vi-VN',{maximumFractionDigits:10}));}finally{await act(async()=>previewRoot.unmount());previewHost.remove();}
   const xml=strFromU8(unzipSync(payrollXlsx(tableExportReport({...data,compactHeader:true})))['xl/worksheets/sheet1.xml']);
   const parsed=new dom.window.DOMParser().parseFromString(xml,'application/xml');assert.equal(parsed.querySelectorAll('parsererror').length,0);assert.ok([...parsed.querySelectorAll('c')].some(c=>c.querySelector('v')?.textContent===String(rate)&&c.getAttribute('t')!=='inlineStr'));
   if(screen==='output'){assert.equal(data.rows[0][unit],rate);assert.equal(data.rows[0][data.headers.indexOf('Giờ công chuẩn HT')],rate*100);assert.equal(data.rows[0][data.headers.indexOf('Tổng giờ LSX')],1);}

@@ -36,3 +36,13 @@ test('preview snapshot exports all 47 filtered rows as real XLSX and PDF',async(
  assert.match(new TextDecoder().decode(pdf.slice(0,8)),/%PDF/);
  mkdirSync('.local-data/tests/table-report',{recursive:true});writeFileSync('.local-data/tests/table-report/report.xlsx',bytes);writeFileSync('.local-data/tests/table-report/report.pdf',pdf);
 });
+
+test('PDF rendering retains labor-rate precision without changing ordinary hours or source values',async()=>{
+ const {displayPayrollCell}=await import('../lib/production-payroll-export.mjs');
+ const rows=[[.016,1.234],[.0006,0],[0,0],[null,null]],before=JSON.stringify(rows);
+ const report=tableExportReport({title:'Synthetic rates',headers:['Rate','Hours'],rows,precisionColumns:[0],compactHeader:true});
+ assert.deepEqual(report.sheets[0].rows.slice(2).map(r=>r.values.map(displayPayrollCell)),[['0,016','1,23'],['0,0006','0'],['0','0'],['—','—']]);
+ const {createCanvas}=await import('@napi-rs/canvas'),originalDocument=globalThis.document,drawn=[];
+ globalThis.document={createElement:()=>{const canvas=createCanvas(1,1),get=canvas.getContext.bind(canvas);canvas.getContext=(...args)=>{const ctx=get(...args),fill=ctx.fillText.bind(ctx);ctx.fillText=(text,...rest)=>{drawn.push(text);return fill(text,...rest);};return ctx;};return canvas;}};
+ try{const bytes=await payrollPdf(report);assert.match(new TextDecoder().decode(bytes),/^%PDF/);for(const value of ['0,016','0,0006','0','—'])assert.ok(drawn.includes(value),value);assert.equal(JSON.stringify(rows),before);}finally{globalThis.document=originalDocument;}
+});
