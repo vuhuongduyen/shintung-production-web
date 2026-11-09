@@ -1,4 +1,6 @@
 "use client";
+import {LeadtimeTiers} from "../components/leadtime-tiers";
+import {validLeadtimeTiers} from "../lib/leadtime-tiers.mjs";
 import {resolveLeadtimeVersion} from "../lib/leadtime-effective.mjs";
 import {SkuTransfer} from '../components/sku-transfer';
 import {hasMenuPermission} from '../lib/menu-action-access.mjs';
@@ -1090,7 +1092,8 @@ const activeSafetyRuleFor = (weekStart: string, rules = safetyRuleSets) => {
     .sort(
       (a, b) =>
         b.effectiveFrom.localeCompare(a.effectiveFrom) ||
-        b.version.localeCompare(a.version),
+        (Date.parse(b.confirmedAt || "") || 0) - (Date.parse(a.confirmedAt || "") || 0) ||
+        b.version.localeCompare(a.version, undefined, {numeric:true}),
     )[0];
 };
 const safetyBreakdown = (leadTime: number, rule?: SafetyRuleSet) => {
@@ -3725,6 +3728,7 @@ function buildProductionEngine(
         return;
       }
       const savedLead = leadtimeBySku.get(sku);
+      if(savedLead?._deleted || (savedLead && !Number.isFinite(savedLead.leadTime))){errors.push(`${sku}: Thiếu căn cứ Leadtime theo ngày hiệu lực; chưa tính kế hoạch.`);return;}
       const sourceLead = leadtimeRows.find((r) => r.sku.toUpperCase() === sku);
       const legacy = forecastData[sku];
       const parsedLead = Number.parseFloat(item.leadTime);
@@ -6143,6 +6147,8 @@ function PlanningView({
             const master = masterRows.find(
               (item) => normalizeSkuCode(item.code) === normalizeSkuCode(sku),
             );
+            if (!version && resolveLeadtimeVersion(leadVersions,sku,calculationAt).hasHistory)
+              leadtimeBySku.set(normalizeSkuCode(sku),{sku,leadTime:NaN,moq:NaN,_deleted:true} as LeadtimeRow);
             if (version && master)
               leadtimeBySku.set(sku, {
                 sku,
@@ -6291,7 +6297,6 @@ function PlanningView({
   const engineResult = useMemo(() => {
     if (
       savedEngine?.payload.week === engineWeek &&
-      (!engineDemandLoaded || engineDemandCurrent) &&
       Array.isArray(savedEngine.payload.rows) &&
       Array.isArray(savedEngine.payload.metrics)
     ) {
@@ -6433,6 +6438,7 @@ function PlanningView({
               }
               onWeekChange={async (value) => {
                 try {
+                  const sourceRevisions: Record<string, Array<{key:string;revision:string}>> = {};
                   const read = async (entity: string) => {
                     const response = await recordFetch(
                       `/api/records?entity=${entity}`,
@@ -6442,7 +6448,10 @@ function PlanningView({
                       throw Error(
                         `Không tải được ${entity}; chưa chạy Engine.`,
                       );
-                    return (await response.json()).records
+                    const records = (await response.json()).records;
+                    if(["leadtime","leadtime_versions","safety_rules","sku"].includes(entity))
+                      sourceRevisions[entity] = records.filter((r: {revision?:string})=>!!r.revision).map((r:{key:string;revision:string})=>({key:r.key,revision:r.revision}));
+                    return records
                       .flatMap((r: { payload: any }) =>
                         Array.isArray(r.payload)
                           ? r.payload
@@ -6507,6 +6516,8 @@ function PlanningView({
                       code,
                       `${value}T00:00:00+07:00`,
                     );
+                    if(!version && resolveLeadtimeVersion(freshVersions,code,`${value}T00:00:00+07:00`).hasHistory)
+                      leadtimeBySku.set(normalizeSkuCode(code),{sku:code,leadTime:NaN,moq:NaN,_deleted:true} as LeadtimeRow);
                     if (version) {
                       const lead = leadtimeBySku.get(code);
                       leadtimeBySku.set(code, {
@@ -6574,7 +6585,7 @@ function PlanningView({
                   const response = await fetch("/api/engine-run", {
                     method: "POST",
                     headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ payload: enginePayload }),
+                    body: JSON.stringify({ payload: enginePayload, sourceRevisions }),
                   });
                   const stored = await response.json();
                   if (!response.ok)
@@ -11396,14 +11407,7 @@ function WarehouseContent({
             .filter((row) => !useReportRows || row.sourceReportMonth)
             .map((row) => [normalizeSkuCode(row.sku), calculateForecastDemand(row)]),
         );
-        const rule = rules
-          .filter(
-            (item) =>
-              item.status === "Đang áp dụng" &&
-              item.effectiveFrom <= snapshotWeek &&
-              (!item.effectiveTo || item.effectiveTo >= snapshotWeek),
-          )
-          .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0];
+        const rule = activeSafetyRuleFor(snapshotWeek, rules);
         const next = new Map<string, InventorySafetyMetric>();
         skuCatalog.forEach((sku) => {
           const code = normalizeSkuCode(sku.code);
@@ -11415,7 +11419,9 @@ function WarehouseContent({
             `${snapshotWeek}T00:00:00+07:00`,
           );
           const fallbackLead = leadtimeBySku.get(code)?.leadTime;
-          const leadTime = Number(version?.leadTime ?? fallbackLead ?? 0);
+          if(!version && resolveLeadtimeVersion(versions,code,`${snapshotWeek}T00:00:00+07:00`).hasHistory)return;
+          const leadTime = Number(version?.leadTime ?? fallbackLead);
+          if(!Number.isFinite(leadTime) || !rule)return;
           const matchedSafety = rule?.leadTimeRules
             ?.filter(
               (item) =>
@@ -14426,9 +14432,7 @@ function LegacySafetyRulesView() {
     await persist(
       {
         ...rule,
-        status: "Nháp",
-        confirmedBy: undefined,
-        confirmedAt: undefined,
+        status: "Đã hủy xác nhận",
         changeReason: reason,
         updatedBy: operator,
         updatedAt: new Date().toISOString(),
@@ -15291,6 +15295,14 @@ function SafetyRulesView() {
         safetyRuleSets = [linked,...(closedLinked ? [closedLinked] : []),
           ...safetyRuleSets.filter(x => x.id !== linked.id && x.id !== closedLinked?.id)];
       }
+      return;
+    }
+    if (kind === "cancel-confirm" && tab === "leadtime") {
+      const linked = safetyRuleSets.find(x => x.id === selected.id);
+      if (!linked) {setNotice("Thiếu quy tắc Safety liên kết; tải lại để đối chiếu trước khi hủy.");return;}
+      const cancelled = {...linked,status:"Đã hủy xác nhận" as const,updatedBy:operator,updatedAt:now,changeReason:reason};
+      if(await persist(next,selected,label,[{entity:"safety_rules",key:linked.id,payload:cancelled,audit:{type:label,before:linked,after:cancelled,reason}}]))
+        safetyRuleSets=safetyRuleSets.map(x=>x.id===linked.id?cancelled:x);
       return;
     }
     await persist(next, selected, label);
@@ -16768,6 +16780,7 @@ type LeadTimeStatus =
   | "Không hợp lệ"
   | "Đã hủy";
 type LeadTimeVersion = {
+  tiers?: Array<{moq:number;value:number}>;
   cancelled?:boolean;
   updatedAt?:string;
   _deleted?: boolean;
@@ -16843,7 +16856,7 @@ const currentLeadtimeSettingForSku = (
   const legacy = snapshot.leadRows.find(
     (row) => normalizeSkuCode(row.sku) === normalizedSku,
   );
-  const leadTime = activeVersion?.leadTime ?? legacy?.leadTime ?? 0;
+  const leadTime = activeVersion?.leadTime ?? (resolveLeadtimeVersion(snapshot.versions,normalizedSku,at).hasHistory ? NaN : legacy?.leadTime ?? NaN);
   const rule = activeSafetyRuleFor(vietnamDate(at), snapshot.rules);
   return {
     leadTime,
@@ -16873,7 +16886,9 @@ function LeadtimeMasterView({
   const [panel, setPanel] = useState<LeadTimePanel>(null);
   const [selectedSku, setSelectedSku] = useState("");
   const [formSku, setFormSku] = useState("");
-  const [leadValue, setLeadValue] = useState("");
+  const [tierDraft,setTierDraft] = useState<Array<{moq:string;value:string}>>([{moq:"",value:""}]);
+  const leadValue=tierDraft[0]?.value || "";
+  const setLeadValue=(value:string)=>setTierDraft([{moq:"",value}]);
   const [skuLookupOpen, setSkuLookupOpen] = useState(false);
   const [skuValidated, setSkuValidated] = useState(false);
   const [note, setNote] = useState("");
@@ -16936,17 +16951,19 @@ function LeadtimeMasterView({
           const legacy = leadtimeBySku.get(sku);
           const cancelled = versions.filter(item=>item.sku===sku && isMasterCancelled(item)).sort(newestMasterFirst)[0];
           const version = pending ?? saved ?? (legacy?.cancelled ? cancelled : undefined);
-          const leadTime = version?.leadTime ?? (legacy as LeadtimeRow & {retainedLeadTime?:number})?.retainedLeadTime ?? legacy?.leadTime ?? 0;
+          const missingHistory=!version&&resolveLeadtimeVersion(versions,sku,now).hasHistory;
+          const leadTime = version?.leadTime ?? (missingHistory?NaN:(legacy as LeadtimeRow & {retainedLeadTime?:number})?.retainedLeadTime ?? legacy?.leadTime ?? 0);
           return {
             master,
             version,
             leadTime,
+            missingHistory,
             safety: safetyBreakdown(isMasterCancelled(legacy)||isMasterCancelled(version) ? 0 : leadTime, currentSafetyRule),
           };
         })
         .filter(
           (item) =>
-            isMasterCancelled(leadtimeBySku.get(item.master.code)) || item.leadTime > 0 ||
+            isMasterCancelled(leadtimeBySku.get(item.master.code)) || item.missingHistory || item.leadTime > 0 ||
             item.version?.status === "Chờ xác nhận" ||
             (
               leadtimeBySku.get(item.master.code) as LeadtimeRow & {
@@ -16975,24 +16992,15 @@ function LeadtimeMasterView({
   const filteredRows = useMemo(
     () =>
       activeRows
-        .filter(({ master, version }) => {
+        .filter(({ master, version, leadTime, safety }) => {
           const key = normalizeSearchText(query);
-          const safety = safetyBreakdown(
-            version?.leadTime ??
-              leadtimeBySku.get(normalizeSkuCode(master.code))?.leadTime ??
-              0,
-            currentSafetyRule,
-          );
           const values: Record<LeadTimeSearchField, string | number> = {
             sku: master.code,
             name: master.name,
             specification: master.specification,
             group: master.group,
             line: master.line,
-            leadTime:
-              version?.leadTime ??
-              leadtimeBySku.get(normalizeSkuCode(master.code))?.leadTime ??
-              0,
+            leadTime: Number.isFinite(leadTime)?leadTime:"Thiếu căn cứ",
             leadTimeSafety: safety.leadTimeDays,
             forecastDays: safety.forecastDays,
             situationDays: safety.situationDays,
@@ -17065,7 +17073,7 @@ function LeadtimeMasterView({
     (item) => item.status === "Chờ xác nhận" || item.status === "Nháp",
   );
   const selectedLegacy = leadtimeBySku.get(normalizeSkuCode(selectedSku));
-  const currentLead = selectedActive?.leadTime ?? selectedLegacy?.leadTime ?? 0;
+  const currentLead = selectedActive?.leadTime ?? (resolveLeadtimeVersion(versions,selectedSku,now).hasHistory ? NaN : selectedLegacy?.leadTime ?? 0);
   const selectedSafetyRule = currentSafetyRule;
   const selectedSafety = safetyBreakdown(currentLead, selectedSafetyRule);
 
@@ -17121,7 +17129,8 @@ function LeadtimeMasterView({
     }
     if (next === "edit" && selectedSku) {
       setFormSku(selectedSku);
-      setLeadValue("");
+      const existing=selectedActive?.tiers || [{moq:selectedLegacy?.moq ?? masterMap.get(selectedSku)?.moq ?? 0,value:currentLead}];
+      setTierDraft(existing.map(t=>({moq:String(t.moq),value:String(t.value)})));
       setNote("");
       setReason("");
     }
@@ -17179,7 +17188,9 @@ function LeadtimeMasterView({
     const sku = normalizeSkuCode(formSku);
     const master = masterMap.get(sku);
     const masterError = validateMaster(master);
-    const value = Number(leadValue);
+    const tiers=tierDraft.map(t=>({moq:Number(t.moq),value:Number(t.value)})).sort((a,b)=>a.moq-b.moq);
+    const value=tiers.length?Math.max(...tiers.map(t=>t.value)):NaN;
+    if(tierDraft.some(t=>t.moq.trim()===""||t.value.trim()==="")||!validLeadtimeTiers(tiers)){setError("Nhập đủ các mức MOQ và Leadtime hợp lệ; không được trùng ngưỡng.");return;}
     if (masterError) {
       setError(masterError);
       return;
@@ -17211,6 +17222,7 @@ function LeadtimeMasterView({
       sku,
       version: leadTimeVersionNumber(versions, sku),
       leadTime: value,
+      tiers,
       status,
       setupAt: new Date().toISOString(),
       note: note.trim(),
@@ -17348,6 +17360,8 @@ function LeadtimeMasterView({
       <div className="safety-rules-title">
         <PageTitle variant="menu-root">Leadtime</PageTitle>
       </div>
+      {(selectedPending?.tiers || selectedActive?.tiers) && panel !== "create" && panel !== "edit" && <LeadtimeTiers value={(selectedPending?.tiers || selectedActive?.tiers || []).map(t=>({moq:String(t.moq),value:String(t.value)}))} />}
+
       {cancellation.dialog}
       <StandardToolbar name="LeadtimeMasterView" items={[toolbarConfig.group([toolbarConfig.group([toolbarConfig.action({"onClick": () => openPanel("create")},<>＋ Thêm mới</>, true, "action"),
 toolbarConfig.action({"disabled": !selectedSku || isMasterCancelled(leadtimeBySku.get(selectedSku)), disabledExplanation: !selectedSku ? "Chọn một dòng trong bảng trước khi thực hiện thao tác." : "Lead Time này đã bị hủy.","onClick": () => openPanel("edit")},<>✎ Sửa
@@ -17526,24 +17540,10 @@ toolbarConfig.action({"onClick": () => {
               {panel === "edit" && (
                 <label>
                   <span>Lead Time hiện tại</span>
-                  <input readOnly value={currentLead} />
+                  <input readOnly value={Number.isFinite(currentLead)?currentLead:"Thiếu căn cứ"} />
                 </label>
               )}
-              <label>
-                <span>
-                  {panel === "edit" ? "Lead Time mới" : "Lead Time"} *
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={leadValue}
-                  onChange={(e) => {
-                    setLeadValue(e.target.value);
-                    setDirty(true);
-                  }}
-                />
-              </label>
+              <LeadtimeTiers value={tierDraft} onChange={rows=>{setTierDraft(rows);setDirty(true);}} />
               <label>
                 <span>Ngày thiết lập</span>
                 <input readOnly value={formatDateTimeDisplay(new Date())} />
@@ -17775,7 +17775,7 @@ toolbarConfig.action({"onClick": () => {
                   <DataCell>{master.specification}</DataCell>
                   <DataCell kind="code">{master.line}</DataCell>
                   <DataCell kind="number" className="number">
-                    {leadTime > 0 ? leadTime : "Chờ bổ sung"}
+                    {Number.isFinite(leadTime) ? leadTime : "Thiếu căn cứ"}
                   </DataCell>
                   <DataCell kind="number" className="number">{safety.leadTimeDays}</DataCell>
                   <DataCell kind="number" className="number">{safety.forecastDays}</DataCell>
@@ -20162,13 +20162,13 @@ toolbarConfig.action({"onClick": () => {
                       <div>
                         <dt>Safety Days</dt>
                         <dd>
-                          {selectedProductionSetting?.safety.total || 0} ngày
+                          {selectedProductionSetting && Number.isFinite(selectedProductionSetting.leadTime) && selectedProductionSetting.rule ? `${selectedProductionSetting.safety.total} ngày` : "Thiếu căn cứ"}
                         </dd>
                       </div>
                       <div>
                         <dt>Lead time</dt>
                         <dd>
-                          {selectedProductionSetting?.leadTime
+                          {selectedProductionSetting && Number.isFinite(selectedProductionSetting.leadTime)
                             ? `${selectedProductionSetting.leadTime} ngày`
                             : "Chưa thiết lập"}
                         </dd>

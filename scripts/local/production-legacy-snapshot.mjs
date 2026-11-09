@@ -12,7 +12,7 @@ function identity(id){if(typeof id!=='string'||!/^[A-Za-z0-9-]{16,80}$/.test(id)
 const manifestRow=(db,id)=>db.prepare("SELECT payload FROM app_records WHERE entity='production_legacy_manifest' AND record_key=?").bind(id).first();
 function relation(id){const prefix=identity(id);return `(SELECT json_extract(record_key,'$[1]') AS entity,json_extract(record_key,'$[2]') AS record_key,payload,updated_by,updated_at FROM app_records WHERE entity='${entity}' AND record_key>='${prefix}' AND record_key<'${prefix}\uffff')`;}
 // Used only with trusted SELECTs from existing readers. Never expose as a SQL API.
-export function legacySnapshotDatabase(db,id){const table=relation(id);return {prepare(sql){if(!/^\s*SELECT\b/i.test(sql)||!(/\bapp_records\b/i.test(sql))||/\b(auth_accounts|auth_sessions|pragma|sqlite_master)\b/i.test(sql))fail('Snapshot chỉ hỗ trợ đọc nghiệp vụ đã chốt.',403);return db.prepare(sql.replace(/\bapp_records\b/gi,table));},batch(){fail('Không được ghi qua snapshot đọc.',403);}};}
+export function legacySnapshotDatabase(db,id){const table=relation(id);return {observedSourceSnapshot:true,prepare(sql){if(!/^\s*SELECT\b/i.test(sql)||!(/\bapp_records\b/i.test(sql))||/\b(auth_accounts|auth_sessions|pragma|sqlite_master)\b/i.test(sql))fail('Snapshot chỉ hỗ trợ đọc nghiệp vụ đã chốt.',403);return db.prepare(sql.replace(/\bapp_records\b/gi,table));},batch(){fail('Không được ghi qua snapshot đọc.',403);}};}
 export async function captureLegacySource(db,{snapshotId,cutoverDate},actor,{sourceId}={}){
  access(actor);sourceIdentity(sourceId);const prefix=identity(snapshotId);
  if(!validBusinessDate(cutoverDate)||cutoverDate<dailyToday())fail('Chọn ngày chuyển đổi từ hôm nay; không dựng snapshot quá khứ.',422);

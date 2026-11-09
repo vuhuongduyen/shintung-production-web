@@ -1,3 +1,4 @@
+import {engineSourceRevisions} from '../lib/engine-effective-basis.mjs';
 import test from 'node:test';
 import {assertRejectedRequestAudit,assertSnapshotWithReceipts} from './helpers/rejected-request-audit.mjs';
 import assert from 'node:assert/strict';
@@ -14,6 +15,7 @@ test('Site APIs use trusted identity, isolate bindings, retain D1/R2 data and ne
  const email='admin@example.test';const cookies={};
  const req=(url,body,who=email)=>new Request('https://test.invalid'+url,{method:body?'POST':'GET',headers:{...(who?{'oai-authenticated-user-id':'fixture-id','oai-authenticated-user-email':who,'Cookie':cookies[who]||''}:{}),...(body?{'origin':'https://test.invalid','content-type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
  const call=async(url,body,who)=>{
+  if(url==='/api/engine-run'&&body)body={...body,sourceRevisions:await engineSourceRevisions(c.db)};
   if(url==='/api/records'&&body?.entity&&body?.key&&body.expectedRevision===undefined){
    const current=await c.db.prepare('SELECT payload FROM app_records WHERE entity=? AND record_key=?').bind(body.entity,body.key).first();
    body={...body,expectedRevision:await recordRevision(current?.payload)};

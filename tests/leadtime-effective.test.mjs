@@ -41,3 +41,20 @@ test('captured MOQ levels are isolated from later master edits; zero remains a v
  assert.equal(damaged.value,null);assert.equal(transitStandardLeadtime({...row,planLeadtimeBasis:damaged},saved),null);
  assert.equal(transitStandardLeadtime({...row,planLeadtimeBasis:{...basis,tiers:[{moq:-1,value:2}]}},saved),null);
 });
+
+test('published MOQ tier snapshots select the transferred quantity and survive future tier edits',()=>{
+ const version={...next,tiers:[{moq:100,value:2},{moq:1000,value:5}]};
+ const basis=capturePlanLeadtime(row,[],[version],'2026-11-06T00:00:00Z','SYNTHETIC');
+ assert.equal(basis.value,5);version.tiers[0].value=99;
+ assert.equal(transitStandardLeadtime({...row,planLeadtimeBasis:basis},[],[version]),2);
+ for(const tiers of [[{moq:100,value:2},{moq:100,value:7}],[{moq:100,value:7},{moq:100,value:2}]]){
+  const missing=capturePlanLeadtime(row,[],[{...version,tiers}],'2026-11-06T00:00:00Z','SYNTHETIC');
+  assert.equal(missing.value,null);assert.equal(transitStandardLeadtime({...row,planLeadtimeBasis:missing}),null);
+ }
+});
+
+test('a cancelled source cannot regain a numeric result through captured tiers',()=>{
+ const version={...next,tiers:[{moq:100,value:2},{moq:1000,value:5}]};
+ const basis=capturePlanLeadtime(row,[{sku:row.sku,cancelled:true}],[version],'2026-11-06T00:00:00Z','SYNTHETIC');
+ assert.equal(basis.value,null);assert.equal(basis.tiers,undefined);assert.equal(transitStandardLeadtime({...row,planLeadtimeBasis:basis}),null);
+});

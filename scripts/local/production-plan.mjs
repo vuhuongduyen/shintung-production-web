@@ -155,7 +155,7 @@ export async function mutatePlan(db, body, actor) {
             }
             const labor = state.labor.filter(x => text(x.sku).toUpperCase() === text(r.sku).toUpperCase()).at(0);
             const masterData=master?.payload&&typeof master.payload==='object'?master.payload:master;
-            const sourceFields = { name: text(r.name), spec: text(r.spec), group: text(masterData?.group)||text(r.group), suggested: numberOrNull(r.suggested), enginePriority: text(r.priority), laborHour: numberOrNull(labor?.laborHour), source: '05_PRODUCTION_ENGINE' };
+            const sourceFields = { engineCalculationBasis:r.engineCalculationBasis??{status:'missing'}, name: text(r.name), spec: text(r.spec), group: text(masterData?.group)||text(r.group), suggested: numberOrNull(r.suggested), enginePriority: text(r.priority), laborHour: numberOrNull(labor?.laborHour), source: '05_PRODUCTION_ENGINE' };
             if (old) {
                 existing++;
                 if (['ĐÃ CHỐT', 'ĐÃ CHUYỂN'].includes(old.status))

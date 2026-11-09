@@ -1,4 +1,4 @@
-import {confirmationDateError} from '../../lib/leadtime-confirmation.mjs';
+import {confirmationDateError,needsLinkedConfirmation} from '../../lib/leadtime-confirmation.mjs';
 import {productionUnassignedReminder} from './production-unassigned-alert.mjs';
 import {commitRecordWithAudit} from '../../lib/record-mutation-audit.mjs';
 import {adminReadPaths,adminReadResponse} from '../../lib/admin-readonly.mjs';
@@ -157,6 +157,7 @@ export function localTestPlugin(testOptions = {}){
     if(['leadtime','leadtime_versions','safety_rules','safety_rule_groups','safety_days'].includes(body.entity)&&original&&JSON.parse(original.payload).cancelled)return send(409,{error:'Dữ liệu đã Hủy; không được áp dụng lại bằng thao tác sửa/xác nhận.'});
     if(!Object.hasOwn(body,'expectedRevision')||body.expectedRevision!==await recordRevision(original?.payload))return send(409,{error:conflictMessage,current:original?JSON.parse(original.payload):null});
     const confirmationError=confirmationDateError(body.entity,body.payload,original?JSON.parse(original.payload):null);if(confirmationError)return send(409,{error:confirmationError});
+    if(needsLinkedConfirmation(body.entity,body.payload,original?JSON.parse(original.payload):null))return send(409,{error:'Dùng giao dịch xác nhận để giữ phiên bản và lịch sử.'});
     if(body.entity==='inventory_snapshot'){
      const saved=await connection.db.prepare("SELECT payload FROM app_records WHERE entity='inventory_snapshot' AND record_key=?").bind(body.key).first(),old=saved?JSON.parse(saved.payload):null;
      if(!old||!['Đã chốt','Đã được Production_engine sử dụng'].includes(old.status)||body.payload.status!=='Đã mở chốt'||!String(body.payload.reopenReason||'').trim()||body.payload.weekKey!==old.weekKey||JSON.stringify(body.payload.items)!==JSON.stringify(old.items))return send(409,{error:'Chỉ được mở bản chốt hiện có với lý do; tạo bản chốt qua chọn file và tuần.'});

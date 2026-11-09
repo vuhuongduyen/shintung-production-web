@@ -1,3 +1,4 @@
+import {resolveLeadtimeVersion} from '../../lib/leadtime-effective.mjs';
 import {confirmationDateError} from '../../lib/leadtime-confirmation.mjs';
 import {randomUUID} from 'node:crypto';
 import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
@@ -49,6 +50,10 @@ export async function commitLinkedRecords(db,body,actor,{authorize=()=>true,tran
       if(hasBaseLeadtime(sku)||duplicate)fail(`SKU ${sku} đã có Leadtime. Vui lòng chọn dòng và dùng chức năng Sửa.`,409);
     }
   }
+  const publicationEntities=[...permitted];
+  const publicationRows=kind==='bom-change'?[]:(await db.prepare(`SELECT entity,record_key,payload FROM app_records WHERE entity IN (${publicationEntities.map(()=>'?').join(',')})`).bind(...publicationEntities).all()).results;
+  const publicationExpected=JSON.stringify(publicationRows.map(r=>[r.entity,r.record_key,r.payload]));
+  if(new TextEncoder().encode(publicationExpected).length>8*1024*1024)fail('Lịch sử phiên bản vượt giới hạn đối chiếu; chưa lưu.',422);
   const old=[];
   for(const op of ops){
     const row=await db.prepare('SELECT payload FROM app_records WHERE entity=? AND record_key=?').bind(op.entity,op.key).first();
@@ -56,12 +61,43 @@ export async function commitLinkedRecords(db,body,actor,{authorize=()=>true,tran
     if(row && JSON.parse(row.payload).cancelled)fail("Dữ liệu đã Hủy; không được áp dụng lại bằng thao tác sửa/xác nhận.",409);
     old.push(row?.payload??null);
   }
+  for(let i=0;i<ops.length;i++){
+    if(old[i]===null)continue;
+    const before=JSON.parse(old[i]),op=ops[i],lead=op.entity==='leadtime_versions',from=lead?'validFrom':'effectiveFrom',to=lead?'validTo':'effectiveTo';
+    if(op.payload.status==='Hết hiệu lực'&&before.status!=='Hết hiệu lực'){
+      const replacement=ops.find(other=>other.entity===op.entity&&other.key!==op.key&&['Đang áp dụng','Đã xác nhận'].includes(other.payload.status)&&other.payload[from]===op.payload[to]&&(lead?other.payload.sku===op.payload.sku:other.payload.group===op.payload.group));
+      const priorReplacement=replacement?old[ops.indexOf(replacement)]:null;
+      if(!replacement || priorReplacement && !['Nháp','Chờ xác nhận'].includes(JSON.parse(priorReplacement).status))fail('Kết thúc hiệu lực phải đi cùng phiên bản thay thế trong một giao dịch.',409);
+    }
+    if(before.status==='Hết hiệu lực'&&op.payload.status==='Đang áp dụng'){
+      const cancelled=ops.find(other=>other.entity===op.entity&&other.key!==op.key&&['Đã hủy xác nhận','Đã hủy'].includes(other.payload.status)&&other.payload[from]===before[to]);
+      if(!cancelled)fail('Chỉ khôi phục phiên bản trước khi hủy phiên bản thay thế trong cùng giao dịch.',409);
+    }
+  }
   const guardKey=randomUUID(),now=new Date().toISOString();
   for(let index=0;index<ops.length;index++){const error=confirmationDateError(ops[index].entity,ops[index].payload,old[index]===null?null:JSON.parse(old[index]),now);if(error)fail(error,409);}
+  if(kind==='leadtime'){
+    const final=publicationRows.filter(r=>!ops.some(op=>op.entity===r.entity&&op.key===r.record_key)).map(r=>({...JSON.parse(r.payload),id:r.record_key})).concat(ops.map(op=>op.payload));
+    for(const op of ops.filter(op=>op.payload.status==='Đang áp dụng')){
+      const chosen=resolveLeadtimeVersion(final,op.payload.sku,now).selected;
+      if(!chosen||chosen.id!==op.key)fail('Phiên bản Leadtime chồng lấn hoặc chưa đủ căn cứ hiệu lực.',409);
+    }
+  }
+  if(kind==='safety-rule'||kind==='safety-group'){
+    const final=publicationRows.filter(r=>!ops.some(op=>op.entity===r.entity&&op.key===r.record_key)).map(r=>({entity:r.entity,key:r.record_key,payload:JSON.parse(r.payload)})).concat(ops);
+    const active=p=>!p._deleted&&!p.cancelled&&['Đang áp dụng','Đã xác nhận','Sắp có hiệu lực'].includes(p.status);
+    for(const op of ops.filter(op=>active(op.payload))){
+      if(final.some(other=>other.entity===op.entity&&other.key!==op.key&&active(other.payload)&&(op.entity!=='safety_rule_groups'||other.payload.group===op.payload.group)&&other.payload.effectiveFrom<=(op.payload.effectiveTo||'9999-12-31')&&(other.payload.effectiveTo||'9999-12-31')>=op.payload.effectiveFrom))fail('Khoảng hiệu lực Safety Days chồng với phiên bản đang áp dụng; cần thay thế trong cùng giao dịch.',409);
+    }
+  }
   const checks=ops.map((op,index)=>old[index]===null
     ?'NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)'
     :'EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)');
   const checkValues=ops.flatMap((op,index)=>old[index]===null?[op.entity,op.key]:[op.entity,op.key,old[index]]);
+  if(kind!=='bom-change'){
+    checks.push(`((SELECT count(*) FROM app_records WHERE entity IN (${publicationEntities.map(()=>'?').join(',')}))=? AND NOT EXISTS(SELECT 1 FROM json_each(?) j LEFT JOIN app_records a ON a.entity=json_extract(j.value,'$[0]') AND a.record_key=json_extract(j.value,'$[1]') WHERE a.payload IS NOT json_extract(j.value,'$[2]')))`);
+    checkValues.push(...publicationEntities,publicationRows.length,publicationExpected);
+  }
   const guard=db.prepare(`INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'linked_write_guard',?,?,?,? WHERE ${checks.join(' AND ')}`)
     .bind(guardKey,'{}',actor.login,now,...checkValues);
   const writes=[guard],saved=[];

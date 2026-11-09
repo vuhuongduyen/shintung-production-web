@@ -22,3 +22,12 @@ test('existing confirmation provenance survives closure and cannot be edited lat
  assert.equal(check('safety_rules',{status:'Nháp',effectiveFrom:''},null,now),'');
  assert.equal(check('unrelated',{status:'Đang áp dụng'},null,now),'');
 });
+
+test('published values and historical date boundaries cannot be overwritten',()=>{
+ const before={status:'Đang áp dụng',confirmedAt:now,validFrom:now,leadTime:2,tiers:[{moq:100,value:2}]};
+ for(const next of [{...before,leadTime:999},{...before,tiers:[{moq:100,value:999}]},{...before,validTo:'2020-01-01'},{...before,status:'Hết hiệu lực',validTo:'2020-01-01'}])assert.notEqual(check('leadtime_versions',next,before,now),'');
+ assert.notEqual(check('leadtime_versions',{status:'Hết hiệu lực',validFrom:'2000-01-01',confirmedAt:'2000-01-01'},null,now),'');
+ const safety={status:'Đang áp dụng',confirmedAt:now,effectiveFrom:'2026-11-09',leadTimeRules:[{days:2}]};
+ assert.notEqual(check('safety_rules',{...safety,leadTimeRules:[{days:9}]},safety,now),'');
+ assert.equal(check('safety_rules',{...safety,status:'Đã hủy xác nhận'},safety,now),'');
+});
