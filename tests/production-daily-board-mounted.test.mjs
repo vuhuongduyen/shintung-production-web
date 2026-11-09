@@ -15,6 +15,28 @@ const click=async node=>{assert.ok(node);await act(async()=>node.click());};
 const dialog=()=>document.querySelector('[role="dialog"]');
 const setInput=async(node,value)=>{await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new window.Event('input',{bubbles:true}));node.dispatchEvent(new window.Event('change',{bubbles:true}));});};
 const submit=async()=>{await act(async()=>dialog().querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));};
+test('daily report uses the requested quantity label and one accessible header close without discarding its draft',async()=>{
+ const view=await mount();try{
+  await view.render({orders:[{...order,lsxCode:'TEST-LSX-WITH-A-LONG-REFERENCE-THAT-MUST-WRAP'}]});
+  await click(view.host.querySelector('[aria-label="Báo công · TEST-LSX-WITH-A-LONG-REFERENCE-THAT-MUST-WRAP"]'));
+  const modal=dialog(),input=modal.querySelector('input[type="number"]');
+  assert.equal(input.labels.length,1);assert.equal(input.labels[0].textContent,'Số lượng nhập');
+  assert.equal(modal.querySelector('button[type="submit"]').textContent,'Lưu');
+  assert.doesNotMatch(modal.textContent,/SL phát sinh/);
+  const closes=modal.querySelectorAll('button[aria-label="Đóng báo công"]');assert.equal(closes.length,1);assert.equal(modal.querySelector('[data-slot="dialog-close"]'),null);
+  assert.equal(closes[0].getAttribute('aria-label'),'Đóng báo công');assert.equal(closes[0].closest('header'),modal.querySelector('header'));
+  await setInput(input,'275');await click(closes[0]);assert.equal(dialog(),null);assert.equal(view.saved.length,0);
+  await click(view.host.querySelector('[aria-label="Báo công · TEST-LSX-WITH-A-LONG-REFERENCE-THAT-MUST-WRAP"]'));
+  assert.equal(dialog().querySelector('input[type="number"]').value,'275');
+ }finally{await view.close();}
+});
+test('failed save explains the cause and safe retry without exposing a server stack or losing the draft',async()=>{
+ const view=await mount();globalThis.fetch=async(path)=>String(path)==='/api/production-workflow'?Response.json({error:'SQLITE private stack trace'},{status:503}):Response.json({});try{
+  await click(view.host.querySelector('[aria-label="Báo công · TEST-LSX"]'));await setInput(dialog().querySelector('input[type="number"]'),'25');await submit();
+  const alert=dialog().querySelector('[role="alert"]');assert.match(alert.textContent,/Nguyên nhân:/);assert.match(alert.textContent,/Hướng xử lý:/);assert.match(alert.textContent,/Đối chiếu \/ thử lại lượt cũ/);assert.doesNotMatch(alert.textContent,/SQLITE|private|stack/);
+  assert.equal(dialog().querySelector('input[type="number"]').value,'25');assert.equal(dialog().querySelector('.production-daily-close').disabled,true);assert.equal(view.saved.length,0);
+ }finally{globalThis.fetch=fetchOriginal;await view.close();}
+});
 test('an unapproved increase reserves capacity without increasing the visible confirmed amount or export',async()=>{
  const view=await mount();try{
   await view.render({reports:[{id:'SYNTHETIC-CONFIRMED',transitId:order.id,kind:'completion',reportingModel:'daily-finished-v1',quantityOnly:true,reportedQuantity:200,approvedQuantity:200,reviewStatus:'Đã xác nhận',pendingQuantityReservation:100,pendingCorrection:{status:'pending'}}]});
