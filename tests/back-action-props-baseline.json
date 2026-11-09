@@ -8,7 +8,7 @@
       "count": 110,
       "sha256": "b61ae0507ac3a2e1af24c9fd3065abdbcb541466e81ac61958d693654ea0d94d",
       "jsxCount": 325,
-      "jsxSha256": "6a64c2868d0240e0d3672414ff2a2f54ec8950875d08c5b35830b58f151d9a13"
+      "jsxSha256": "5bce7ec4441ab9064adcda54b36488822024cadd9a8a6edc5031e0463280997d"
     },
     {
       "file": "components/labor-hours-master.tsx",
@@ -24,5 +24,8 @@
       "jsxCount": 44,
       "jsxSha256": "bef1f1b51912ec359a812a18f0cd5f2e202825b0cbf3aab1268c20cda21ea108"
     }
+  ],
+  "authorizedChanges": [
+    "PR13: Safety start date is assigned at confirmation; draft save requires reason, not a user-entered effectiveFrom. Existing toolbar callbacks and permissions retained."
   ]
 }

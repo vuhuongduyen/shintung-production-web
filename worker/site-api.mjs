@@ -1,3 +1,4 @@
+import {confirmationDateError,needsLinkedConfirmation} from '../lib/leadtime-confirmation.mjs';
 import {frozenPendingReport} from '../scripts/local/production-quantity-cutover.mjs';
 import {decideDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
 import {readLegacyPreservation} from '../scripts/local/production-legacy-preservation.mjs';
@@ -518,6 +519,8 @@ async function handleSiteApi(request,env,timing){
   if(!Object.hasOwn(body,'expectedRevision')||body.expectedRevision!==actualRevision)
    return json({error:conflictMessage,current:old,updatedBy:oldRow?.updated_by||null,updatedAt:oldRow?.updated_at||null,revision:actualRevision},409);
   if(body.entity==='inventory_snapshot'&&(!old||!['Đã chốt','Đã được Production_engine sử dụng'].includes(old.status)||body.payload.status!=='Đã mở chốt'||!String(body.payload.reopenReason||'').trim()||body.payload.weekKey!==old.weekKey||JSON.stringify(body.payload.items)!==JSON.stringify(old.items)))return json({error:'Chỉ được mở bản chốt hiện có với lý do; tạo bản chốt qua chọn file và tuần.'},409);
+  const confirmationError=confirmationDateError(body.entity,body.payload,old);if(confirmationError)return json({error:confirmationError},409);
+  if(needsLinkedConfirmation(body.entity,body.payload,old))return json({error:'Dùng giao dịch xác nhận để giữ phiên bản và lịch sử.'},409);
   if(body.createOnly&&old)return json({error:'Bản ghi đã tồn tại'},409);
   if(body.entity==='demand_event'&&!old){const v=await validateNewDemand(env.DB,body.payload,await loadCatalog());if(Object.keys(v.fields).length)return json({error:'Demand không hợp lệ',fields:v.fields},400);}
   if(body.entity==='bom_change'&&body.payload.bulk)return json({error:'Dùng API phiếu BOM hàng loạt.'},409);

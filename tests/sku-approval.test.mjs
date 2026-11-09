@@ -1,3 +1,4 @@
+import {engineSourceRevisions} from '../lib/engine-effective-basis.mjs';
 import { saveEngine } from "../scripts/local/engine.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -195,6 +196,7 @@ test("SKU confirmation enforces grants/deletion, single+batch, stale selection, 
     const engine = await saveEngine(
       c.db,
       {
+        sourceRevisions:await engineSourceRevisions(c.db),
         payload: {
           week: "2026-09-14",
           rows: [],

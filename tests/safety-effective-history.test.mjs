@@ -20,3 +20,16 @@ test('expired Safety without confirmation evidence, cancelled and deleted versio
  for(const invalid of [{...previous,status:'Hết hiệu lực',confirmedAt:''},{...previous,status:'Hết hiệu lực',confirmedAt:'not-a-date'},{...previous,status:'Đã hủy xác nhận'},{...previous,status:'Nháp'},{...previous,_deleted:true}])assert.equal(lookup([invalid],'2026-10-12'),undefined);
  assert.equal(lookup([{...previous,status:'Hết hiệu lực',effectiveTo:'2026-10-20'}],'2026-10-21'),undefined);
 });
+
+test('Safety lookup rejects cancellation flags and invalid business intervals without mutating history',()=>{
+ for(const invalid of [{...previous,cancelled:true},{...previous,effectiveFrom:'2026-02-30'},{...previous,effectiveFrom:''},{...previous,effectiveTo:'2026-02-30'},{...previous,effectiveTo:'2026-09-30'}])assert.equal(lookup([invalid],'2026-10-12'),undefined);
+ for(const date of ['', '2026-02-30','2026-10-12T00:00:00Z'])assert.equal(lookup([previous],date),undefined);
+ assert.equal(lookup([{...previous,effectiveTo:'2026-10-12'}],'2026-10-12')?.id,previous.id);
+});
+
+test('Safety same-day revisions use confirmation time and numeric versions, never lexical V9 over V10',()=>{
+ const old={...previous,version:'V9',status:'Hết hiệu lực',effectiveTo:'2026-10-01',confirmedAt:'2026-10-01T01:00:00Z'};
+ const next={...previous,id:'NEW',version:'V10',confirmedAt:'2026-10-01T02:00:00Z'};
+ assert.equal(lookup([old,next],'2026-10-01').id,'NEW');
+ assert.equal(lookup([next,old],'2026-10-01').id,'NEW');
+});
