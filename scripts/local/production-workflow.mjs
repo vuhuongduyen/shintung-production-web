@@ -11,6 +11,7 @@ import {writeDailyOutput,readDailyOutputPolicy} from './production-daily-output.
 import {isDailyOutput} from '../../lib/production-daily-output.mjs';
 import {stageValidationPayload} from './production-stage-read.mjs';
 import {workflowReadSnapshot} from '../../worker/read-performance.mjs';
+import {projectDailyWarehouseStatuses} from '../../worker/warehouse-source-status.mjs';
 import {backfillStageWork} from './production-backfill.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {hasScheduledWorkday,extraWorkBlockedMessage} from '../../lib/production-extra-policy.mjs';
@@ -366,6 +367,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
     approvedSchedules: reviewReportId?[]:[...calendar.approved.entries()].filter(([key]) => permitted(readActor, key.split(":")[1])).map(([key, reference]) => ({ key, ...reference, days: resolveSchedule(calendar, ...key.split(":")).days })),
     rights: { stageLive:true, crossLineView, historyImport:Boolean(actor.isAdmin&&!actor.line),hr:canHr(actor), ...productionMenuRights(actor), line: actor.line || null },
   };
+  result.reports=await projectDailyWarehouseStatuses(db,result.reports);
   if(legacyPreservation){
    const rawReports=[...historyRecords.flatMap(r=>r.payload.reports||[]),...reportRecords.map(r=>({...r.payload,id:r.key}))];
    const prefix=legacyPreservation.attendancePrefix||legacyPreservation.monthly.find(m=>m.kind===attendancePrefixModel);

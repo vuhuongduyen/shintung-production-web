@@ -1,4 +1,5 @@
 import {acknowledgePendingDailyCorrection,reconcilePendingReceiptConfirmation} from '../scripts/local/production-daily-pending-correction.mjs';
+import {warehouseProductionSources,warehouseConfirmationStatements} from './warehouse-source-status.mjs';
 import {decideDailyWithdrawalFromSheet,acknowledgeDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
 import {isDailyOutput} from '../lib/production-report-model.mjs';
 const productionTime=report=>isDailyOutput(report)?report.productionDate:report?.completedAt;
@@ -92,8 +93,10 @@ export async function sheetBridge(request,env){
   next={...p,receivedQuantity:qty,difference,differenceReason:reason,status:'Đã xác nhận',confirmation_status:'Đã xác nhận',confirmationStatus:'Đã xác nhận',confirmedAt:at,confirmedBy:by,confirmationBasis:'Kho xác nhận tại Google Sheet',sheetConfirmationHash:eventHash,updatedAt:now,updatedBy:by,sheetSync:{...p.sheetSync,status:'sent',at:now,error:''}};
  }else fail('Thao tác không hợp lệ');
  if(b.action==='confirm'&&p.pendingCorrection?.status==='pending')return reply(await reconcilePendingReceiptConfirmation(db,{receiptId:key,receipt:next,expectedReceiptRaw:stored.payload},{verified:true,spreadsheetId:config.spreadsheetId}));
+ const receiptRow={record_key:key,payload:stored.payload},sources=b.action==='confirm'?await warehouseProductionSources(db,[receiptRow]):new Map();
+ const receiptWrites=b.action==='confirm'?warehouseConfirmationStatements(db,receiptRow,next,sources.get(key),next.updatedBy||'Google Sheet kho',now):[db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='warehouse_in' AND record_key=? AND payload=?").bind(JSON.stringify(next),next.updatedBy||'Google Sheet kho',now,key,stored.payload)];
  const result=await db.batch([
- db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='warehouse_in' AND record_key=? AND payload=?").bind(JSON.stringify(next),next.updatedBy||'Google Sheet kho',now,key,stored.payload),
+ ...receiptWrites,
  db.prepare("INSERT INTO app_records SELECT 'warehouse_sheet_audit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=? AND payload=?)").bind(crypto.randomUUID(),JSON.stringify({action:b.action,receiptId:key,at:now,confirmedBy:next.confirmedBy,receivedQuantity:next.receivedQuantity,error:next.sheetSync.error}),next.updatedBy||'Google Sheet kho',now,key,JSON.stringify(next))]);
  if(result[0].meta.changes!==1)fail('Phiếu vừa thay đổi. Hệ thống sẽ thử lại.',409);
  return reply({ok:true});
