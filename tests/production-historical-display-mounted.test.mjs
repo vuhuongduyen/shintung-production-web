@@ -123,3 +123,20 @@ test('each final contribution with missing basis is identified, not just the las
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  try{await act(async()=>root.render(React.createElement(Output,{orders:[o],reports:[first,last],events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());const warning=host.querySelector('details.production-inline-message');assert.match(warning.textContent,/SYNTHETIC-FIRST-FINAL/);assert.doesNotMatch(warning.textContent,/SYNTHETIC-LAST-FINAL/);}finally{await act(async()=>root.unmount());host.remove();}
 });
+
+test('preserved journal-last=false does not hide an earlier FINAL missing its rate',async()=>{
+ const {captureLegacyPreservation}=await import('../lib/production-legacy-preservation.mjs'),{attachLegacyEarnedBasis}=await import('../lib/production-legacy-earned-basis.mjs');
+ const o={...order,processes:['CUT','FINAL'],actualCompletedAt:'2026-11-02T04:00:00Z'};
+ const cut={...report,id:'SYNTHETIC-PRESERVED-CUT',stageName:'CUT',productionDate:'2026-11-02',completedAt:'2026-11-02T02:00:00Z',reportedQuantity:0,approvedQuantity:0,standardUnit:undefined,hours:{hc:2,ot:0,total:2}};
+ const first={...report,id:'SYNTHETIC-PRESERVED-FIRST',stageName:'FINAL',productionDate:'2026-11-02',completedAt:'2026-11-02T03:00:00Z',reportedQuantity:50,approvedQuantity:50,standardUnit:undefined,hours:{hc:.25,ot:0,total:.25}},last={...first,id:'SYNTHETIC-PRESERVED-LAST',completedAt:'2026-11-02T04:00:00Z',standardUnit:.016};
+ const raw=[cut,first,last],before=JSON.stringify(raw),workflow={orders:[o],reports:raw,events:[],employees:[],payrollEmployees:[],approvedSchedules:[]};
+ const captured=await captureLegacyPreservation({workflow,standards:new Map(),snapshotId:'SYNTHETIC-PRESERVATION',observedAt:'2026-11-03T00:00:00Z',cutoverDate:'2026-11-03'}),attached=await attachLegacyEarnedBasis(raw,captured.basis,{required:true});
+ assert.equal(attached[1].legacyEarnedBasis.journalPresentation.legacyJournalFinal,false);assert.equal(attached[2].legacyEarnedBasis.journalPresentation.legacyJournalFinal,true);const attachedBefore=JSON.stringify(attached);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(React.createElement(Output,{orders:[o],reports:attached,events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+ const warning=host.querySelector('details.production-inline-message');assert.ok(warning);assert.match(warning.textContent,/SYNTHETIC-PRESERVED-FIRST/);assert.doesNotMatch(warning.textContent,/SYNTHETIC-PRESERVED-CUT|SYNTHETIC-PRESERVED-LAST/);
+ const data=JSON.parse(host.querySelector('table[data-report-source]').dataset.reportSource);assert.equal(data.rows[0][data.headers.indexOf('Tổng giờ LSX')],2.5);assert.equal(data.rows[0][data.headers.indexOf('Giờ công chuẩn HT')],null);
+ const {default:Detail}=await vite.ssrLoadModule('/components/production-detail-fields.tsx');await act(async()=>root.render(React.createElement(Detail,{detail:attached[1],orders:[o],reports:attached,events:[],employees:[]})));assert.match(host.textContent,/Chưa xác định được căn cứ Giờ công\/SP/);assert.match(host.textContent,/SYNTHETIC-PRESERVED-FIRST/);
+ assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(attached),attachedBefore);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
