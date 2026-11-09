@@ -1,5 +1,7 @@
 "use client";
 import {previousSafetyGroup} from "../lib/safety-linked-pair.mjs";
+import {EngineCalculationDetails} from "../components/engine-calculation-details";
+import {engineDetailBasis} from "../lib/engine-detail-basis.mjs";
 import {LeadtimeTiers} from "../components/leadtime-tiers";
 import {validLeadtimeTiers} from "../lib/leadtime-tiers.mjs";
 import {resolveLeadtimeVersion} from "../lib/leadtime-effective.mjs";
@@ -3613,6 +3615,8 @@ const normalizePlanRow = (row: Partial<PlanRow>, index = 0): PlanRow => ({
 });
 
 type EngineMetric = {
+  forecastBasis?: {f30?:number;f60?:number;f90?:number;d30?:number;d60?:number};
+  standardHours?: number | null;
   warnings?: string[];
   defaults?: string[];
   weekLabel: string;
@@ -3684,7 +3688,7 @@ function buildProductionEngine(
   const rows: PlanRow[] = [];
   const errors: string[] = [];
   const warnings: string[] = [];
-  const inputs: Pick<ForecastRow, "sku" | "used" | "name" | "spec" | "line">[] = engineInputRows(forecasts, events, month, weekValue);
+  const inputs: (Pick<ForecastRow, "sku" | "used" | "name" | "spec" | "line"> & Partial<Pick<ForecastRow,"f30" | "f60" | "f90" | "d30" | "d60">>)[] = engineInputRows(forecasts, events, month, weekValue);
   if (!inputs.length)
     errors.push(`${month}: chưa có Base Forecast hoặc Demand Event chưa lập kế hoạch đúng tuần`);
   inputs
@@ -3854,6 +3858,8 @@ function buildProductionEngine(
         weekLabel: `${formatViDate(weekStart)} - ${formatViDate(weekEnd)}`,
         month,
         dailyDemand: f.used,
+        forecastBasis: {f30:f.f30,f60:f.f60,f90:f.f90,d30:f.d30,d60:f.d60},
+        standardHours: Number.isFinite(Number.parseFloat(item.standardHours)) ? Number.parseFloat(item.standardHours) : null,
         eventWeek,
         eventQty,
         fillQty,
@@ -6827,42 +6833,9 @@ toolbarConfig.action({"onClick": () => {
       )}
       {calcSku &&
         (() => {
-          const r =
-            engineResult.rows.find((x) => x.sku === calcSku) ||
-            rows.find((x) => x.sku === calcSku);
-          const metric = engineResult.rows.find((x) => x.sku === calcSku);
-          const m = metric ? engineResult.metrics.get(metric.id) : undefined;
-          const base = m
-            ? baseRows.find((x) => x.sku === calcSku && x.month === m.month)
-            : undefined;
-          const legacy = forecastData[calcSku];
-          if (!r) return null;
-          const f =
-            m && base
-              ? {
-                  f30: base.f30,
-                  f60: base.f60,
-                  f90: base.f90,
-                  d30: base.d30,
-                  d60: base.d60,
-                  used: base.used,
-                  stock: m.stock,
-                  wip: m.inTransit,
-                  lead: m.leadTime,
-                  safety: m.safetyDays,
-                  moq: m.moq,
-                  rop: m.rop,
-                  hours:
-                    Number.parseFloat(
-                      skus.find((item) => item.code === calcSku)
-                        ?.standardHours || "",
-                    ) || 0,
-                  event: m.eventWeek,
-                  replenish: m.replenish,
-                  reason: m.reason,
-                }
-              : legacy;
-          if (!f) return null;
+          const detail=engineDetailBasis(savedEngine,engineWeek,calcSku,engineResult);
+          if(!detail)return null;
+          const {row:r,metric:m}=detail;
           return (
             <>
               <FeedbackActionButton
@@ -6881,105 +6854,7 @@ toolbarConfig.action({"onClick": () => {
                   </div>
                   <FeedbackActionButton onClick={() => setCalcSku(null)}>×</FeedbackActionButton>
                 </div>
-                <section>
-                  <h3>Forecast Kinh doanh</h3>
-                  <dl>
-                    <div>
-                      <dt>Forecast 30D</dt>
-                      <dd>{f.f30.toLocaleString("vi-VN")}</dd>
-                    </div>
-                    <div>
-                      <dt>Forecast 60D</dt>
-                      <dd>{f.f60.toLocaleString("vi-VN")}</dd>
-                    </div>
-                    <div>
-                      <dt>Forecast 90D</dt>
-                      <dd>{f.f90.toLocaleString("vi-VN")}</dd>
-                    </div>
-                    <div>
-                      <dt>Daily Demand 30D</dt>
-                      <dd>{f.d30.toLocaleString("vi-VN")} SP/ngày</dd>
-                    </div>
-                    <div>
-                      <dt>Daily Demand 60D</dt>
-                      <dd>{f.d60.toLocaleString("vi-VN")} SP/ngày</dd>
-                    </div>
-                    <div className="highlight-row">
-                      <dt>Demand dùng cho SX</dt>
-                      <dd>Forecast 30D / 30 = {f.used}</dd>
-                    </div>
-                  </dl>
-                </section>
-                <section>
-                  <h3>Nguồn cung và ngưỡng bổ sung</h3>
-                  <dl>
-                    <div>
-                      <dt>Tồn kho ERP</dt>
-                      <dd>{f.stock.toLocaleString("vi-VN")}</dd>
-                    </div>
-                    <div>
-                      <dt>Đang sản xuất/đang đi</dt>
-                      <dd>{f.wip.toLocaleString("vi-VN")}</dd>
-                    </div>
-                    <div>
-                      <dt>Demand Event tuần</dt>
-                      <dd>{f.event.toLocaleString("vi-VN")}</dd>
-                    </div>
-                    <div>
-                      <dt>Nguồn cung khả dụng</dt>
-                      <dd>{(f.stock + f.wip).toLocaleString("vi-VN")}</dd>
-                    </div>
-                    <div>
-                      <dt>Lead time + Safety</dt>
-                      <dd>
-                        {f.lead} + {f.safety} = {f.lead + f.safety} ngày
-                      </dd>
-                    </div>
-                    <div className="highlight-row">
-                      <dt>ROP</dt>
-                      <dd>
-                        {f.used} × {f.lead + f.safety} ={" "}
-                        {f.rop.toLocaleString("vi-VN")}
-                      </dd>
-                    </div>
-                  </dl>
-                </section>
-                <section className="calc-result">
-                  <h3>Kết quả đề xuất</h3>
-                  <p>
-                    Nguồn cung được so sánh với ROP, cộng Demand Event và làm
-                    tròn theo MOQ {f.moq.toLocaleString("vi-VN")}.
-                  </p>
-                  {m && (
-                    <div>
-                      <span>SL cần bổ sung trước MOQ</span>
-                      <b>
-                        {m.replenish.toLocaleString("vi-VN", {
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        SP
-                      </b>
-                    </div>
-                  )}
-                  <div>
-                    <span>Số lượng đề xuất tuần</span>
-                    <b>{r.suggested.toLocaleString("vi-VN")} SP</b>
-                  </div>
-                  {m && (
-                    <p className="calc-reason">
-                      <b>Lý do:</b> {m.reason}
-                    </p>
-                  )}
-                  <div>
-                    <span>Tổng giờ công dự kiến</span>
-                    <b>
-                      {(r.suggested * f.hours).toLocaleString("vi-VN", {
-                        maximumFractionDigits: 1,
-                      })}{" "}
-                      giờ
-                    </b>
-                  </div>
-                </section>
+                <EngineCalculationDetails metric={m} suggested={r.suggested} />
               </aside>
             </>
           );
