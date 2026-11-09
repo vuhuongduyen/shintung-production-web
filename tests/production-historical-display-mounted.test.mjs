@@ -81,3 +81,28 @@ for(const value of [.0006,.016,0,null])test(`daily detail retains rate precision
  const label=[...host.querySelectorAll('dt')].find(n=>n.textContent==='Định mức hiệu lực');assert.ok(label);assert.equal(label.nextElementSibling.textContent,value===null?'Thiếu căn cứ định mức':value.toLocaleString('vi-VN',{maximumFractionDigits:10}));assert.equal(JSON.stringify(daily),before);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+for(const screen of ['journal','output'])test(`${screen} November legacy missing basis guides user through details even for unfinished LSX`,async()=>{
+ const pendingOrder={...order,actualCompletedAt:undefined,lsxQty:200},value={...report,id:'SYNTHETIC-NOV-MISSING',standardUnit:undefined,productionDate:'2026-11-02',completedAt:'2026-11-02T03:00:00Z'},before=JSON.stringify({pendingOrder,value});
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host),opened=[];
+ try{await act(async()=>root.render(React.createElement(screen==='journal'?Journal:Output,{orders:[pendingOrder],reports:[value],events:[],employees:[],open:r=>opened.push(r),refresh:()=>{},busy:false})));
+ if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+ assert.match(host.textContent,/SYNTHETIC-NOV-MISSING/);assert.match(host.textContent,/2026-11-02/);assert.match(host.textContent,/menu Giờ công/);
+ if(screen==='journal'){
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Chi tiết').click());assert.equal(opened.length,1);
+ const {default:Detail}=await vite.ssrLoadModule('/components/production-detail-fields.tsx');await act(async()=>root.render(React.createElement(Detail,{detail:opened[0],reports:[value],orders:[pendingOrder],employees:[],events:[]})));
+ assert.match(host.textContent,/Chưa xác định được căn cứ Giờ công\/SP/);assert.match(host.textContent,/SYNTHETIC-NOV-MISSING/);assert.match(host.textContent,/2026-11-02/);assert.match(host.textContent,/menu Giờ công/);
+ }
+ assert.equal(JSON.stringify({pendingOrder,value}),before);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+test('unfinished order without final does not warn about final labor rate or alter actual hours',async()=>{
+ const pendingOrder={...order,actualCompletedAt:undefined,processes:['CUT','FINAL']},value={...report,id:'SYNTHETIC-CUT',stageName:'CUT',standardUnit:undefined,productionDate:'2026-11-02'},before=JSON.stringify(value),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{for(const screen of ['journal','output','detail']){
+ const {default:Detail}=await vite.ssrLoadModule('/components/production-detail-fields.tsx');
+ await act(async()=>root.render(React.createElement(screen==='journal'?Journal:screen==='output'?Output:Detail,{detail:value,orders:[pendingOrder],reports:[value],events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
+ if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+ assert.doesNotMatch(host.textContent,/Chưa xác định được Giờ công\/SP cho|Chưa xác định được căn cứ Giờ công\/SP/);assert.equal(JSON.stringify(value),before);assert.deepEqual(value.hours,{hc:1,ot:0,total:1});
+ }}finally{await act(async()=>root.unmount());host.remove();}
+});

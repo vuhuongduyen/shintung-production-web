@@ -1,5 +1,9 @@
 "use client";
+import {finalReportIds} from '../lib/production-report-order.mjs';
+import {preservedJournalFinalIds} from '../lib/production-legacy-earned-basis.mjs';
 import LaborRateWarning from './labor-rate-warning';
+import {laborReferenceInScope,referenceReportBasis} from '../lib/production-labor-reference.mjs';
+import {outputDate} from '../lib/production-output-summary.mjs';
 import {isDailyOutput} from '../lib/production-report-model.mjs';
 import {staffTransferDetails} from '../lib/production-staff-transfer-detail.mjs';
 import {DataTable} from './onspa-ui/DataTable';
@@ -21,6 +25,7 @@ export default function ProductionDetailFields({detail:input,employees,orders,re
  const {detail,source,report,event,destination,affectedOrders}=productionDetailContext(input,orders,reports,events);
  const transfers=staffTransferDetails(events).details.get(detail.id)||[];
  const daily=isDailyOutput(detail)||isDailyOutput(report);
+ const finalIds=preservedJournalFinalIds(reports,finalReportIds(reports,orders));
  const operational=!daily&&Boolean(detail.kind&&!['schedule','capacity','hours-adjustment'].includes(detail.kind));
  const section=(heading:string,fields:Array<[string,any]>)=><section className="production-business-detail"><h3>{heading}</h3><dl>{fields.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value||value===0?value:'—'}</dd></div>)}</dl></section>;
  const people=eventEmployees(detail,employees);
@@ -34,9 +39,10 @@ export default function ProductionDetailFields({detail:input,employees,orders,re
  {operational&&section('Nội dung ghi nhận',[
  ['Thời điểm hiệu lực',datetime(detail.effectiveAt||detail.startedAt)],['Đến thời điểm',detail.openArrival?'Chưa đến':datetime(detail.endsAt||detail.completedAt)],...(staffingKinds.includes(detail.kind)?[[['complete','completion'].includes(detail.kind)?'Số người được phân công':'Số người',numeric(detail.count??event?.count)] as [string,any]]:[]),...(['start','transfer','add','reduce','absence','line-absence','attendance-override','complete','completion'].includes(detail.kind)?[['Nhân viên',people.length?people.map(person=>person.name?`${person.name} (${person.id})`:person.id).join(', '):'Chưa ghi nhận nhân viên'] as [string,any]]:[]),...(detail.destinationId?[['Chuyển đến lệnh',destination?.lsxCode] as [string,any],['Line chuyển đến',detail.destinationLine||destination?.line] as [string,any]]:[]),...(detail.affectedOrderIds?.length?[['LSX chịu ảnh hưởng',affectedOrders.map((o:Row)=>o.lsxCode).join(', ')] as [string,any]]:[]),...(detail.absenceType?[['Loại biến động',detail.absenceType] as [string,any]]:[]),...(['complete','completion','report-approval','report-rejection','report-correction','report-cancel'].includes(detail.kind)?[['Sản lượng lần này',numeric(detail.reportedQuantity??report?.reportedQuantity)] as [string,any]]:[]),['Tình trạng duyệt',detail.reviewStatus||report?.reviewStatus|| (detail.approved===false?'Chờ duyệt giờ':detail.approved===true?'Đã duyệt giờ':'—')],['Nội dung / lý do',detail.reason||detail.note]])}
  {transfers.length>0&&<section className="production-business-detail"><h3>Chuyển nhân viên trong thao tác này</h3>{transfers.map((r:Row)=><p key={`${r.employeeId}:${r.fromEventId}:${r.toEventId}`}><strong>{employees.find(p=>String(p.id)===r.employeeId)?.name||r.employeeId}</strong> ({r.employeeId})<br/>Từ lệnh {orders.find(o=>o.id===r.fromOrderId)?.lsxCode||r.fromOrder||'Chưa ghi nhận'} · {r.fromStage||'Chưa ghi công đoạn'} → Lệnh {orders.find(o=>o.id===r.toOrderId)?.lsxCode||r.toOrder||'Chưa ghi nhận'} · {r.toStage||'Chưa ghi công đoạn'}<br/>{datetime(r.at)}{detail.voided?' · Thao tác đã hủy':''}</p>)}</section>}
+ {report&&!daily&&finalIds.has(report.id)&&laborReferenceInScope(report)&&referenceReportBasis(report).unit==null&&<>{section('Giờ công chuẩn/SP', [['Căn cứ theo ngày sản lượng','Chưa xác định được căn cứ Giờ công/SP']])}<LaborRateWarning items={[{id:report.id,sku:report.sku||source?.sku,date:outputDate(report)}]}/></>}
  {daily&&report&&(report.rateStatus!=='resolved'||typeof report.rateBasis?.value!=='number')&&<LaborRateWarning items={[{id:report.id,sku:report.sku,date:report.productionDate}]}/>}
  {daily&&report&&section('Sản lượng và xác nhận',[['Ngày giờ sản xuất',report.productionAt?datetime(report.productionAt):date(report.productionDate)],['Sản lượng phát sinh',numeric(report.reportedQuantity)],['Sản lượng đã duyệt',numeric(report.approvedQuantity)],['Trạng thái',report.reviewStatus],['Kho',report.warehouseStatus],['Định mức hiệu lực',report.rateStatus==='resolved'?(typeof report.rateBasis?.value==='number'&&Number.isFinite(report.rateBasis.value)?report.rateBasis.value.toLocaleString('vi-VN',{maximumFractionDigits:10}):'Thiếu căn cứ định mức'):'Thiếu căn cứ định mức: chưa tính tiền'],['Lý do trễ',report.delayReason],[productionReviewResult(report).label,productionReviewResult(report).actorId],[productionReviewResult(report).timeLabel,productionReviewResult(report).at?datetime(productionReviewResult(report).at):'—']])}
- {report?.laborReference&&section('Giờ công/SP đối chiếu lịch sử',[
+ {report?.laborReference&&finalIds.has(report.id)&&section('Giờ công/SP đối chiếu lịch sử',[
  ['Mức theo ngày báo công',report.laborReference.status==='resolved'?Number(report.laborReference.basis.value).toLocaleString('vi-VN',{maximumFractionDigits:6}):'Thiếu căn cứ'],
  ['Ngày báo công',date(report.laborReference.productionDate)],['Ngày áp dụng',date(report.laborReference.basis?.validFrom)],
  ['Phiên bản',report.laborReference.basis?.versionId],['Ngày cập nhật nguồn',datetime(report.laborReference.basis?.recordedAt||report.laborReference.basis?.publishedAt)],
