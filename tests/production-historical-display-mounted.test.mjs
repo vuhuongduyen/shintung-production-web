@@ -41,3 +41,27 @@ for(const locale of ['en','zh'])for(const screen of ['journal','output'])test(`$
   const table=host.querySelector('table[data-report-source]'),data=JSON.parse(table.dataset.reportSource),label=t('Thiếu căn cứ định mức');assert.notEqual(label,'Thiếu căn cứ định mức');assert.equal(data.rows[0][data.headers.indexOf(t('Giờ công chuẩn/SP'))],label);assert.ok([...table.querySelectorAll('[aria-label]')].some(n=>n.getAttribute('aria-label')===label));assert.equal(JSON.stringify(report),before);
  }finally{await act(async()=>root.unmount());host.remove();document.documentElement.lang='vi';}
 });
+
+for(const screen of ['journal','output'])test(`${screen} displays and exports dated reference explicitly without changing stored evidence`,async()=>{
+ const {attachLaborReferences}=await import('../lib/production-labor-reference.mjs'),{siteLaborHours}=await import('../lib/site-labor-hours.mjs');
+ const value={...report,standardUnit:undefined,legacyEarnedBasis:{kind:'observed-legacy-earned-v1',status:'missing',sku:order.sku,line:'A',journalPresentation:{standardUnitHours:null,standardLaborHours:null,laborDeviation:null}}};
+ const menu=siteLaborHours([{key:order.sku,payload:{sku:order.sku,version:1,laborHour:.016,updatedAt:'2026-10-16T03:00:00Z'}}]),projected=attachLaborReferences([value],[order],menu),before=JSON.stringify(projected);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try {
+  await act(async()=>root.render(React.createElement(screen==='journal'?Journal:Output,{orders:[order],reports:projected,events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
+  if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+  const table=host.querySelector('table[data-report-source]'),data=JSON.parse(table.dataset.reportSource),unit=data.headers.indexOf('Giờ công chuẩn/SP');
+  assert.match(table.querySelector('tbody').textContent,/0,0160/);assert.match(table.querySelector('tbody').textContent,/Đối chiếu, chưa chốt/);assert.match(JSON.stringify(data.rows),/Đối chiếu lịch sử, chưa chốt/);
+  if(screen==='output'){assert.equal(data.rows[0][unit],.016);assert.equal(data.rows[0][data.headers.indexOf('Giờ công chuẩn HT')],1.6);assert.equal(data.rows[0][data.headers.indexOf('Tổng giờ LSX')],1);}
+  assert.equal(JSON.stringify(projected),before);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+test('report detail shows historical reference date/version and leaves actual hours intact',async()=>{
+ const {default:Detail}=await vite.ssrLoadModule('/components/production-detail-fields.tsx');
+ const value={...report,standardUnit:undefined,laborReference:{kind:'historical-labor-reference-v1',status:'resolved',sku:order.sku,productionDate:'2026-10-30',frozen:false,basis:{value:.016,validFrom:'2026-10-16',productionDate:'2026-10-30',versionId:'SYNTHETIC-H2',recordedAt:'2026-10-16T03:00:00Z'}}},before=JSON.stringify(value),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{
+  await act(async()=>root.render(React.createElement(Detail,{detail:value,reports:[value],orders:[order],employees:[],events:[]})));
+  assert.match(host.textContent,/0,016/);assert.match(host.textContent,/SYNTHETIC-H2/);assert.match(host.textContent,/16\/10\/2026/);assert.match(host.textContent,/Đối chiếu lịch sử, chưa chốt/);assert.equal(JSON.stringify(value),before);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

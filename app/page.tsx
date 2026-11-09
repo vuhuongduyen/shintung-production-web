@@ -1,4 +1,5 @@
 "use client";
+import {laborHourNumber,formatLaborHour} from '../lib/labor-hour-display.mjs';
 import {SkuTransfer} from '../components/sku-transfer';
 import {hasMenuPermission} from '../lib/menu-action-access.mjs';
 import {DepartmentChangeRequests,useChangeRequests,requestDepartment,requestWorkspace,canReplyDepartments} from "../components/department-change-requests";
@@ -6066,6 +6067,20 @@ function PlanningView({
   }, [notice]);
   const [fullView, setFullView] = useState(false);
   const [calcSku, setCalcSku] = useState<string | null>(null);
+  const [engineLabor, setEngineLabor] = useState<{sku:string|null;value:number|null;error:string}>({sku:null,value:null,error:''});
+  useEffect(() => {
+    if (!calcSku) return;
+    let active=true;
+    setEngineLabor({sku:calcSku,value:null,error:''});
+    recordFetch('/api/records?entity=labor_hours',{cache:'no-store'}).then(async response=>{
+      if(!response.ok)throw Error('Không tải được Giờ công');
+      const data=await response.json(),rate=data.records?.find((r:any)=>normalizeSkuCode(r.payload?.sku||r.key)===normalizeSkuCode(calcSku))?.payload;
+      const value=rate&&!rate.cancelled&&!rate._deleted&&rate.status!=='Đã hủy'?laborHourNumber(rate.laborHour):null;
+      if(active)setEngineLabor({sku:calcSku,value,error:''});
+    }).catch(()=>{if(active)setEngineLabor({sku:calcSku,value:null,error:'Không tải được Giờ công'});});
+    return()=>{active=false;};
+  },[calcSku,masterDataRevision]);
+
 
   const [inventorySnapshots, setInventorySnapshots] = useState<
     InventorySnapshot[]
@@ -6833,11 +6848,6 @@ toolbarConfig.action({"onClick": () => {
                   safety: m.safetyDays,
                   moq: m.moq,
                   rop: m.rop,
-                  hours:
-                    Number.parseFloat(
-                      skus.find((item) => item.code === calcSku)
-                        ?.standardHours || "",
-                    ) || 0,
                   event: m.eventWeek,
                   replenish: m.replenish,
                   reason: m.reason,
@@ -6954,10 +6964,9 @@ toolbarConfig.action({"onClick": () => {
                   <div>
                     <span>Tổng giờ công dự kiến</span>
                     <b>
-                      {(r.suggested * f.hours).toLocaleString("vi-VN", {
-                        maximumFractionDigits: 1,
-                      })}{" "}
-                      giờ
+                      {engineLabor.sku===calcSku&&engineLabor.value!==null
+                        ? `${(r.suggested * engineLabor.value).toLocaleString('vi-VN',{maximumFractionDigits:1})} giờ`
+                        : engineLabor.error||'Chưa có định mức'}
                     </b>
                   </div>
                 </section>
@@ -18454,7 +18463,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
       versions: [],
       rules: [],
     });
-  const [skuLaborHours, setSkuLaborHours] = useState<Map<string, number>>(
+  const [skuLaborHours, setSkuLaborHours] = useState<Map<string, number | null>>(
     new Map(),
   );
   useEffect(() => {
@@ -18474,7 +18483,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
             laborData.records.map(
               (record: { key: string; payload: { laborHour: number } }) => [
                 normalizeSkuCode(record.key),
-                Number(record.payload.laborHour || 0),
+                laborHourNumber(record.payload.laborHour),
               ],
             ),
           ),
@@ -20192,12 +20201,7 @@ toolbarConfig.action({"onClick": () => {
                       <div>
                         <dt>Giờ công chuẩn</dt>
                         <dd>
-                          {(
-                            skuLaborHours.get(
-                              normalizeSkuCode(selected.code),
-                            ) ?? 0
-                          ).toFixed(3)}{" "}
-                          giờ/SP
+                          {formatLaborHour(skuLaborHours.get(normalizeSkuCode(selected.code)))}
                         </dd>
                       </div>
                     </dl>
