@@ -18,7 +18,7 @@ after(async()=>{globalThis.fetch=originalFetch;await vite.close();closeBrowserCh
 test('mounted monthly totals, staff eligibility, line selection and missing dates follow policy',async()=>{
  const employees=[{id:'THAO',name:'Quách Chanh Thảo',line:'A',startDate:'2020-01-01'},{id:'TIN',name:'Đoàn Hữu Tín',line:'C',startDate:'2020-01-01'},{id:'VIET',name:'Trần Quốc Việt',line:'B',startDate:'2020-01-01'}];
  const schedules=['A','B'].map(line=>{const days=Array.from({length:31},(_,i)=>({date:`2026-10-${String(i+1).padStart(2,'0')}`,working:i===0,ot:false}));return {line,days,roster:days.map(d=>({date:d.date,hc:line==='A'?['THAO','TIN']:['VIET'],ot:[]})),input:{dailySchedule:days}};});
- const orders=['A','B'].map(line=>({id:line,line,sku:'ONSPA-TEST',name:'Sản phẩm kiểm thử'})),reports=['A','B'].map(line=>({id:line,transitId:line,kind:'completion',reviewStatus:'Đã xác nhận',productionDate:'2026-10-01',approvedQuantity:100}));
+ const orders=['A','B'].map(line=>({id:line,line,sku:'ONSPA-TEST',name:'Sản phẩm kiểm thử'})),reports=['A','B'].map(line=>({id:line,transitId:line,kind:'completion',reviewStatus:'Đã xác nhận',productionDate:'2026-10-01',approvedQuantity:100,standardUnit:1}));
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  const render=async people=>act(async()=>root.render(React.createElement(Screen,{employees:people,orders,reports,schedules,events:[],open:()=>{},refresh:async()=>true})));
  try{

@@ -19,8 +19,9 @@ test('stage time journal accumulates its own hours and stage quantity, excludes 
 
 test('journal displays per-unit standard while deviation compares total standard hours',async()=>{
  const {journalStandardHours}=await import('../lib/production-journal-standards.mjs');
- const calculate=o=>journalStandardHours(rows,[o],new Map([['SKU',.021]]),new Set(['f2']),new Map([['f2',{orderCumulativeHours:15}]] )).get('f2');
+ const calculate=o=>journalStandardHours(rows.map(r=>({...r,standardUnit:.07})),[o],new Map([['SKU',.021]]),new Set(['f2']),new Map([['f2',{orderCumulativeHours:15}]] )).get('f2');
  const saved=calculate({...order,sku:'SKU',laborHour:.07});
  assert.equal(saved.standardUnitHours,.07);assert.equal(saved.standardLaborHours,140);assert.equal(saved.laborDeviation,15/140-1);
- assert.equal(calculate({...order,sku:'SKU'}).standardUnitHours,.021);
+ assert.equal(calculate({...order,sku:'SKU'}).standardUnitHours,.07);
+ assert.equal(journalStandardHours(rows,[order],new Map([['SKU',.021]]),new Set(['f2']),new Map()).get('f2').standardUnitHours,null,'missing report evidence cannot use order or live master');
 });

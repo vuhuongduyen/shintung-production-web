@@ -210,7 +210,7 @@ for (const method of ['enter','click']) {
       const line=[...toolbar(view.host).querySelectorAll('select')].find(s=>s.querySelector('option[value=all]')&&s.querySelector('option[value=A]'));
       await choose(line,'B');await openPickerEnter(line);assert.match(body(view.host),/LSX-ALPHA/);
       await search(view.host,line,method);assert.doesNotMatch(body(view.host),/LSX-ALPHA/);assert.match(body(view.host),/LSX-BETA/);
-      assert.deepEqual(requests,['/api/production-standards'],'loaded standards only; lookup must not refetch or write');
+      assert.deepEqual(requests,[],'historical journal lookup reads stored evidence without fetching a live master or writing');
     } finally {await view.close();}
   });
   test(`ProductionCorrections real text and closed Line lookup apply by ${method} without editing`,async()=>{

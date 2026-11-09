@@ -30,13 +30,13 @@ test('editable Vietnam production time selects its own day and never rewrites au
  assert.throws(()=>buildDailyOutput({...input,productionDate:'2026-11-04',productionLocalDateTime:'2026-11-04T08:01'}));
 });
 
-test('monthly daily earnings sum immutable per-day rates, preserve legacy contract and block missing basis',async()=>{
+test('monthly earnings sum immutable per-report rates and block legacy or daily missing basis',async()=>{
  const {monthlyEarnedOrders}=await import('../lib/production-payroll.mjs');
  const confirmed=r=>({...r,reviewStatus:'Đã xác nhận',approvedQuantity:r.reportedQuantity});
  const a=confirmed(buildDailyOutput(input)),b=confirmed(buildDailyOutput({...input,quantity:300,id:'OTHER',productionDate:'2026-11-03'}));
  const rates=new Map([['TEST',9]]),row=monthlyEarnedOrders([order],[a,b],'2026-11','A',rates,true)[0];assert.equal(row.qty,500);assert.equal(row.earned,80);assert.equal(row.source,'Theo ngày sản xuất');assert.equal(row.unit,null);assert.equal(row.basis.length,2);
  const missing=confirmed(buildDailyOutput({...input,id:'MISSING',rateVersions:[]}));assert.equal(monthlyEarnedOrders([order],[a,missing],'2026-11','A',rates,true)[0].earned,null);
- const legacy={id:'LEGACY',kind:'completion',transitId:order.id,productionDate:'2026-11-01',reviewStatus:'Đã xác nhận',approvedQuantity:10};assert.equal(monthlyEarnedOrders([order],[legacy],'2026-11','A',rates,true)[0].earned,90);
+ const legacy={id:'LEGACY',kind:'completion',transitId:order.id,productionDate:'2026-11-01',reviewStatus:'Đã xác nhận',approvedQuantity:10};assert.equal(monthlyEarnedOrders([order],[legacy],'2026-11','A',rates,true)[0].earned,null);assert.equal(monthlyEarnedOrders([order],[{...legacy,standardUnit:.1}],'2026-11','A',rates,true)[0].earned,1);
  assert.equal(monthlyEarnedOrders([order],[a,b],'2026-12','A',rates,true).length,0);
 });
 
