@@ -1,6 +1,6 @@
 # ONSPA local development
 
-- Trước mỗi việc, đọc `docs/ONSPA-DEVELOPMENT-WORKFLOW.md` và `docs/STAGING-WORKFLOW.md`. Quy trình cập nhật 09/11/2026 ở cuối tệp thay thế các mặc định triển khai ngày 22/10 và 31/10; chỉ dẫn cụ thể mới nhất của người dùng vẫn quyết định quyền thực hiện.
+- Quy trình làm việc chính duy nhất: đọc `docs/ONSPA-DEVELOPMENT-WORKFLOW.md` trước mỗi việc. Toàn bộ trình tự, điều phối, kiểm thử, merge và triển khai được cập nhật tại đó; không tạo hoặc duy trì bản quy trình song song trong tệp này.
 
 - Khi người dùng yêu cầu thiết lập menu Sản xuất/Báo công, đọc `docs/PRODUCTION-REPORTING-DESIGN-2026-09-23.md` cùng `docs/CAPACITY-DESIGN-DECISIONS-2026-09-23.md`; đây là thiết kế đã thảo luận, chưa mặc nhiên là chức năng đang chạy. Kiểm tra source và yêu cầu mới nhất trước khi sửa.
 
@@ -62,19 +62,6 @@
 - Giữ quyền cá nhân đã cấp; không tự xóa hoặc thay bằng mẫu bộ phận khi chưa đối chiếu dữ liệu phân quyền/lịch sử. Rà toàn bộ user từ bảng quyền, không yêu cầu người dùng nhắc lại từng tài khoản.
 - Không báo đã kiểm tra toàn bộ quyền thực tế khi chỉ kiểm thử mẫu quyền hoặc chưa đọc được bảng phân quyền bằng phiên Admin.
 
-## Đồng bộ hai môi trường (22/10/2026, lịch sử đã được thay thế)
-- Theo yêu cầu người dùng: mọi điều chỉnh website mặc định triển khai cả web chính và môi trường thử, trừ khi người dùng giới hạn rõ một môi trường. Giữ project, DB/FILES, dữ liệu, banner và hạn thử nghiệm riêng; không sao chép dữ liệu nghiệp vụ giữa hai bên.
+## Quy trình và phạm vi triển khai hiện hành
 
-## Phạm vi triển khai từ 31/10/2026 (lịch sử đã được thay thế)
-- Người dùng chuyển sang thao tác trên web chính: từ nay chỉ sửa và triển khai MAIN appgprj_6a8f9b8b6bc48191b07d8293bcb8402a. Không cập nhật web thử trừ khi người dùng yêu cầu riêng. Quy tắc này thay thế mặc định đồng bộ hai môi trường ở trên.
-
-## Quy trình PR và QA bắt buộc (09/11/2026)
-
-- Mỗi việc có một đầu mối, một cloud công việc và PR riêng; dùng lại đúng nơi đang làm, không tạo trùng. Khi đổi ưu tiên/phương án, chuyển chỉ đạo ngay, xác minh việc cũ đã dừng thật hoặc tiếp tục đúng phạm vi rồi báo lại; giữ công việc dở dang.
-- Mỗi việc độc lập có PR riêng vào `staging`; cùng việc tiếp tục PR hiện hữu, không tạo trùng hoặc trộn việc khác. Lỗi phát hiện sau merge dùng PR sửa riêng.
-- Trước merge: đối chiếu đầy đủ yêu cầu, rà diff, kiểm lỗi/hồi quy và review, đọc đúng head/base/merge-tree và CI. Không coi CI xanh là đủ khi còn yêu cầu thiếu hoặc chưa kiểm. Chỉ merge trong phạm vi được người dùng cho phép.
-- Sau merge staging: chủ động tiếp tục đồng bộ web thử khi đã được phép, xác minh deployment và version/source active, rồi kiểm thực tế chức năng, dữ liệu và giao diện trên đúng web thử trước bàn giao. Còn lỗi hoặc chưa kiểm thì báo chưa đạt/chưa hoàn tất và tiếp tục xử lý trong phạm vi được phép.
-- Chọn và giải thích ngắn phương án ít bước, nhanh và an toàn dựa trên phụ thuộc; PR riêng không bắt buộc dựng bản ứng dụng tách rời. Chỉ hỏi khi cần quyết định hoặc quyền còn thiếu.
-- Không chờ người dùng nhắc mới theo dõi và báo kết quả; nếu thiếu quyền hoặc công cụ, nêu chính xác blocker và đầu vào cần thêm. Báo đúng đang làm hay đang chờ và bước tiếp theo; không nói đang kiểm khi chưa kiểm. Không suy quyền sửa/push thành quyền merge/deploy.
-- Tuyệt đối không đồng bộ web chính đối với phần chưa đạt QA web thử. Sau khi đạt QA và được nghiệm thu, vẫn cần Duyên yêu cầu riêng cho đúng phạm vi MAIN. Không gom phần khác chưa thử chỉ vì đã nằm trên staging.
-- Giữ nguyên identity, DB/FILES, dữ liệu, tài khoản, quyền và guard của từng môi trường. Thay đổi tài liệu không phải lý do để triển khai ứng dụng. Chi tiết và mẫu bàn giao nằm trong hai tài liệu quy trình ở trên.
+Đọc [Quy trình thay đổi ONSPA](docs/ONSPA-DEVELOPMENT-WORKFLOW.md), tài liệu chính duy nhất đã gom quy trình cũ và các điều chỉnh ngày 09/11/2026. Các mặc định đồng bộ hai môi trường ngày 22/10 và chỉ MAIN ngày 31/10 là lịch sử đã được thay thế, không dùng làm chỉ dẫn triển khai hiện tại. Hướng dẫn kỹ thuật/nghiệp vụ khác trong tệp này vẫn giữ nguyên.

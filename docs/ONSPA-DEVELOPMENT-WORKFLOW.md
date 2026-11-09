@@ -1,10 +1,10 @@
 # Quy trình thay đổi ONSPA: PR riêng → kiểm đủ → staging → QA web thử → nghiệm thu → main
 
-Quy trình này là điểm tham chiếu cố định cho các lần làm việc sau. Assistant phải đọc tài liệu này và `AGENTS.md` khi bắt đầu, kiểm tra trạng thái thực tế rồi thực hiện trong phạm vi người dùng yêu cầu. Không thay cách làm, tạo nền tảng hoặc cuộc trò chuyện mới chỉ vì phiên làm việc thay đổi.
+**Đây là tài liệu quy trình chính duy nhất** cho các lần làm việc sau. Quy trình cũ và các điều chỉnh đã được gom về đây; khi thay đổi cách làm, cập nhật tại đây, không tạo bản quy trình song song. `README.md`, `AGENTS.md` và `STAGING-WORKFLOW.md` chỉ dẫn đến tài liệu này; các tài liệu CI/Codespaces còn lại là hướng dẫn kỹ thuật chuyên biệt, không thay thế trình tự và điều kiện bàn giao ở đây. Assistant phải đọc tài liệu này và `AGENTS.md` khi bắt đầu, kiểm tra trạng thái thực tế rồi thực hiện trong phạm vi người dùng yêu cầu. Không thay cách làm, tạo nền tảng hoặc cuộc trò chuyện mới chỉ vì phiên làm việc thay đổi.
 
 **Quy trình không phải quyền thường trực để sửa mã, cấp quyền, tạo credentials, merge hoặc deploy.** Chỉ dẫn cụ thể mới nhất của người dùng quyết định phạm vi mỗi lần. Lưu trên GitHub, CI đạt, preview hoạt động, người dùng nghiệm thu, merge và deployment là các trạng thái riêng biệt.
 
-**Cập nhật 06/11:** dùng [nhánh/web thử cố định](STAGING-WORKFLOW.md). PR mới vào `staging`; hợp nhất nhánh thử sau CI trong phạm vi được phép, triển khai QA riêng, Duyên nghiệm thu rồi mới xét PR vào main và deployment MAIN. Codespaces bên dưới là lịch sử/phương án dự phòng được cho phép riêng, không còn là mặc định để gửi link. Việc giữ nguyên PR #7 là giới hạn của lượt thiết lập 06/11, không phải trạng thái hiện tại.
+**Cập nhật 06/11:** dùng nhánh/web thử cố định, xem [đích và cấu hình môi trường](#8-đích-triển-khai-cấu-hình-và-bằng-chứng-môi-trường). PR mới vào `staging`; hợp nhất nhánh thử sau CI trong phạm vi được phép, triển khai QA riêng, Duyên nghiệm thu rồi mới xét PR vào main và deployment MAIN. Codespaces bên dưới là lịch sử/phương án dự phòng được cho phép riêng, không còn là mặc định để gửi link. Việc giữ nguyên PR #7 là giới hạn của lượt thiết lập 06/11, không phải trạng thái hiện tại.
 
 **Cập nhật 09/11:** mỗi việc có PR riêng; kiểm đủ yêu cầu trước merge vào `staging`; sau merge phải tiếp tục đồng bộ đúng web thử và kiểm chức năng, dữ liệu, giao diện thực tế trước bàn giao. CI đạt hoặc deploy thành công không thay cho QA. **Không đồng bộ web chính khi phần cần đưa lên chưa đạt QA web thử; kể cả đã đạt, vẫn chờ Duyên yêu cầu riêng cho đúng phạm vi.** Các chỉ dẫn mặc định đồng bộ cả hai web ngày 22/10 và chỉ MAIN ngày 31/10 đã được thay thế.
 
@@ -46,7 +46,7 @@ Quy trình này là điểm tham chiếu cố định cho các lần làm việc
 
 ## 4. Preview toàn bộ ONSPA từ đúng commit
 
-Mặc định dùng **Site thử cố định** trong [STAGING-WORKFLOW.md](STAGING-WORKFLOW.md), D1/R2 và tài khoản bền vững. Chỉ dùng lại **GitHub Codespaces có sẵn, cổng 5173 Private** với Miniflare TEST nếu được yêu cầu riêng. Không dùng web trial cũ, mockup/component fixture hoặc giao diện sao chép để thay cho bản PR cần nghiệm thu. Không mặc định yêu cầu tài khoản Cloudflare riêng hoặc tạo Site/DB cloud mới.
+Mặc định dùng **Site thử cố định** ở [mục 8](#8-đích-triển-khai-cấu-hình-và-bằng-chứng-môi-trường), D1/R2 và tài khoản bền vững. Chỉ dùng lại **GitHub Codespaces có sẵn, cổng 5173 Private** với Miniflare TEST nếu được yêu cầu riêng. Không dùng web trial cũ, mockup/component fixture hoặc giao diện sao chép để thay cho bản PR cần nghiệm thu. Không mặc định yêu cầu tài khoản Cloudflare riêng hoặc tạo Site/DB cloud mới.
 
 ### Mốc lịch sử để tìm lại, không phải xác nhận hiện trạng
 
@@ -60,7 +60,7 @@ Adapter QA cố định cho Codespace cũ và giới hạn Host/Origin/role: [CO
 
 ### Kiểm web thử cố định trước bàn giao
 
-Sau merge staging, thực hiện đầy đủ mục 5 và [quy trình triển khai QA](STAGING-WORKFLOW.md). Link Site có sẵn chỉ chứng minh địa chỉ tồn tại, chưa chứng minh bản sửa đã chạy hoặc đã đạt QA. Gửi link để cùng kiểm khi còn lỗi phải ghi rõ “chưa đạt/chưa kiểm xong”, không bàn giao như đã hoàn tất.
+Sau merge staging, thực hiện đầy đủ mục 5 và các điều kiện môi trường ở mục 8. Link Site có sẵn chỉ chứng minh địa chỉ tồn tại, chưa chứng minh bản sửa đã chạy hoặc đã đạt QA. Gửi link để cùng kiểm khi còn lỗi phải ghi rõ “chưa đạt/chưa kiểm xong”, không bàn giao như đã hoàn tất.
 
 ### Các điểm phải xác minh riêng khi được phép dùng Codespaces
 
@@ -91,12 +91,13 @@ Assistant chịu trách nhiệm chuẩn bị và xác minh rồi gửi link; kh�
 3. Kiểm thực tế trên **chính URL web thử đang chạy bản đó**, bằng browser thật và API/Worker khi cần. Theo checklist yêu cầu, thử chức năng từ đầu đến cuối, dữ liệu hiển thị/lưu/tải lại, quyền, ngày hiệu lực/lịch sử nếu có; kiểm giao diện desktop/mobile, toolbar, bảng, modal và thông báo ở phần bị ảnh hưởng. Xem lỗi mạng/console liên quan. Test local, DOM giả lập, ảnh cũ hoặc build đạt không thay bước này.
 4. Đối chiếu cả trường hợp lỗi người dùng đã nêu với kết quả mong đợi. Ví dụ phần Giờ công phải kiểm đúng mốc áp dụng, lịch sử và các nơi dùng số giờ; không kết luận dữ liệu cũ đã đúng chỉ vì công thức hoặc test mới đạt.
 5. Nếu còn lỗi, thiếu dữ liệu/công cụ để kiểm hoặc kết quả chưa rõ, ghi **QA chưa đạt/chưa hoàn tất**, báo blocker và tiếp tục sửa trong phạm vi được phép. Bản sửa sau merge đi bằng PR riêng, kiểm lại trước merge rồi triển khai và QA lại. Không bỏ bước vì đã có một lần CI/QA đạt ở bản trước.
-6. Chỉ bàn giao bản sửa như hoàn tất khi checklist đạt và có bằng chứng chức năng/giao diện trên bản active. Gửi Duyên URL, version/source, các mục đã kiểm, kết quả, giới hạn còn lại và trạng thái MAIN. Duyên nghiệm thu đúng bản đó; nếu có thay đổi sau QA/nghiệm thu, kiểm lại phần bị ảnh hưởng trước khi dùng kết quả cũ.
+6. Chỉ bàn giao bản sửa như hoàn tất khi checklist đạt và có bằng chứng chức năng/giao diện trên bản active. Gửi Duyên URL, version/source, các mục đã kiểm, kết quả, giới hạn còn lại và trạng thái MAIN. Duyên nghiệm thu đúng bản đó; không thay app đang được nghiệm thu mà chưa thông báo. Nếu có thay đổi sau QA/nghiệm thu, kiểm lại phần bị ảnh hưởng trước khi dùng kết quả cũ.
 
 ## 6. Chặn web chính cho tới khi QA đạt và có yêu cầu riêng
 
 - **Tuyệt đối không đồng bộ, triển khai hoặc đưa phần chưa đạt QA web thử lên MAIN.** `staging` có commit, bốn check CI xanh, merge thành công, deploy QA `succeeded` hoặc một hạng mục khác đã đạt đều không thay kết quả QA của chính phần cần phát hành.
 - Sau khi phần đó đạt QA và Duyên nghiệm thu, chỉ chuẩn bị/merge PR promotion vào `main` khi được yêu cầu đúng phạm vi; triển khai MAIN vẫn cần yêu cầu riêng. Không suy “làm tiếp”, “đồng bộ web thử” hoặc chấp nhận bản QA thành quyền cập nhật web chính.
+- PR promotion vào `main` phải chạy đầy đủ CI của đúng revision và đạt trước merge; không dùng kết quả CI staging hoặc kiểm sau merge main để thay thế.
 - Trước promotion/deploy, đọc lại yêu cầu, diff, SHA/tree và phiên bản QA đã đạt. Chỉ lấy phần đã thử và được duyệt, không gom cả staging có thêm thay đổi chưa đạt. Xác minh trigger tự động trước merge/push để tránh deploy ngoài phạm vi.
 - Dùng đúng nguồn, commit, Site và cấu hình MAIN hiện hữu; bảo toàn DB/FILES, tài khoản, quyền, secrets và dữ liệu. Không đưa guard QA sang MAIN, không thực hiện sửa dữ liệu/backfill ngoài phạm vi.
 - Theo dõi deployment tới terminal. Chỉ báo web chính đã cập nhật khi deployment **succeeded**, đọc lại version/source active khớp nguồn được duyệt và kiểm lại chức năng/giao diện bị tác động. GitHub push, build, saved version hoặc merge không thay thế bằng chứng triển khai.
@@ -125,7 +126,46 @@ Không báo “xong” chỉ vì đã push, CI đạt, merge hoặc deploy. Nế
 Tài liệu liên quan: [CI](CI.md), [bàn giao lỗi đã biết](BUG-HANDOFF-2026-11-02.md), [chẩn đoán và hướng xử lý](CI-RESIDUAL-DIAGNOSIS-2026-11-02.md). Báo cáo lỗi là mốc lịch sử; luôn đọc kết quả của head hiện tại khi quyết định bước tiếp theo.
 
 
-## Tiết kiệm phút GitHub — cập nhật bản nháp 05/11
+## 8. Đích triển khai, cấu hình và bằng chứng môi trường
+
+Phần này được chuyển từ tài liệu nhánh/web thử cũ để mọi điều kiện của quy trình nằm tại một nơi. Không thay Site, nguồn dữ liệu, quyền truy cập, secrets, branch protection hoặc billing chỉ để thực hiện quy trình.
+
+### Các đích riêng biệt
+
+| Thành phần | Đích | Ý nghĩa |
+|---|---|---|
+| Mã đã hợp nhất | GitHub `main` | Không đồng nghĩa đã triển khai web chính |
+| Mã ứng viên | GitHub `staging` | Không chứa dữ liệu runtime hoặc lớp guard chỉ dành QA |
+| Web thử cố định | `https://onspa-thu-nghiem.shintung-vn-4458.chatgpt.site` | Site `appgprj_6aed30807a6c8191bfcc31f6ec1d4291`, DB/FILES riêng; giữ quyền chủ sở hữu hiện có |
+| Web chính | `https://sanxuat.shintung-vn-4458.chatgpt.site` | Site `appgprj_6a8f9b8b6bc48191b07d8293bcb8402a`; không triển khai trong bước QA |
+
+Trước mỗi thay đổi, đọc mới ref và working tree, bảo toàn công việc dở dang. Các số phiên bản/SHA sau đây là **mốc khảo sát lịch sử 06/11, không xác nhận hiện trạng**: GitHub main `d8dbb1e031e540fec892509b577cd49c3d2cc442`, MAIN v810 source `d8d938c6f5804ba1cb13a38bda7d38414120e7bf`; hai SHA không giống nhau nên phải đối chiếu file/tree, không tự coi là khác nghiệp vụ hoặc tương đương. Báo cáo đối chiếu nguồn được ghi riêng khi có manifest kiểm chứng. Web thử v8 source `accf9e79c6a80b488f7a775c9e31cd090d09d374` là bản đang chạy tại lúc khảo sát, không phải bằng chứng đã nhận PR #7 hoặc nhánh mới. Đợt bootstrap ban đầu giữ nguyên PR #7. Yêu cầu sau đó đưa PR #7 lên web thử được thực hiện bằng ứng viên có CI nhắm `staging`, giữ lớp triển khai QA riêng; trạng thái GitHub và Site phải được đọc lại độc lập.
+
+### Tách cấu hình, dữ liệu và tài khoản
+
+`.openai/hosting.json` trong mã GitHub hiện vẫn là metadata MAIN được kiểm bởi hợp đồng snapshot. **Không dùng trực tiếp checkout GitHub để publish QA**, và không đổi tệp này thành ID QA rồi gộp trở lại MAIN. Cấu hình Site đích và các guard QA nằm trong repository triển khai của Site QA, ngoài diff ứng dụng được promotion. Không đưa source credential, session, hash tài khoản, DB dump, R2 files, dữ liệu snapshot hoặc cấu hình Sheet vào GitHub, kể cả khi repo được người dùng chủ động để public.
+
+Web thử giữ D1/R2 và tài khoản thử bền vững. Giữ project, banner và hạn thử nghiệm riêng của từng môi trường; không sao chép dữ liệu nghiệp vụ giữa hai bên ngoài phạm vi được phép. Không seed, reset hoặc nhập lại dữ liệu mỗi lần khởi động/deploy. Bản sao dữ liệu/quyền được người dùng cho phép là một snapshot độc lập, không tự đồng bộ dữ liệu thật khi merge mã. Tài khoản đăng nhập được giữ theo cơ chế đã kiểm; không hứa phiên không bao giờ hết hạn. Đừng thay bằng harness Miniflare volatile hoặc Admin giả.
+
+Không suy cách ly từ việc không có env vars: cấu hình Sheet có thể ở `app_records`. Giữ chặn kết nối kho thật, inbound/outbound tích hợp và đường `/environment-refresh`/API sao chép dữ liệu thật ở QA. Không lấy guard QA hoặc cấu hình kết nối thử đưa lên MAIN. Mốc lịch sử v8 ghi nhận năm tệp còn chờ, cần đọc lại trạng thái trước khi xử lý; lượt thiết lập CI không chứng nhận đã đầy đủ tệp hoặc đã nghiệm thu dữ liệu.
+
+### Nguồn kiểm thử và cấu hình CI
+
+Workflow nhận PR vào `main` và `staging` khi opened/synchronize/reopened, kể cả draft; chỉ nhận push vào `main`. Như vậy một push nhánh làm việc có PR không tạo thêm run push trùng. Merge staging tái sử dụng bằng chứng cây mã của CI PR khi trùng; push trực tiếp staging không phải đường phát hành đã kiểm. Main sau merge vẫn được kiểm riêng. Không dùng skip-ci, lọc test theo file thay đổi, sửa billing, thêm secrets hoặc tắt assertion.
+
+Các bước `CI SOURCE` ghi checkout SHA, tree SHA, head/base và nhánh đích bằng Git thực tế; từ chối checkout/merge parents sai. Thông tin chỉ nhận diện mã, không chứa request body hoặc credential. Mỗi job giữ cùng danh tính check, Node 24, npm lockfile và quyền contents:read. Gate lỗi làm các shard báo failure trước bước tốn phút; gate đạt vẫn chạy đầy đủ. Workflow không có bước deploy/merge/import.
+
+PR cũ vẫn giữ nguyên đích cho đến khi có quyết định chuyển. Nếu đổi base của PR, phải kiểm lại CI cho merge tree mới; sửa mô tả/chuyển ready không thay cho kiểm tra revision. Khi cấu hình chỉ ở nhánh thử, không tuyên bố main hoặc các nhánh cũ đã tự nhận cấu hình mới.
+
+### Bằng chứng và quay lui
+
+Mỗi bản QA ghi: GitHub head/base/merge-tree đã kiểm và run; source MAIN làm baseline; danh sách/hash thay đổi ứng dụng; danh sách/hash overlay QA được giữ; Site QA source/version/deployment và dữ liệu snapshot; kết quả tự kiểm/browser; Duyên đã nghiệm thu gì; main/production còn chờ quyền nào. Metadata source Site khác GitHub vì có lớp QA phải được giải thích, không gọi byte-identical.
+
+Lưu version QA trước khi cập nhật. Quay lui source chỉ dùng version tương thích schema/dữ liệu hiện tại; không tự restore DB, xóa snapshot hoặc đảo các thao tác nghiệp vụ. MAIN có kế hoạch quay lui riêng do Website kiểm tra. Nếu thiếu nguồn, file, quyền/công cụ hoặc deployment thất bại, giữ đúng Site/branch và báo chính xác; không tạo lại Site, đổi nền tảng hoặc gửi link chưa tự kiểm.
+
+Hướng dẫn kỹ thuật: [CI](CI.md), [Codespaces Private](CODESPACE-PRIVATE-PREVIEW-TEST.md), [GitHub: pull_request kiểm merge commit](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request), [lọc nhánh đích PR](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#using-filters-to-target-specific-branches-for-pull-request-events).
+
+## 9. Tiết kiệm phút GitHub — ghi nhận kỹ thuật 05/11
 
 Theo [cấu hình CI](CI.md), nhánh làm việc gửi lên GitHub rồi mở/cập nhật PR để chạy một lượt kiểm; không dùng push nhánh source-sync tạo thêm lượt full trùng PR. Main vẫn được kiểm sau merge. PR draft vẫn chạy; sửa mô tả/chuyển ready không tạo CI mới nếu commit không đổi. Bốn check giữ tên, gate nhanh/TypeScript đi trước ba shard; khi gate đạt vẫn chạy đủ toàn bộ test cuối. Lỗi gate không được coi là full suite đạt.
 
