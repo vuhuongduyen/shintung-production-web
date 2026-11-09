@@ -115,3 +115,14 @@ test('same-day labor correction through public API keeps an already closed Plan 
   assert.equal((await c.db.prepare("SELECT payload FROM app_records WHERE entity='production_plan' AND record_key=?").bind(week).first()).payload,saved);
  }finally{t.mock.timers.reset();}
 }));
+
+test('Plan close resolves menu update-date history and keeps its captured basis after a later master update',async t=>fixture(async c=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-04T03:00:00Z')});try{
+  await c.put('labor_hours',sku,{sku,version:2,laborHour:.2,updatedAt:'2026-11-03T03:00:00Z'});
+  await c.put('labor_hours_history','SYNTHETIC-H1',{id:'SYNTHETIC-H1',sku,version:1,newLaborHour:.1,at:'2026-11-01T03:00:00Z'});
+  await c.put('labor_hours_history','SYNTHETIC-H2',{id:'SYNTHETIC-H2',sku,version:2,newLaborHour:.2,at:'2026-11-03T03:00:00Z'});
+  const closed=await send(c.db,req('close',0,['SYNTHETIC-PLAN']));assert.equal(closed.rows[0].laborHour,.2);assert.equal(closed.rows[0].planLaborBasis.basis.dateBasis,'updated-date');
+  await c.put('labor_hours',sku,{sku,version:3,laborHour:9,updatedAt:'2026-11-05T03:00:00Z'});
+  assert.deepEqual((await getPlan(c.db,week,true)).rows[0].planLaborBasis,closed.rows[0].planLaborBasis);
+ }finally{t.mock.timers.reset();}
+}));

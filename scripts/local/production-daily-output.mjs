@@ -1,3 +1,4 @@
+import {readLaborRateSource} from './labor-rate-source.mjs';
 import {normalizeTransit,mergeProduction} from '../../lib/in-transit.mjs';
 import {quantityCutoverModel,quantityManifestValid,quantitySourceDatabase} from './production-quantity-cutover.mjs';
 import {readSummaryScope,summaryByteBudget} from './production-summary-scope.mjs';
@@ -70,16 +71,16 @@ export async function writeDailyOutput(db,body,actor,commitEvents,{legacySubmiss
  if(actor.line&&actor.line!==order.line)fail('Không có quyền báo sản lượng Line khác.',403);
  if(!activation.policy?.active)fail('Báo sản lượng ngày chưa được bật theo mốc triển khai đã duyệt.',409);
  if(!(legacySubmission&&activation.policy.intakeModel===quantityCutoverModel&&body.expectedOrderRevision===undefined)&&body.expectedOrderRevision!==await recordRevision(orderRow.payload))fail('Lệnh đã thay đổi. Tải lại để đối chiếu trước khi ghi.',409);
- const [context,rateRow]=await Promise.all([readDailyOrderReports(db,order),db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(String(order.sku||'').trim().toUpperCase()).first()]);
- const reports=context.reports,rate=rateRow?JSON.parse(rateRow.payload):null,now=new Date().toISOString(),quantityBaseline=await quantityBaselineForOrder(db,activation.policy,order);
+ const [context,rateSource]=await Promise.all([readDailyOrderReports(db,order),readLaborRateSource(db,order.sku)]);
+ const reports=context.reports,rate=rateSource.menu,now=new Date().toISOString(),quantityBaseline=await quantityBaselineForOrder(db,activation.policy,order);
  if(typeof body.productionLocalDateTime!=='string')fail('Thiếu ngày giờ sản xuất (GMT+7).');
- const report=buildDailyOutput({order:quantityBaseline?{...order,quantityBaseline}:order,reports,quantity:body.quantity,productionDate:body.productionDate,productionLocalDateTime:body.productionLocalDateTime,cutoverDate:activation.policy.effectiveFrom,intakeModel:activation.policy.intakeModel,today:dailyToday(),rateVersions:rate?.effectiveVersions||[],id:crypto.randomUUID(),actor:actor.login,recordedAt:now});
+ const report=buildDailyOutput({order:quantityBaseline?{...order,quantityBaseline}:order,reports,quantity:body.quantity,productionDate:body.productionDate,productionLocalDateTime:body.productionLocalDateTime,cutoverDate:activation.policy.effectiveFrom,intakeModel:activation.policy.intakeModel,today:dailyToday(),rateVersions:rate?.resolvedRateVersions||rate?.effectiveVersions||[],id:crypto.randomUUID(),actor:actor.login,recordedAt:now});
  report.sourceOrderRevision=await recordRevision(orderRow.payload);
  if(quantityBaseline)report.quantityBaseline=quantityBaseline;
  if(activation.policy.intakeModel===quantityCutoverModel)report.intake={model:quantityCutoverModel,receivedAt:now,snapshotId:activation.manifestKey,legacySubmission};
  const event={id:crypto.randomUUID(),kind:'daily-output',reportingModel:dailyOutputModel,quantityOnly:true,sourceId:order.id,line:order.line,planId:order.planId,lsxCode:order.lsxCode,sku:order.sku,reportId:report.id,quantity:report.reportedQuantity,productionDate:report.productionDate,productionLocalDateTime:report.productionLocalDateTime,productionAt:report.productionAt,effectiveAt:now,recordedAt:now,actor:actor.login,requestIdempotency:token,requestFingerprint:fingerprint};
  const rawGuard=(entity,key,raw)=>({sql:raw===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)":"EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)",args:raw===null?[entity,key]:[entity,key,raw]});
- const guards=[...dailyPolicyGuards(activation),rawGuard('in_transit',order.id,orderRow.payload),rawGuard('labor_hours',String(order.sku||'').trim().toUpperCase(),rateRow?.payload??null),...context.guards];
+ const guards=[...dailyPolicyGuards(activation),rawGuard('in_transit',order.id,orderRow.payload),...rateSource.guards,...context.guards];
  // Preserve the append-only admission revision on legacy rows without a materialized
  // pending field. An existing projection must be refreshed with the receipt atomically.
  const merged=Object.hasOwn(order,'pendingReportQty')?mergeProduction({...order,...(quantityBaseline?{quantityBaseline}:{})},[...reports,report]):null;

@@ -1,3 +1,4 @@
+import {readLaborHistory} from './labor-rate-source.mjs';
 import {productionUnassignedReminder} from './production-unassigned-alert.mjs';
 import {commitRecordWithAudit} from '../../lib/record-mutation-audit.mjs';
 import {adminReadPaths,adminReadResponse} from '../../lib/admin-readonly.mjs';
@@ -79,7 +80,7 @@ export function localTestPlugin(testOptions = {}){
     if(url.pathname==='/api/employees'&&req.method==='GET')return send(200,await readEmployees(connection.db,authenticated?{...session,isAdmin:true}:null));
     if(url.pathname==='/api/production-plan'&&req.method==='GET')return send(200,url.searchParams.get('capacityDetail')==='1'?await getPlanCapacityDetail(connection.db,url.searchParams.get('week'),url.searchParams.get('line')):url.searchParams.get('capacityOnly')==='1'?{capacity:await getPlanCapacity(connection.db,url.searchParams.get('week'))}:await getPlan(connection.db,url.searchParams.get('week'),!!(authenticated&&session.canReopenPlan)));
     if(url.pathname==='/api/in-transit'&&req.method==='GET'){const sku=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}));return send(200,await getTransit(connection.db,Object.fromEntries(url.searchParams),sku));}
-    if(url.pathname==='/api/production-standards'&&req.method==='GET'){if(!authenticated)return send(401,{error:'Vui lòng đăng nhập.'});const rows=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;return send(200,{records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})),laborBusinessDate()).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});}
+    if(url.pathname==='/api/production-standards'&&req.method==='GET'){if(!authenticated)return send(401,{error:'Vui lòng đăng nhập.'});const rows=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;return send(200,{records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})),laborBusinessDate(),await readLaborHistory(connection.db)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});}
     if(url.pathname==='/api/production-hr-hours'&&req.method==='GET')return send(200,await readHrMonth(connection.db,url.searchParams.get('month'),authenticated?{...session,isAdmin:true}:null,url.searchParams.get('examples')==='1'));
     if(url.pathname==='/api/production-workflow'&&req.method==='GET'){const actor=authenticated?{...session,isAdmin:true}:null,workflow=await readProductionWorkflow(connection.db,actor,[],{includeDerivedHours:url.searchParams.get('unassignedAlerts')!=='1'});return send(200,url.searchParams.get('unassignedAlerts')==='1'?await productionUnassignedReminder(connection.db,actor,workflow):workflow);}
     if(adminReadPaths.has(url.pathname)){
@@ -96,7 +97,7 @@ export function localTestPlugin(testOptions = {}){
      if(entity==='sku'&&url.searchParams.has('stock'))return send(200,await readSkuStock(connection.db,url.searchParams.get('stock')));
      if(entity==='bom'){const masters=(await connection.db.prepare("SELECT payload FROM app_records WHERE entity='sku'").all()).results.map(row=>JSON.parse(row.payload));return send(200,{records:records.map(row=>({...row,payload:syncBomSources(row.payload,masters)}))});}
      if(entity==='leadtime')return send(200,{records:records.map(row=>({...row,payload:projectCancelledMaster('leadtime',row.payload)}))});
-     if(entity==='labor_hours')return send(200,{records:siteLaborHours(records,laborBusinessDate())});
+     if(entity==='labor_hours')return send(200,{records:siteLaborHours(records,laborBusinessDate(),await readLaborHistory(connection.db))});
      if(entity==='labor_hours_history')return send(200,{records:siteLaborHoursHistory(records,url.searchParams.get('sku')||'')});
      return send(200,{records});
     }

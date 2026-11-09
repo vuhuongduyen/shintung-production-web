@@ -1,0 +1,47 @@
+# Giờ công: hiệu lực hoặc ngày cập nhật của từng phiên bản
+
+Quy tắc người dùng xác nhận 09/11/2026: lấy từ menu Giờ công, ưu tiên ngày hiệu lực; nếu không có thì ngày cập nhật của chính phiên bản (GMT+7). Không lấy mức mới nhất áp lùi toàn bộ lịch sử. Audit thao tác thật không đổi; trường Ngày hiệu lực là mốc nghiệp vụ độc lập, cho phép sửa có lý do theo API hiện có.
+
+## Phạm vi bản sửa
+- Tạo timeline chỉ đọc từ master và labor_hours_history, gồm dòng PDF khởi tạo với mốc cập nhật đã lưu. Phiên bản hiệu lực đã công bố giữ ưu tiên cho chính revision đó.
+- Mức cũ chỉ dùng từ ngày cập nhật của nó; mức mới không ghi đè khoảng trước. Mức 0 là hợp lệ, khoảng không có dữ liệu và lịch sử hiệu lực sai/chồng lấn vẫn báo thiếu.
+- Menu/PDF/Plan mới/phiếu mới và luồng sửa ngày sản xuất dùng cùng nguồn. Đường chốt/ghi giữ CAS cho cả payload, ngày cập nhật và tập lịch sử đã đọc.
+- Sửa số lượng cùng ngày giữ snapshot phiếu cũ, kể cả snapshot thiếu; Plan chốt/chuyển giữ căn cứ đã lưu. Giờ thực tế vẫn lấy từ SX đã báo.
+- Không migration, không backfill, không thay dữ liệu QA hoặc MAIN.
+
+## Preview trước xử lý dữ liệu cũ
+Xuất dữ liệu được phép đọc thành JSON với ba mảng `labor` (key/payload/updatedAt), `history` (key/payload/updatedAt) và `reports`. Chạy:
+
+`node scripts/verification/labor-rate-preview.mjs /absolute/path/export.json`
+
+Kết quả ghi stdout, không sửa input, không kết nối DB/network. Không đưa export/preview dữ liệu thật vào GitHub. Các trạng thái:
+- `preserve-saved-basis`: giữ căn cứ đã lưu.
+- `review-required-locked`: có đề xuất nhưng phiếu đã xác nhận/khóa; không tự cập nhật.
+- `proposed-only`: chỉ đề xuất cho bản thiếu căn cứ.
+- `unresolved`: thiếu ngày/nguồn hợp lệ hoặc nguồn mâu thuẫn.
+
+Preview có lịch sử giá trị, ngày hiệu lực, ngày thao tác, lý do và nguồn ngày dùng. Phải đối chiếu từng nhóm trước thao tác ghi riêng. Một giá trị lớn không tự chứng minh là test: chỉ loại bản được đánh dấu test rõ ràng; không tự suy từ trị số, xóa audit hoặc lấy bản sửa áp lùi tùy ý. Trường hợp 106TG01 có lần nhập 16 phải đối chiếu/mốc sửa riêng trước triển khai; bản nháp này không tự sửa dữ liệu đó.
+
+## Còn phải kiểm trước phát hành
+- Preview trên export QA hiện tại để đối chiếu 264 phiếu/227 dòng thiếu mà PCB quan sát; các số này là báo cáo hiện trường, không phải kết quả tái đếm của PR.
+- Xác nhận dấu hiệu/mốc sửa cho lần nhập sai so với bản sửa, đặc biệt 106TG01.
+- Full CI exact head, review độc lập và bản ghép QA giữ guard/PR11/PR12.
+- Kiểm browser PDF và trường ngày bằng thao tác thực, readback ngày app nhận; giới hạn mobile hosted phải nêu rõ.
+
+## Kiểm ba blocker PR14
+- Current V2 dùng ngày cập nhật của V2 dù đã có explicit V1. Không suy liên kết revision từ các bản explicit cũ thiếu số revision; cần đối chiếu nguồn thiếu định danh.
+- Dấu `isTest`, `usage=test`, `status=test` được đối chiếu theo SKU/revision trên cả master, audit và explicit; không hồi sinh bản explicit cùng ngày đã bị thay thế. Không suy test theo trị số 16.
+- Đọc master và lịch sử cùng một SELECT. CAS so sánh đủ khóa, payload nguyên bản, updated_at và số bản ghi bằng JSON snapshot với 3 tham số cố định; phát hiện thêm, xóa, thay khóa cùng số lượng và sửa payload/timestamp. Snapshot vượt 512 KiB trả 409 trước ghi để giữ giới hạn an toàn.
+- Kiểm D1 giả với 35 revisions lưu thành công và chọn đúng ngày hoàn thành. Có kiểm các race nêu trên, giữ snapshot Plan/phiếu cũ và ngân sách 4 SELECT.
+
+- Projection menu theo ngày luôn chạy cả khi timeline rỗng: nếu toàn bộ revision bị loại vì test, trả `laborHour=null`, `currentRateIssue=missing` và giữ `rateTimelineIssues`; không rơi về scalar đang lưu. Có kiểm hồi quy cả audit/explicit/master tại hàm projection và API menu so với phiếu mới, cùng kiểm nguyên trạng master/audit.
+
+## Phân biệt PDF nền và revision đang dùng
+Dòng PDF V1 tự sinh mang provenance riêng `rateSource=pdf-baseline` ở lớp đọc, không thuộc chuỗi revision của master/audit đang lưu. Không dùng số V1 của PDF để loại fallback current V1 hoặc triệt tiêu lịch sử nền khi current bị đánh dấu test. Chỉ gộp bản current trùng PDF khi revision, giá trị và timestamp đều khớp.
+
+Regression dùng DB giả: SKU có PDF 0,017 ngày 17/09, master V1 0,03 cập nhật 09/11, không có audit riêng. Menu và phiếu 09/11 lấy 0,03; phiếu 08/11 giữ 0,017. Có kiểm ưu tiên ngày hiệu lực riêng, explicit V1, dấu test không lan nhầm sang PDF, và master/audit không thay đổi. Đây là tái hiện shape dữ liệu giả, chưa kết luận QA thật có shape này. Không yêu cầu nhập lại ngày đã có.
+
+## Timestamp lịch sử và cặp CI
+UI lịch sử và preview dùng `payload.at`, thiếu thì dùng `updatedAt` của bản ghi ngoài, giống resolver. Không ghi timestamp suy ra trở lại dữ liệu. Regression kiểm mốc 08/11 17:30 UTC hiển thị 09/11 00:30 GMT+7, ngày áp dụng 09/11 và preview giữ timestamp nguyên bản.
+
+Đồng bộ staging `fc5e892d4b6d99b49c61539112e0fcfa5bd2b12c` (chỉ thay tài liệu quy trình) vào nhánh PR để tạo event CI với đúng base/head. Giữ nguyên workflow và guard kiểm merge parents; run cũ `42579643859` fail ở provenance trước tests không phải bằng chứng kiểm ứng dụng.

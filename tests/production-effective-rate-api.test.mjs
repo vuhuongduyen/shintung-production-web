@@ -46,3 +46,77 @@ test('historical PDF publication keeps current display at the active date and ne
  const report=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor);assert.equal(report.report.rateBasis.value,.15);
  const {effectiveValueOn}=await import('../lib/effective-dated-value.mjs');assert.equal(effectiveValueOn(result.body.payload.effectiveVersions,'2026-10-31').reason,'missing');
 }));
+
+test('new output resolves legacy menu revisions by update date without backdating the latest value or rewriting old reports',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:.2,version:2,updatedAt:'2026-11-03T03:00:00Z'}),sku).run();
+ await c.put('labor_hours_history','SYNTHETIC-H1',{id:'SYNTHETIC-H1',sku,version:1,newLaborHour:.1,at:'2026-11-01T03:00:00Z'});
+ await c.put('labor_hours_history','SYNTHETIC-H2',{id:'SYNTHETIC-H2',sku,version:2,newLaborHour:.2,at:'2026-11-03T03:00:00Z'});
+ const before=await records(c.db),earlier=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor),later=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-04'}),actor);
+ assert.equal(earlier.report.rateBasis.value,.1);assert.equal(later.report.rateBasis.value,.2);assert.equal(earlier.report.rateBasis.dateBasis,'updated-date');
+ assert.deepEqual((await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),before.filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)));
+}));
+
+test('a concurrent change to fallback history aborts output without saving a mixed rate',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:.1,version:1,updatedAt:'2026-11-01T03:00:00Z'}),sku).run();
+ await c.put('labor_hours_history','SYNTHETIC-RACE',{id:'SYNTHETIC-RACE',sku,version:1,newLaborHour:.1,at:'2026-11-01T03:00:00Z'});
+ let injected=false;const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{if(!injected){injected=true;await target.prepare("UPDATE app_records SET payload=json_set(payload,'$.newLaborHour',9) WHERE entity='labor_hours_history' AND record_key='SYNTHETIC-RACE'").run();}return target.batch(statements);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});
+ await assert.rejects(()=>mutateProductionWorkflow(db,c.body({quantity:1}),actor),{status:409});assert.equal(injected,true);assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_report'").first()).n,0);
+}));
+
+test('35 menu revisions save output within D1 variable limit and retain completion-day rate',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:.35,version:35,updatedAt:'2026-11-04T03:00:00Z'}),sku).run();
+ for(let i=1;i<=35;i++)await c.put('labor_hours_history','LONG-'+i,{sku,version:i,newLaborHour:i/100,at:new Date(Date.UTC(2026,9,i,3)).toISOString()});
+ const r=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor);
+ assert.equal(r.report.rateBasis.value,.33);assert.equal(r.report.rateBasis.revision,33);
+}));
+for(const change of ['insert','delete','replace','timestamp','master'])test('labor snapshot CAS rejects '+change+' without saving output',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;await c.put('labor_hours_history','CAS-H',{sku,version:1,newLaborHour:.1,at:'2026-11-01'});
+ let injected=false;const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{if(!injected){injected=true;
+ if(change==='insert')await c.put('labor_hours_history','CAS-NEW',{sku,version:3,newLaborHour:.3,at:'2026-11-04'});
+ if(change==='delete')await target.prepare("DELETE FROM app_records WHERE entity='labor_hours_history' AND record_key='CAS-H'").run();
+ if(change==='replace')await target.prepare("UPDATE app_records SET record_key='CAS-REPLACED' WHERE entity='labor_hours_history' AND record_key='CAS-H'").run();
+ if(change==='timestamp')await target.prepare("UPDATE app_records SET updated_at='2026-11-09' WHERE entity='labor_hours_history' AND record_key='CAS-H'").run();
+ if(change==='master')await target.prepare("UPDATE app_records SET updated_at='2026-11-09' WHERE entity='labor_hours'").run();
+ }return target.batch(statements);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});
+ await assert.rejects(()=>mutateProductionWorkflow(db,c.body({quantity:1}),actor),{status:409});assert.equal(injected,true);assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_report'").first()).n,0);
+}));
+test('test audit revision is never assigned to a new output even with an explicit publication',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:16,version:2,updatedAt:'2026-11-03',effectiveVersions:[{id:'V1',revision:1,status:'published',value:.1,validFrom:'2026-11-01',validTo:'2026-11-03'},{id:'V2',revision:2,status:'published',value:16,validFrom:'2026-11-03'}]}),sku).run();
+ await c.put('labor_hours_history','TEST-V2',{sku,version:2,newLaborHour:16,at:'2026-11-03',isTest:true});
+ const r=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-04'}),actor);
+ assert.equal(r.report.rateBasis??null,null);assert.equal(r.report.standardUnit??null,null);
+}));
+test('new output uses current V2 update date alongside explicit V1',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:.2,version:2,updatedAt:'2026-11-03',effectiveVersions:[{id:'V1',revision:1,status:'published',value:.1,validFrom:'2026-11-01'}]}),sku).run();
+ const before=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor),after=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-04'}),actor);
+ assert.equal(before.report.rateBasis.value,.1);assert.equal(after.report.rateBasis.value,.2);assert.equal(after.report.rateBasis.dateBasis,'updated-date');
+}));
+
+for(const marker of ['audit','explicit','master'])test('menu API and output agree when sole revision is test-marked in '+marker,()=>dailyFixture(async c=>{
+ const sku=c.order.sku,master={sku,version:1,laborHour:16,updatedAt:'2026-11-01',effectiveVersions:[{id:'ONLY',revision:1,status:'published',value:16,validFrom:'2026-11-01'}]},history={sku,version:1,newLaborHour:16,at:'2026-11-01'};
+ if(marker==='audit')history.isTest=true;
+ if(marker==='explicit')master.effectiveVersions[0].isTest=true;
+ if(marker==='master')master.isTest=true;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify(master),sku).run();
+ await c.put('labor_hours_history','ONLY-H',history);
+ const before=(await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),call=await reviewer(c),read=await call('/api/records?entity=labor_hours');
+ assert.equal(read.status,200);const menu=read.body.records.find(r=>r.key===sku).payload;
+ assert.equal(menu.laborHour,null);assert.equal(menu.currentRateIssue,'missing');assert.deepEqual(menu.resolvedRateVersions,[]);assert.ok(menu.rateTimelineIssues.some(x=>x.startsWith('excluded-test:')));
+ const output=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor);assert.equal(output.report.rateBasis??null,null);assert.equal(output.report.standardUnit??null,null);
+ assert.deepEqual((await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),before);
+}));
+
+test('legacy live V1 uses its existing update date despite generated PDF V1 in menu and output',()=>dailyFixture(async c=>{
+ const sku='106TG01';await c.put('labor_hours',sku,{sku,version:1,laborHour:.03,updatedAt:'2026-11-09T03:00:00Z'});
+ await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.sku',?) WHERE entity='in_transit' AND record_key=?").bind(sku,c.order.id).run();
+ const raw=(await c.db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(c.order.id).first()).payload,{recordRevision}=await import('../lib/record-revision.mjs'),expectedOrderRevision=await recordRevision(raw);
+ const before=(await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),call=await reviewer(c),read=await call('/api/records?entity=labor_hours');
+ assert.equal(read.status,200);assert.equal(read.body.records.find(r=>r.key===sku).payload.laborHour,.03);
+ const old=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-08',expectedOrderRevision}),actor),now=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-09',expectedOrderRevision}),actor);
+ assert.equal(old.report.rateBasis.value,.017);assert.equal(now.report.rateBasis.value,.03);assert.equal(now.report.rateBasis.dateBasis,'updated-date');assert.equal(now.report.rateBasis.recordedAt,'2026-11-09T03:00:00Z');
+ assert.deepEqual((await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),before);
+}));

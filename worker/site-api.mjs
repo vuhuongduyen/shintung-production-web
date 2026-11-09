@@ -1,3 +1,4 @@
+import {readLaborHistory} from '../scripts/local/labor-rate-source.mjs';
 import {frozenPendingReport} from '../scripts/local/production-quantity-cutover.mjs';
 import {decideDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
 import {readLegacyPreservation} from '../scripts/local/production-legacy-preservation.mjs';
@@ -182,7 +183,7 @@ async function handleSiteApi(request,env,timing){
    if(!hasGrant(actor,'Quản lý sản xuất',['Xem']))return json({error:'Không có quyền xem giờ công sản xuất.'},403);
    const rows=(await env.DB.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;
    const allowedSkus=hasQuickLineReadScope(actor)?new Set((await readProductionWorkflow(env.DB,actor)).orders.map(row=>row.sku)):null;
-   return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})),laborBusinessDate()).filter(r=>!allowedSkus||allowedSkus.has(r.payload.sku||r.key)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});
+   return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})),laborBusinessDate(),await readLaborHistory(env.DB)).filter(r=>!allowedSkus||allowedSkus.has(r.payload.sku||r.key)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});
   }
   if(path==='/api/production-hr-hours'){
    const hrExample=url.searchParams.get('examples')==='1';
@@ -259,7 +260,7 @@ async function handleSiteApi(request,env,timing){
    }
    if(entity==='sku'&&url.searchParams.get('view')!=='stored')return json({records:await loadCatalog()});
    const rows=await Promise.all((await env.DB.prepare('SELECT record_key,payload,updated_by,updated_at FROM app_records WHERE entity=? ORDER BY updated_at DESC').bind(entity).all()).results.map(async r=>({...r,revision:await recordRevision(r.payload)})));
-   if(entity==='labor_hours')return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at})),laborBusinessDate()),importSummary:laborHoursImportSummary});
+   if(entity==='labor_hours')return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at})),laborBusinessDate(),await readLaborHistory(env.DB)),importSummary:laborHoursImportSummary});
    if(entity==='labor_hours_history')return json({records:siteLaborHoursHistory(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at})),url.searchParams.get('sku')||'')});
    if(url.searchParams.get('view')==='stored'){if(!await isSuperAdmin(env.DB,actor))return json({error:'Forbidden'},403);return json({records:rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at}))});}
    if(entity==='demand_event')return json({records:siteDemand(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision})))});

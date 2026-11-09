@@ -1,3 +1,4 @@
+import {readLaborRateSource} from './labor-rate-source.mjs';
 import {mergeProduction} from '../../lib/in-transit.mjs';
 import {queuePendingDailyCorrection} from './production-daily-pending-correction.mjs';
 import {buildCorrectedDailyReport} from './production-daily-correction-value.mjs';
@@ -25,17 +26,18 @@ export async function correctDailyOutput(db,body,actor){
  const warehouseArgs=[old.id,`SX:${old.id}`];
  if(!(await db.prepare(`SELECT ${warehouseSql} AS safe`).bind(...warehouseArgs).first()).safe)fail('Phiếu đã liên kết kho, không tự sửa hoặc đảo kho.');
  const [orderRow,cursor,policy,rateRow]=await Promise.all([rawRow(db,'in_transit',old.transitId),rawRow(db,'production_cursor','global'),readDailyOutputPolicy(db),rawRow(db,'labor_hours',String(old.sku||'').trim().toUpperCase())]);
+ const rateSource=body.productionDate!==old.productionDate?await readLaborRateSource(db,old.sku):{menu:null,guards:[]};
  if(!orderRow||!policy.policy?.active)fail('Lệnh hoặc mốc triển khai đã thay đổi.');
  const order={...JSON.parse(orderRow.payload),id:old.transitId};
  if(['line','sku','lsxCode'].some(k=>order[k]!==old[k]))fail('Lệnh đã đổi Line/SKU/LSX so với phiếu. Cần đối chiếu trước khi điều chỉnh.');
  const scoped=await readDailyOrderReports(db,order),now=new Date().toISOString();
- const next=buildCorrectedDailyReport({old,body,actor,order,scoped,policy,rateRow,now,reason});
- const cursorRaw=cursor?.payload||JSON.stringify({version:0,token:''}),expectedRevision=await recordRevision(JSON.stringify([fingerprint,cursorRaw,reportRow.payload,orderRow.payload,policy.raw,policy.activationRaw,policy.manifestRaw,rateRow?.payload??null,scoped.guards]));
+ const next=buildCorrectedDailyReport({old,body,actor,order,scoped,policy,rateRow,rateVersions:rateSource.menu?.resolvedRateVersions,now,reason});
+ const cursorRaw=cursor?.payload||JSON.stringify({version:0,token:''}),expectedRevision=await recordRevision(JSON.stringify([fingerprint,cursorRaw,reportRow.payload,orderRow.payload,policy.raw,policy.activationRaw,policy.manifestRaw,rateRow?.payload??null,rateSource.guards,scoped.guards]));
  if(body.action==='preview')return {ok:true,expectedRevision,before:old,after:next};
  if(body.expectedRevision!==expectedRevision||Number(body.expectedVersion)!==Number(old.version||0))fail(conflictMessage);
  const event={id:crypto.randomUUID(),kind:'daily-output-correction',reportingModel:dailyOutputModel,quantityOnly:true,sourceId:old.transitId,line:old.line,reportId:old.id,operation:body.operation,before:old,after:next,reason,actor:actor.login,recordedAt:now,effectiveAt:now,requestIdempotency:token,requestFingerprint:fingerprint};
  const guard=(entity,key,raw)=>raw==null?{sql:'NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)',args:[entity,key]}:{sql:'EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)',args:[entity,key,raw]};
- const guards=[guard('production_report',old.id,reportRow.payload),guard('in_transit',old.transitId,orderRow.payload),...dailyPolicyGuards(policy),guard('labor_hours',String(old.sku||'').trim().toUpperCase(),rateRow?.payload??null),...scoped.guards,{sql:warehouseSql,args:warehouseArgs}],nextCursor=JSON.stringify({version:Number(JSON.parse(cursorRaw).version||0)+1,token:crypto.randomUUID()});
+ const guards=[guard('production_report',old.id,reportRow.payload),guard('in_transit',old.transitId,orderRow.payload),...dailyPolicyGuards(policy),guard('labor_hours',String(old.sku||'').trim().toUpperCase(),rateRow?.payload??null),...rateSource.guards,...scoped.guards,{sql:warehouseSql,args:warehouseArgs}],nextCursor=JSON.stringify({version:Number(JSON.parse(cursorRaw).version||0)+1,token:crypto.randomUUID()});
  const writes=[db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key='global' AND payload=? AND ${guards.map(g=>g.sql).join(' AND ')}`).bind(nextCursor,actor.login,now,cursorRaw,...guards.flatMap(g=>g.args))];
  const gate="EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key='global' AND payload=?)";
  writes.push(db.prepare(`UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_report' AND record_key=? AND ${gate}`).bind(JSON.stringify(next),actor.login,now,old.id,nextCursor));
