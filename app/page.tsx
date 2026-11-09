@@ -6067,21 +6067,6 @@ function PlanningView({
   }, [notice]);
   const [fullView, setFullView] = useState(false);
   const [calcSku, setCalcSku] = useState<string | null>(null);
-  const [engineLabor, setEngineLabor] = useState<{sku:string|null;value:number|null;error:string}>({sku:null,value:null,error:''});
-  useEffect(() => {
-    if (!calcSku) return;
-    let active=true;
-    setEngineLabor({sku:calcSku,value:null,error:''});
-    recordFetch('/api/records?entity=labor_hours',{cache:'no-store'}).then(async response=>{
-      if(!response.ok)throw Error('Không tải được Giờ công');
-      const data=await response.json(),rate=data.records?.find((r:any)=>normalizeSkuCode(r.payload?.sku||r.key)===normalizeSkuCode(calcSku))?.payload;
-      const value=rate&&!rate.cancelled&&!rate._deleted&&rate.status!=='Đã hủy'?laborHourNumber(rate.laborHour):null;
-      if(active)setEngineLabor({sku:calcSku,value,error:''});
-    }).catch(()=>{if(active)setEngineLabor({sku:calcSku,value:null,error:'Không tải được Giờ công'});});
-    return()=>{active=false;};
-  },[calcSku,masterDataRevision]);
-
-
   const [inventorySnapshots, setInventorySnapshots] = useState<
     InventorySnapshot[]
   >(() =>
@@ -6964,9 +6949,7 @@ toolbarConfig.action({"onClick": () => {
                   <div>
                     <span>Tổng giờ công dự kiến</span>
                     <b>
-                      {engineLabor.sku===calcSku&&engineLabor.value!==null
-                        ? `${(r.suggested * engineLabor.value).toLocaleString('vi-VN',{maximumFractionDigits:1})} giờ`
-                        : engineLabor.error||'Chưa có định mức'}
+                      Thiếu căn cứ Giờ công/SP đã lưu
                     </b>
                   </div>
                 </section>
