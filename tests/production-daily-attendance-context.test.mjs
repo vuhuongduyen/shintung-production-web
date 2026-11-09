@@ -25,6 +25,8 @@ test('actual Worker preserves observed legacy display and raw records after acti
 test('actual Worker retains proven legacy report/order context when current LSX disappears, without recreating it',async()=>{
  const c=await workflowGetFixture(6);try{
   const {reviewer}=await import('./helpers/daily-output-reviewer.mjs');const put=(entity,key,value)=>c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(entity,key,JSON.stringify(value),'SYNTHETIC','2026-11-02').run();const call=await reviewer({...c,put});await put('labor_hours','SYNTHETIC-SKU',{sku:'SYNTHETIC-SKU',laborHour:.1});
+  // The legacy result has a stored rate, rather than borrowing the live master.
+  await c.db.prepare("UPDATE app_records SET payload=json_set(payload,'$.standardUnit',0.1) WHERE entity='production_report' AND record_key='SYNTHETIC-LSX3-report'").run();
   const before=(await call('/api/production-workflow')).body,old=before.reports.find(r=>r.id==='SYNTHETIC-LSX3-report');assert.ok(old);
   await activateDailyPolicy(c.db,{effectiveFrom:day});await c.db.prepare("DELETE FROM app_records WHERE entity='in_transit' AND record_key='SYNTHETIC-LSX3'").run();const after=(await call('/api/production-workflow')).body,saved=after.reports.find(r=>r.id===old.id),context=after.orders.find(o=>o.id===old.transitId);assert.ok(saved);assert.equal(context.historicalOnly,true);assert.equal(saved.legacyEarnedBasis.earned,10);assert.deepEqual(saved.hours,old.hours);assert.equal(context.sku,'SYNTHETIC-SKU');
   assert.equal((await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='in_transit' AND record_key='SYNTHETIC-LSX3'").first()).n,0);

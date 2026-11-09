@@ -1,5 +1,7 @@
 # Trạng thái chức năng đang thay đổi
 
+Đợt sửa ngày 09/11 trên nhánh `fix/legacy-earned-effective-history-20261109`: kết quả giờ chuẩn của phiếu cũ dùng định mức đã lưu cùng phiếu hoặc snapshot đúng ngày; không lấy scalar danh mục hiện tại hay ước tính kế hoạch để tính lại lịch sử. Phiếu thiếu hoặc mâu thuẫn căn cứ giữ trạng thái thiếu, không dựng số giờ từ giờ nhân công. Đường đọc lịch sử import giữ `standardUnit` gốc, không chèn mức hiện hành; không ghi/migration dữ liệu. Luồng ghi sản lượng mới vẫn theo ngày sản xuất và snapshot riêng của từng phiếu. Đây là bản sửa qua PR riêng vào staging, chưa merge hoặc triển khai; kiểm thử local, CI đúng commit và nghiệm thu QA là các bước riêng. Các mốc phía dưới là lịch sử, không thay cho trạng thái PR hiện tại.
+
 Báo sản lượng thành phẩm theo ngày đang ở nhánh phát triển riêng, chưa merge/triển khai. Chi tiết source, các kiểm thử, hiệu năng và phần còn chặn nghiệm thu ở [DAILY-OUTPUT-IMPLEMENTATION-STATUS.md](DAILY-OUTPUT-IMPLEMENTATION-STATUS.md).
 
 Luồng mới được khóa mặc định nếu chưa có policy/mốc triển khai được duyệt. Lịch sử/công thức phụ kho và chia tiền cũ được giữ; chưa tuyên bố hoàn tất bảo toàn ngày hiệu lực toàn web. Không coi persisted synthetic TEST hoặc mounted JSDOM là đã nghiệm thu trình duyệt/production.

@@ -10,7 +10,7 @@ export function fullPayrollFixture(){
   return {line,days,roster:days.map(d=>({date:d.date,hc:line==='A'?['SYNTHETIC-A']:['SYNTHETIC-B','SYNTHETIC-B-UNRELATED'],ot:[]})),input:{dailySchedule:days}};
  });
  const orders=['A','B'].map(line=>({id:'SYNTHETIC-LSX-'+line,lsxCode:'SYNTHETIC-LSX-'+line,line,sku:'SYNTHETIC-SKU-'+line}));
- const reports=orders.map(o=>({id:o.id+'-REPORT',kind:'completion',transitId:o.id,line:o.line,productionDate:month+'-01',reviewStatus:'Đã xác nhận',approvedQuantity:100}));
+ const reports=orders.map(o=>({id:o.id+'-REPORT',kind:'completion',transitId:o.id,line:o.line,productionDate:month+'-01',reviewStatus:'Đã xác nhận',approvedQuantity:100,standardUnit:1}));
  const events=[{id:'SYNTHETIC-LOAN',kind:'line-movement',line:'B',destinationLine:'A',employees:['SYNTHETIC-B'],approved:true,effectiveAt:month+'-01T08:00:00+07:00',endsAt:month+'-01T12:00:00+07:00'}];
  return {employees,schedules,orders,reports,events,month,standards:new Map(orders.map(o=>[o.sku,1])),baseFund:6000000};
 }

@@ -7,7 +7,7 @@ test('exact coefficient boundaries match supplied table without rounding a score
 });
 test('earned standard hours follow confirmed quantities and production month across an order, exclude pending/cancelled',()=>{
  const orders=[{id:'a',lsxCode:'LSX-A',line:'A',sku:'TEST-SKU-001',laborHour:.1},{id:'b',line:'B',sku:'x',laborHour:1}];
- const report=(id,date,qty,extra={})=>({id,transitId:'a',kind:'completion',productionDate:date,approvedQuantity:qty,reviewStatus:'Đã xác nhận',...extra});
+ const report=(id,date,qty,extra={})=>({id,transitId:'a',kind:'completion',productionDate:date,approvedQuantity:qty,standardUnit:.1,reviewStatus:'Đã xác nhận',...extra});
  const reports=[report('r1','2026-09-30',100),report('r2','2026-10-01',200),report('r3','2026-10-02',999,{reviewStatus:'Chờ kiểm tra'}),report('r4','2026-10-02',888,{cancelled:true})];
  assert.equal(monthlyEarnedOrders(orders,reports,'2026-09','A')[0].earned,10);
  assert.equal(monthlyEarnedOrders(orders,reports,'2026-10','A')[0].earned,20);
@@ -58,10 +58,11 @@ test('shared 6m fund follows earned hours, conserves money, guards missing other
  assert.ok(allocateLineFunds(null,10).issues.length);assert.ok(allocateLineFunds(0,0).issues.length);assert.ok(allocateLineFunds(10,10,'').issues.length);
  for(const amount of [1,2,100,6000000])assert.equal(allocateLineFunds(1,2,amount).lines.reduce((s,r)=>s+r.allocated,0),amount);
 });
-test('payroll uses live menu standard even when old order snapshot exists; missing menu value blocks',()=>{
- const order={id:'lsx',line:'A',sku:'TEST-SKU-001',laborHour:99},r={kind:'completion',transitId:'lsx',productionDate:'2026-10-01',approvedQuantity:100,reviewStatus:'Đã xác nhận'};
- assert.equal(monthlyEarnedOrders([order],[r],'2026-10','A',new Map([['TEST-SKU-001',.2]]),true)[0].earned,20);
- assert.equal(monthlyEarnedOrders([order],[r],'2026-10','A',new Map(),true)[0].earned,null);
+test('payroll keeps the report standard independently of live menu or planning estimates; unknown history blocks',()=>{
+ const order={id:'lsx',line:'A',sku:'TEST-SKU-001',laborHour:99},r={kind:'completion',transitId:'lsx',productionDate:'2026-10-01',approvedQuantity:100,standardUnit:.1,reviewStatus:'Đã xác nhận'};
+ assert.equal(monthlyEarnedOrders([order],[r],'2026-10','A',new Map([['TEST-SKU-001',.2]]),true)[0].earned,10);
+ assert.equal(monthlyEarnedOrders([order],[r],'2026-10','A',new Map(),true)[0].earned,10);
+ assert.equal(monthlyEarnedOrders([order],[{...r,standardUnit:undefined}],'2026-10','A',new Map([['TEST-SKU-001',.2]]),true)[0].earned,null);
 });
 test('PDF preview matches identity, blocks mismatch/duplicate and needs valid reviewed hours',async()=>{
  const {matchHrRows,validHrRows}=await import('../lib/production-hr-import.mjs');
@@ -77,7 +78,7 @@ test('PDF preview matches identity, blocks mismatch/duplicate and needs valid re
 
 test('reported order hours use lifetime LSX total across months and preserve missing hours',()=>{
  const orders=[{id:'a',line:'A',sku:'X',laborHour:.5}];
- const report=(id,qty,total,extra={})=>({id,transitId:'a',kind:'completion',reviewStatus:'Đã xác nhận',productionDate:'2026-10-02',approvedQuantity:qty,hours:{total},...extra});
+ const report=(id,qty,total,extra={})=>({id,transitId:'a',kind:'completion',reviewStatus:'Đã xác nhận',productionDate:'2026-10-02',approvedQuantity:qty,standardUnit:.5,hours:{total},...extra});
  const reports=[report('final',10,2),report('stage',0,3),report('old',0,99,{replacedByStageBatch:'new'}),report('cancel',0,99,{cancelled:true}),report('pending',0,99,{reviewStatus:'Chờ kiểm tra'}),report('prior',0,13,{productionDate:'2026-09-30'})];
  const row=monthlyEarnedOrders(orders,reports,'2026-10','A')[0];assert.equal(row.earned,5);assert.equal(row.reported,18);
  reports[1].hours.total=7;assert.equal(monthlyEarnedOrders(orders,reports,'2026-10','A')[0].reported,22);
