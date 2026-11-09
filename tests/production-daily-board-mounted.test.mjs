@@ -37,6 +37,12 @@ test('failed save explains the cause and safe retry without exposing a server st
   assert.equal(dialog().querySelector('input[type="number"]').value,'25');assert.equal(dialog().querySelector('.production-daily-close').disabled,true);assert.equal(view.saved.length,0);
  }finally{globalThis.fetch=fetchOriginal;await view.close();}
 });
+for(const [status,expected] of [[401,/Đăng nhập lại đúng tài khoản/],[403,/Kiểm tra tài khoản đang đăng nhập và Line/],[409,/Đối chiếu SL lệnh và SL hoàn thành/],[422,/Kiểm tra Số lượng nhập/],[429,/bấm Lưu một lần/]])test(`save ${status} explains the actual next quantity-reporting step`,async()=>{
+ const view=await mount();globalThis.fetch=async(path)=>String(path)==='/api/production-workflow'?Response.json({error:'Không thể lưu phiếu thử.'},{status}):Response.json({});try{
+  await click(view.host.querySelector('[aria-label="Báo công · TEST-LSX"]'));await setInput(dialog().querySelector('input[type="number"]'),'25');await submit();
+  const alert=dialog().querySelector('[role="alert"]');assert.match(alert.textContent,expected);assert.doesNotMatch(alert.textContent,/nhân viên|công đoạn|giờ công|FINAL/i);assert.equal(dialog().querySelector('input[type="number"]').value,'25');assert.equal(view.saved.length,0);
+ }finally{globalThis.fetch=fetchOriginal;await view.close();}
+});
 test('an unapproved increase reserves capacity without increasing the visible confirmed amount or export',async()=>{
  const view=await mount();try{
   await view.render({reports:[{id:'SYNTHETIC-CONFIRMED',transitId:order.id,kind:'completion',reportingModel:'daily-finished-v1',quantityOnly:true,reportedQuantity:200,approvedQuantity:200,reviewStatus:'Đã xác nhận',pendingQuantityReservation:100,pendingCorrection:{status:'pending'}}]});
