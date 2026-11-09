@@ -18,6 +18,21 @@
 - Lập checklist đầy đủ từ yêu cầu và các điều chỉnh sau đó: từng mục ghi kết quả mong đợi, phần giữ nguyên, cách kiểm và bằng chứng. Kiểm cả dữ liệu/lịch sử, ngày áp dụng, quyền và màn hình liên quan nếu bị tác động; không rút yêu cầu xuống chỉ còn phần test hiện có.
 - Trong phạm vi đã được phép, chủ động tiếp tục đến bước kế tiếp và báo kết quả từng mốc có ý nghĩa; không chờ Duyên nhắc mới đọc CI, xử lý lỗi, triển khai QA hoặc kiểm sau triển khai. Không hỏi lại quyền đã rõ, nhưng không suy quyền sửa/push thành quyền merge/deploy. Khi thiếu quyền, dữ liệu, công cụ hoặc quyết định nghiệp vụ, nêu đúng bước bị chặn, phần đã xong và đầu vào cần thêm; không tự coi việc đã hoàn tất.
 
+### Bảo toàn dữ liệu cũ và bốn điểm kiểm bắt buộc
+
+**Không có yêu cầu thay đổi dữ liệu cũ thì phải giữ nguyên dữ liệu đã lưu.** Quyền sửa mã, công thức, giao diện hoặc đồng bộ ứng dụng không phải quyền sửa dữ liệu lịch sử. Không tự cập nhật/xóa phiếu cũ, đổi mốc hiệu lực, tính lại rồi ghi đè kết quả/snapshot, chuẩn hóa hàng loạt, backfill, reset, seed hoặc chạy chuyển đổi làm thay đổi dữ liệu cũ chỉ để bản sửa hoạt động hay test đạt.
+
+**Phiếu đã ghi nhận theo V1 phải giữ dữ liệu và căn cứ V1 khi V2 xuất hiện.** Đây là bất biến bắt buộc, không đợi Duyên nhắc lại. Không tự áp V2 ngược vào phiếu V1, làm trống/mất dữ liệu hoặc thay snapshot/mốc đã ghi nhận. Phiếu mới dùng phiên bản theo quy tắc và ngày hiệu lực đã được thống nhất; không suy “phiên bản mới nhất” là căn cứ cho mọi phiếu cũ. Nếu phiếu thiếu căn cứ gốc, báo thiếu và đối chiếu nguồn lịch sử, không tự lấy V2 điền thay.
+
+Mỗi thay đổi ứng dụng phải đi qua đủ bốn điểm kiểm sau; ghi kết quả và bằng chứng cho từng điểm, không đánh dấu đạt theo cảm tính:
+
+1. **Trước sửa:** lập danh sách menu, loại phiếu, trường dữ liệu, phép tính và nơi sử dụng bị tác động; chốt phần giữ nguyên và kết quả mong đợi. Dùng nguồn đọc hợp lệ của môi trường được phép để lập baseline dữ liệu và kết quả trước/sau: phạm vi, tổng số phiếu, mốc đọc, phiên bản/căn cứ và giá trị/trạng thái cần kiểm. Không chỉ chọn vài phiếu dễ kiểm hoặc suy toàn bộ dữ liệu từ mẫu giả.
+2. **Trước merge:** kiểm đủ trường hợp phiếu cũ theo V1, phiếu mới theo V2 và phiếu thiếu dữ liệu/căn cứ, cả dữ liệu đã lưu, kết quả tính lẫn hiển thị. Kiểm các đường đọc, mở màn hình, khởi động, lưu và triển khai để tránh gián tiếp ghi lại dữ liệu cũ. Phân biệt giá trị đã lưu với giá trị tính/hiển thị khi đọc; không lặng lẽ đổi kết quả lịch sử ngoài yêu cầu. Test giả là phần bổ sung, không thay việc đối chiếu dữ liệu sẵn có được phép đọc. Test thao tác ghi chỉ dùng dữ liệu thử riêng được phép, không dùng phiếu cũ thật làm vật thử.
+3. **Sau đồng bộ web thử:** đối chiếu **toàn bộ phiếu liên quan** trước/sau, đúng phiên bản đang active, theo mục 5. Ghi tổng số/phạm vi, số đã kiểm, phần thiếu, kết quả dữ liệu và hiển thị. Sai lệch ngoài phạm vi cho phép hoặc còn phiếu chưa kiểm phải dừng bàn giao, không tự sửa dữ liệu để làm kết quả khớp.
+4. **Trước bàn giao:** chỉ đánh dấu đạt khi chức năng, giao diện và dữ liệu liên quan đều đạt trên đúng bản cần bàn giao. Báo trực tiếp trong cloud công việc: kết quả bốn điểm kiểm, việc đã làm, số/phạm vi phiếu đã đối chiếu, phần thiếu, blocker và bước tiếp theo. Không dùng CI xanh, deploy thành công hoặc một vài ảnh/test mẫu thay bằng chứng.
+
+Nếu phát hiện dữ liệu cũ sai, thiếu hoặc cần chuyển đổi để đáp ứng yêu cầu, báo rõ phiếu/phạm vi bị ảnh hưởng, tác động và phương án; xin Duyên quyết định trước khi sửa dữ liệu. Thiếu quyền hoặc công cụ đọc thì ghi chưa kiểm và yêu cầu đúng đầu vào còn thiếu, không lấy đường ghi, credentials khác hay cách đi vòng hạn chế để kiểm. Không đưa dữ liệu phiếu, thông tin riêng tư, credential hoặc bản xuất dữ liệu thật lên GitHub/log công khai.
+
 ### Điều phối công việc, ưu tiên và phương án
 
 - Mỗi việc có **một đầu mối chịu trách nhiệm, một cloud công việc và một PR riêng**. Dùng lại đúng cloud/PR đang làm việc đó; không mở bản trùng, chuyển sang cloud khác hoặc tạo thêm nền tảng khiến thông tin bị chia nhỏ. Việc tách PR để theo dõi không có nghĩa phải dựng một bản ứng dụng tách rời.
@@ -90,7 +105,12 @@ Assistant chịu trách nhiệm chuẩn bị và xác minh rồi gửi link; kh�
 1. Chủ động tiếp tục đồng bộ đúng thay đổi đã merge sang **Site thử hiện có** trong phạm vi đã được phép. Nếu quyền triển khai QA chưa có, hỏi đúng quyền còn thiếu; không dừng im lặng ở “đã merge”. Giữ guard QA, cấu hình, DB/FILES, tài khoản và dữ liệu hiện có; không seed/reset, chép dữ liệu MAIN hoặc mang cấu hình MAIN sang QA.
 2. Theo dõi deployment tới terminal, đọc lại Site/version/source đang active và đối chiếu manifest với commit/tree ứng viên. Source Site có overlay QA nên phải ghi ánh xạ và khác biệt, không tuyên bố cùng SHA khi chưa đúng.
 3. Kiểm thực tế trên **chính URL web thử đang chạy bản đó**, bằng browser thật và API/Worker khi cần. Theo checklist yêu cầu, thử chức năng từ đầu đến cuối, dữ liệu hiển thị/lưu/tải lại, quyền, ngày hiệu lực/lịch sử nếu có; kiểm giao diện desktop/mobile, toolbar, bảng, modal và thông báo ở phần bị ảnh hưởng. Xem lỗi mạng/console liên quan. Test local, DOM giả lập, ảnh cũ hoặc build đạt không thay bước này.
-4. Đối chiếu cả trường hợp lỗi người dùng đã nêu với kết quả mong đợi. Ví dụ phần Giờ công phải kiểm đúng mốc áp dụng, lịch sử và các nơi dùng số giờ; không kết luận dữ liệu cũ đã đúng chỉ vì công thức hoặc test mới đạt.
+4. **Sau đồng bộ web thử, đối chiếu toàn bộ phiếu liên quan đang có trên môi trường thử bằng thao tác chỉ đọc hợp lệ**, không chỉ chạy test với dữ liệu giả:
+   - Xác định tổng phạm vi, đọc hết các trang và các kỳ/trạng thái liên quan, gồm phiếu cũ/đã chốt/đang dở/sửa lại khi bị tác động. Không lấy một vài phiếu mẫu thay cho toàn bộ phạm vi.
+   - Đối chiếu từng phiếu với căn cứ trước thay đổi và kết quả mong đợi: dữ liệu đã lưu, phiên bản/snapshot/lịch sử, mốc áp dụng, trạng thái và các nơi hiển thị/sử dụng liên quan. Bắt buộc kiểm phiếu ghi theo V1 vẫn giữ V1 khi có V2; không đổi theo V2 hoặc bị trống/mất dữ liệu. Kiểm cả lỗi Duyên đã nêu; ví dụ Giờ công phải kiểm đúng mốc áp dụng, lịch sử và nơi dùng số giờ, không kết luận dữ liệu cũ đúng chỉ vì công thức hoặc test mới đạt.
+   - Đối chiếu nguồn đã lưu, phản hồi API và kết quả trên giao diện để phân biệt **lỗi hiển thị trống** với **dữ liệu/căn cứ đã bị ghi đè hoặc mất**. Không kết luận mất dữ liệu chỉ từ ô trống, cũng không kết luận giữ nguyên dữ liệu chỉ từ giao diện có số. Nếu có sai lệch, ghi đúng nguồn, bước và phạm vi, không tự sửa/backfill để che lỗi.
+   - Ghi mốc đọc và tách thay đổi nghiệp vụ hợp lệ phát sinh trong thời gian đối chiếu khỏi sai lệch do bản sửa. Không sửa/lưu lại phiếu để phục vụ việc kiểm.
+   - Nếu thiếu trang, quyền, dữ liệu hoặc không đọc được hết, nêu số/phạm vi đã kiểm, phần chưa kiểm và blocker; không tuyên bố đã kiểm toàn bộ hoặc QA đã hoàn tất.
 5. Nếu còn lỗi, thiếu dữ liệu/công cụ để kiểm hoặc kết quả chưa rõ, ghi **QA chưa đạt/chưa hoàn tất**, báo blocker và tiếp tục sửa trong phạm vi được phép. Bản sửa sau merge đi bằng PR riêng, kiểm lại trước merge rồi triển khai và QA lại. Không bỏ bước vì đã có một lần CI/QA đạt ở bản trước.
 6. Chỉ bàn giao bản sửa như hoàn tất khi checklist đạt và có bằng chứng chức năng/giao diện trên bản active. Gửi Duyên URL, version/source, các mục đã kiểm, kết quả, giới hạn còn lại và trạng thái MAIN. Duyên nghiệm thu đúng bản đó; không thay app đang được nghiệm thu mà chưa thông báo. Nếu có thay đổi sau QA/nghiệm thu, kiểm lại phần bị ảnh hưởng trước khi dùng kết quả cũ.
 
@@ -118,6 +138,7 @@ Mỗi lần bàn giao phải điền riêng từng trạng thái, dùng “chưa
 | Lỗi đã biết | Báo cáo lỗi và blockers; không đồng nhất số test fail với số lỗi sản phẩm |
 | Web thử | URL cố định, Site/version/source active, ánh xạ commit/tree và deployment terminal; nếu Codespaces thì ghi Private/server |
 | Cô lập dữ liệu/auth | DB/FILES QA độc lập, dữ liệu/tài khoản được giữ, guard/tích hợp bị chặn; local TEST nếu dùng Codespaces |
+| Bảo toàn dữ liệu/phiếu liên quan | Phạm vi và tổng số phiếu, số đã đối chiếu, mốc trước/sau, dữ liệu giữ nguyên/sai lệch, phần chưa đọc được và lý do; nguồn đọc hợp lệ, không công khai dữ liệu thật |
 | QA/nghiệm thu | Browser thật trên bản active, checklist chức năng/dữ liệu/giao diện desktop/mobile; Duyên nghiệm thu bản nào hay chưa |
 | Merge | Staging và main ghi riêng: quyền, chưa làm/đã merge đúng PR, commit/tree nếu có |
 | Deploy | QA và MAIN ghi riêng: quyền, chưa làm/pending/failed/succeeded; active version/source và kết quả kiểm sau deploy |
