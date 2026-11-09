@@ -5,13 +5,14 @@ import {resolve} from 'node:path';
 import {openDatabase,migrate,root} from '../scripts/local/database.mjs';
 import {mutateInventoryImport} from '../scripts/local/inventory-import.mjs';
 import {saveEngine} from '../scripts/local/engine.mjs';
+import {engineSourceRevisions} from '../lib/engine-effective-basis.mjs';
 import {readWebsiteTestLog} from '../lib/website-test-log.mjs';
 const actor={login:'TEST-OPERATOR',userId:'TEST-ID'},week='2026-10-12';
 const upload={action:'upload',sourceFile:'TEST.xlsx',rows:[{sku:'SKU1',name:'Test product',warehouse:'TP',qty:3}]};
 async function fixture(){const base=resolve(root,'.local-data/tests');mkdirSync(base,{recursive:true});const c=await openDatabase(mkdtempSync(resolve(base,'mutation-capture-')));await migrate(c.db);return c;}
 const count=async(db,entity)=>(await db.prepare('SELECT count(*) AS n FROM app_records WHERE entity=?').bind(entity).first()).n;
 const logs=async db=>(await db.prepare("SELECT payload FROM app_records WHERE entity='admin_audit'").all()).results.map(r=>JSON.parse(r.payload));
-async function seedEngine(c){await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('sku','SKU1',JSON.stringify({code:'SKU1',name:'Test',confirmation_status:'Đã xác nhận',usage_status:'Đang sử dụng'}),'fixture','fixture').run();return{payload:{week,rows:[{id:'row1',sku:'SKU1'}],metrics:[['row1',{}]]}};}
+async function seedEngine(c){await c.db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind('sku','SKU1',JSON.stringify({code:'SKU1',name:'Test',confirmation_status:'Đã xác nhận',usage_status:'Đang sử dụng'}),'fixture','fixture').run();return{sourceRevisions:await engineSourceRevisions(c.db),payload:{week,rows:[{id:'row1',sku:'SKU1'}],metrics:[['row1',{}]]}};}
 test('inventory upload/cancel logs committed before/after once; rejected repeat does not log',async()=>{
  const c=await fixture();try{
   const result=await mutateInventoryImport(c.db,upload,actor);let entries=await logs(c.db);assert.equal(entries.length,1);assert.equal(entries[0].before,null);assert.equal(entries[0].after.status,'Chờ chốt');assert.equal(entries[0].actorId,'TEST-ID');
