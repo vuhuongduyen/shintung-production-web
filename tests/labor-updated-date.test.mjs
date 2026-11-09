@@ -32,3 +32,21 @@ test('backfill is a pure preview; existing report basis wins and no report is re
  const menu=new Map([[sku,{resolvedRateVersions:laborRateTimeline({sku,laborHour:.1,version:1,updatedAt:'2026-11-09T03:00:00Z'}).versions}]]);
  const preview=previewLaborRateBackfill(reports,menu);assert.equal(preview[0].status,'preserve-saved-basis');assert.equal(preview[1].status,'proposed-only');assert.equal(preview[1].proposedBasis.value,.1);assert.deepEqual(reports,before);
 });
+
+test('current V2 falls back to its update day even when an explicit V1 exists',()=>{
+ const explicit=[{id:'V1',revision:1,status:'published',value:.1,validFrom:'2026-11-01'}];
+ const r=laborRateTimeline({sku,version:2,laborHour:.2,updatedAt:'2026-11-03T03:00:00Z',effectiveVersions:explicit});
+ assert.equal(value(r.versions,'2026-11-02'),.1);assert.equal(value(r.versions,'2026-11-03'),.2);
+ assert.equal(explicit[0].validTo,undefined);
+});
+for(const flag of [{isTest:true},{usage:'test'},{status:'test'}])test('test audit excludes matching explicit and scalar revision '+JSON.stringify(flag),()=>{
+ const explicit=[{id:'V1',revision:1,status:'published',value:.1,validFrom:'2026-11-01',validTo:'2026-11-03'},{id:'V2',revision:2,status:'published',value:16,validFrom:'2026-11-03'}];
+ const record={sku,version:2,laborHour:16,updatedAt:'2026-11-03T03:00:00Z',effectiveVersions:explicit};
+ const r=laborRateTimeline(record,[h(2,16,record.updatedAt,flag)]);
+ assert.equal(value(r.versions,'2026-11-02'),.1);assert.equal(value(r.versions,'2026-11-03'),null);assert.ok(r.issues.some(i=>i.startsWith('excluded-test:')));
+ assert.equal(value(laborRateTimeline(record).versions,'2026-11-03'),16); // magnitude alone never marks test
+});
+test('excluding same-day replacement does not reactivate its superseded explicit value',()=>{
+ const r=laborRateTimeline({sku,effectiveVersions:[{id:'V1',revision:1,status:'published',value:.1,validFrom:'2026-11-01'},{id:'V2',revision:2,status:'published',value:.2,validFrom:'2026-11-01',supersedesVersionId:'V1'}]},[h(2,.2,'2026-11-01',{isTest:true})]);
+ assert.equal(value(r.versions,'2026-11-02'),null);
+});

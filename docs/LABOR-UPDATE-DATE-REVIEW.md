@@ -27,3 +27,9 @@ Preview có lịch sử giá trị, ngày hiệu lực, ngày thao tác, lý do 
 - Xác nhận dấu hiệu/mốc sửa cho lần nhập sai so với bản sửa, đặc biệt 106TG01.
 - Full CI exact head, review độc lập và bản ghép QA giữ guard/PR11/PR12.
 - Kiểm browser PDF và trường ngày bằng thao tác thực, readback ngày app nhận; giới hạn mobile hosted phải nêu rõ.
+
+## Kiểm ba blocker PR14
+- Current V2 dùng ngày cập nhật của V2 dù đã có explicit V1. Không suy liên kết revision từ các bản explicit cũ thiếu số revision; cần đối chiếu nguồn thiếu định danh.
+- Dấu `isTest`, `usage=test`, `status=test` được đối chiếu theo SKU/revision trên cả master, audit và explicit; không hồi sinh bản explicit cùng ngày đã bị thay thế. Không suy test theo trị số 16.
+- Đọc master và lịch sử cùng một SELECT. CAS so sánh đủ khóa, payload nguyên bản, updated_at và số bản ghi bằng JSON snapshot với 3 tham số cố định; phát hiện thêm, xóa, thay khóa cùng số lượng và sửa payload/timestamp. Snapshot vượt 512 KiB trả 409 trước ghi để giữ giới hạn an toàn.
+- Kiểm D1 giả với 35 revisions lưu thành công và chọn đúng ngày hoàn thành. Có kiểm các race nêu trên, giữ snapshot Plan/phiếu cũ và ngân sách 4 SELECT.

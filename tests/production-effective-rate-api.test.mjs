@@ -63,3 +63,35 @@ test('a concurrent change to fallback history aborts output without saving a mix
  let injected=false;const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{if(!injected){injected=true;await target.prepare("UPDATE app_records SET payload=json_set(payload,'$.newLaborHour',9) WHERE entity='labor_hours_history' AND record_key='SYNTHETIC-RACE'").run();}return target.batch(statements);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});
  await assert.rejects(()=>mutateProductionWorkflow(db,c.body({quantity:1}),actor),{status:409});assert.equal(injected,true);assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_report'").first()).n,0);
 }));
+
+test('35 menu revisions save output within D1 variable limit and retain completion-day rate',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:.35,version:35,updatedAt:'2026-11-04T03:00:00Z'}),sku).run();
+ for(let i=1;i<=35;i++)await c.put('labor_hours_history','LONG-'+i,{sku,version:i,newLaborHour:i/100,at:new Date(Date.UTC(2026,9,i,3)).toISOString()});
+ const r=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor);
+ assert.equal(r.report.rateBasis.value,.33);assert.equal(r.report.rateBasis.revision,33);
+}));
+for(const change of ['insert','delete','replace','timestamp','master'])test('labor snapshot CAS rejects '+change+' without saving output',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;await c.put('labor_hours_history','CAS-H',{sku,version:1,newLaborHour:.1,at:'2026-11-01'});
+ let injected=false;const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{if(!injected){injected=true;
+ if(change==='insert')await c.put('labor_hours_history','CAS-NEW',{sku,version:3,newLaborHour:.3,at:'2026-11-04'});
+ if(change==='delete')await target.prepare("DELETE FROM app_records WHERE entity='labor_hours_history' AND record_key='CAS-H'").run();
+ if(change==='replace')await target.prepare("UPDATE app_records SET record_key='CAS-REPLACED' WHERE entity='labor_hours_history' AND record_key='CAS-H'").run();
+ if(change==='timestamp')await target.prepare("UPDATE app_records SET updated_at='2026-11-09' WHERE entity='labor_hours_history' AND record_key='CAS-H'").run();
+ if(change==='master')await target.prepare("UPDATE app_records SET updated_at='2026-11-09' WHERE entity='labor_hours'").run();
+ }return target.batch(statements);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});
+ await assert.rejects(()=>mutateProductionWorkflow(db,c.body({quantity:1}),actor),{status:409});assert.equal(injected,true);assert.equal((await c.db.prepare("SELECT count(*) n FROM app_records WHERE entity='production_report'").first()).n,0);
+}));
+test('test audit revision is never assigned to a new output even with an explicit publication',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:16,version:2,updatedAt:'2026-11-03',effectiveVersions:[{id:'V1',revision:1,status:'published',value:.1,validFrom:'2026-11-01',validTo:'2026-11-03'},{id:'V2',revision:2,status:'published',value:16,validFrom:'2026-11-03'}]}),sku).run();
+ await c.put('labor_hours_history','TEST-V2',{sku,version:2,newLaborHour:16,at:'2026-11-03',isTest:true});
+ const r=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-04'}),actor);
+ assert.equal(r.report.rateBasis??null,null);assert.equal(r.report.standardUnit??null,null);
+}));
+test('new output uses current V2 update date alongside explicit V1',()=>dailyFixture(async c=>{
+ const sku=c.order.sku;
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku,laborHour:.2,version:2,updatedAt:'2026-11-03',effectiveVersions:[{id:'V1',revision:1,status:'published',value:.1,validFrom:'2026-11-01'}]}),sku).run();
+ const before=await mutateProductionWorkflow(c.db,c.body({quantity:1}),actor),after=await mutateProductionWorkflow(c.db,c.body({quantity:1,productionDate:'2026-11-04'}),actor);
+ assert.equal(before.report.rateBasis.value,.1);assert.equal(after.report.rateBasis.value,.2);assert.equal(after.report.rateBasis.dateBasis,'updated-date');
+}));
