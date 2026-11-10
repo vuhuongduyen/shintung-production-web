@@ -5,7 +5,7 @@ import {previewFixedLaborReferences} from '../lib/production-labor-reference-sna
 import {referenceReportBasis} from '../lib/production-labor-reference.mjs';
 import {siteLaborHours} from '../lib/site-labor-hours.mjs';
 test('configured separate registry fixes read results across retroactive updates without writing original reports',()=>dailyFixture(async c=>{
- const raw={id:'SYNTHETIC-LEGACY',transitId:c.order.id,kind:'completion',sku:c.order.sku,line:'A',version:1,stageName:'FINAL',reviewStatus:'Đã xác nhận',approvedQuantity:100,reportedQuantity:100,completedAt:'2026-11-02T03:00:00Z',hours:{hc:3,ot:1,total:4}};
+ const raw={id:'SYNTHETIC-LEGACY',transitId:c.order.id,kind:'completion',sku:c.order.sku,orderSnapshot:{id:c.order.id,sku:c.order.sku,line:'A'},line:'A',version:1,stageName:'FINAL',reviewStatus:'Đã xác nhận',approvedQuantity:100,reportedQuantity:100,completedAt:'2026-11-02T03:00:00Z',hours:{hc:3,ot:1,total:4}};
  await c.put('production_report',raw.id,raw);
  let snapshotId;
  const call=await reviewer(c,(request,env)=>siteApi(request,{...env,LABOR_RATE_SNAPSHOT_ID:snapshotId}));
@@ -19,6 +19,11 @@ test('configured separate registry fixes read results across retroactive updates
  const before=await records(c.db),response=await call('/api/production-workflow');assert.equal(response.status,200);
  const found=response.body.reports.find(r=>r.id===raw.id);assert.equal(referenceReportBasis(found).unit,.1);assert.equal(found.laborReference.frozen,true);assert.deepEqual(found.hours,raw.hours);
  assert.deepEqual(await records(c.db),before);
+ await c.put('labor_hours','SYNTHETIC-OTHER-SKU',{sku:'SYNTHETIC-OTHER-SKU',version:1,laborHour:.9,updatedAt:'2026-11-01T00:00:00Z'});
+ const identityChanged={...raw,orderSnapshot:{...raw.orderSnapshot,sku:'SYNTHETIC-OTHER-SKU'}};
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='production_report' AND record_key=?").bind(JSON.stringify(identityChanged),raw.id).run();
+ const blockedIdentity=await call('/api/production-workflow');assert.equal(referenceReportBasis(blockedIdentity.body.reports.find(r=>r.id===raw.id)).unit,null);
+ snapshotId=undefined;const unpinned=await call('/api/production-workflow');assert.equal(referenceReportBasis(unpinned.body.reports.find(r=>r.id===raw.id)).unit,.9);snapshotId=preview.manifest.digest;
  await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='production_report' AND record_key=?").bind(JSON.stringify({...raw,version:2,approvedQuantity:99}),raw.id).run();
  const changed=await call('/api/production-workflow');assert.equal(changed.status,200);assert.equal(referenceReportBasis(changed.body.reports.find(r=>r.id===raw.id)).unit,null);
  snapshotId='f'.repeat(64);const missing=await call('/api/production-workflow');assert.equal(missing.status,400);assert.match(missing.body.error,/Configured fixed labor basis is unavailable/);

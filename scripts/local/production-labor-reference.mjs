@@ -16,7 +16,7 @@ export async function readLaborReferences(db,workflow,omissionsJson=undefined,sn
   if(!saved)throw Error('Configured fixed labor basis is unavailable.');
   const manifest=JSON.parse(saved.payload);
   if(manifest.digest!==snapshotId)throw Error('Fixed labor basis identity mismatch.');
-  reports=await applyFixedLaborReferences(reports,manifest);
+  reports=await applyFixedLaborReferences(reports,manifest,workflow.orders||[]);
  }
  return {...workflow,reports:attachLaborRateOmissions(reports,workflow.orders||[],policy)};
 }

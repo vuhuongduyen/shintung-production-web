@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {previewFixedLaborReferences,applyFixedLaborReferences} from '../lib/production-labor-reference-snapshot.mjs';
+import {previewFixedLaborReferences,applyFixedLaborReferences,laborReferenceBinding} from '../lib/production-labor-reference-snapshot.mjs';
 import {attachLaborReferences,referenceReportBasis} from '../lib/production-labor-reference.mjs';
 import {siteLaborHours} from '../lib/site-labor-hours.mjs';
 import {monthlyEarnedOrders} from '../lib/production-payroll.mjs';
@@ -24,4 +24,26 @@ test('changed report, absent entry and altered manifest cannot borrow a new time
 test('preview keeps every input row classified, preserves zero and never invents missing evidence',async()=>{
  const input=[report,{...report,id:'OLD',productionDate:'2026-09-30'},{...report,id:'SAVED',standardUnit:0},{...report,id:'NO',sku:'UNKNOWN'},{...report,id:'CANCEL',cancelled:true}];
  const p=await preview(input);assert.equal(p.rows.length,input.length);assert.deepEqual(p.counts,{'fixed-candidate':1,'out-of-scope':1,'preserve-stored':1,'missing':1,'not-applicable':1});assert.equal(p.manifest.entries.length,1);
+});
+
+test('every rate-selection identity change invalidates the fixed basis even if report version is unchanged',async()=>{
+ const alternate={id:order.id,sku:'SYNTHETIC-B',line:'B'},rates=siteLaborHours([...[order,alternate].map((o,i)=>({key:o.sku,updatedAt:'2026-10-16',payload:{sku:o.sku,version:1,laborHour:i?.1:.016}}))]);
+ for(const source of ['orderSnapshot','legacyEarnedBasis','report','live-order']){
+  const base={...report,sku:undefined,...(source==='orderSnapshot'?{orderSnapshot:{id:order.id,sku:order.sku,line:'A'}}:source==='legacyEarnedBasis'?{legacyEarnedBasis:{kind:'observed-legacy-earned-v1',status:'missing',sku:order.sku,line:'A',snapshotId:'SYNTHETIC-ANCHOR'}}:source==='report'?{sku:order.sku}:{})};
+  const p=await previewFixedLaborReferences({reports:[base],orders:[order],menu:rates,observedAt:'2026-11-10T00:00:00Z'});
+  assert.equal(p.manifest.entries.length,1);
+  const changed=source==='orderSnapshot'?{...base,orderSnapshot:{...base.orderSnapshot,sku:alternate.sku}}:source==='legacyEarnedBasis'?{...base,legacyEarnedBasis:{...base.legacyEarnedBasis,sku:alternate.sku}}:source==='report'?{...base,sku:alternate.sku}:base;
+  const orders=source==='live-order'?[alternate]:[order];
+  assert.notEqual(await laborReferenceBinding(base,[order]),await laborReferenceBinding(changed,orders));
+  const dynamic=attachLaborReferences([changed],orders,rates);assert.equal(referenceReportBasis(dynamic[0]).unit,.1);
+  const kept=await applyFixedLaborReferences(dynamic,p.manifest,orders);assert.equal(referenceReportBasis(kept[0]).unit,null);assert.equal(changed.version,base.version);
+  const unchanged=await applyFixedLaborReferences(attachLaborReferences([base],[order],rates),p.manifest,[order]);assert.equal(referenceReportBasis(unchanged[0]).unit,.016);
+ }
+});
+test('snapshot and legacy identity edits, removals, and version changes cannot reuse a fixed basis',async()=>{
+ const base={...report,orderSnapshot:{id:order.id,sku:order.sku,line:'A'},legacyEarnedBasis:{kind:'observed-legacy-earned-v1',status:'missing',sku:order.sku,line:'A',snapshotId:'SYNTHETIC-ANCHOR'}};
+ const p=await preview([base]);
+ for(const patch of [{orderSnapshot:{...base.orderSnapshot,id:'OTHER'}},{orderSnapshot:undefined},{legacyEarnedBasis:{...base.legacyEarnedBasis,snapshotId:'OTHER'}},{legacyEarnedBasis:{...base.legacyEarnedBasis,line:'B'}},{legacyEarnedBasis:undefined},{version:2}]){
+  const changed={...base,...patch},result=await applyFixedLaborReferences(attachLaborReferences([changed],[order],menu(.1)),p.manifest,[order]);assert.equal(referenceReportBasis(result[0]).unit,null);
+ }
 });
