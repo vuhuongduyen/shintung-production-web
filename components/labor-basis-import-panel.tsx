@@ -34,7 +34,12 @@ export default function LaborBasisImportPanel({allowed}:{allowed:boolean}){
   const current=generation.current,payload=input,basis=preview;
   running.current=true;setBusy(true);setError('');setMessage('');setConfirmed(false);
   async function post(body:unknown){
-   const r=await sessionFetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),data=await r.json();
+   const r=await sessionFetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+   if(!r.headers.get('content-type')?.toLowerCase().includes('application/json')){
+    await r.body?.cancel();
+    throw Error(`Máy chủ chưa trả kết quả hợp lệ (HTTP ${r.status}); có thể bị giới hạn tài nguyên. Không xác nhận đã lưu. Chọn Kiểm tra căn cứ để đọc lại trước khi thử tiếp.`);
+   }
+   let data;try{data=await r.json();}catch{throw Error('Không đọc được phản hồi máy chủ. Chưa xác minh kết quả; chọn Kiểm tra căn cứ để đọc lại.');}
    if(!r.ok)throw Error(data.error||'Không thực hiện được. Kiểm tra lại nguồn trước khi lưu.');
    if(data.ok!==true||data.digest!==payload.manifest.digest||data.count!==payload.manifest.entries.length||data.activated!==false)throw Error('Kết quả không khớp tệp đã chọn. Không bật cấu hình; kiểm tra lại bản đã lưu.');
    return data;

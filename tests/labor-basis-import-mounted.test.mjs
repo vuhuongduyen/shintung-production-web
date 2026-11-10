@@ -71,3 +71,13 @@ test('UI is hidden for ordinary or Line-scoped users and MAIN; losing permission
  dom.reconfigure({url:'https://sanxuat.shintung-vn-4458.chatgpt.site'});ui=await mount(true);assert.equal(ui.host.textContent,'');await ui.close();dom.reconfigure({url:origin});
  ui=await mount(true);try{await ui.load({action:'preview',manifest:{kind:'labor-reference-snapshot-v1',digest:'a'.repeat(64),entries:[{}]},omissions:[]});await ui.render(false);assert.equal(ui.host.textContent,'');await ui.render(true);assert.doesNotMatch(ui.host.textContent,/synthetic-preview/);assert.equal(ui.button('Lưu bản căn cứ riêng').disabled,true);assert.equal(calls,0);}finally{await ui.close();}
 });
+
+test('HTML resource-limit response never renders raw HTML or claims an import succeeded',()=>dailyFixture(async c=>{
+ const f=await setup(c,2),ui=await mount();try{
+ await ui.load(f.payload);
+ f.setIntercept(()=>new Response('<html>Worker exceeded resource limits</html>',{status:500,headers:{'Content-Type':'text/html'}}));
+ await ui.click('Kiểm tra căn cứ');await ui.settle();assert.match(ui.host.querySelector('[role=alert]').textContent,/giới hạn tài nguyên/);assert.doesNotMatch(ui.host.textContent,/Unexpected token|<html>|Đã đọc lại và đối chiếu khớp/);assert.equal(ui.button('Lưu bản căn cứ riêng').disabled,true);assert.equal((await records(c.db)).filter(r=>r.entity==='production_labor_reference_snapshot').length,0);
+ f.setIntercept(()=>new Response('{invalid',{status:200,headers:{'Content-Type':'application/json'}}));
+ await ui.click('Kiểm tra căn cứ');await ui.settle();assert.match(ui.host.querySelector('[role=alert]').textContent,/Không đọc được phản hồi máy chủ/);assert.equal(ui.button('Lưu bản căn cứ riêng').disabled,true);
+ }finally{await ui.close();}
+}));
