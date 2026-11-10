@@ -47,3 +47,17 @@ test('snapshot and legacy identity edits, removals, and version changes cannot r
   const changed={...base,...patch},result=await applyFixedLaborReferences(attachLaborReferences([changed],[order],menu(.1)),p.manifest,[order]);assert.equal(referenceReportBasis(result[0]).unit,null);
  }
 });
+
+test('registry leaves non-candidate display references intact, including confirmed and pending zero-output stages',async()=>{
+ const originals=['Đã xác nhận','Chờ kiểm tra'].map((reviewStatus,i)=>({...report,id:'STAGE-'+i,stageName:'CUT',reportedQuantity:0,approvedQuantity:0,reviewStatus}));
+ originals.push({...report,id:'OLD-DISPLAY',productionDate:'2026-09-30'},{...report,id:'SAVED-DISPLAY',standardUnit:.012});
+ const dynamic=attachLaborReferences(originals,[order],menu(.016)),before=structuredClone(dynamic),p=await preview([report,...originals]);
+ const result=await applyFixedLaborReferences(dynamic,p.manifest,[order]);assert.deepEqual(result,dynamic);assert.deepEqual(dynamic,before);
+ for(const row of result.slice(0,2)){assert.equal(referenceReportBasis(row).unit,.016);assert.equal(referenceReportBasis(row).earned,0);assert.deepEqual(row.hours,report.hours);}
+});
+test('a candidate changed to zero output is rejected, while an unregistered positive output cannot borrow a mutable rate',async()=>{
+ const p=await preview([report]);
+ for(const changed of [{...report,reportedQuantity:0,approvedQuantity:0},{...report,id:'UNREGISTERED'}]){
+  const dynamic=attachLaborReferences([changed],[order],menu(.1)),result=await applyFixedLaborReferences(dynamic,p.manifest,[order]);assert.equal(referenceReportBasis(result[0]).unit,null);
+ }
+});

@@ -7,6 +7,7 @@ import {siteLaborHours} from '../lib/site-labor-hours.mjs';
 test('configured separate registry fixes read results across retroactive updates without writing original reports',()=>dailyFixture(async c=>{
  const raw={id:'SYNTHETIC-LEGACY',transitId:c.order.id,kind:'completion',sku:c.order.sku,orderSnapshot:{id:c.order.id,sku:c.order.sku,line:'A'},line:'A',version:1,stageName:'FINAL',reviewStatus:'Đã xác nhận',approvedQuantity:100,reportedQuantity:100,completedAt:'2026-11-02T03:00:00Z',hours:{hc:3,ot:1,total:4}};
  await c.put('production_report',raw.id,raw);
+ for(const [suffix,reviewStatus] of [['CONFIRMED','Đã xác nhận'],['PENDING','Chờ kiểm tra']])await c.put('production_report','SYNTHETIC-ZERO-'+suffix,{...raw,id:'SYNTHETIC-ZERO-'+suffix,stageName:'CUT',reportedQuantity:0,approvedQuantity:0,reviewStatus});
  let snapshotId;
  const call=await reviewer(c,(request,env)=>siteApi(request,{...env,LABOR_RATE_SNAPSHOT_ID:snapshotId}));
  const first=await call('/api/production-workflow');assert.equal(first.status,200);
@@ -18,6 +19,7 @@ test('configured separate registry fixes read results across retroactive updates
  await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify({sku:c.order.sku,version:9,laborHour:9,updatedAt:'2026-11-10',effectiveFrom:'2026-11-01',effectiveVersions:[{id:'SYNTHETIC-RETRO',status:'published',value:9,validFrom:'2026-11-01'}]}),c.order.sku).run();
  const before=await records(c.db),response=await call('/api/production-workflow');assert.equal(response.status,200);
  const found=response.body.reports.find(r=>r.id===raw.id);assert.equal(referenceReportBasis(found).unit,.1);assert.equal(found.laborReference.frozen,true);assert.deepEqual(found.hours,raw.hours);
+ for(const zero of response.body.reports.filter(r=>r.id.startsWith('SYNTHETIC-ZERO-'))){assert.equal(referenceReportBasis(zero).unit,9);assert.equal(referenceReportBasis(zero).earned,0);assert.deepEqual(zero.hours,raw.hours);}
  assert.deepEqual(await records(c.db),before);
  await c.put('labor_hours','SYNTHETIC-OTHER-SKU',{sku:'SYNTHETIC-OTHER-SKU',version:1,laborHour:.9,updatedAt:'2026-11-01T00:00:00Z'});
  const identityChanged={...raw,orderSnapshot:{...raw.orderSnapshot,sku:'SYNTHETIC-OTHER-SKU'}};
