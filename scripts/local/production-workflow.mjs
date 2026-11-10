@@ -254,7 +254,7 @@ function reportMetadata(calendar,events,row,directory) {
  if(row.kind!=="completion")return {};
  const {hours,sourceSnapshot,...meta}=reportCalculation(calendar,events,row,directory,false);return meta;
 }
-export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, reviewReportId=null, stageValidation=false,legacyPreservation=null,observationAt=undefined} = {}) {
+export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, includeJournalHours=includeDerivedHours, reviewReportId=null, stageValidation=false,legacyPreservation=null,observationAt=undefined} = {}) {
   if (!canWork(actor) && !canHr(actor) && !hasRole(actor, "xem")) fail("Không có quyền xem Quản lý sản xuất.", 403);
   // Menu visibility does not broaden the authenticated Line data boundary.
   const crossLineView=false,readActor=actor;
@@ -280,14 +280,15 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   // across users. Policies retain the global attendance/movement boundaries.
   const policies=new Map(),policyFor=line=>{if(!policies.has(line))policies.set(line,attendancePolicy(calendar,calculationEvents,line,true));return policies.get(line);};
   const journalPolicies=new Map(),journalPolicy=line=>{if(calculationEvents===allEvents)return policyFor(line);if(!journalPolicies.has(line))journalPolicies.set(line,attendancePolicy(calendar,allEvents,line,true));return journalPolicies.get(line);};
-  const orderEvents=new Map();if(includeDerivedHours)for(const event of allEvents)for(const id of new Set([event.sourceId,event.destinationId].filter(Boolean))){if(!orderEvents.has(id))orderEvents.set(id,[]);orderEvents.get(id).push(event);}
+  const orderEvents=new Map();if(includeDerivedHours||includeJournalHours)for(const event of allEvents)for(const id of new Set([event.sourceId,event.destinationId].filter(Boolean))){if(!orderEvents.has(id))orderEvents.set(id,[]);orderEvents.get(id).push(event);}
   const readContext=includeDerivedHours?{orderEvents,attendance:effectiveAttendance(calculationEvents),pending:effectiveAttendance(calculationEvents,true).filter(e=>e.approved===false&&["absence","line-absence","attendance-override"].includes(e.kind))}:null;
   const events = eventRows(scopedJournal, readActor).map(event => ({...event, employeeDetails:eventEmployees(event, employeeDirectory),
     affectedOrderIds:includeDerivedHours&&!reviewReportId&&!event.sourceId&&["line-absence","attendance-override"].includes(event.kind)?(()=>{
       const start=Date.parse(event.effectiveAt),end=Date.parse(event.endsAt),points=[start,end,...allEvents.map(e=>Date.parse(e.effectiveAt)).filter(t=>t>start&&t<end)].sort((a,b)=>a-b);
       return orders.filter(order=>{const own=orderEvents.get(order.id)||[];return points.slice(1).some((t,i)=>peopleAt(own,order.id,(points[i]+t)/2).people.some(id=>event.employees?.includes(id)));}).map(o=>o.id);
     })():undefined}));
-  if(includeDerivedHours&&!reviewReportId)for (const order of orders) {
+  // Journal projection is independent of refreshing stored report hours.
+  if(includeJournalHours&&!reviewReportId)for (const order of orders) {
     const moments=(orderEvents.get(order.id)||[]).map(e=>Date.parse(e.effectiveAt)).filter(Number.isFinite);
     if(!moments.length)continue;
     const map=toScheduleMap(calendar,new Date(Math.min(...moments)).toISOString(),new Date(Math.max(...moments)).toISOString(),order.line);

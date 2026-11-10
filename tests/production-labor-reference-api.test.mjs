@@ -1,3 +1,4 @@
+import {siteApi} from '../worker/site-api.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {dailyFixture} from './helpers/daily-output-fixture.mjs';import {reviewer} from './helpers/daily-output-reviewer.mjs';import {records} from '../scripts/local/database.mjs';
 for(const completion of ['2026-10-25','2026-11-05'])test(`workflow GET exposes dated comparison on ${completion} without backfilling records`,()=>dailyFixture(async c=>{
@@ -14,4 +15,16 @@ test('standards API preserves outer update metadata and distinguishes valid zero
   const read=response=>response.body.records.find(r=>r.key===sku).payload.laborHour;
   assert.equal(read(menu),laborHour);assert.equal(read(standards),laborHour);assert.deepEqual(await records(c.db),before);
  }
+}));
+
+test('workflow omission policy matches exact business keys and never writes reports',()=>dailyFixture(async c=>{
+ await c.put('production_report','SYNTHETIC-MISSING',{id:'SYNTHETIC-MISSING',transitId:c.order.id,kind:'completion',line:'A',sku:c.order.sku,reviewStatus:'Đã xác nhận',reportedQuantity:7,approvedQuantity:7,completedAt:'2026-10-02T03:00:00Z',hours:{hc:3,ot:1,total:4}});
+ const policy=JSON.stringify([{orderCode:c.order.lsxCode,sku:c.order.sku,date:'2026-10-02'}]);
+ let config=policy;
+ const call=await reviewer(c,(request,env)=>siteApi(request,{...env,LABOR_RATE_OMISSIONS_JSON:config}));
+ const before=await records(c.db),result=await call('/api/production-workflow');assert.equal(result.status,200);
+ const report=result.body.reports.find(r=>r.id==='SYNTHETIC-MISSING');
+ assert.equal(report.laborRateOmission?.kind,'explicit-missing-rate-omission-v1');assert.deepEqual(report.hours,{hc:3,ot:1,total:4});assert.equal(report.approvedQuantity,7);assert.equal(report.rateBasis,undefined);
+ config='{invalid';const invalid=await call('/api/production-workflow');assert.equal(invalid.body.reports.find(r=>r.id==='SYNTHETIC-MISSING').laborRateOmission,undefined);
+ assert.deepEqual(await records(c.db),before);
 }));

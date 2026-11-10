@@ -1,3 +1,5 @@
+import {attachLaborReferences} from '../lib/production-labor-reference.mjs';
+import {siteLaborHours} from '../lib/site-labor-hours.mjs';
 import {trackBrowserChannels} from './helpers/browser-channels.mjs';
 const closeChannels=trackBrowserChannels();
 import test,{after} from 'node:test';
@@ -29,5 +31,8 @@ test('actual payroll component keeps existing layout and only shows supported di
   assert.deepEqual([...host.querySelector('table').querySelectorAll('thead th')].map(c=>c.textContent),headers);
   await render(fullPayrollFixture());assert.ok(host.querySelector('select[aria-label="Line"]'));
   assert.match(host.querySelector('table').textContent,/3\.000\.000/);assert.doesNotMatch(host.textContent,/Cần quyền xem cả Line A và B/);
+  const baseline=host.querySelector('table').textContent,dated=fullPayrollFixture();
+  dated.reports=attachLaborReferences(dated.reports.map(({standardUnit,...r})=>r),dated.orders,siteLaborHours(dated.orders.map(o=>({key:o.sku,updatedAt:'2026-10-01T00:00:00Z',payload:{sku:o.sku,laborHour:1,version:1}}))));
+  await render(dated);assert.equal(host.querySelector('table').textContent,baseline);assert.doesNotMatch(host.textContent,/Chưa đủ giờ công chuẩn hoàn thành/);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
