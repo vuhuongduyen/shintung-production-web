@@ -1,3 +1,19 @@
+# Admin QA interface for a reviewed labor-reference snapshot
+
+After deploying this change to QA, sign in with an existing Admin account without a Line restriction. Open **Admin → Căn cứ Giờ công QA** (the collapsible panel above the Admin content).
+
+1. Choose the private JSON **preview request package** containing `action: "preview"`, `manifest`, and `omissions`. This is the reviewed package, not an arbitrary database export or the standalone manifest. Reading the file performs no request and no write. The panel shows its filename, number of bases, and number of omissions. It does not store the file in browser storage or upload it as an attachment.
+2. Click **Kiểm tra căn cứ**. The existing authenticated importer validates the manifest digest, source identity/version, and current rate history. The UI enables confirmation only when the returned digest, count, and source revision match the selected package. An existing identical registry is read back and reported without enabling another save.
+3. Check the explicit confirmation for the displayed number of bases, then click **Lưu bản căn cứ riêng**. The button is disabled until preview and confirmation are complete; an in-flight lock also prevents duplicate submissions. Selecting another file discards the preview and confirmation. Changing the signed-in account remounts the panel.
+4. The UI uses the preview's exact sourceRevision/digest for apply, then performs another read-only preview to verify the stored registry. Success is shown only when this readback matches. If a response is lost, click **Kiểm tra căn cứ** to read back before retrying. Source changes require a fresh preview; no automatic retry or auto-apply occurs.
+5. Continue the separately authorized configuration/deployment verification. This panel never changes configuration or activates the registry. It only calls the existing importer through the application's normal session-aware API client; it requires no copied cookies, browser console scripts, or additional credential.
+
+The panel is hidden outside the fixed QA hostname and for non-Admin/Line-scoped sessions. The existing server checks remain authoritative. No permission, QA isolation guard, source report, rate, or generic records allowlist is changed. The generic API can handle reviewed manifests of different sizes; the UI shows the actual selected and server-verified count rather than embedding private production records.
+
+Mounted end-to-end tests use synthetic reports and the real site API with isolated D1 TEST: file selection → preview → explicit confirmation → apply → readback, idempotency, stale source, invalid digest/file, unknown network result, bad readback and UI access restrictions. They do not certify hosted QA until deployment and the agreed hosted checks finish.
+
+---
+
 # Import a reviewed labor-reference snapshot on QA
 
 `POST /api/labor-reference-snapshot-import` uses the existing server-authenticated Admin session, without a Line restriction. It accepts same-origin JSON only. The handler rejects every hostname except the fixed QA hostname; it does not change authentication, permissions, reporting guards, or the generic records allowlist. It has no automatic startup/import behavior.
