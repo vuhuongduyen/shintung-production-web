@@ -15,6 +15,31 @@ const click=async node=>{assert.ok(node);await act(async()=>node.click());};
 const dialog=()=>document.querySelector('[role="dialog"]');
 const setInput=async(node,value)=>{await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new window.Event('input',{bubbles:true}));node.dispatchEvent(new window.Event('change',{bubbles:true}));});};
 const submit=async()=>{await act(async()=>dialog().querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));};
+test('report product context belongs to the selected order and follows fresh same-order data without discarding its draft',async()=>{
+ const view=await mount();try{
+  const first={...order,sku:'DEMO-A',name:'Sản phẩm A',spec:'Hộp 24 cái'},second={...order,id:'DEMO-B',lsxCode:'LSX-B',sku:'DEMO-B',name:'Sản phẩm B',spec:'Túi 500 g'};
+  await view.render({orders:[first,second]});
+  await click(view.host.querySelector('[aria-label="Báo công · LSX-B"]'));
+  const context=()=>dialog().querySelector('.production-daily-product');
+  assert.deepEqual([...context().querySelectorAll('dt')].map(n=>n.textContent),['SKU','Tên SP','Quy cách']);
+  assert.deepEqual([...context().querySelectorAll('dd')].map(n=>n.textContent),['DEMO-B','Sản phẩm B','Túi 500 g']);
+  assert.equal(context().closest('header'),dialog().querySelector('header'));assert.equal(context().previousElementSibling.dataset.slot,'dialog-title');
+  await setInput(dialog().querySelector('input[type=number]'),'125');
+  await view.render({orders:[first,{...second,name:'Sản phẩm B cập nhật',spec:'',revision:'revision2'}]});
+  assert.deepEqual([...context().querySelectorAll('dd')].map(n=>n.textContent),['DEMO-B','Sản phẩm B cập nhật','—']);
+  assert.equal(dialog().querySelector('input[type=number]').value,'125');assert.equal(dialog().querySelector('button[type=submit]').disabled,true);
+  await click(dialog().querySelector('[aria-label="Đóng báo công"]'));await click(view.host.querySelector('[aria-label="Báo công · TEST-LSX"]'));
+  assert.deepEqual([...context().querySelectorAll('dd')].map(n=>n.textContent),['DEMO-A','Sản phẩm A','Hộp 24 cái']);
+  assert.equal(view.saved.length,0);
+ }finally{await view.close();}
+});
+test('missing product context stays explicit and product text is rendered safely without a catalogue fallback',async()=>{
+ const view=await mount();try{
+  await view.render({orders:[{...order,sku:'<DEMO>',name:'<img src=x onerror=alert(1)>',spec:null}]});await click(view.host.querySelector('[aria-label="Báo công · TEST-LSX"]'));
+  const context=dialog().querySelector('.production-daily-product');assert.deepEqual([...context.querySelectorAll('dd')].map(n=>n.textContent),['<DEMO>','<img src=x onerror=alert(1)>','—']);assert.equal(context.querySelector('img'),null);
+  await view.render({orders:[]});assert.equal(context.textContent.includes('<DEMO>'),true);assert.match(dialog().textContent,/Lệnh không còn/);assert.equal(dialog().querySelector('button[type=submit]').disabled,true);
+ }finally{await view.close();}
+});
 test('daily report uses the requested quantity label and one accessible header close without discarding its draft',async()=>{
  const view=await mount();try{
   await view.render({orders:[{...order,lsxCode:'TEST-LSX-WITH-A-LONG-REFERENCE-THAT-MUST-WRAP'}]});
