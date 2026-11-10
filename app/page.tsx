@@ -65,6 +65,7 @@ import { normalizeBomWaste } from "../lib/bom-waste.mjs";
 import { bomMetadataResolver, bomClassifications } from "../lib/bom-metadata.mjs";
 import { bomSourceResolver, bomSourceLabel, projectBomSources, syncBomSources, syncBomCatalogSources } from "../lib/bom-source.mjs";
 import {bomHistoricalMeasure} from '../lib/bom-historical-measure.mjs';
+const LaborBasisImportPanel = deferredScreen(() => import("../components/labor-basis-import-panel"));
 const StorageHandover = deferredScreen(() => import("../components/storage-handover"));
 import {
   useSkuApproval,
@@ -19128,7 +19129,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
           )
         ) : view === "users" ? (
           isAdmin ? (
-            <UserContent section={activeChild} />
+            <><LaborBasisImportPanel key={changeLogin} allowed={isAdmin&&!sessionLine} /><UserContent section={activeChild} /></>
           ) : (
             <main className="workspace">
               <section className="data-card">
