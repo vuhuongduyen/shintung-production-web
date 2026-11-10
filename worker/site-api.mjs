@@ -1,3 +1,4 @@
+import {readLaborReferences} from '../scripts/local/production-labor-reference.mjs';
 import {readLaborHistory} from '../scripts/local/labor-rate-source.mjs';
 import {frozenPendingReport} from '../scripts/local/production-quantity-cutover.mjs';
 import {decideDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
@@ -181,9 +182,9 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/user-permission-setup'){if(request.method==='GET')return json(await readPermissionSetup(env.DB,actor));if(request.method!=='POST')return json({error:'Phương thức không hợp lệ'},405);if(request.headers.get('origin')!==url.origin)return json({error:'Origin không hợp lệ'},403);return json(await applyPermissionSetup(env.DB,await request.json(),actor));}
   if(path==='/api/production-standards'&&request.method==='GET'){
    if(!hasGrant(actor,'Quản lý sản xuất',['Xem']))return json({error:'Không có quyền xem giờ công sản xuất.'},403);
-   const rows=(await env.DB.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;
+   const rows=(await env.DB.prepare("SELECT record_key,payload,updated_at FROM app_records WHERE entity='labor_hours'").all()).results;
    const allowedSkus=hasQuickLineReadScope(actor)?new Set((await readProductionWorkflow(env.DB,actor)).orders.map(row=>row.sku)):null;
-   return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})),laborBusinessDate(),await readLaborHistory(env.DB)).filter(r=>!allowedSkus||allowedSkus.has(r.payload.sku||r.key)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});
+   return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedAt:r.updated_at})),laborBusinessDate(),await readLaborHistory(env.DB)).filter(r=>!allowedSkus||allowedSkus.has(r.payload.sku||r.key)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});
   }
   if(path==='/api/production-hr-hours'){
    const hrExample=url.searchParams.get('examples')==='1';
@@ -242,7 +243,7 @@ async function handleSiteApi(request,env,timing){
    const legacyPreservation=await readLegacyPreservation(productionDb,activation.policy,actor,{full:url.searchParams.get('view')!=='work'});
    const workflow=await readProductionWorkflow(workflowReadSnapshot(productionDb),actor,await catalogRead,{legacyPreservation,includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',stageValidation:url.searchParams.get('view')==='work'});
    if(url.searchParams.get('unassignedAlerts')==='1'){if(productionReportingHold(url.hostname))return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,workflow));}
-   return json({...workflow,...(activation.policy?{dailyOutputPolicy:activation.policy}:{}),reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
+   return json({...await readLaborReferences(productionDb,workflow),...(activation.policy?{dailyOutputPolicy:activation.policy}:{}),reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
   }
   if(path==='/api/records'&&request.method==='GET'){
    const entity=url.searchParams.get('entity');if(!entities.has(entity))return json({error:'Hạng mục không hợp lệ'},400);

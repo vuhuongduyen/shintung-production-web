@@ -1,4 +1,5 @@
 "use client";
+import {laborHourNumber,formatLaborHour} from '../lib/labor-hour-display.mjs';
 import {SkuTransfer} from '../components/sku-transfer';
 import {hasMenuPermission} from '../lib/menu-action-access.mjs';
 import {DepartmentChangeRequests,useChangeRequests,requestDepartment,requestWorkspace,canReplyDepartments} from "../components/department-change-requests";
@@ -3602,6 +3603,7 @@ const normalizePlanRow = (row: Partial<PlanRow>, index = 0): PlanRow => ({
 });
 
 type EngineMetric = {
+  standardHours?: number;
   warnings?: string[];
   defaults?: string[];
   weekLabel: string;
@@ -6066,7 +6068,6 @@ function PlanningView({
   }, [notice]);
   const [fullView, setFullView] = useState(false);
   const [calcSku, setCalcSku] = useState<string | null>(null);
-
   const [inventorySnapshots, setInventorySnapshots] = useState<
     InventorySnapshot[]
   >(() =>
@@ -6816,6 +6817,8 @@ toolbarConfig.action({"onClick": () => {
           const base = m
             ? baseRows.find((x) => x.sku === calcSku && x.month === m.month)
             : undefined;
+          const laborRow=savedEngine?.payload.week===engineWeek?savedEngine.payload.rows.find(x=>x.sku===calcSku):undefined;
+          const laborMetric=laborRow?savedEngine?.payload.metrics?.find(([id])=>id===laborRow.id)?.[1]:undefined;
           const legacy = forecastData[calcSku];
           if (!r) return null;
           const f =
@@ -6833,11 +6836,6 @@ toolbarConfig.action({"onClick": () => {
                   safety: m.safetyDays,
                   moq: m.moq,
                   rop: m.rop,
-                  hours:
-                    Number.parseFloat(
-                      skus.find((item) => item.code === calcSku)
-                        ?.standardHours || "",
-                    ) || 0,
                   event: m.eventWeek,
                   replenish: m.replenish,
                   reason: m.reason,
@@ -6954,11 +6952,9 @@ toolbarConfig.action({"onClick": () => {
                   <div>
                     <span>Tổng giờ công dự kiến</span>
                     <b>
-                      {(r.suggested * f.hours).toLocaleString("vi-VN", {
-                        maximumFractionDigits: 1,
-                      })}{" "}
-                      giờ
+                      {typeof laborMetric?.standardHours==='number'&&Number.isFinite(laborMetric.standardHours)&&laborMetric.standardHours>=0&&typeof laborRow?.suggested==='number' ? `${(laborRow.suggested*laborMetric.standardHours).toLocaleString('vi-VN',{maximumFractionDigits:10})} giờ (${laborMetric.standardHours.toLocaleString('vi-VN',{maximumFractionDigits:10})} giờ/SP · căn cứ đã lưu)` : 'Thiếu căn cứ Giờ công/SP đã lưu'}
                     </b>
+                    {!(typeof laborMetric?.standardHours==='number'&&Number.isFinite(laborMetric.standardHours)&&laborMetric.standardHours>=0)&&<small>Không đọc được mức giờ/SP trong căn cứ của bản Engine này. Kiểm tra bản tính đã lưu và SKU trong menu Giờ công → Lịch sử. Với kế hoạch mới, cập nhật dữ liệu tuần để lập bản mới theo dữ liệu phù hợp; không ghi đè bản đã chốt để lấp chỗ thiếu.</small>}
                   </div>
                 </section>
               </aside>
@@ -18454,7 +18450,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
       versions: [],
       rules: [],
     });
-  const [skuLaborHours, setSkuLaborHours] = useState<Map<string, number>>(
+  const [skuLaborHours, setSkuLaborHours] = useState<Map<string, number | null>>(
     new Map(),
   );
   useEffect(() => {
@@ -18474,7 +18470,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
             laborData.records.map(
               (record: { key: string; payload: { laborHour: number } }) => [
                 normalizeSkuCode(record.key),
-                Number(record.payload.laborHour || 0),
+                laborHourNumber(record.payload.laborHour),
               ],
             ),
           ),
@@ -20192,12 +20188,7 @@ toolbarConfig.action({"onClick": () => {
                       <div>
                         <dt>Giờ công chuẩn</dt>
                         <dd>
-                          {(
-                            skuLaborHours.get(
-                              normalizeSkuCode(selected.code),
-                            ) ?? 0
-                          ).toFixed(3)}{" "}
-                          giờ/SP
+                          {formatLaborHour(skuLaborHours.get(normalizeSkuCode(selected.code)))}
                         </dd>
                       </div>
                     </dl>
