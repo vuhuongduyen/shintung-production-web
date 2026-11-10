@@ -51,7 +51,7 @@ for(const rate of [.016,.0006,0])for(const screen of ['journal','output'])test(`
   await act(async()=>root.render(React.createElement(screen==='journal'?Journal:Output,{orders:[order],reports:projected,events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
   if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
   const table=host.querySelector('table[data-report-source]'),data=JSON.parse(table.dataset.reportSource),unit=data.headers.indexOf('Giờ công chuẩn/SP');
-  assert.ok(table.querySelector('tbody').textContent.includes(rate.toLocaleString('vi-VN',{minimumFractionDigits:4})));assert.match(table.querySelector('tbody').textContent,/Theo ngày/);assert.match(JSON.stringify(data.rows),/Giờ công theo ngày/);
+  assert.ok(table.querySelector('tbody').textContent.includes(rate.toLocaleString('vi-VN',{minimumFractionDigits:4})));if(screen==='output'){const cell=table.querySelector('tbody tr').children[unit];assert.equal(cell.textContent,rate.toLocaleString('vi-VN',{minimumFractionDigits:4}));assert.equal(cell.querySelector('small'),null);}else assert.match(table.querySelector('tbody').textContent,/Theo ngày/);assert.match(JSON.stringify(data.rows),/Giờ công theo ngày/);
   assert.equal(data.rows[0][unit],rate);
   // The displayed dated rate must also feed the real earnings/payroll readers.
   const {monthlyEarnedOrders,payrollPreview}=await import('../lib/production-payroll.mjs');
