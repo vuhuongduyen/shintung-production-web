@@ -51,7 +51,7 @@ for(const rate of [.016,.0006,0])for(const screen of ['journal','output'])test(`
   await act(async()=>root.render(React.createElement(screen==='journal'?Journal:Output,{orders:[order],reports:projected,events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
   if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
   const table=host.querySelector('table[data-report-source]'),data=JSON.parse(table.dataset.reportSource),unit=data.headers.indexOf('Giờ công chuẩn/SP');
-  assert.ok(table.querySelector('tbody').textContent.includes(rate.toLocaleString('vi-VN',{minimumFractionDigits:4})));assert.match(table.querySelector('tbody').textContent,/Theo ngày/);assert.match(JSON.stringify(data.rows),/Giờ công theo ngày/);
+  assert.ok(table.querySelector('tbody').textContent.includes(rate.toLocaleString('vi-VN',{minimumFractionDigits:4})));if(screen==='output'){const cell=table.querySelector('tbody tr').children[unit];assert.equal(cell.textContent,rate.toLocaleString('vi-VN',{minimumFractionDigits:4}));assert.equal(cell.querySelector('small'),null);}else assert.match(table.querySelector('tbody').textContent,/Theo ngày/);assert.match(JSON.stringify(data.rows),/Giờ công theo ngày/);
   assert.equal(data.rows[0][unit],rate);
   // The displayed dated rate must also feed the real earnings/payroll readers.
   const {monthlyEarnedOrders,payrollPreview}=await import('../lib/production-payroll.mjs');
@@ -163,5 +163,42 @@ for(const liveRoute of [['CUT','FINAL'],['CUT','PACKING'],['FINAL','CUT']])test(
   const cells=[...table.querySelectorAll('tbody tr')].map(r=>r.children[column]?.textContent).filter(x=>x!==undefined);
   assert.deepEqual(cells,['—','0,43','0,43','2,40','5,88','6,25']);
   assert.deepEqual(data.rows.map(r=>r[column]),hours);assert.equal(JSON.stringify(events),before);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+for(const screen of ['output','journal'])test(`${screen} hides only three configured rate warnings while retaining missing numeric cells and export`,async()=>{
+ const {attachLaborRateWarningSuppressions}=await import('../lib/production-labor-warning.mjs');
+ const orders=Array.from({length:4},(_,i)=>({...order,id:'SYNTHETIC-SUPPRESS-'+i,lsxCode:'SYNTHETIC-CODE-'+i}));
+ const original=orders.map((o,i)=>({...report,id:'SYNTHETIC-SUPPRESS-REPORT-'+i,transitId:o.id,orderSnapshot:o,standardUnit:undefined}));
+ const policy=orders.slice(0,3).map(o=>({orderCode:o.lsxCode,sku:o.sku,date:'2026-10-30'})),projected=attachLaborRateWarningSuppressions(original,orders,policy),before=JSON.stringify(original);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);let baseline;
+ try{for(const reports of [original,projected]){
+ await act(async()=>root.render(React.createElement(screen==='output'?Output:Journal,{orders,reports,events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
+ if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+ const table=host.querySelector('table[data-report-source]'),data=JSON.parse(table.dataset.reportSource);
+ if(reports===original){baseline=data;assert.equal(host.querySelectorAll('[data-operation-guidance] li').length,4);}else{
+ assert.deepEqual(data,baseline);const warnings=[...host.querySelectorAll('[data-operation-guidance] li')];assert.equal(warnings.length,1);assert.match(warnings[0].textContent,/SYNTHETIC-SUPPRESS-REPORT-3/);
+ const unit=data.headers.indexOf('Giờ công chuẩn/SP');assert.ok(data.rows.every(r=>r[unit]==='Thiếu căn cứ định mức'));
+ }
+ }assert.equal(JSON.stringify(original),before);}finally{await act(async()=>root.unmount());host.remove();}
+});
+
+test('warning suppression keeps missing-basis status in report detail without the guidance notice',async()=>{
+ const {default:Detail}=await vite.ssrLoadModule('/components/production-detail-fields.tsx'),{attachLaborRateWarningSuppressions}=await import('../lib/production-labor-warning.mjs');
+ const raw={...report,orderSnapshot:order,standardUnit:undefined},[value]=attachLaborRateWarningSuppressions([raw],[order],[{orderCode:order.lsxCode,sku:order.sku,date:'2026-10-30'}]),before=JSON.stringify(value);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(React.createElement(Detail,{detail:value,reports:[value],orders:[order],employees:[],events:[]})));
+ assert.equal(host.querySelector('[data-operation-guidance]'),null);assert.match(host.textContent,/Chưa xác định được căn cứ Giờ công\/SP/);assert.equal(JSON.stringify(value),before);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+for(const screen of ['output','journal','detail'])test(`${screen} honors warning suppression when SKU/code exist only on the live order`,async()=>{
+ const {attachLaborRateWarningSuppressions}=await import('../lib/production-labor-warning.mjs'),{default:Detail}=await vite.ssrLoadModule('/components/production-detail-fields.tsx');
+ const raw={...report,sku:undefined,orderSnapshot:undefined,standardUnit:undefined},[value]=attachLaborRateWarningSuppressions([raw],[order],[{orderCode:order.lsxCode,sku:order.sku,date:'2026-10-30'}]),before=JSON.stringify(value);
+ assert.ok(value.laborRateWarningSuppression);const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(React.createElement(screen==='detail'?Detail:screen==='output'?Output:Journal,{detail:value,orders:[order],reports:[value],events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
+ if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+ assert.equal(host.querySelector('[data-operation-guidance]'),null);assert.equal(JSON.stringify(value),before);
+ if(screen==='detail')assert.match(host.textContent,/Chưa xác định được căn cứ Giờ công\/SP/);
  }finally{await act(async()=>root.unmount());host.remove();}
 });

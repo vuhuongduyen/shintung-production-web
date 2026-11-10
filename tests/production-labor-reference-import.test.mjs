@@ -30,6 +30,7 @@ test('QA Admin preview is read-only; apply appends one audited registry; retry a
  assert.equal((await records(c.db)).filter(r=>r.entity===entity).length,0);
  const applied=await f.call(path,f.apply);assert.equal(applied.status,200);assert.equal(applied.body.status,'stored');assert.equal(applied.body.activated,false);
  assert.deepEqual(await source(c.db),before);
+ assert.equal((await c.db.prepare("SELECT name FROM sqlite_master WHERE name GLOB '_onspa_labor_import_*'").all()).results.length,0);
  const saved=(await records(c.db)).filter(r=>r.entity===entity);assert.equal(saved.length,1);assert.equal(saved[0].updated_by,actor.login);assert.deepEqual(JSON.parse(saved[0].payload),f.body.manifest);
  const retry=await f.call(path,f.apply);assert.equal(retry.body.status,'already-present');assert.deepEqual((await records(c.db)).filter(r=>r.entity===entity),saved);
  // No automatic activation. Switching only the read configuration on/off never mutates records.
@@ -53,6 +54,7 @@ test('changed snapshot identity or rates cannot import an old or forged manifest
 for(const mutation of ['update','insert','delete'])test(`atomic guard rejects concurrent source ${mutation} before write`,()=>dailyFixture(async c=>{
  const f=await setup(c);let changed=false;
  const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{
+  if(statements.length===2)return target.batch(statements);
   if(mutation==='update')await c.db.prepare("UPDATE app_records SET updated_at='RACE' WHERE entity='labor_hours'").run();
   if(mutation==='insert')await c.put('labor_hours_history','SYNTHETIC-RACE',{sku:c.order.sku,value:.3});
   if(mutation==='delete')await c.db.prepare("DELETE FROM app_records WHERE entity='labor_hours'").run();
@@ -63,7 +65,7 @@ for(const mutation of ['update','insert','delete'])test(`atomic guard rejects co
 }));
 test('D1 batch failure after INSERT rolls back registry and leaves every original record intact',()=>dailyFixture(async c=>{
  const f=await setup(c),before=await records(c.db);
- const db=new Proxy(c.db,{get(target,key){if(key==='batch')return statements=>target.batch([...statements,target.prepare("SELECT json('SYNTHETIC_FAILURE')")]);const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ const db=new Proxy(c.db,{get(target,key){if(key==='batch')return statements=>target.batch(statements.length===2?statements:[...statements,target.prepare("SELECT json('SYNTHETIC_FAILURE')")]);const value=target[key];return typeof value==='function'?value.bind(target):value;}});
  await assert.rejects(importLaborReferenceSnapshot(db,f.apply,actor,{hostname}),/Giao dịch/);assert.deepEqual(await records(c.db),before);
 }));
 test('same-key conflicting payload is never overwritten',()=>dailyFixture(async c=>{
@@ -80,7 +82,7 @@ test('no authentication, ordinary user, Line Admin, MAIN, foreign origin and mis
  assert.equal((await f.call(path,{...f.apply,confirmDigest:'wrong'})).status,400);
  assert.deepEqual(await records(c.db),before);
 }));
-test('many source versions use bounded JSON guards without SQL variable explosion',()=>dailyFixture(async c=>{
+test('many source versions and large Unicode use DB comparison without SQL variable explosion',()=>dailyFixture(async c=>{
  for(let i=0;i<140;i++)await c.put('labor_hours_history','SYNTHETIC-HISTORY-'+i,{sku:'OTHER',value:i,revision:i,note:'x'.repeat(5000)});
  await c.put('production_history_archive','SYNTHETIC-LARGE',{note:'Tiếng Việt 😀'.repeat(60000)});
  const f=await setup(c);assert.equal((await f.call(path,f.apply)).status,200);
@@ -89,7 +91,8 @@ test('many source versions use bounded JSON guards without SQL variable explosio
 test('changed large Unicode payload is rejected atomically even with preserved length and timestamps',()=>dailyFixture(async c=>{
  await c.put('production_history_archive','SYNTHETIC-LARGE',{note:'Tiếng Việt 😀'.repeat(60000)});
  const f=await setup(c);
- const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{await c.db.prepare("UPDATE app_records SET payload=replace(payload,'Tiếng','tiếng') WHERE entity='production_history_archive'").run();return target.batch(statements);};const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{
+  if(statements.length===2)return target.batch(statements);await c.db.prepare("UPDATE app_records SET payload=replace(payload,'Tiếng','tiếng') WHERE entity='production_history_archive'").run();return target.batch(statements);};const value=target[key];return typeof value==='function'?value.bind(target):value;}});
  await assert.rejects(importLaborReferenceSnapshot(db,f.apply,actor,{hostname}),/Giao dịch/);assert.equal((await records(c.db)).filter(r=>r.entity===entity).length,0);
 }));
 test('server session role is authoritative; request body cannot grant Admin permission',()=>dailyFixture(async c=>{
@@ -110,4 +113,36 @@ test('one heavy scan per isolate: concurrent import fails clearly and gate relea
  const first=importLaborReferenceSnapshot(db,f.apply,actor,{hostname});await entered;
  try{await assert.rejects(importLaborReferenceSnapshot(c.db,f.apply,actor,{hostname}),e=>e.status===503&&/Đang có/.test(e.message));}finally{release();}
  assert.equal((await first).status,'stored');assert.equal((await importLaborReferenceSnapshot(c.db,f.apply,actor,{hostname})).status,'already-present');
+}));
+
+test('immutable apply snapshot detects same-length payload race without timestamp changes and cleans transport',()=>dailyFixture(async c=>{
+ await c.put('website_action_audit','SYNTHETIC-SOURCE',{value:'AAAA'});
+ const f=await setup(c);let mutated=false;
+ const db=new Proxy(c.db,{get(target,key){
+  if(key==='batch')return async statements=>{
+   if(statements.length===3){mutated=true;await target.prepare("UPDATE app_records SET payload=replace(payload,'AAAA','BBBB') WHERE entity='website_action_audit'").run();}
+   return target.batch(statements);
+  };const value=target[key];return typeof value==='function'?value.bind(target):value;
+ }});
+ await assert.rejects(importLaborReferenceSnapshot(db,f.apply,actor,{hostname}),/Giao dịch/);assert.equal(mutated,true);
+ assert.equal((await records(c.db)).filter(r=>r.entity===entity).length,0);
+ assert.equal((await c.db.prepare("SELECT name FROM sqlite_master WHERE name GLOB '_onspa_labor_import_*'").all()).results.length,0);
+}));
+test('snapshot creation failure rolls back transport and registry before validation',()=>dailyFixture(async c=>{
+ const f=await setup(c),before=await records(c.db);
+ const db=new Proxy(c.db,{get(target,key){if(key==='batch')return statements=>target.batch([...statements,target.prepare("SELECT json('SYNTHETIC_FAILURE')")]);const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ await assert.rejects(importLaborReferenceSnapshot(db,f.apply,actor,{hostname}));assert.deepEqual(await records(c.db),before);
+ assert.equal((await c.db.prepare("SELECT name FROM sqlite_master WHERE name GLOB '_onspa_labor_import_*'").all()).results.length,0);
+}));
+
+test('business validation reads captured source; live changes after capture are rejected by final atomic comparison',()=>dailyFixture(async c=>{
+ const f=await setup(c);let changed=false;
+ const db=new Proxy(c.db,{get(target,key){if(key==='batch')return async statements=>{
+  const result=await target.batch(statements);
+  if(statements.length===2){changed=true;await target.prepare("UPDATE app_records SET payload=? WHERE entity='production_report' AND record_key=?").bind(JSON.stringify({...f.raw,orderSnapshot:{...f.raw.orderSnapshot,sku:'CHANGED-LIVE'}}),f.raw.id).run();}
+  return result;
+ };const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ await assert.rejects(importLaborReferenceSnapshot(db,f.apply,actor,{hostname}),/Giao dịch nhập không hoàn tất/);assert.equal(changed,true);
+ assert.equal((await records(c.db)).filter(r=>r.entity===entity).length,0);
+ assert.equal((await c.db.prepare("SELECT name FROM sqlite_master WHERE name GLOB '_onspa_labor_import_*'").all()).results.length,0);
 }));

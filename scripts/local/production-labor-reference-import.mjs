@@ -1,3 +1,4 @@
+import {createLaborImportSnapshot} from './labor-import-snapshot.mjs';
 import {scanLaborImportSource} from './labor-import-source.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {readDailyOutputPolicy} from './production-daily-output.mjs';
@@ -51,21 +52,24 @@ export async function importLaborReferenceSnapshot(db,body,actor,{hostname}={}){
  }
  if(sourceCheckBusy)fail('Đang có một lần kiểm căn cứ trên máy chủ. Vui lòng chờ rồi kiểm tra lại.',503);
  sourceCheckBusy=true;
+ let snapshot;
  try{
- const before=await scanLaborImportSource(db);
- const counts=await validateCurrentManifest(db,actor,manifest,omissions);
- // Business projections are out of scope before retaining the commit guards.
- const after=await scanLaborImportSource(db,{retainGuards:body.action==='apply'});
+ if(body.action==='apply')snapshot=await createLaborImportSnapshot(db);
+ const sourceDb=snapshot?.reader??db;
+ const before=await scanLaborImportSource(sourceDb);
+ const counts=await validateCurrentManifest(sourceDb,actor,manifest,omissions);
+ // Apply validates the immutable DB snapshot; the commit compares every source row.
+ const after=await scanLaborImportSource(sourceDb);
  if(before.revision!==after.revision||before.count!==after.count)fail('Nguồn đã thay đổi khi kiểm; chưa nhập căn cứ.');
- const sourceRevision=await digest({model:'streamed-source-v2',revision:before.revision,count:before.count,omissions,manifestDigest});
+ const sourceRevision=await digest({model:'db-snapshot-source-v3',revision:before.revision,count:before.count,omissions,manifestDigest});
  if(body.action==='preview')return {ok:true,status:'preview-only',digest:manifestDigest,count:manifest.entries.length,sourceRevision,counts,sourceStats:{count:before.count,bytes:before.sourceBytes,guardBytes:before.guardBytes,maxPageBytes:before.maxPageBytes},activated:false};
  if(body.expectedSourceRevision!==sourceRevision)fail('Phiên bản nguồn khác preview đã duyệt; chưa nhập căn cứ.');
  const now=new Date().toISOString();
  try{
-  await db.batch([...after.guards,db.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING').bind(entity,manifestDigest,JSON.stringify(manifest),actor.login,now)]);
+  await db.batch([snapshot.guard,db.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING').bind(entity,manifestDigest,JSON.stringify(manifest),actor.login,now),snapshot.dropStatement]);
  }catch{fail('Giao dịch nhập không hoàn tất; kiểm lại nguồn và đọc lại khóa căn cứ trước khi thử lại.');}
  const saved=await db.prepare('SELECT payload FROM app_records WHERE entity=? AND record_key=?').bind(entity,manifestDigest).first();
  if(!saved||encoded(JSON.parse(saved.payload))!==encoded(manifest))fail('Đọc lại căn cứ không khớp; không kích hoạt cấu hình.');
  return {ok:true,status:'stored',digest:manifestDigest,count:manifest.entries.length,activated:false};
- }finally{sourceCheckBusy=false;}
+ }finally{try{if(snapshot)await snapshot.drop();}finally{sourceCheckBusy=false;}}
 }
