@@ -202,3 +202,11 @@ for(const screen of ['output','journal','detail'])test(`${screen} honors warning
  if(screen==='detail')assert.match(host.textContent,/Chưa xác định được căn cứ Giờ công\/SP/);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+for(const screen of ['journal','output'])test(`${screen} observed menu preservation keeps numeric export and actual hours`,async()=>{
+ const value={...report,standardUnit:undefined,laborReference:{kind:'observed-menu-labor-reference-v1',status:'resolved',frozen:true,unit:.046,quantity:100,sku:order.sku,productionDate:report.productionDate,observedAt:'2026-11-10T00:00:00Z'}};
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(React.createElement(screen==='journal'?Journal:Output,{orders:[order],reports:[value],events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
+ if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+ const data=JSON.parse(host.querySelector('table[data-report-source]').dataset.reportSource);assert.equal(data.rows[0][data.headers.indexOf('Giờ công chuẩn/SP')],.046);assert.ok(!host.textContent.includes('Thiếu căn cứ định mức'));assert.deepEqual(value.hours,report.hours);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
