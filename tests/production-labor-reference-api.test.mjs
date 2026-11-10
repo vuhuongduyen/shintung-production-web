@@ -28,3 +28,15 @@ test('workflow omission policy matches exact business keys and never writes repo
  config='{invalid';const invalid=await call('/api/production-workflow');assert.equal(invalid.body.reports.find(r=>r.id==='SYNTHETIC-MISSING').laborRateOmission,undefined);
  assert.deepEqual(await records(c.db),before);
 }));
+
+test('workflow warning-only configuration marks exactly three synthetic reports without omissions, payroll changes or DB writes',()=>dailyFixture(async c=>{
+ const dates=['2026-10-02','2026-10-03','2026-10-04','2026-10-05'];
+ for(let i=0;i<4;i++)await c.put('production_report','SYNTHETIC-WARNING-'+i,{id:'SYNTHETIC-WARNING-'+i,transitId:c.order.id,orderSnapshot:c.order,kind:'completion',stageName:'FINAL',line:'A',sku:c.order.sku,reviewStatus:'Đã xác nhận',reportedQuantity:7,approvedQuantity:7,completedAt:dates[i]+'T03:00:00Z',hours:{hc:3,ot:1,total:4}});
+ let config;const call=await reviewer(c,(request,env)=>siteApi(request,{...env,LABOR_RATE_WARNING_SUPPRESSIONS_JSON:config}));
+ const before=await records(c.db),baseline=await call('/api/production-workflow');assert.equal(baseline.status,200);
+ config=JSON.stringify(dates.slice(0,3).map(date=>({orderCode:c.order.lsxCode,sku:c.order.sku,date})));
+ const r=await call('/api/production-workflow');assert.equal(r.status,200);
+ const selected=r.body.reports.filter(p=>p.id.startsWith('SYNTHETIC-WARNING-')).sort((a,b)=>a.id.localeCompare(b.id));assert.deepEqual(selected.map(p=>!!p.laborRateWarningSuppression),[true,true,true,false]);assert.ok(selected.every(p=>!p.laborRateOmission));
+ const {monthlyEarnedOrders}=await import('../lib/production-payroll.mjs');assert.deepEqual(monthlyEarnedOrders(r.body.orders,r.body.reports,'2026-10','A'),monthlyEarnedOrders(baseline.body.orders,baseline.body.reports,'2026-10','A'));
+ config='{bad';const bad=await call('/api/production-workflow');assert.ok(bad.body.reports.every(p=>!p.laborRateWarningSuppression));assert.deepEqual(await records(c.db),before);
+}));

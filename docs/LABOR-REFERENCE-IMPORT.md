@@ -43,3 +43,11 @@ This adds transient DB writes and storage during apply, unlike preview. Deployme
 SourceRevision now uses `db-snapshot-source-v3`: obtain a fresh preview after deployment. The manifest format is unchanged. Synthetic scale tests cover 16,197 records, 139 bases and over 40MiB of payload in actual bundled workerd, plus a bounded Node worker and conservative 1,000-query budget. Measured Node heap/external allocations are not exact hosted isolate accounting. Hosted preview/apply/readback and all agreed data comparisons remain required before acceptance.
 
 The Admin UI retains the clear non-JSON/invalid-JSON resource/readback error and explicit approval. It never auto-applies or claims success after a failed response.
+
+## Warning-only display policy
+
+`LABOR_RATE_WARNING_SUPPRESSIONS_JSON` accepts an explicit array of `{orderCode,sku,date}` entries. The server matches all three values for unresolved final production contributions and adds only a read-time presentation marker. The UI suppresses the guidance for those exact reports, while numeric cells/export/detail still identify missing rates. The marker is never read by earnings/payroll or snapshot selection. Invalid configuration hides nothing; other missing reports remain visible. No report or source record is rewritten.
+
+Do not use `LABOR_RATE_OMISSIONS_JSON` to hide warnings: that separate setting excludes matched contributions from the calculation and can change the fund. For a display-only request, leave that calculation setting unchanged and configure only the warning policy through the authorized environment process. No private exception list is embedded in this repository. The import request's omissions do not automatically activate either runtime setting.
+
+Missing-rate guidance is passive inline information, not an operation result. It is excluded from the global operation-popup bridge to avoid being mislabeled as a successful/failed user action. The normal save/error popup behavior is retained. At Giờ công theo LSX the standard/SP cell shows only its numeric rate; source details stay in the tooltip and export notes.

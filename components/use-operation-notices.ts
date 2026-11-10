@@ -7,7 +7,7 @@ export function useOperationNotices(){
  useEffect(()=>{
  const seen=new WeakMap<Element,string>();const hidden=new Set<HTMLElement>();let mounted=true;let scheduled=false;let lastSource:HTMLElement|null=null;
  const scan=()=>{scheduled=false;if(!mounted)return;if(lastSource&&(!lastSource.isConnected||lastSource.closest('[hidden],[aria-hidden="true"]'))){lastSource=null;window.dispatchEvent(new Event(ACTION_FEEDBACK_CLEAR_EVENT));}for(const node of document.querySelectorAll<HTMLElement>(operationNoticeSelector)){
-  if(node.closest('[data-global-operation-notice], [hidden], [aria-hidden="true"], td, th')||node.querySelector('input,select,textarea'))continue;
+  if(node.closest('[data-global-operation-notice], [data-operation-guidance], [hidden], [aria-hidden="true"], td, th')||node.querySelector('input,select,textarea'))continue;
   const text=Array.from(node.childNodes).map(n=>n.nodeType===1&&((n as Element).matches('button,[data-feedback-button]'))?'':n.textContent||'').join(' ').trim();
   if(!text||seen.get(node)===text)continue;
   if(!hidden.has(node)&&!node.getClientRects().length)continue;

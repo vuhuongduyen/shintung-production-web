@@ -1,9 +1,10 @@
+import {attachLaborRateWarningSuppressions} from '../../lib/production-labor-warning.mjs';
 import {applyFixedLaborReferences} from '../../lib/production-labor-reference-snapshot.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {siteLaborHours} from '../../lib/site-labor-hours.mjs';
 import {attachLaborReferences,attachLaborRateOmissions,laborReferenceInScope} from '../../lib/production-labor-reference.mjs';
 import {earnedReportBasis} from '../../lib/production-legacy-earned-basis.mjs';
-export async function readLaborReferences(db,workflow,omissionsJson=undefined,snapshotId=undefined){
+export async function readLaborReferences(db,workflow,omissionsJson=undefined,snapshotId=undefined,warningSuppressionsJson=undefined){
  if(!workflow.reports?.some(r=>laborReferenceInScope(r)&&r.kind==='completion'&&earnedReportBasis(r).unit==null))return workflow;
  const rows=await readRecordPages(db,{where:"entity IN ('labor_hours','labor_hours_history')"});
  const wrap=r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedAt:r.updated_at});
@@ -18,5 +19,7 @@ export async function readLaborReferences(db,workflow,omissionsJson=undefined,sn
   if(manifest.digest!==snapshotId)throw Error('Fixed labor basis identity mismatch.');
   reports=await applyFixedLaborReferences(reports,manifest,workflow.orders||[]);
  }
- return {...workflow,reports:attachLaborRateOmissions(reports,workflow.orders||[],policy)};
+ let warningPolicy=[];try{warningPolicy=JSON.parse(warningSuppressionsJson||'[]');}catch{/* Invalid presentation policy hides nothing. */}
+ reports=attachLaborRateOmissions(reports,workflow.orders||[],policy);
+ return {...workflow,reports:attachLaborRateWarningSuppressions(reports,workflow.orders||[],warningPolicy)};
 }
