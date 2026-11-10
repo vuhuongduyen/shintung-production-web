@@ -97,3 +97,17 @@ test('server session role is authoritative; request body cannot grant Admin perm
  await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='users' AND record_key=?").bind(JSON.stringify({login:actor.login,role:'USER',active:true}),actor.login).run();
  const before=await records(c.db),r=await f.call(path,{...f.apply,isAdmin:true,actor});assert.equal(r.status,403);assert.deepEqual(await records(c.db),before);
 }));
+
+test('one heavy scan per isolate: concurrent import fails clearly and gate releases after completion',()=>dailyFixture(async c=>{
+ const f=await setup(c);let release,started;const entered=new Promise(r=>{started=r;}),barrier=new Promise(r=>{release=r;});let blocked=false;
+ const db=new Proxy(c.db,{get(target,key){
+  if(key==='prepare')return sql=>{
+   const statement=target.prepare(sql);if(!sql.includes('LIMIT 256'))return statement;
+   return {bind:(...args)=>({all:async()=>{if(!blocked){blocked=true;started();await barrier;}return statement.bind(...args).all();}})};
+  };
+  const value=target[key];return typeof value==='function'?value.bind(target):value;
+ }});
+ const first=importLaborReferenceSnapshot(db,f.apply,actor,{hostname});await entered;
+ try{await assert.rejects(importLaborReferenceSnapshot(c.db,f.apply,actor,{hostname}),e=>e.status===503&&/Đang có/.test(e.message));}finally{release();}
+ assert.equal((await first).status,'stored');assert.equal((await importLaborReferenceSnapshot(c.db,f.apply,actor,{hostname})).status,'already-present');
+}));
