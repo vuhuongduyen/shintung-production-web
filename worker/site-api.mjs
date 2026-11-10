@@ -241,7 +241,7 @@ async function handleSiteApi(request,env,timing){
    if(activation.policy?.cutoverReached&&!activation.policy.active)return json({error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy},503);
    const catalogRead=loadCatalog();
    const legacyPreservation=await readLegacyPreservation(productionDb,activation.policy,actor,{full:url.searchParams.get('view')!=='work'});
-   const workflow=await readProductionWorkflow(workflowReadSnapshot(productionDb),actor,await catalogRead,{legacyPreservation,includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',stageValidation:url.searchParams.get('view')==='work'});
+   const workflow=await readProductionWorkflow(workflowReadSnapshot(productionDb),actor,await catalogRead,{legacyPreservation,includeJournalHours:url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',stageValidation:url.searchParams.get('view')==='work'});
    if(url.searchParams.get('unassignedAlerts')==='1'){if(productionReportingHold(url.hostname))return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,workflow));}
    return json({...await readLaborReferences(productionDb,workflow,env.LABOR_RATE_OMISSIONS_JSON),...(activation.policy?{dailyOutputPolicy:activation.policy}:{}),reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
   }

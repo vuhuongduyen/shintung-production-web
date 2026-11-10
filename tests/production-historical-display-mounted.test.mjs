@@ -152,3 +152,16 @@ for(const liveRoute of [['CUT','FINAL'],['CUT','PACKING'],['FINAL','CUT']])test(
  assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(attached),attachedBefore);assert.equal(JSON.stringify(captured),capturedBefore);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+ test('time journal renders restored stage cumulative hours for entry, pause, resume, add and repeated exits',async()=>{
+ const actions=['start','pause','resume','add','complete','complete'],hours=[null,.43,.43,2.4,5.88,6.25];
+ const events=actions.map((stageAction,i)=>({id:'SYNTHETIC-TIME-'+i,kind:'stage-work',stageReporting:true,stageAction,stageName:'ASSY',sourceId:order.id,line:'A',effectiveAt:`2026-11-04T${String(i+8).padStart(2,'0')}:00:00+07:00`,cumulativeLaborHours:hours[i]}));
+ const before=JSON.stringify(events),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{
+  await act(async()=>root.render(React.createElement(Journal,{orders:[order],reports:[],events,employees:[],open:()=>{},refresh:()=>{},busy:false,initialCategory:'time'})));
+  const table=host.querySelector('table[data-report-source]'),data=JSON.parse(table.dataset.reportSource),column=data.headers.indexOf('Tổng giờ công lũy kế');assert.ok(column>=0);
+  const cells=[...table.querySelectorAll('tbody tr')].map(r=>r.children[column]?.textContent).filter(x=>x!==undefined);
+  assert.deepEqual(cells,['—','0,43','0,43','2,40','5,88','6,25']);
+  assert.deepEqual(data.rows.map(r=>r[column]),hours);assert.equal(JSON.stringify(events),before);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
