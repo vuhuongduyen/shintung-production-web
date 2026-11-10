@@ -191,3 +191,14 @@ test('warning suppression keeps missing-basis status in report detail without th
  assert.equal(host.querySelector('[data-operation-guidance]'),null);assert.match(host.textContent,/Chưa xác định được căn cứ Giờ công\/SP/);assert.equal(JSON.stringify(value),before);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+for(const screen of ['output','journal','detail'])test(`${screen} honors warning suppression when SKU/code exist only on the live order`,async()=>{
+ const {attachLaborRateWarningSuppressions}=await import('../lib/production-labor-warning.mjs'),{default:Detail}=await vite.ssrLoadModule('/components/production-detail-fields.tsx');
+ const raw={...report,sku:undefined,orderSnapshot:undefined,standardUnit:undefined},[value]=attachLaborRateWarningSuppressions([raw],[order],[{orderCode:order.lsxCode,sku:order.sku,date:'2026-10-30'}]),before=JSON.stringify(value);
+ assert.ok(value.laborRateWarningSuppression);const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(React.createElement(screen==='detail'?Detail:screen==='output'?Output:Journal,{detail:value,orders:[order],reports:[value],events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
+ if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
+ assert.equal(host.querySelector('[data-operation-guidance]'),null);assert.equal(JSON.stringify(value),before);
+ if(screen==='detail')assert.match(host.textContent,/Chưa xác định được căn cứ Giờ công\/SP/);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

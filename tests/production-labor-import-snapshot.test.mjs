@@ -16,3 +16,19 @@ test('transport cleanup only removes expired exact namespace; business backup om
   assert.ok(await c.db.prepare('SELECT name FROM sqlite_master WHERE name=?').bind(snap.name).first());
  }finally{await snap.drop();}
 }));
+
+test('two isolates can sweep the same stale table and capture independent snapshots without a lifecycle failure',()=>dailyFixture(async c=>{
+ const old='_onspa_labor_import_'+(Date.now()-90000000)+'_'+'b'.repeat(32);await c.db.prepare(`CREATE TABLE "${old}" (value TEXT)`).run();
+ let arrivals=0,release;const barrier=new Promise(r=>{release=r;});
+ const db=new Proxy(c.db,{get(target,key){if(key==='prepare')return sql=>{
+  const statement=target.prepare(sql);if(sql!=="SELECT name FROM sqlite_master WHERE type='table'")return statement;
+  return {all:async()=>{const rows=await statement.all();if(++arrivals===2)release();await barrier;return rows;}};
+ };const value=target[key];return typeof value==='function'?value.bind(target):value;}});
+ const snapshots=await Promise.all([createLaborImportSnapshot(db),createLaborImportSnapshot(db)]);
+ try{assert.notEqual(snapshots[0].name,snapshots[1].name);assert.equal(arrivals,2);
+ assert.equal(await c.db.prepare('SELECT name FROM sqlite_master WHERE name=?').bind(old).first(),null);
+ assert.deepEqual((await snapshots[0].reader.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results,(await snapshots[1].reader.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results);
+ assert.equal((await c.db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='production_labor_reference_snapshot'").first()).n,0);
+ }finally{await Promise.all(snapshots.map(s=>s.drop()));}
+ assert.equal((await c.db.prepare("SELECT name FROM sqlite_master WHERE name GLOB '_onspa_labor_import_*'").all()).results.length,0);
+}));

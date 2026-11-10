@@ -4,7 +4,7 @@ const quote=name=>'"'+name+'"';
 // Apply-only transport, not business data. No payload crosses into a binding.
 export async function createLaborImportSnapshot(db){
  const stale=(await db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()).results;
- for(const {name} of stale.filter(({name})=>laborImportTablePattern.test(name)&&Date.now()-Number(name.split('_')[4])>86400000).slice(0,10))await db.prepare(`DROP TABLE ${quote(name)}`).run();
+ for(const {name} of stale.filter(({name})=>laborImportTablePattern.test(name)&&Date.now()-Number(name.split('_')[4])>86400000).slice(0,10))await db.prepare(`DROP TABLE IF EXISTS ${quote(name)}`).run();
  const name='_onspa_labor_import_'+Date.now()+'_'+crypto.randomUUID().replaceAll('-',''),table=quote(name);
  const drop=()=>db.prepare(`DROP TABLE IF EXISTS ${table}`).run();
  try{

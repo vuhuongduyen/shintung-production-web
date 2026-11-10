@@ -20,3 +20,11 @@ test('warning policy is exact, unresolved-only and cannot silently suppress diff
  for(const change of [{stageName:'CUT'},{cancelled:true},{approvedQuantity:0},{approvedQuantity:'invalid'},{completedAt:'2026-09-30T03:00:00Z'}])assert.equal(hidden(attach([{...reports[0],...change}],orders,policy)[0]),false);
  const marked=attach(reports,orders,policy)[0];for(const change of [{id:'OTHER'},{completedAt:'2026-11-03T03:00:00Z'},{orderSnapshot:{...orders[0],sku:'OTHER'}},{standardUnit:0}])assert.equal(hidden({...marked,...change}),false);
 });
+
+test('warning attachment and reader share live-order SKU/code fallback, and reject changed or missing context',()=>{
+ const raw={...reports[0],sku:undefined,orderSnapshot:undefined},[marked]=attach([raw],orders,policy);
+ assert.ok(marked.laborRateWarningSuppression);assert.equal(hidden(marked,orders[0]),true);assert.equal(hidden(marked),false);
+ for(const changed of [{...orders[0],sku:'OTHER'},{...orders[0],lsxCode:'OTHER'}])assert.equal(hidden(marked,changed),false);
+ assert.equal(isLaborRateOmitted(marked),false);assert.deepEqual(referenceReportBasis(marked),referenceReportBasis(raw));
+ assert.deepEqual(monthlyEarnedOrders(orders,[marked],'2026-11','A'),monthlyEarnedOrders(orders,[raw],'2026-11','A'));
+});
