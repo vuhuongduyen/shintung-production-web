@@ -1,3 +1,4 @@
+import {applyMenuPreservation,menuPreservationModel} from '../../lib/production-labor-menu-preservation.mjs';
 import {attachLaborRateWarningSuppressions} from '../../lib/production-labor-warning.mjs';
 import {applyFixedLaborReferences} from '../../lib/production-labor-reference-snapshot.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
@@ -17,7 +18,7 @@ export async function readLaborReferences(db,workflow,omissionsJson=undefined,sn
   if(!saved)throw Error('Configured fixed labor basis is unavailable.');
   const manifest=JSON.parse(saved.payload);
   if(manifest.digest!==snapshotId)throw Error('Fixed labor basis identity mismatch.');
-  reports=await applyFixedLaborReferences(reports,manifest,workflow.orders||[]);
+  reports=await (manifest.kind===menuPreservationModel?applyMenuPreservation:applyFixedLaborReferences)(reports,manifest,workflow.orders||[]);
  }
  let warningPolicy=[];try{warningPolicy=JSON.parse(warningSuppressionsJson||'[]');}catch{/* Invalid presentation policy hides nothing. */}
  reports=attachLaborRateOmissions(reports,workflow.orders||[],policy);

@@ -1,3 +1,4 @@
+import {previewMenuPreservation} from '../lib/production-labor-menu-preservation.mjs';
 import {trackBrowserChannels} from './helpers/browser-channels.mjs';const closeChannels=trackBrowserChannels();
 import test,{after} from 'node:test';import assert from 'node:assert/strict';import {JSDOM} from 'jsdom';
 import {createTestServer} from './helpers/vite-test-server.mjs';import {dailyFixture} from './helpers/daily-output-fixture.mjs';import {reviewer} from './helpers/daily-output-reviewer.mjs';
@@ -22,7 +23,7 @@ async function setup(c,count=139){
   if(String(url)!==endpoint)return Response.json({ok:true});
   const body=JSON.parse(init.body);calls.push(body);const result=await api(endpoint,body);if(intercept)return intercept(result,body);return Response.json(result.body,{status:result.status});
  };
- return {payload,calls,setIntercept:fn=>{intercept=fn;}};
+ return {payload,calls,workflow:w.body,menu:m.body.records,setIntercept:fn=>{intercept=fn;}};
 }
 async function mount(allowed=true){
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
@@ -79,5 +80,14 @@ test('HTML resource-limit response never renders raw HTML or claims an import su
  await ui.click('Kiểm tra căn cứ');await ui.settle();assert.match(ui.host.querySelector('[role=alert]').textContent,/giới hạn tài nguyên/);assert.doesNotMatch(ui.host.textContent,/Unexpected token|<html>|Đã đọc lại và đối chiếu khớp/);assert.equal(ui.button('Lưu bản căn cứ riêng').disabled,true);assert.equal((await records(c.db)).filter(r=>r.entity==='production_labor_reference_snapshot').length,0);
  f.setIntercept(()=>new Response('{invalid',{status:200,headers:{'Content-Type':'application/json'}}));
  await ui.click('Kiểm tra căn cứ');await ui.settle();assert.match(ui.host.querySelector('[role=alert]').textContent,/Không đọc được phản hồi máy chủ/);assert.equal(ui.button('Lưu bản căn cứ riêng').disabled,true);
+ }finally{await ui.close();}
+}));
+
+test('mounted preservation package previews, confirms and reads back a separate menu baseline',()=>dailyFixture(async c=>{
+ const f=await setup(c,2),parent=f.payload.manifest;await c.put('production_labor_reference_snapshot',parent.digest,parent);
+ const p=await previewMenuPreservation({reports:f.workflow.reports,orders:f.workflow.orders,menu:siteLaborHours(f.menu,'2026-11-10'),parentManifest:parent,month:'2026-11',observedAt:new Date().toISOString()});
+ const before=await records(c.db),ui=await mount();try{await ui.load({action:'preview',manifest:p.manifest,omissions:[]});assert.match(ui.host.textContent,/Bảo toàn kết quả kỳ 2026-11/);
+ await ui.click('Kiểm tra căn cứ');await ui.settle();assert.deepEqual(await records(c.db),before);await ui.confirm();await ui.click('Lưu bản căn cứ riêng');await ui.settle();assert.match(ui.host.textContent,/Đã đọc lại và đối chiếu khớp 2 căn cứ/);
+ assert.deepEqual((await records(c.db)).filter(r=>r.record_key!==p.manifest.digest),before);
  }finally{await ui.close();}
 }));
