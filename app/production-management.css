@@ -473,7 +473,7 @@ html body .app-shell .production-work-screen .daily-output-table .work-product{w
 .daily-output-board [data-feedback-button],.production-correction-orders-table [data-feedback-button],.production-time-correction-dialog [data-feedback-button]{position:relative}
 
 /* Only the daily-report form: reserve a close-button column and separate labels from inputs. */
-.production-daily-report-modal>header{gap:12px;align-items:flex-start}
+.production-daily-report-modal>header{gap:12px;align-items:flex-start;flex-shrink:0}
 .production-daily-report-modal>header h2{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.3}
 .production-daily-close-slot{flex:0 0 32px;min-width:32px}
 .production-daily-close-slot>[data-feedback-button]{position:relative;display:flex;width:32px}
@@ -482,3 +482,9 @@ html body .app-shell .production-work-screen .daily-output-table .work-product{w
 .production-daily-close:disabled{opacity:.55;cursor:wait}
 .production-daily-report-form{display:grid;gap:16px;margin-top:16px}
 .production-daily-report-field{display:grid;gap:8px;justify-items:start;min-width:0}
+.production-daily-heading{flex:1;min-width:0}
+.production-daily-report-modal>header .production-daily-product{display:grid;gap:4px;margin:10px 0 0;font-size:14px;line-height:1.4;color:inherit;max-height:28dvh;overflow:auto}
+.production-daily-report-modal>header .production-daily-product>div{display:grid;grid-template-columns:4.5em minmax(0,1fr);gap:8px;margin:0;padding:0;border:0}
+.production-daily-report-modal>header .production-daily-product dt{font-size:inherit;font-weight:600;color:inherit}
+.production-daily-report-modal>header .production-daily-product dd{margin:0;min-width:0;overflow-wrap:anywhere;font-size:inherit;font-weight:400;color:inherit}
+.production-daily-report-modal>.production-modal-body{min-height:0}
