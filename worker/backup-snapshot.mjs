@@ -1,9 +1,10 @@
+import {laborImportTablePattern} from '../scripts/local/labor-import-snapshot.mjs';
 import {createHash} from 'node:crypto';
 const q=s=>'"'+s.replaceAll('"','""')+'"';
 const literal=s=>"'"+s.replaceAll("'","''")+"'";
 const stagePattern=/^_onspa_pc_snapshot_[0-9]{13}_[a-f0-9]{32}$/;
 const schemaQuery="SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT GLOB 'sqlite_*' AND name NOT GLOB '_cf_*' ORDER BY type,name";
-const readSchema=async db=>(await db.prepare(schemaQuery).all()).results.filter(s=>!stagePattern.test(s.name));
+const readSchema=async db=>(await db.prepare(schemaQuery).all()).results.filter(s=>!stagePattern.test(s.name)&&!laborImportTablePattern.test(s.name));
 const encode=s=>new TextEncoder().encode(s);
 // Freeze SQL rows inside one D1 transaction. Only bounded pages cross into the Worker.
 export async function stagedDatabaseSnapshot(db,bucket,key){
@@ -25,7 +26,7 @@ export async function stagedDatabaseSnapshot(db,bucket,key){
   statements.push(db.prepare('SELECT * FROM file_objects'));
   if(hasSequence)statements.push(db.prepare('SELECT quote(name) AS name,quote(seq) AS seq FROM sqlite_sequence'));
   const result=await db.batch(statements);
-  if(result.some(r=>r.success===false)||JSON.stringify(result[1].results.filter(s=>!stagePattern.test(s.name)))!==JSON.stringify(schema))throw Error('Cấu trúc DB thay đổi; thử sao lưu lại.');
+  if(result.some(r=>r.success===false)||JSON.stringify(result[1].results.filter(s=>!stagePattern.test(s.name)&&!laborImportTablePattern.test(s.name)))!==JSON.stringify(schema))throw Error('Cấu trúc DB thay đổi; thử sao lưu lại.');
   const counts=Object.fromEntries(info.map((t,i)=>[t.name,result[i+2].meta.changes]));
   const digest=createHash('sha256');let size=0,buffer=[],bufferSize=0,partNumber=0;const parts=[];
   upload=await bucket.createMultipartUpload(key,{httpMetadata:{contentType:'application/sql'}});
