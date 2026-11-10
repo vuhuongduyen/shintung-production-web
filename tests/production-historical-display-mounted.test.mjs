@@ -51,8 +51,19 @@ for(const rate of [.016,.0006,0])for(const screen of ['journal','output'])test(`
   await act(async()=>root.render(React.createElement(screen==='journal'?Journal:Output,{orders:[order],reports:projected,events:[],employees:[],open:()=>{},refresh:()=>{},busy:false})));
   if(screen==='output')await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Giờ công theo LSX').click());
   const table=host.querySelector('table[data-report-source]'),data=JSON.parse(table.dataset.reportSource),unit=data.headers.indexOf('Giờ công chuẩn/SP');
-  assert.ok(table.querySelector('tbody').textContent.includes(rate.toLocaleString('vi-VN',{minimumFractionDigits:4})));assert.match(table.querySelector('tbody').textContent,/Đối chiếu, chưa chốt/);assert.match(JSON.stringify(data.rows),/Đối chiếu lịch sử, chưa chốt/);
+  assert.ok(table.querySelector('tbody').textContent.includes(rate.toLocaleString('vi-VN',{minimumFractionDigits:4})));assert.match(table.querySelector('tbody').textContent,/Theo ngày/);assert.match(JSON.stringify(data.rows),/Giờ công theo ngày/);
   assert.equal(data.rows[0][unit],rate);
+  // The displayed dated rate must also feed the real earnings/payroll readers.
+  const {monthlyEarnedOrders,payrollPreview}=await import('../lib/production-payroll.mjs');
+  const earned=monthlyEarnedOrders([order],projected,'2026-10','A',new Map([[order.sku,99]]))[0];
+  assert.equal(earned.unit,rate);assert.equal(earned.earned,rate*100);assert.equal(earned.reported,1);
+  assert.equal(earned.basis[0].reference.basis.versionId,projected[0].laborReference.basis.versionId);
+  const payroll=payrollPreview(earned.calculationEarned,[{id:'SYNTHETIC-WORKER',name:'Synthetic worker',line:'A',startDate:'2020-01-01',hc:report.hours.hc,ot:report.hours.ot,helper:0}],3000000,[],'2026-10');
+  assert.deepEqual(payroll.issues,[]);assert.equal(payroll.production,report.hours.total);
+  assert.equal(payroll.score,rate*100/report.hours.total*100);
+  assert.equal(payroll.factor,rate===.016?1:0);assert.equal(payroll.paid,rate===.016?3000000:0);
+  assert.equal(payroll.paid+payroll.returned+payroll.unallocated,3000000);
+  assert.doesNotMatch(table.querySelector('tbody').textContent,/Đối chiếu, chưa chốt/);
   const {tableExportReport}=await import('../lib/table-report.mjs'),{payrollXlsx}=await import('../lib/production-payroll-export.mjs'),{unzipSync,strFromU8}=await import('fflate');
   const exportReport=tableExportReport({...data,compactHeader:true}),{displayPayrollCell}=await import('../lib/production-payroll-export.mjs');
   assert.equal(displayPayrollCell(exportReport.sheets[0].rows.at(-1).values[unit]),rate.toLocaleString('vi-VN',{maximumFractionDigits:10}));
@@ -70,7 +81,7 @@ test('report detail shows historical reference date/version and leaves actual ho
  const value={...report,standardUnit:undefined,laborReference:{kind:'historical-labor-reference-v1',status:'resolved',sku:order.sku,productionDate:'2026-10-30',frozen:false,basis:{value:.016,validFrom:'2026-10-16',productionDate:'2026-10-30',versionId:'SYNTHETIC-H2',recordedAt:'2026-10-16T03:00:00Z'}}},before=JSON.stringify(value),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  try{
   await act(async()=>root.render(React.createElement(Detail,{detail:value,reports:[value],orders:[order],employees:[],events:[]})));
-  assert.match(host.textContent,/0,016/);assert.match(host.textContent,/SYNTHETIC-H2/);assert.match(host.textContent,/16\/10\/2026/);assert.match(host.textContent,/Đối chiếu lịch sử, chưa chốt/);assert.equal(JSON.stringify(value),before);
+  assert.match(host.textContent,/0,016/);assert.match(host.textContent,/SYNTHETIC-H2/);assert.match(host.textContent,/16\/10\/2026/);assert.match(host.textContent,/Giờ công theo ngày/);assert.equal(JSON.stringify(value),before);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
 
