@@ -1,4 +1,8 @@
-import test,{after} from 'node:test';
+import test,{after,beforeEach,afterEach,mock} from 'node:test';
+// October fixtures stay inside their business entry window, regardless of CI date.
+// Only Date is mocked; DOM/Vite timers continue to run normally.
+beforeEach(()=>mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-09T09:00:00Z')}));
+afterEach(()=>mock.timers.reset());
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createServer} from 'vite';
@@ -140,5 +144,21 @@ test('reopening a fully saved batch adds one empty input without resending or de
  const calls=[],initial={...props,globalHr:true,save:async body=>{calls.push(body);return true;}};const m=await mount(Entry,initial);try{
   await change(field(m.host,1,'Nhân viên'),'NV001');await click(save(m.host));assert.equal(calls.length,1);assert.match(row(m.host,1).textContent,/Đã lưu/);
   await m.render({...initial,active:false});await m.render(initial);assert.equal(m.host.querySelectorAll('[data-hr-row]').length,2);assert.match(row(m.host,1).textContent,/Đã lưu/);assert.equal(field(m.host,2,'Nhân viên').value,'');await click(button(row(m.host,2),'Xóa dòng'));assert.equal(m.host.querySelectorAll('[data-hr-row]').length,2);assert.equal(field(m.host,2,'Nhân viên').value,'');assert.equal(calls.length,1);
+ }finally{await m.close();}
+});
+
+test('October entry is open through the final Vietnam deadline millisecond, then read-only without writes',async()=>{
+ mock.timers.setTime(Date.parse('2026-11-10T16:59:59.999Z'));
+ let calls=0;const initial={...props,save:async()=>{calls++;return true;}};
+ const m=await mount(Entry,initial);try{
+  assert.ok(row(m.host,1));await change(field(m.host,1,'Nhân viên'),'NV001');
+  await click(save(m.host));assert.equal(calls,1,'last millisecond of November 10 in GMT+7 remains writable');
+  await click(button(m.host,'Thêm dòng'));await change(field(m.host,2,'Nhân viên'),'NV002');
+  mock.timers.tick(1);await m.render({...initial});
+  assert.equal(field(m.host,2,'Nhân viên').disabled,true,'unsaved entry becomes read-only after the deadline');
+  assert.match(field(m.host,2,'Nhân viên').value,/NV002/,'deadline transition preserves the draft');
+  assert.equal(save(m.host).disabled,true);await click(save(m.host));
+  assert.match(m.host.textContent,/10\/11\/2026|10 tháng sau|hết hạn|khóa/i);
+  assert.equal(calls,1,'crossing deadline and rendering never submits a mutation');
  }finally{await m.close();}
 });
