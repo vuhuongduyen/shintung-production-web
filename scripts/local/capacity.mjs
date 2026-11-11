@@ -1,3 +1,4 @@
+import {withTestRosterCapability,assertTestRosterMutation} from '../../lib/capacity-test-roster.mjs';
 import {employeeActiveOn} from '../../lib/employee-employment.mjs';
 import {assertCapacityAllocationPreserved} from '../../lib/capacity-allocation-queue.mjs';
 import {assertPlanningReservations} from '../../lib/capacity-allocation-reservations.mjs';
@@ -49,11 +50,11 @@ export async function readLatestCapacity(db,actor){
  const week=weeks.sort().at(-1)||monday(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date()));
  return {week,snapshot:capacityFromRecords(all,directory,week,actor)};
 }
-export async function readCapacity(db,week,actor){
+export async function readCapacity(db,week,actor,testRosterPolicy=null){
  if(!capacityPermissions(actor).view)fail('Không có quyền xem Capacity / No permission',403);
  if(!week||monday(week)!==week)fail('Tuần kế hoạch không hợp lệ / Invalid week');
  const {all,directory}=await capacitySnapshot(db);
- return capacityFromRecords(all,directory,week,actor);
+ return withTestRosterCapability(capacityFromRecords(all,directory,week,actor),testRosterPolicy);
 }
 export function capacityFromRecords(all,directory,week,actor){
  const current=all.find(r=>r.key===week&&r.payload.schemaVersion===1);
@@ -70,11 +71,12 @@ export async function listCapacityRequests(db,actor){
  if(!capacityPermissions(actor).review)fail('Không có quyền xét duyệt Capacity',403);
  return (await records(db,'capacity')).filter(x=>x.payload?.schemaVersion===1).flatMap(x=>(x.payload.rows||[]).filter(row=>row.request?.status==='pending').map(row=>({week:x.key,line:row.line,revision:x.payload.revision,version:row.version,availableHours:row.availableHours,request:row.request,confirmedBy:row.confirmedBy,confirmedAt:row.confirmedAt}))).sort((a,b)=>a.request.at.localeCompare(b.request.at));
 }
-export async function mutateCapacity(db,body,actor,clock=()=>Date.now()){
+export async function mutateCapacity(db,body,actor,clock=()=>Date.now(),testRosterPolicy=null){
  const rights=capacityPermissions(actor),action=body.action;
  if(!actor?.login)fail('Vui lòng đăng nhập / Sign in',401);
  const required=action==='review'?'review':['confirm','sync'].includes(action)?'confirm':action==='revoke'?'revoke':'edit';
  if(!rights[required])fail('Không có quyền thực hiện thao tác Capacity / Permission denied',403);
+ if(action==='employee'&&testRosterPolicy)fail('Không sửa danh mục nhân viên trong phép thử roster.',403);
  if(action==='employee'){
   const id=String(body.id||'').trim(),name=String(body.name||'').trim();if(!id||!name||id.length>80||name.length>200)fail('Nhập mã và tên nhân viên / Enter employee ID and name');
   const now=new Date(clock()).toISOString(),value={id,name,createdBy:actor.login,history:[{action:'add',at:now,by:actor.login,actorId:productionActorId(actor),before:null,after:{id,name}}]};
@@ -91,21 +93,22 @@ export async function mutateCapacity(db,body,actor,clock=()=>Date.now()){
  const state=capacityFromRecords(snapshot.all,snapshot.directory,week,actor);
  // Preserve the legacy/mismatched-envelope guard as well as the write CAS.
  if(raw){const stored=JSON.parse(raw.payload);if(stored.revision!==state.revision||JSON.stringify(stored.rows)!==JSON.stringify(state.rows))fail('Capacity vừa thay đổi trong khi tải. Không ghi đè; bản nhập vẫn được giữ.',409);}
- const {next,now}=prepareCapacityMutation(body,actor,{state,hasRaw:!!raw,queue:allocationRaw?JSON.parse(allocationRaw.payload):null,clock});
+ const {next,now}=prepareCapacityMutation(body,actor,{state,hasRaw:!!raw,queue:allocationRaw?JSON.parse(allocationRaw.payload):null,clock,testRosterPolicy});
  // One compare-and-swap statement commits both Lines, full snapshots and history together.
  const result=raw?await db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='capacity' AND record_key=? AND payload=? AND COALESCE((SELECT payload FROM app_records WHERE entity='production_allocation_queue' AND record_key='global'),'')=?").bind(JSON.stringify(next),actor.login,now,week,raw.payload,allocationRaw?.payload||'').run():await db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'capacity',?,?,?,? WHERE COALESCE((SELECT payload FROM app_records WHERE entity='production_allocation_queue' AND record_key='global'),'')=? ON CONFLICT(entity,record_key) DO NOTHING").bind(week,JSON.stringify(next),actor.login,now,allocationRaw?.payload||'').run();
  if(result.meta.changes!==1)fail('Có người vừa cập nhật Capacity. Không ghi đè; tải lại và đối chiếu.',409);
- return {...next,permissions:rights,employees:state.employees,legacy:[]};
+ return withTestRosterCapability({...next,permissions:rights,employees:state.employees,legacy:[]},testRosterPolicy);
 }
 
 // Shared validation prepares a calendar draft without writing. Allocation is
 // saved independently through its own guarded queue transaction.
-export function prepareCapacityMutation(body,actor,{state,hasRaw,queue,clock=()=>Date.now()}){
+export function prepareCapacityMutation(body,actor,{state,hasRaw,queue,clock=()=>Date.now(),testRosterPolicy=null}){
  const rights=capacityPermissions(actor),action=body.action;
  if(!actor?.login)fail('Vui lòng đăng nhập / Sign in',401);
  const required=action==='review'?'review':['confirm','sync'].includes(action)?'confirm':action==='revoke'?'revoke':'edit';
  if(!rights[required])fail('Không có quyền thực hiện thao tác Capacity / Permission denied',403);
  const week=body.week;if(monday(week)!==week||!week)fail('Chọn tuần bắt đầu thứ Hai');
+ if(testRosterPolicy&&!hasRaw)fail('Phép thử cần tuần nháp riêng đã chuẩn bị; không tạo tuần tự động.',409);
  if(state.legacy.length)fail('Tuần này có dữ liệu Capacity cũ. Cần đối chiếu trước khi tạo bản hiện hành; dữ liệu cũ được giữ nguyên.',409);
  if(body.revision!==state.revision)fail('Dữ liệu đã được người khác sửa. Tải lại để đối chiếu; bản nhập của bạn vẫn được giữ.',409);
  if(action==='create'&&hasRaw)fail('Tuần Capacity đã tồn tại',409);
@@ -199,5 +202,6 @@ export function prepareCapacityMutation(body,actor,{state,hasRaw,queue,clock=()=
  assertCapacityAllocationPreserved(state.rows,next.rows);
  assertPlanningReservations(queue,next.rows);
  validateCapacityAssignments(next.rows);
+ assertTestRosterMutation(body,state,next,testRosterPolicy);
  return {next,now};
 }

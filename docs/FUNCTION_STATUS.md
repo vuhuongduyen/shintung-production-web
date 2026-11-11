@@ -80,3 +80,10 @@ Chưa đo propagation Sec-Fetch-Site trên đường GitHub từ probe cũ; chư
 - 05/11, bổ sung candidate sau7056664: badge/hạn/ghi chú KHSX và trạng thái mobile theo work-board gốc; export toàn bộ kết quả đã lọc qua metadata, kể cả khi dùng thẻ mobile, giữ quyền/active-scope. Local42/42 và13/13 bổ sung có giao nhau; TypeScript/build/Worker đạt. Chờ CI đúng head và browser QA, không tự cập nhật Site hay mô tả PR bị chặn.
 
 - 05/11, đính chính Xuất SX: Home baseline vẫn tắt exporter cho report-work/production-report/report-review, toolbar không có nút; các test bật riêng chỉ là kiểm metadata/thành phần, không phải nghiệm thu xuất qua app. Lượt ACK đang sửa projection riêng lệnh đã ghi để200/1000 đi cùng Đang SX ngay cả khi refresh chậm/lỗi; giữ report mới hơn, metadata/order revision/lịch sử và các guard cũ. Không bật xuất hoặc triển khai.
+
+## Synthetic Capacity roster (draft PR, 2026-11-11)
+
+- Added an optional, disabled-by-default roster selector for an existing isolated test week/Line. Selection uses an explicit server-owned allowlist, checks employment dates, replaces dormant names as well as HC/OT names, and changes only the unsaved draft until Save.
+- Backend keeps existing permissions, version checks, lifecycle, reservations and compare-and-swap writes. An enabled policy rejects creating a week, writes outside its Line, non-synthetic or out-of-date names, unnamed leave, transfers/cleaning, and replacing confirmed or dependency-bearing rosters.
+- No Worker/local API route enables the policy. No QA identity, runtime allowlist, seed, integration setting or deployment change is included. Production behavior remains unchanged.
+- **Not live acceptance:** QA overlay wiring and desktop/mobile end-to-end overtime/payroll QA are still pending. See `docs/CAPACITY-TEST-ROSTER.md` for activation contract and verification gates. Do not merge/deploy merely because component/unit checks pass.
