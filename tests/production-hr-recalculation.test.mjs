@@ -1,9 +1,14 @@
-import test from 'node:test';
+import test,{beforeEach,afterEach,mock} from 'node:test';
+// Fixed business date plus an explicit tick per mutation preserves event ordering.
+// Do not change the production deadline or use a wall-clock-dependent fixture.
+beforeEach(()=>mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-09T09:00:00Z')}));
+afterEach(()=>mock.timers.reset());
 import assert from 'node:assert/strict';
 import {mkdtempSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {openDatabase,migrate} from '../scripts/local/database.mjs';
-import {mutateProductionWorkflow as mutate,readProductionWorkflow as read} from '../scripts/local/production-workflow.mjs';
+import {mutateProductionWorkflow as mutateAtTime,readProductionWorkflow as read} from '../scripts/local/production-workflow.mjs';
 import {calculateErpStage,erpScheduleDay,erpFallbackDay} from '../lib/production-erp-stage.mjs';
+const mutate=(...args)=>{mock.timers.tick(1);return mutateAtTime(...args);};
 const admin={login:'TEST-ADMIN',isAdmin:true},hr={login:'TEST-HR',grants:['Quản lý sản xuất / Lịch SX thực tế / Ghi vắng mặt']};
 const id='S2017002',other='TEST-OTHER',at=(day,time)=>`2026-10-${day}T${time}:00+07:00`;
 async function fixture(fn){const c=await openDatabase(mkdtempSync(join(tmpdir(),'onspa-hr-recalc-')));try{await migrate(c.db);
@@ -57,4 +62,17 @@ test('saving actual work hours automatically recalculates confirmed ERP, preserv
  const replay=await mutate(db,{...body,version:1},admin);assert.equal(replay.unchanged,true);
  const restored=await mutate(db,{...body,version:1,days:approved.days,reason:'Khôi phục giờ bắt đầu'},admin);assert.equal(restored.affected,1);assert.equal(person(await saved(db),id),person(before,id));
  const audits=(await read(db,admin)).events.filter(e=>e.kind==='hours-adjustment');assert.equal(audits.length,2);
+}));
+
+test('HR create/edit/cancel close exactly at midnight GMT+7 and rejected calls preserve every record',()=>fixture(async({db})=>{
+ mock.timers.setTime(Date.parse('2026-11-10T16:59:59.998Z'));
+ const created=await mutate(db,leave,hr); // explicit tick reaches the final permitted millisecond
+ assert.ok(created.event.id);
+ const snapshot=async()=>(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
+ const before=await snapshot();
+ for(const body of [leave,{...leave,action:'attendance-edit',attendanceId:created.event.id,effectiveAt:at('23','09:00'),reason:'Boundary edit'},
+  {action:'attendance-cancel',attendanceId:created.event.id,reason:'Boundary cancellation'}]){
+  await assert.rejects(mutate(db,body,hr),error=>error.status===409&&/hết hạn.*2026-10/.test(error.message));
+  assert.deepEqual(await snapshot(),before,'deadline rejection must not rewrite data/history');
+ }
 }));
