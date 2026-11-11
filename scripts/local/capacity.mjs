@@ -65,7 +65,9 @@ export function capacityFromRecords(all,directory,week,actor){
  const employees=directory.filter(r=>!r.payload._deleted).map(r=>({id:r.key,name:r.payload.name||r.payload.employeeName||r.key,line:r.payload.line||'',startDate:r.payload.startDate,endDate:r.payload.endDate,employmentDatesManaged:r.payload.employmentDatesManaged,cancelled:r.payload.cancelled,active:employeeActiveOn(r.payload,week)}));
  const fresh=['A','B'].map(line=>{const row=newDailyCapacity(week,line,factor),ids=employees.filter(e=>e.active&&e.line===line).map(e=>e.id);row.input.workers=ids.length;row.input.otWorkers=ids.length;row.input.dailyRoster=row.input.dailySchedule.map(d=>({date:d.date,hc:d.working?employees.filter(e=>e.line===line&&employeeActiveOn(e,d.date)).map(e=>e.id):[],ot:[]}));return row;});
  const state=current?.payload||{schemaVersion:1,week,revision:0,rows:fresh},line=hasQuickLineReadScope(actor)?actor.line:null;
- return {...state,rows:state.rows.filter(row=>!line||row.line===line),permissions:capacityPermissions(actor),employees:employees.filter(row=>!line||row.line===line),legacy:legacy.map(r=>r.payload).filter(row=>!line||row.line===line)};
+ // Runtime capabilities are server-owned, never trusted from persisted payloads.
+ const projected={...state};delete projected.testRoster;
+ return {...projected,rows:state.rows.filter(row=>!line||row.line===line),permissions:capacityPermissions(actor),employees:employees.filter(row=>!line||row.line===line),legacy:legacy.map(r=>r.payload).filter(row=>!line||row.line===line)};
 }
 export async function listCapacityRequests(db,actor){
  if(!capacityPermissions(actor).review)fail('Không có quyền xét duyệt Capacity',403);
