@@ -4,13 +4,14 @@ const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'https://sy
 for(const n of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLButtonElement','MutationObserver','CustomEvent','Event','Node','NodeFilter','HTMLFormElement','HTMLDialogElement','getComputedStyle'])globalThis[n]=dom.window[n];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
 const vite=await createTestServer({appType:'custom',configFile:false,resolve:{alias:{'@':fileURLToPath(new URL('..',import.meta.url))}},server:{middlewareMode:true,hmr:false}});
+const {clearClientReads}=await vite.ssrLoadModule('/lib/data-sync.ts');
 const {default:Work}=await vite.ssrLoadModule('/components/production-paged-work.tsx'),originalFetch=globalThis.fetch;
 after(async()=>{globalThis.fetch=originalFetch;await vite.close();closeChannels();dom.window.close();});
 const order=(id)=>({id,lsxCode:id,sku:'TEST-SKU',name:'Synthetic product',line:'A',lsxQty:1000,revision:'TEST-REVISION',week:'2026-11-02',serverSummary:{totals:{approved:200,pending:0,reported:200},badge:{label:'Đang SX',tone:'running'},runtime:{known:true,running:true}}});
 const snapshot=(id,page=1)=>({supported:true,orders:[order(id)],page,pageSize:10,total:21,totals:{orders:21,quantity:21000,approved:4200,pending:0,reserved:0},dailyOutputPolicy:{active:true,effectiveFrom:'2026-11-01',intakeModel:'server-receipt-quantity-v1'},rights:{work:true,line:'A'}});
 const tick=()=>new Promise(r=>setTimeout(r,0));
 async function flush(){await act(async()=>{await tick();await tick();});}
-async function mount(fetcher){globalThis.fetch=fetcher;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(React.createElement(Work,{sessionLine:'A',preferenceUser:'SYNTHETIC-LINE-A',fallback:React.createElement('div',null,'Legacy fallback')})));await flush();return {host,close:async()=>{await act(async()=>root.unmount());host.remove();}};}
+async function mount(fetcher,props={}){clearClientReads();globalThis.fetch=fetcher;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(React.createElement(Work,{sessionLine:'A',preferenceUser:'SYNTHETIC-LINE-A',fallback:React.createElement('div',null,'Legacy fallback'),...props})));await flush();return {host,close:async()=>{await act(async()=>root.unmount());host.remove();}};}
 const button=(host,text)=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===text),click=async n=>{assert.ok(n);await act(async()=>n.click());await flush();};
 async function input(n,value){assert.ok(n);await act(async()=>{const proto=n.tagName==='SELECT'?window.HTMLSelectElement.prototype:window.HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(n,value);n.dispatchEvent(new window.Event('input',{bubbles:true}));n.dispatchEvent(new window.Event('change',{bubbles:true}));});await flush();}
 test('mounted work screen requests server pages, applies only submitted filters and keeps totals from all matching orders',async()=>{
@@ -52,4 +53,39 @@ test('a requested new page cannot report against retained rows before that page 
 test('a failed background read retains the loaded order and reporting rights; it cannot grant rights to a read-only user',async()=>{
  for(const work of [true,false]){let fail=false;const m=await mount(async()=>fail?Response.json({error:'Synthetic offline'},{status:503}):Response.json({...snapshot('FIRST'),rights:{work,line:'A'}}));
  try{fail=true;await click(button(m.host,'Cập nhật dữ liệu'));assert.match(m.host.textContent,/Synthetic offline/);assert.equal(m.host.querySelector('button[aria-label="Báo công · FIRST"]').disabled,!work);}finally{await m.close();}}
+});
+
+test('focus wakes join the pending initial read; a slow read cannot repeatedly restart or hide the loaded pager',async()=>{
+ let release,calls=0,aborted=false;const m=await mount(async(_path,init)=>{calls++;init.signal.addEventListener('abort',()=>{aborted=true;});return new Promise(r=>{release=()=>r(Response.json(snapshot('JOINED')));});});
+ try{
+  await act(async()=>window.dispatchEvent(new window.Event('focus')));await flush();assert.equal(calls,1);assert.equal(aborted,false);
+  await act(async()=>release());await flush();assert.ok(m.host.querySelector('button[aria-label="Trang 2"]'));assert.equal(m.host.querySelector('button[aria-label="Trang 2"]').disabled,false);
+ }finally{await m.close();}
+});
+test('Admin, Line A/B and view-only roles all retain enabled pagination during background refresh and after a read error',async()=>{
+ for(const props of [{sessionLine:undefined,preferenceUser:'ADMIN'},{sessionLine:'A'},{sessionLine:'B'},{sessionLine:undefined,preferenceUser:'VIEW-ONLY'}]){
+  let refresh=false,release;const m=await mount(async()=>refresh?new Promise(r=>{release=()=>r(Response.json({error:'Synthetic offline'},{status:503}));}):Response.json({...snapshot('VISIBLE'),rights:{work:props.preferenceUser!=='VIEW-ONLY'}}),props);
+  try{refresh=true;await click(button(m.host,'Cập nhật dữ liệu'));assert.equal(m.host.querySelector('button[aria-label="Trang 2"]').disabled,false);await act(async()=>release());await flush();assert.equal(m.host.querySelector('button[aria-label="Trang 2"]').disabled,false);assert.equal(m.host.querySelector('button[aria-label="Báo công · VISIBLE"]').disabled,props.preferenceUser==='VIEW-ONLY');}
+  finally{await m.close();}
+ }
+});
+test('next page prefetch makes navigation immediate',async()=>{
+ const calls=[];const m=await mount(async path=>{calls.push(String(path));const page=Number(new URL(String(path),'https://synthetic.test').searchParams.get('page'));return Response.json(snapshot(page===2?'PREFETCHED':'FIRST',page));});
+ try{await act(async()=>new Promise(r=>setTimeout(r,300)));await flush();assert.equal(calls.filter(p=>p.includes('page=2')).length,1);await click(m.host.querySelector('button[aria-label="Trang 2"]'));assert.ok(m.host.querySelector('[aria-label="Báo công · PREFETCHED"]'));assert.equal(calls.filter(p=>p.includes('page=2')).length,1);}
+ finally{await m.close();}
+});
+
+test('memory pages survive reopening the same session, but a session or permission reset forces a new read',async()=>{
+ const {readProductionPage,cachedProductionPage}=await vite.ssrLoadModule('/lib/production-page-cache.ts');clearClientReads();let calls=0;globalThis.fetch=async()=>{calls++;return Response.json(snapshot('SESSION-'+calls));};
+ const url='/api/production-order-pages?page=1&sort=due&line=A';await readProductionPage(url,'same');assert.equal(cachedProductionPage(url,'same').orders[0].id,'SESSION-1');await readProductionPage(url,'same');assert.equal(calls,1);
+ clearClientReads();assert.equal(cachedProductionPage(url,'same'),null);await readProductionPage(url,'same');assert.equal(calls,2);
+ clearClientReads('mutation');assert.equal(cachedProductionPage(url,'same'),null);await readProductionPage(url,'same');assert.equal(calls,3);
+});
+
+test('a timed-out page read releases loading and can be retried without a permanent pager lock',async()=>{
+ const {readProductionPage}=await vite.ssrLoadModule('/lib/production-page-cache.ts');clearClientReads();const originalTimeout=globalThis.setTimeout;
+ globalThis.setTimeout=(fn,ms,...args)=>originalTimeout(fn,ms===25000?5:ms,...args);
+ globalThis.fetch=async(_path,init)=>new Promise((_resolve,reject)=>init.signal.addEventListener('abort',()=>reject(Object.assign(Error('aborted'),{name:'AbortError'}))));
+ try{await assert.rejects(readProductionPage('/api/production-order-pages?page=1','TIMEOUT'),/Tải dữ liệu quá lâu/);globalThis.fetch=async()=>Response.json(snapshot('RETRIED'));assert.equal((await readProductionPage('/api/production-order-pages?page=1','TIMEOUT')).orders[0].id,'RETRIED');}
+ finally{globalThis.setTimeout=originalTimeout;clearClientReads();}
 });

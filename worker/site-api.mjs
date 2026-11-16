@@ -15,7 +15,7 @@ import {productionUnassignedReminder} from '../scripts/local/production-unassign
 import {cancelReportingDay} from './cancel-reporting-day.mjs';
 import {productionReportingHold,reportingWriteBlocked} from '../lib/production-reporting-hold.mjs';
 import {sheetBridge,sheetSetup} from './warehouse-sheet.mjs';
-import {productionOrderPage,productionPageQuery} from '../scripts/local/production-order-pages.mjs';
+import {productionOrderPage,productionPageQuery,readProductionPageCatalog} from '../scripts/local/production-order-pages.mjs';
 import {skuTransfer} from './sku-transfer.mjs';
 import {hasMenuPermission,entityPermissionMenu,productionMenus} from '../lib/menu-action-access.mjs';
 import {createProductionIncident} from './production-incidents.mjs';
@@ -245,7 +245,7 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/in-transit'&&request.method==='GET'){if(url.searchParams.get('creationRecovery')==='1'){if(!canWrite(actor,'In Transit')&&!canWrite(actor,'In_transit'))return json({error:'Không có quyền cập nhật In Transit'},403);return json(await readAdditionalCreationScope(env.DB,actor));}if(!hasGrant(actor,'Kế hoạch sản xuất / In_transit',['Xem']))return json({error:'Không có quyền xem In Transit'},403);const activation=await readDailyOutputPolicy(env.DB);if(activation.policy?.cutoverReached&&!activation.policy.active)return json({error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy},503);const preservation=await readLegacyPreservation(env.DB,activation.policy,actor,{full:false});return json(await getTransit(env.DB,Object.fromEntries(url.searchParams),await loadCatalog(),{preservedOrders:preservation?.orders}));}
   if(path==='/api/production-order-pages'&&request.method==='GET'){
    productionPageQuery(url.searchParams,actor);
-   const result=await productionOrderPage(productionDb,actor,url.searchParams,await loadCatalog());
+   const result=await productionOrderPage(productionDb,actor,url.searchParams,examples?[]:await readProductionPageCatalog(env.DB));
    if(result instanceof Response)return result;
    const projected=result.reports?await readLaborReferences(productionDb,result,env.LABOR_RATE_OMISSIONS_JSON,env.LABOR_RATE_SNAPSHOT_ID,env.LABOR_RATE_WARNING_SUPPRESSIONS_JSON):result;
    return json({...projected,reportingHold:productionReportingHold(url.hostname)});
