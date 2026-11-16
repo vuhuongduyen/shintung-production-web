@@ -11,8 +11,37 @@ const order=(id)=>({id,lsxCode:id,sku:'TEST-SKU',name:'Synthetic product',line:'
 const snapshot=(id,page=1)=>({supported:true,orders:[order(id)],page,pageSize:10,total:21,totals:{orders:21,quantity:21000,approved:4200,pending:0,reserved:0},dailyOutputPolicy:{active:true,effectiveFrom:'2026-11-01',intakeModel:'server-receipt-quantity-v1'},rights:{work:true,line:'A'}});
 const tick=()=>new Promise(r=>setTimeout(r,0));
 async function flush(){await act(async()=>{await tick();await tick();});}
-async function mount(fetcher,props={}){clearClientReads();globalThis.fetch=fetcher;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(React.createElement(Work,{sessionLine:'A',preferenceUser:'SYNTHETIC-LINE-A',fallback:React.createElement('div',null,'Legacy fallback'),...props})));await flush();return {host,close:async()=>{await act(async()=>root.unmount());host.remove();}};}
+async function mount(fetcher,props={},reset=true){if(reset)clearClientReads();globalThis.fetch=fetcher;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(React.createElement(Work,{sessionLine:'A',preferenceUser:'SYNTHETIC-LINE-A',fallback:React.createElement('div',null,'Legacy fallback'),...props})));await flush();return {host,close:async()=>{await act(async()=>root.unmount());host.remove();}};}
 const button=(host,text)=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===text),click=async n=>{assert.ok(n);await act(async()=>n.click());await flush();};
+test('expired page reopens with retained rows, then verifies before enabling writes',async()=>{
+ const first=await mount(async()=>Response.json(snapshot('RETAINED')));await first.close();
+ const now=Date.now,future=now()+31000;Date.now=()=>future;let release;
+ const second=await mount(async()=>new Promise(r=>{release=()=>r(Response.json(snapshot('VERIFIED')));}),{},false);
+ try{
+  assert.ok(second.host.querySelector('[aria-label="Báo công · RETAINED"]'));
+  assert.equal(second.host.querySelector('button[aria-label="Báo công · RETAINED"]').disabled,true);
+  assert.equal(second.host.querySelector('button[aria-label="Trang 2"]').disabled,false);
+  await act(async()=>release());await flush();
+  assert.equal(second.host.querySelector('button[aria-label="Báo công · VERIFIED"]').disabled,false);
+ }finally{await second.close();Date.now=now;clearClientReads();}
+});
+test('retained pages do not cross identities or a session reset',async()=>{
+ const {readProductionPage,retainedProductionPage}=await vite.ssrLoadModule('/lib/production-page-cache.ts');
+ clearClientReads();globalThis.fetch=async()=>Response.json(snapshot('PRIVATE-A'));
+ await readProductionPage('/api/production-order-pages?page=1','USER-A');
+ assert.equal(retainedProductionPage('/api/production-order-pages?page=1','USER-B'),null);
+ assert.equal(retainedProductionPage('/api/production-order-pages?page=2','USER-A'),null);
+ clearClientReads();assert.equal(retainedProductionPage('/api/production-order-pages?page=1','USER-A'),null);
+});
+test('expiry during background refresh does not lock a page already verified in this screen',async()=>{
+ let refresh=false,release;const now=Date.now;
+ const m=await mount(async()=>refresh?new Promise(r=>{release=()=>r(Response.json(snapshot('ACTIVE')));}):Response.json(snapshot('ACTIVE')));
+ try{const future=now()+31000;Date.now=()=>future;refresh=true;await click(button(m.host,'Cập nhật dữ liệu'));
+  assert.equal(m.host.querySelector('button[aria-label="Báo công · ACTIVE"]').disabled,false);
+  assert.equal(m.host.querySelector('button[aria-label="Trang 2"]').disabled,false);
+  await act(async()=>release());await flush();
+ }finally{Date.now=now;await m.close();clearClientReads();}
+});
 async function input(n,value){assert.ok(n);await act(async()=>{const proto=n.tagName==='SELECT'?window.HTMLSelectElement.prototype:window.HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(n,value);n.dispatchEvent(new window.Event('input',{bubbles:true}));n.dispatchEvent(new window.Event('change',{bubbles:true}));});await flush();}
 test('mounted work screen requests server pages, applies only submitted filters and keeps totals from all matching orders',async()=>{
  const calls=[];const m=await mount(async path=>{calls.push(String(path));const p=new URL(String(path),'https://synthetic.test').searchParams;return Response.json(snapshot(p.get('query')?'FOUND':p.get('page')==='2'?'SECOND':'FIRST',Number(p.get('page')||1)));});

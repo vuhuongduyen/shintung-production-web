@@ -109,3 +109,7 @@ Chưa đo propagation Sec-Fetch-Site trên đường GitHub từ probe cũ; chư
 ## 16/11/2026 — ứng viên sửa tải nền/phân trang SX báo công
 
 Đã tái hiện trên MAIN v826: Line A và Admin có lúc khóa phân trang trong khi tải; Admin hiện lại phân trang và chuyển trang được sau khi hoàn tất. Đã rà cấu hình 30 user (17 có quyền menu), chưa đăng nhập thử từng user. Ứng viên riêng từ staging sau PR #30: cache theo phiên/user/Line/bộ lọc, gộp request focus/poll, tải trước một trang, timeout/retry và không khóa phân trang vì cập nhật nền/lỗi đọc; giảm dữ liệu SKU và bỏ đọc Leadtime không dùng. Không đổi tổng/trạng thái/quyền hoặc dữ liệu thật. Chi tiết và giới hạn: `docs/SX-PAGED-LOADING-2026-11-16.md`. Chưa merge/deploy, chưa nghiệm thu tốc độ bản sửa trên web thật.
+
+## 16/11/2026 — ứng viên giảm thời gian mở SX báo công
+
+Chỉ SX báo công: giảm đọc lặp, giữ snapshot hết TTL khi mở lại để kiểm tra nền. Fixture 126 lệnh: 45 → 17 lượt DB, tổng/dữ liệu lưu giữ nguyên. 37 ca mục tiêu/hồi quy, TypeScript và build đạt. Chưa merge/deploy hoặc nghiệm thu tốc độ end-to-end MAIN. Các menu còn lại giữ nguyên. Chi tiết: docs/SX-FIRST-LOAD-2026-11-16.md.

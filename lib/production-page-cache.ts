@@ -22,5 +22,6 @@ function entry(url:string,identity:string){
  }
  return cache;
 }
+export function retainedProductionPage(url:string,identity:string){return entry(url,identity).snapshot();}
 export function cachedProductionPage(url:string,identity:string){return entry(url,identity).freshSnapshot();}
 export function readProductionPage(url:string,identity:string,force=false){return entry(url,identity).read(force).catch(error=>{if(error?.status===401||error?.status===403)clearProductionPages();throw error;});}
