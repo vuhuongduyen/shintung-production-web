@@ -13,6 +13,7 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
  const active=useContext(WorkspaceActivityContext),exportAllowed=useContext(ExportPermissionContext),[snapshot,setSnapshot]=useState<Row|null>(null),[legacy,setLegacy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [search,setSearch]=useState(false),[field,setField]=useState(''),[query,setQuery]=useState(''),[line,setLine]=useState(sessionLine||'all'),[status,setStatus]=useState('all'),[applied,setApplied]=useState<Row|null>(null),[sort,setSort]=useState('due'),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0);
  const [editing,setEditing]=useState(false),[detail,setDetail]=useState<Row|null>(null),[notice,setNotice]=useState(''),[holdExpired,setHoldExpired]=useState(false);
+ const loadedUrl=useRef('');
  const generation=useRef(0),owner=useRef({}),seen=useRef(new Set<string>()),revision=useDataRefresh(['production_workflow','production_report'],{ignoreSource:owner.current});
  const url=productionOrderPageUrl({page,sort,applied,line:sessionLine||'all'});
  const held=editing||!!detail;
@@ -20,7 +21,7 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
   void productionApiFetch(url,{signal:controller.signal,cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw Object.assign(Error(data.error||'Không tải được danh sách báo công.'),{status:response.status});if(id!==generation.current)return;
    if(data.supported===false){setLegacy(true);setLoading(false);return;}
    if(data.supported!==true||!Array.isArray(data.orders)||!Number.isSafeInteger(data.total)||!data.totals||!data.rights)throw Error('Phản hồi danh sách báo công không hợp lệ.');
-   setLegacy(false);setSnapshot(data);setPage(data.page);setLoading(false);
+   loadedUrl.current=url;setLegacy(false);setSnapshot(data);setPage(data.page);setLoading(false);
   }).catch(e=>{if(id!==generation.current||controller.signal.aborted)return;if(e.status===401||e.status===403)setSnapshot(null);setError(e.message);setLoading(false);});
   return()=>{generation.current++;controller.abort();};
  },[url,active,held,refresh,revision,sessionLine,preferenceUser]);
@@ -45,7 +46,7 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
   {error&&<div role="alert" className="production-inline-message error">{error}{snapshot?' Đang giữ kết quả đã tải trước đó.':''} <FeedbackActionButton type="button" disabled={loading} disabledExplanation="Đang tải dữ liệu. Vui lòng chờ hoàn tất rồi thử lại." onClick={()=>setRefresh(n=>n+1)}>Thử lại</FeedbackActionButton></div>}
   {notice&&<div role="status" className="production-inline-message success">{notice}</div>}
   {!snapshot&&!error&&<section className="data-card production-empty" role="status">Đang tải dữ liệu sản xuất…</section>}
-  {snapshot&&<><p className="production-attendance-note">Theo toàn bộ bộ lọc: {snapshot.total.toLocaleString('vi-VN')} lệnh · Đã duyệt {snapshot.totals.approved.toLocaleString('vi-VN')} · Chờ duyệt {snapshot.totals.pending.toLocaleString('vi-VN')}</p><ProductionDailyBoard orders={snapshot.orders} reports={[]} policy={snapshot.dailyOutputPolicy} allowed={snapshot.rights.work&&!paused&&!loading&&!error} active={active} owner={owner.current} onSaved={saved} openDetail={setDetail} onEditingChange={setEditing} onNotice={setNotice} serverPage={{page:snapshot.page,pageSize:snapshot.pageSize,total:snapshot.total,loading:loading||held||!!error,onChange:setPage}}/></>}
+  {snapshot&&<><p className="production-attendance-note">Theo toàn bộ bộ lọc: {snapshot.total.toLocaleString('vi-VN')} lệnh · Đã duyệt {snapshot.totals.approved.toLocaleString('vi-VN')} · Chờ duyệt {snapshot.totals.pending.toLocaleString('vi-VN')}</p><ProductionDailyBoard orders={snapshot.orders} reports={[]} policy={snapshot.dailyOutputPolicy} allowed={snapshot.rights.work&&!paused&&loadedUrl.current===url} blockedReason={!snapshot.rights.work?'Bạn chưa có quyền báo sản lượng.':paused?snapshot.reportingHold?.message:loadedUrl.current!==url?'Đang tải trang hoặc bộ lọc mới. Vui lòng chờ đúng kết quả.':undefined} active={active} owner={owner.current} onSaved={saved} openDetail={setDetail} onEditingChange={setEditing} onNotice={setNotice} serverPage={{page:snapshot.page,pageSize:snapshot.pageSize,total:snapshot.total,loading:loading||held||!!error,onChange:setPage}}/></>}
   {detail&&snapshot&&<ProductionPagedWorkDetail order={detail} active={active} onClose={()=>setDetail(null)}/>}
  </main>;
 }
