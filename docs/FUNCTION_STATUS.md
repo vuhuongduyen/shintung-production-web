@@ -97,3 +97,11 @@ Chưa đo propagation Sec-Fetch-Site trên đường GitHub từ probe cũ; chư
 - Bốn điểm kiểm: (1) source/baseline đã đối chiếu, chưa đọc đủ queue/ACK live theo ID; (2) thử cô lập nhập/sửa/hủy, ACK thất lạc/retry và race nhận hàng đạt trong các suite trên, chưa đủ điều kiện merge vì thiếu đối soát live; (3) chưa đồng bộ QA; (4) chưa nghiệm thu hoặc triển khai Apps Script/MAIN.
 - Browser MAIN chỉ kiểm mẫu Admin: thấy nút Báo công, tổng số cập nhật sau tải nền và chuyển được trang. Chưa đo mở mới, chưa kiểm Line A/B thật hoặc chứng nhận tốc độ. Apps Script hiện hiển thị 0 trigger cho tài khoản đang xem; không thay trigger.
 - Còn mở: phân loại toàn bộ khác biệt source, kiểm riêng quyền/tốc độ Line A/B, đối soát queue/ACK live trước mọi điều kiện khôi phục, rà công thức theo tháng và nghiệm thu trên Sheet TEST đã được phép. Không kết luận sai lệch tồn thật từ việc chỉ đọc một mẫu công thức.
+
+
+## Cảnh báo đồng bộ Kho (16/11/2026, ứng viên PR riêng)
+
+- Bổ sung cảnh báo đọc thuần vào chuông và màn Nhập kho cho phiếu bridge ONSPA: lỗi/sai mã phiên bản ngay, chờ quyết định/ACK quá 5 phút, hủy thiếu bằng chứng loại tồn. Một phiếu một cảnh báo; không tự ghi/sửa/tính lại tồn.
+- Giữ quyền đọc hiện tại; dùng tập phiếu của API chuông đã đọc và refresh màn Kho theo cơ chế chung khi active. Không tăng reader SX; không thêm job hoặc bật trigger. Xem phiếu từ cảnh báo chỉ lọc ID, không chọn hay xác nhận.
+- Bốn điểm kiểm: baseline 101 phiếu bridge vừa đối soát → chạy bộ đọc mới có 0 cảnh báo và input bất biến; trước merge có 14/14 ca mục tiêu + 24/24 quick, TypeScript/build đạt; chưa đồng bộ QA; chưa nghiệm thu browser/Sheet TEST/MAIN.
+- Giới hạn: cảnh báo trạng thái/ACK không phải kiểm lại công thức tồn trực tiếp trên Sheet. Không bảo đảm phát hiện thao tác sửa tay sau ACK; chưa có giám sát khi web đóng. Chi tiết tại docs/WAREHOUSE-SYNC-ALERTS.md.
