@@ -34,3 +34,10 @@ test('large synthetic summary reads retain every row while excluding bulky displ
  assert.equal(projected.length,count);assert.equal(new Set(projected.map(r=>r.record_key)).size,count);assert.equal(projected.reduce((n,r)=>n+JSON.parse(r.payload).reportedQuantity,0),count);
  const bytes=projected.reduce((n,r)=>n+Buffer.byteLength(r.payload),0);assert.ok(bytes<400000);assert.equal((await db.prepare("SELECT count(*) AS n FROM app_records WHERE json_extract(payload,'$.sourceSnapshot.audit')=?").bind(audit).first()).n,count);
 }));
+test('summary pages budget the projected bytes rather than splitting removed audit copies into many DB calls',()=>fixture(async({db})=>{
+ await put(db,'in_transit',order.id,order);
+ const audit='x'.repeat(600000);for(let i=0;i<16;i++)await put(db,'production_history_import','IMPORT-'+i,{reports:[{id:'P-'+i,transitId:order.id,kind:'completion',reportedQuantity:1,reviewStatus:'Chờ kiểm tra',sourceSnapshot:{audit}}]});
+ let calls=0;const tracked={prepare(sql){const statement=db.prepare(sql);return {bind(...args){const bound=statement.bind(...args);return {all(){if(args[0]==='production_history_import')calls++;return bound.all();},first:()=>bound.first(),run:()=>bound.run()};}};}};
+ const state=await getTransit(tracked,{},[],{includeHistory:false,includeProductionSummary:true});assert.equal(state.rows[0].pendingReportQty,16);assert.ok(calls<=3,`projected history requires ${calls} DB round trips`);
+ assert.equal((await db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='production_history_import' AND length(json_extract(payload,'$.reports[0].sourceSnapshot.audit'))=600000").first()).n,16);
+}));

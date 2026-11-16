@@ -68,7 +68,12 @@ const parse = (r) => {
     return { ...r, payload: null };
   }
 };
-const read = async (db, entity, stageValidation=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:transitProductionPayload(entity)!=='payload'?transitProductionPayload(entity):stageValidation?stageValidationPayload(entity):'payload',sizeExpression:'payload'})).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
+const read = async (db, entity, stageValidation=false, projectedBudget=false) => {
+ const expression=transitProductionPayload(entity)!=='payload'?transitProductionPayload(entity):stageValidation?stageValidationPayload(entity):'payload';
+ // The paged quantity reader transports this exact projection, never the removed
+ // audit copies. Keep the 512 KiB limit on the bytes actually returned by D1.
+ return (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:expression,sizeExpression:projectedBudget?expression:'payload'})).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
+};
 const write = (db, entity, key, payload, actor, now) =>
   db
     .prepare(
@@ -112,7 +117,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
           return row?[parse(row)]:[];
         }
         if(options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly&&['in_transit_audit','leadtime','leadtime_versions'].includes(e))return [];
-        return read(db,e,options.stageValidation);
+        return read(db,e,options.stageValidation,options.includeProductionSummary===true);
       },
     ),
   );

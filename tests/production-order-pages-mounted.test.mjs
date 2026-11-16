@@ -38,3 +38,18 @@ test('opening a detail reads only that order and changing its report page never 
   await click(dialog.querySelector('button[aria-label="Trang 2"]'));assert.ok(calls.at(-1).includes('orderId=FIRST'));assert.ok(calls.at(-1).includes('page=2'));assert.equal(calls.some(p=>p.startsWith('/api/production-workflow')),false);
  }finally{await m.close();}
 });
+test('background refresh of the same page does not lock reporting or prevent opening its draft',async()=>{
+ let release,delayed=false;const m=await mount(async path=>{if(delayed)return new Promise(r=>{release=()=>r(Response.json(snapshot('REFRESHED')));});return Response.json(snapshot('FIRST'));});
+ try{
+  const report=()=>m.host.querySelector('button[aria-label="Báo công · FIRST"]');assert.equal(report().disabled,false);delayed=true;await click(button(m.host,'Cập nhật dữ liệu'));assert.equal(report().disabled,false,'a background refresh must not lock a valid loaded order');
+  await click(report());const dialog=document.querySelector('[role="dialog"]');assert.ok(dialog);assert.equal(dialog.querySelector('input[type=number]').disabled,false);await click(dialog.querySelector('button[aria-label="Đóng báo công"]'));await act(async()=>release());await flush();
+ }finally{await m.close();}
+});
+test('a requested new page cannot report against retained rows before that page has loaded',async()=>{
+ let release;const m=await mount(async path=>new URL(String(path),'https://synthetic.test').searchParams.get('page')==='2'?new Promise(r=>{release=()=>r(Response.json(snapshot('SECOND',2)));}):Response.json(snapshot('FIRST')));
+ try{await click(m.host.querySelector('button[aria-label="Trang 2"]'));assert.equal(m.host.querySelector('button[aria-label="Báo công · FIRST"]').disabled,true);await act(async()=>release());await flush();assert.equal(m.host.querySelector('button[aria-label="Báo công · SECOND"]').disabled,false);}finally{await m.close();}
+});
+test('a failed background read retains the loaded order and reporting rights; it cannot grant rights to a read-only user',async()=>{
+ for(const work of [true,false]){let fail=false;const m=await mount(async()=>fail?Response.json({error:'Synthetic offline'},{status:503}):Response.json({...snapshot('FIRST'),rights:{work,line:'A'}}));
+ try{fail=true;await click(button(m.host,'Cập nhật dữ liệu'));assert.match(m.host.textContent,/Synthetic offline/);assert.equal(m.host.querySelector('button[aria-label="Báo công · FIRST"]').disabled,!work);}finally{await m.close();}}
+});
