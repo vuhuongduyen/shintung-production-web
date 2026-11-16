@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {dailyFixture,actor as lineActor} from './helpers/daily-output-fixture.mjs';
-import {productionOrderPage,productionPageQuery} from '../scripts/local/production-order-pages.mjs';
+import {productionOrderPage,productionPageQuery,readProductionPageCatalog} from '../scripts/local/production-order-pages.mjs';
 import {records} from '../scripts/local/database.mjs';
 const admin={login:'SYNTHETIC-ADMIN',isAdmin:true};
 test('server pages filter before returning rows and totals cover every matching order, not the current page',()=>dailyFixture(async c=>{
@@ -93,4 +93,11 @@ test('CSV enforces the existing exact export grant on the server; view, sibling/
 test('a changed or inconsistent order identity cannot silently disappear from page counts',()=>dailyFixture(async c=>{
  await c.put('in_transit','BAD-KEY',{...c.order,id:'DIFFERENT-ID',lsxCode:'INCONSISTENT'});
  await assert.rejects(()=>productionOrderPage(c.db,admin,new URLSearchParams('field=LSX&query=INCONSISTENT')),e=>e.status===409);
+}));
+
+test('paged SKU metadata excludes bulky audit fields and list/detail never reads leadtime tables',()=>dailyFixture(async c=>{
+ await c.put('sku','SYNTHETIC-CATALOG',{code:'SYNTHETIC-CATALOG',name:'Tên từ SKU',specification:'Quy cách',unit:'Cái',group:'Nhóm',line:'A',history:'x'.repeat(650000)});
+ const before=await records(c.db),catalog=await readProductionPageCatalog(c.db);const sku=catalog.find(r=>r.key==='SYNTHETIC-CATALOG');assert.equal(sku.payload.name,'Tên từ SKU');assert.equal(sku.payload.specification,'Quy cách');assert.equal(sku.payload.history,undefined);
+ const db={prepare(sql){const stmt=c.db.prepare(sql);if(sql.includes('entity=?'))return new Proxy(stmt,{get(target,key){if(key==='bind')return (...args)=>{assert.ok(!['leadtime','leadtime_versions'].includes(args[0]),'paged view does not use leadtime');return target.bind(...args);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});return stmt;}};
+ const page=await productionOrderPage(db,admin,new URLSearchParams(),catalog);assert.ok(page.supported);await productionOrderPage(db,admin,new URLSearchParams({orderId:c.order.id}),catalog);assert.deepEqual(await records(c.db),before);
 }));

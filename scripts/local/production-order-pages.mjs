@@ -1,3 +1,5 @@
+import {siteCatalog} from '../../lib/site-catalog.mjs';
+import {readRecordPages} from './production-record-pages.mjs';
 import {getTransit} from './in-transit.mjs';
 import {readDailyOutputPolicy} from './production-daily-output.mjs';
 import {dailyOutputTotalsIndex} from '../../lib/production-daily-output.mjs';
@@ -13,6 +15,14 @@ const sourceCode=value=>`CAST(coalesce(nullif(nullif(json_extract(${value},'$.ls
 const completed=new Set(['early','completed','late']);
 const fields={LSX:'lsxCode',SKU:'sku','Tên sản phẩm':'name','Plan ID':'planId'};
 const orderFields=['id','planId','planGroupId','week','lsxCode','sku','name','spec','unit','line','planningNote','sequence','lsxQty','completedQty','pendingReportQty','inTransitQty','planStart','planEnd','actualStartedAt','actualCompletedAt','status','productionState','progressStatus','syncStatus','revision'];
+// The list/detail only consumes SKU display metadata. Do not transport audit,
+// BOM or price history, or hash the complete catalog, for every page request.
+export async function readProductionPageCatalog(db){
+ const columns=['code','group','productGroup','category','name','productName','specification','spec','quyCach','quy_cach','unit','uom','unitOfMeasure','line','productionLine','_deleted','status','confirmation_status','usage_status'];
+ const expression=`json_object(${columns.flatMap(k=>[`'${k}'`, `json_extract(payload,'$.${k}')`]).join(',')})`;
+ const records=await readRecordPages(db,{where:"entity='sku'",payloadExpression:expression,sizeExpression:expression});
+ return siteCatalog(records.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})));
+}
 export const canExportProductionWork=actor=>actor?.authMode!=='quick_line'&&Boolean(actor?.isAdmin||(actor?.grants||[]).some(g=>normalizePermission(g)===normalizePermission(productionMenus.work+' / Xuất dữ liệu')));
 const productionCursor=async db=>(await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first())?.payload??null;
 async function assertCursor(db,before){if(await productionCursor(db)!==before)fail('Báo công vừa thay đổi trong lúc đọc. Tải lại đúng trang và bộ lọc.',409);}
@@ -65,7 +75,7 @@ export async function* matchingProductionOrders(db,actor,q,catalog=[]){
   const candidates=(await db.prepare(orderDirectory+` SELECT record_key,lsxCode,planId,planGroupId FROM directory WHERE ${where.join(' AND ')} ORDER BY coalesce(week,'9999'),coalesce(${sortField},'9999'),record_key LIMIT 25 OFFSET ?`).bind(...args,offset).all()).results;
   if(!candidates.length)break;
   const orders=candidates.map(r=>({...r,id:r.record_key})),scope=productionOrderScope(db,orders);
-  const state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true}),totals=dailyOutputTotalsIndex(state.rows,state.summaryReports),byId=new Map(state.rows.map(o=>[o.id,o]));
+  const state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true,skipLeadtime:true}),totals=dailyOutputTotalsIndex(state.rows,state.summaryReports),byId=new Map(state.rows.map(o=>[o.id,o]));
   for(const candidate of orders){const o=byId.get(candidate.id);if(!o)fail('Định danh lệnh đã thay đổi hoặc không khớp dữ liệu đã lưu. Tải lại và đối chiếu trước khi tiếp tục.',409);if(o.syncStatus!=='ĐÃ ĐỒNG BỘ'||!o.lsxCode)continue;
    const reports=state.summaryReports.filter(r=>r.transitId===o.id),events=state.summaryEvents.filter(e=>!e.voided&&(e.sourceId===o.id||e.destinationId===o.id)),runtime=productionRuntime(o,events),summary=progressReviewSummary(o,state.summaryReports,events);
    const badge=o.status==='HỦY'?{label:'Đã hủy',tone:'cancelled'}:!runtime.known&&!reports.length&&productionProgressDisplay(o.progressStatus)||progressOrderStatus(summary,runtime,events);
@@ -108,7 +118,7 @@ async function readProductionOrderDetail(db,actor,params,catalog,policy){
  if(!id||id.length>250||!['reports','events'].includes(kind)||!Number.isSafeInteger(page)||page<1)fail('Phạm vi chi tiết không hợp lệ.');
  const row=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(id).first();if(!row)fail('Không còn lệnh để tra cứu.',404);
  const stored=JSON.parse(row.payload),raw=normalizeTransit({...stored,id});if(stored._deleted)fail('Lệnh đã lưu trữ; tra cứu tại lịch sử được phân quyền.',404);if(actor.line&&raw.line!==actor.line)fail('Không có quyền đọc Line khác.',403);
- const scope=productionOrderScope(db,[{...raw,id}]),state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true}),order=state.rows.find(o=>o.id===id);if(!order)fail('Không còn lệnh để tra cứu.',404);
+ const scope=productionOrderScope(db,[{...raw,id}]),state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true,skipLeadtime:true}),order=state.rows.find(o=>o.id===id);if(!order)fail('Không còn lệnh để tra cứu.',404);
  const totals=dailyOutputTotalsIndex([order],state.summaryReports).get(id);
  const code=String(raw.lsxCode||'').trim(),plan=String(raw.planId||'').trim();
  const match=`(json_extract(p,'$.transitId')=? OR (coalesce(json_extract(p,'$.transitId'),'')='' AND (upper(trim(${sourceCode('p')}))=upper(?) OR (?=1 AND ${sourceCode('p')}='' AND upper(trim(coalesce(json_extract(p,'$.planId'),'')))=upper(?)))))`;

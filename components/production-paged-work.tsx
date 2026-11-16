@@ -1,7 +1,7 @@
 'use client';
 import {useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {WorkspaceActivityContext,useDataRefresh} from '../lib/data-sync';
-import {productionApiFetch} from '../lib/production-api';
+import {cachedProductionPage,readProductionPage} from '../lib/production-page-cache';
 import {productionOrderPageUrl,applyPagedProductionSave} from '../lib/production-order-page-client.mjs';
 import {StandardToolbar,toolbar,ExportPermissionContext} from './standard-toolbar/StandardToolbar';
 import {PageTitle} from './onspa-ui/PageTitle';
@@ -17,14 +17,23 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
  const generation=useRef(0),owner=useRef({}),seen=useRef(new Set<string>()),revision=useDataRefresh(['production_workflow','production_report'],{ignoreSource:owner.current});
  const url=productionOrderPageUrl({page,sort,applied,line:sessionLine||'all'});
  const held=editing||!!detail;
- useEffect(()=>{if(!active||held)return;const id=++generation.current,controller=new AbortController();setLoading(true);setError('');
-  void productionApiFetch(url,{signal:controller.signal,cache:'no-store'}).then(async response=>{const data=await response.json();if(!response.ok)throw Object.assign(Error(data.error||'Không tải được danh sách báo công.'),{status:response.status});if(id!==generation.current)return;
+ const lastRead=useRef({url:'',refresh:0,revision:0});
+ const identity=JSON.stringify([preferenceUser||'',sessionLine||'all']);
+ useEffect(()=>{if(!active||held)return;const id=++generation.current;
+  const cached=cachedProductionPage(url,identity);if(cached?.supported===true){loadedUrl.current=url;setSnapshot(cached);setLegacy(false);}
+  setLoading(true);setError('');
+  const force=lastRead.current.url===url&&(lastRead.current.refresh!==refresh||lastRead.current.revision!==revision);lastRead.current={url,refresh,revision};
+  void readProductionPage(url,identity,force).then(data=>{if(id!==generation.current)return;
    if(data.supported===false){setLegacy(true);setLoading(false);return;}
-   if(data.supported!==true||!Array.isArray(data.orders)||!Number.isSafeInteger(data.total)||!data.totals||!data.rights)throw Error('Phản hồi danh sách báo công không hợp lệ.');
    loadedUrl.current=url;setLegacy(false);setSnapshot(data);setPage(data.page);setLoading(false);
-  }).catch(e=>{if(id!==generation.current||controller.signal.aborted)return;if(e.status===401||e.status===403)setSnapshot(null);setError(e.message);setLoading(false);});
-  return()=>{generation.current++;controller.abort();};
- },[url,active,held,refresh,revision,sessionLine,preferenceUser]);
+  }).catch(e=>{if(id!==generation.current)return;if(e.status===401||e.status===403){loadedUrl.current='';setSnapshot(null);}setError(e.message);setLoading(false);});
+  // Focus/poll joins an in-flight read instead of aborting and restarting it.
+  return()=>{generation.current++;};
+ },[url,active,held,refresh,revision,identity]);
+ useEffect(()=>{if(loading||!active||held||!snapshot||loadedUrl.current!==url||snapshot.page*snapshot.pageSize>=snapshot.total)return;
+  const timer=setTimeout(()=>{void readProductionPage(productionOrderPageUrl({page:snapshot.page+1,sort,applied,line:sessionLine||'all'}),identity).catch(()=>{});},250);
+  return()=>clearTimeout(timer);
+ },[snapshot,url,active,held,sort,applied,sessionLine,identity,loading]);
  useEffect(()=>{setHoldExpired(false);if(!snapshot?.reportingHold?.active)return;const t=setTimeout(()=>{setHoldExpired(true);setRefresh(n=>n+1);},Math.max(0,snapshot.reportingHold.remainingMs));return()=>clearTimeout(t);},[snapshot?.reportingHold]);
  const saved=useCallback((result:Row)=>{setSnapshot(old=>applyPagedProductionSave(old,result,seen.current));setRefresh(n=>n+1);},[]);
  const reset=()=>{setApplied(null);setQuery('');setStatus('all');setLine(sessionLine||'all');setPage(1);};
@@ -44,9 +53,10 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
    toolbar.action({onClick:()=>window.location.assign(productionOrderPageUrl({page:1,sort,applied,line:sessionLine||'all',format:'csv'})),disabled:!snapshot||!snapshot.rights.export||!exportAllowed||loading||held||!!error,disabledExplanation:!exportAllowed||snapshot&&!snapshot.rights.export?'Bạn chưa có quyền xuất dữ liệu SX báo công.':'Chờ danh sách tải xong và đóng bản nháp trước khi xuất.'},'Xuất dữ liệu CSV theo bộ lọc',true,'action')
   ]}/></div>
   {error&&<div role="alert" className="production-inline-message error">{error}{snapshot?' Đang giữ kết quả đã tải trước đó.':''} <FeedbackActionButton type="button" disabled={loading} disabledExplanation="Đang tải dữ liệu. Vui lòng chờ hoàn tất rồi thử lại." onClick={()=>setRefresh(n=>n+1)}>Thử lại</FeedbackActionButton></div>}
+  <p role="status" className="production-attendance-note" style={{minHeight:"1.4em"}}>{loading&&snapshot?(loadedUrl.current===url?'Đang cập nhật nền… Bạn vẫn có thể chọn trang khác.':'Đang tải trang đã chọn… Bạn vẫn có thể chọn trang khác.'):''}</p>
   {notice&&<div role="status" className="production-inline-message success">{notice}</div>}
   {!snapshot&&!error&&<section className="data-card production-empty" role="status">Đang tải dữ liệu sản xuất…</section>}
-  {snapshot&&<><p className="production-attendance-note">Theo toàn bộ bộ lọc: {snapshot.total.toLocaleString('vi-VN')} lệnh · Đã duyệt {snapshot.totals.approved.toLocaleString('vi-VN')} · Chờ duyệt {snapshot.totals.pending.toLocaleString('vi-VN')}</p><ProductionDailyBoard orders={snapshot.orders} reports={[]} policy={snapshot.dailyOutputPolicy} allowed={snapshot.rights.work&&!paused&&loadedUrl.current===url} blockedReason={!snapshot.rights.work?'Bạn chưa có quyền báo sản lượng.':paused?snapshot.reportingHold?.message:loadedUrl.current!==url?'Đang tải trang hoặc bộ lọc mới. Vui lòng chờ đúng kết quả.':undefined} active={active} owner={owner.current} onSaved={saved} openDetail={setDetail} onEditingChange={setEditing} onNotice={setNotice} serverPage={{page:snapshot.page,pageSize:snapshot.pageSize,total:snapshot.total,loading:loading||held||!!error,onChange:setPage}}/></>}
+  {snapshot&&<><p className="production-attendance-note">Theo toàn bộ bộ lọc: {snapshot.total.toLocaleString('vi-VN')} lệnh · Đã duyệt {snapshot.totals.approved.toLocaleString('vi-VN')} · Chờ duyệt {snapshot.totals.pending.toLocaleString('vi-VN')}</p><ProductionDailyBoard orders={snapshot.orders} reports={[]} policy={snapshot.dailyOutputPolicy} allowed={snapshot.rights.work&&!paused&&loadedUrl.current===url} blockedReason={!snapshot.rights.work?'Bạn chưa có quyền báo sản lượng.':paused?snapshot.reportingHold?.message:loadedUrl.current!==url?'Đang tải trang hoặc bộ lọc mới. Vui lòng chờ đúng kết quả.':undefined} active={active} owner={owner.current} onSaved={saved} openDetail={setDetail} onEditingChange={setEditing} onNotice={setNotice} serverPage={{page:snapshot.page,pageSize:snapshot.pageSize,total:snapshot.total,loading:held,onChange:next=>{if(next===page)setRefresh(n=>n+1);else setPage(next);}}}/></>}
   {detail&&snapshot&&<ProductionPagedWorkDetail order={detail} active={active} onClose={()=>setDetail(null)}/>}
  </main>;
 }

@@ -105,3 +105,7 @@ Chưa đo propagation Sec-Fetch-Site trên đường GitHub từ probe cũ; chư
 - Giữ quyền đọc hiện tại; dùng tập phiếu của API chuông đã đọc và refresh màn Kho theo cơ chế chung khi active. Không tăng reader SX; không thêm job hoặc bật trigger. Xem phiếu từ cảnh báo chỉ lọc ID, không chọn hay xác nhận.
 - Bốn điểm kiểm: baseline 101 phiếu bridge vừa đối soát → chạy bộ đọc mới có 0 cảnh báo và input bất biến; trước merge có 14/14 ca mục tiêu + 24/24 quick, TypeScript/build đạt; chưa đồng bộ QA; chưa nghiệm thu browser/Sheet TEST/MAIN.
 - Giới hạn: cảnh báo trạng thái/ACK không phải kiểm lại công thức tồn trực tiếp trên Sheet. Không bảo đảm phát hiện thao tác sửa tay sau ACK; chưa có giám sát khi web đóng. Chi tiết tại docs/WAREHOUSE-SYNC-ALERTS.md.
+
+## 16/11/2026 — ứng viên sửa tải nền/phân trang SX báo công
+
+Đã tái hiện trên MAIN v826: Line A và Admin có lúc khóa phân trang trong khi tải; Admin hiện lại phân trang và chuyển trang được sau khi hoàn tất. Đã rà cấu hình 30 user (17 có quyền menu), chưa đăng nhập thử từng user. Ứng viên riêng từ staging sau PR #30: cache theo phiên/user/Line/bộ lọc, gộp request focus/poll, tải trước một trang, timeout/retry và không khóa phân trang vì cập nhật nền/lỗi đọc; giảm dữ liệu SKU và bỏ đọc Leadtime không dùng. Không đổi tổng/trạng thái/quyền hoặc dữ liệu thật. Chi tiết và giới hạn: `docs/SX-PAGED-LOADING-2026-11-16.md`. Chưa merge/deploy, chưa nghiệm thu tốc độ bản sửa trên web thật.
