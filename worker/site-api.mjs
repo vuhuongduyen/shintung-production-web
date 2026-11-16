@@ -168,7 +168,7 @@ async function handleSiteApi(request,env,timing){
    const result=await adminReadResponse({path,method:request.method,authorized,db:env.DB,searchParams:url.searchParams});
    return json(result.body,result.status);
   }
-  if(actor.authMode==='quick_line'&&path!=='/api/production-workflow'&&!(request.method==='GET'&&['/api/capacity','/api/production-hr-hours','/api/production-standards'].includes(path)))return json({error:'User Line chỉ được xem Quản lý sản xuất và báo công tại Line của mình.'},403);
+  if(actor.authMode==='quick_line'&&path!=='/api/production-workflow'&&!(request.method==='GET'&&['/api/capacity','/api/production-hr-hours','/api/production-standards','/api/production-order-pages'].includes(path)))return json({error:'User Line chỉ được xem Quản lý sản xuất và báo công tại Line của mình.'},403);
   if(path==='/api/production-allocation-scope'){
    if(request.method==='GET')return json(await readAllocationScope(env.DB,actor));
    if(request.method!=='POST')return json({error:'Phương thức không hợp lệ'},405);
