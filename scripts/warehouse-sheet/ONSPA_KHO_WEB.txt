@@ -8,14 +8,21 @@ function ONSPA_caiDatKetNoi() {
  if(ss.getId()===ONSPA_REAL_SHEET&&base!=='https://sanxuat.shintung-vn-4458.chatgpt.site')throw Error('Không nối web thử vào kho thật.');
  const token=ui.prompt('Khóa kết nối','Dán khóa từ nút Kết nối Google Sheet trên web',ui.ButtonSet.OK_CANCEL);if(token.getSelectedButton()!==ui.Button.OK)return;
  PropertiesService.getScriptProperties().setProperties({ONSPA_URL:base,ONSPA_TOKEN:token.getResponseText().trim(),ONSPA_SHEET:ss.getId()});
- ONSPA_khoiPhucKetNoi();
+ ONSPA_kiemTraKetNoi();
 }
-// Reuse the URL/key already saved by setup; no need to create another key.
-function ONSPA_khoiPhucKetNoi(){
- ONSPA_api_({action:'ping'}); // authentication check only; no receipt mutations
+// Both entry points reuse saved settings and only ping; neither starts a job.
+function ONSPA_kiemTraKetNoi(){
+ const result=ONSPA_api_({action:'ping'});
+ SpreadsheetApp.getUi().alert('Kết nối hợp lệ. Chưa bật lịch đồng bộ. Kiểm tra kết nối không nhập hoặc xác nhận phiếu.');
+ return result;
+}
+function ONSPA_khoiPhucKetNoi(){return ONSPA_kiemTraKetNoi();}
+// Separate, explicit action. Do not run during verification or recovery checks.
+function ONSPA_batTriggerDongBo(){
+ ONSPA_api_({action:'ping'});
  ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='ONSPA_dongBoTuDong').forEach(t=>ScriptApp.deleteTrigger(t));
  ScriptApp.newTrigger('ONSPA_dongBoTuDong').timeBased().everyMinutes(1).create();
- SpreadsheetApp.getUi().alert('Đã cài kết nối. Tự đồng bộ mỗi phút. Kho vẫn dùng menu xác nhận như trước.');
+ SpreadsheetApp.getUi().alert('Đã bật lịch đồng bộ mỗi phút.');
 }
 function ONSPA_api_(body){
  const p=PropertiesService.getScriptProperties().getProperties();if(!p.ONSPA_URL||!p.ONSPA_TOKEN)throw Error('Chưa cài kết nối: chạy ONSPA_caiDatKetNoi.');

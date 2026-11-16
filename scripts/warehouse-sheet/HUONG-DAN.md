@@ -6,7 +6,7 @@ Chưa có kết nối tự động cho đến khi hoàn tất cài đặt dướ
 2. Trên web, đăng nhập Admin → Nhập kho → Nhập từ Sản xuất báo công → Kết nối Google Sheet. Nhập ID file kho, bấm Tạo / cấp lại khóa. Sao chép khóa, chỉ hiển thị một lần.
 3. Trong Apps Script của file kho: thay code xác nhận cũ bằng toàn bộ KHO_TP_XAC_NHAN.gs. Không để hai bản trùng hàm/hằng số. Giữ các file nghiệp vụ khác; toàn dự án chỉ có một onOpen, gọi KHO_TP_taoMenuKho_ trong onOpen hiện có nếu cần.
 4. Tạo thêm file ONSPA_KHO_WEB.gs, dán toàn bộ code tương ứng. Không dán file SX_DAY_NHAP_KHO_TP cũ vào dự án kho.
-5. Chạy ONSPA_caiDatKetNoi một lần bằng tài khoản quản trị file kho; cấp quyền Google yêu cầu; nhập URL web và khóa ở bước 2. Tài khoản này tạo lịch tự chạy mỗi phút.
+5. Nếu đã lưu URL/khóa, giữ nguyên và chỉ chạy `ONSPA_kiemTraKetNoi` (hoặc tên cũ `ONSPA_khoiPhucKetNoi`). Hai hàm chỉ ping, không tạo trigger hoặc đồng bộ phiếu. Chỉ dùng `ONSPA_caiDatKetNoi` khi chưa có cấu hình hoặc người quản lý yêu cầu đổi; cài đặt cũng không bật trigger. `ONSPA_batTriggerDongBo` là thao tác bật lịch riêng, chỉ chạy khi có yêu cầu vận hành sau nghiệm thu. Đợt tiếp nhận 16/11/2026 giữ trigger ngưng.
 6. QLSX xác nhận báo công thành phẩm: web vẫn tạo phiếu; Sheet nhận trong lần chạy tiếp theo, thường khoảng một phút, có thể chậm theo lịch Apps Script. Ngày nhập lấy thời điểm xuất trạm, không lấy ngày duyệt.
 7. Kho chọn dòng NHAP và dùng menu xác nhận cũ. Nhập N nếu số lượng khác, P nếu chênh lệch. Kho cần dùng tài khoản Google nhận diện được email. Kết quả được gửi ngay về web, không cần xác nhận lại.
 8. T = ĐÃ ĐỒNG BỘ WEB mới là đã gửi thành công. Nếu lỗi: xem U. Giữ kết quả xác nhận tại Sheet và tự gửi lại mỗi phút. Không sửa tay M/R/S để thử xác nhận lại.
@@ -22,7 +22,7 @@ Tắt kết nối trên web sẽ dừng quyền truy cập của script. Cấp l
 Nếu SX điều chỉnh ngày xuất trạm hợp lệ: lần đồng bộ tiếp theo cập nhật riêng cột A (Ngày nhập kho), giữ nguyên xác nhận, số lượng và người kho. Chỉ áp dụng phiếu đã liên kết ONSPA_WEB.
 
 ## Sửa kết nối 24/10/2026
-Nếu đã nhập URL/khóa nhưng cài đặt báo lỗi: thay toàn bộ WEB.gs bằng ONSPA_KHO_WEB.txt mới, lưu rồi chạy ONSPA_khoiPhucKetNoi. Hàm dùng lại khóa đã lưu, kiểm tra kết nối trước khi tạo lịch mỗi phút; không nhập hoặc xác nhận phiếu khi kiểm tra. Không tạo khóa mới chỉ để thử lại. Nếu TOKEN_INVALID, chạy ONSPA_caiDatKetNoi nhập khóa hiện hành. NOT_CONFIGURED: kiểm tra URL; DISABLED: kiểm tra cấu hình Admin.
+Nếu đã nhập URL/khóa nhưng cài đặt báo lỗi: dùng lại khóa đã lưu và kiểm bằng ONSPA_kiemTraKetNoi. Tên tương thích ONSPA_khoiPhucKetNoi cũng chỉ kiểm kết nối; từ bản sửa 16/11/2026 không còn tự tạo lịch. Không tạo khóa mới chỉ để thử lại. Nếu TOKEN_INVALID, chỉ nhập lại khóa hiện hành qua ONSPA_caiDatKetNoi khi được yêu cầu. NOT_CONFIGURED: kiểm tra URL; DISABLED: kiểm tra cấu hình Admin. Không chạy ONSPA_dongBoTuDong để kiểm kết nối vì hàm đó xử lý phiếu thật.
 
 
 ## Source thu hồi sản lượng ngày — chưa triển khai
