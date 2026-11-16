@@ -89,3 +89,9 @@ test('a timed-out page read releases loading and can be retried without a perman
  try{await assert.rejects(readProductionPage('/api/production-order-pages?page=1','TIMEOUT'),/Tải dữ liệu quá lâu/);globalThis.fetch=async()=>Response.json(snapshot('RETRIED'));assert.equal((await readProductionPage('/api/production-order-pages?page=1','TIMEOUT')).orders[0].id,'RETRIED');}
  finally{globalThis.setTimeout=originalTimeout;clearClientReads();}
 });
+
+test('unchanged background results still renew the next-page prefetch after its TTL expires',async()=>{
+ const calls=[],realNow=Date.now;const m=await mount(async path=>{calls.push(String(path));const page=Number(new URL(String(path),'https://synthetic.test').searchParams.get('page'));return Response.json(snapshot(page===2?'NEXT':'UNCHANGED',page));});
+ try{await act(async()=>new Promise(r=>setTimeout(r,300)));await flush();assert.equal(calls.filter(p=>p.includes('page=2')).length,1);const future=realNow()+31000;Date.now=()=>future;await click(button(m.host,'Cập nhật dữ liệu'));await act(async()=>new Promise(r=>setTimeout(r,300)));await flush();assert.equal(calls.filter(p=>p.includes('page=2')).length,2);}
+ finally{Date.now=realNow;await m.close();}
+});

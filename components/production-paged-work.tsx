@@ -30,10 +30,10 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
   // Focus/poll joins an in-flight read instead of aborting and restarting it.
   return()=>{generation.current++;};
  },[url,active,held,refresh,revision,identity]);
- useEffect(()=>{if(!active||held||!snapshot||loadedUrl.current!==url||snapshot.page*snapshot.pageSize>=snapshot.total)return;
+ useEffect(()=>{if(loading||!active||held||!snapshot||loadedUrl.current!==url||snapshot.page*snapshot.pageSize>=snapshot.total)return;
   const timer=setTimeout(()=>{void readProductionPage(productionOrderPageUrl({page:snapshot.page+1,sort,applied,line:sessionLine||'all'}),identity).catch(()=>{});},250);
   return()=>clearTimeout(timer);
- },[snapshot,url,active,held,sort,applied,sessionLine,identity]);
+ },[snapshot,url,active,held,sort,applied,sessionLine,identity,loading]);
  useEffect(()=>{setHoldExpired(false);if(!snapshot?.reportingHold?.active)return;const t=setTimeout(()=>{setHoldExpired(true);setRefresh(n=>n+1);},Math.max(0,snapshot.reportingHold.remainingMs));return()=>clearTimeout(t);},[snapshot?.reportingHold]);
  const saved=useCallback((result:Row)=>{setSnapshot(old=>applyPagedProductionSave(old,result,seen.current));setRefresh(n=>n+1);},[]);
  const reset=()=>{setApplied(null);setQuery('');setStatus('all');setLine(sessionLine||'all');setPage(1);};

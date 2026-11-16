@@ -22,7 +22,7 @@
 
 ## Kiểm tra và giới hạn
 
-- 29 ca mục tiêu: backend/client/mounted, gồm Admin, Line A/B, user chỉ xem, focus khi request chậm, dữ liệu nhớ, tải trước, timeout/retry, 401/403 và dữ liệu lịch sử. Bản ghi trong fixture giữ nguyên trước/sau.
+- 30 ca mục tiêu: backend/client/mounted, gồm Admin, Line A/B, user chỉ xem, focus khi request chậm, dữ liệu nhớ, tải trước, timeout/retry, 401/403 và dữ liệu lịch sử. Bản ghi trong fixture giữ nguyên trước/sau.
 - 37 ca hồi quy: Quick Line, import thưa, session, loading, read performance và In Transit; 24 hợp đồng CI nhanh. Typecheck/build đạt trước cập nhật ghi chú trạng thái cuối; chạy lại trước commit.
 - Browser MAIN chỉ xác minh lỗi bản cũ và cấu hình quyền; không giả đăng nhập/đổi mật khẩu user khác. Chưa nghiệm thu sửa trên web chạy thật, chưa đo tốc độ sau triển khai, chưa coi đã thử trực tiếp đủ 17 user.
 - Không tạo phiếu thử trên MAIN, không sửa/duyệt/hủy phiếu thật. Chưa merge hoặc triển khai bản sửa. PR riêng kế tiếp sau #30.
