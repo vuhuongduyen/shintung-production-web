@@ -1,4 +1,5 @@
 import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
+import {transitProductionPayload} from './transit-production-read.mjs';
 import {stageValidationPayload} from './production-stage-read.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {transitStandardLeadtime} from '../../lib/transit-leadtime.mjs';
@@ -67,7 +68,7 @@ const parse = (r) => {
     return { ...r, payload: null };
   }
 };
-const read = async (db, entity, stageValidation=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:stageValidation?stageValidationPayload(entity):'payload'})).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
+const read = async (db, entity, stageValidation=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:transitProductionPayload(entity)!=='payload'?transitProductionPayload(entity):stageValidation?stageValidationPayload(entity):'payload',sizeExpression:'payload'})).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
 const write = (db, entity, key, payload, actor, now) =>
   db
     .prepare(
@@ -193,7 +194,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
     .filter((r) => r.payload && !r.payload._deleted)
     .map((r) => r.payload)
     .sort((a, b) => text(b.at).localeCompare(text(a.at)));
-  const result={rows:withLeadtime,history};
+  const result={rows:withLeadtime,history,...(options.includeProductionSummary?{summaryReports:reportRows,summaryEvents:productionEvents}:{})};
   if(referenceOnly&&records[0]?.rawPayload){
     const row=records[0];let policy;try{policy=JSON.parse(row.reference_policy);}catch{policy=null;}
     const historyProtected=Boolean(row.reference_activation)||policy?.mode==='daily-finished-v1'&&policy.approved===true&&dateISO(policy.effectiveFrom)===policy.effectiveFrom&&policy.effectiveFrom<=vietnamDateISO();
