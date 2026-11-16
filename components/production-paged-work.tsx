@@ -3,14 +3,14 @@ import {useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'r
 import {WorkspaceActivityContext,useDataRefresh} from '../lib/data-sync';
 import {productionApiFetch} from '../lib/production-api';
 import {productionOrderPageUrl,applyPagedProductionSave} from '../lib/production-order-page-client.mjs';
-import {StandardToolbar,toolbar} from './standard-toolbar/StandardToolbar';
+import {StandardToolbar,toolbar,ExportPermissionContext} from './standard-toolbar/StandardToolbar';
 import {PageTitle} from './onspa-ui/PageTitle';
 import {FeedbackActionButton} from './action-feedback';
 import ProductionDailyBoard from './production-daily-board';
 import ProductionPagedWorkDetail from './production-paged-work-detail';
 type Row=Record<string,any>;
 export default function ProductionPagedWork({sessionLine,preferenceUser,fallback}:{sessionLine?:string;preferenceUser?:string;fallback:ReactNode}){
- const active=useContext(WorkspaceActivityContext),[snapshot,setSnapshot]=useState<Row|null>(null),[legacy,setLegacy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const active=useContext(WorkspaceActivityContext),exportAllowed=useContext(ExportPermissionContext),[snapshot,setSnapshot]=useState<Row|null>(null),[legacy,setLegacy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [search,setSearch]=useState(false),[field,setField]=useState(''),[query,setQuery]=useState(''),[line,setLine]=useState(sessionLine||'all'),[status,setStatus]=useState('all'),[applied,setApplied]=useState<Row|null>(null),[sort,setSort]=useState('due'),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0);
  const [editing,setEditing]=useState(false),[detail,setDetail]=useState<Row|null>(null),[notice,setNotice]=useState(''),[holdExpired,setHoldExpired]=useState(false);
  const generation=useRef(0),owner=useRef({}),seen=useRef(new Set<string>()),revision=useDataRefresh(['production_workflow','production_report'],{ignoreSource:owner.current});
@@ -40,7 +40,7 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
     toolbar.action({onClick:find},'Tìm kiếm',true,'search'),toolbar.action({onClick:reset},'Xóa lọc',true,'clear'),toolbar.action({onClick:()=>{setSearch(false);setField('');reset();}},'Quay lại',true,'back')
    ]:[toolbar.field('Sắp xếp',[toolbar.select({value:sort,onChange:e=>{setSort(e.target.value);setPage(1);}},<><option value="due">Hạn hoàn thành gần nhất</option><option value="start">Ngày bắt đầu gần nhất</option></>)])]),
    toolbar.action({onClick:()=>setRefresh(n=>n+1),disabled:loading||held,disabledExplanation:'Đang xử lý hoặc đang mở bản nháp.'},'Cập nhật dữ liệu',true,'action'),
-   toolbar.action({onClick:()=>window.location.assign(productionOrderPageUrl({page:1,sort,applied,line:sessionLine||'all',format:'csv'})),disabled:!snapshot||loading||held||!!error,disabledExplanation:'Chờ danh sách tải xong và đóng bản nháp trước khi xuất.'},'Xuất CSV theo bộ lọc',true,'action')
+   toolbar.action({onClick:()=>window.location.assign(productionOrderPageUrl({page:1,sort,applied,line:sessionLine||'all',format:'csv'})),disabled:!snapshot||!snapshot.rights.export||!exportAllowed||loading||held||!!error,disabledExplanation:!exportAllowed||snapshot&&!snapshot.rights.export?'Bạn chưa có quyền xuất dữ liệu SX báo công.':'Chờ danh sách tải xong và đóng bản nháp trước khi xuất.'},'Xuất dữ liệu CSV theo bộ lọc',true,'action')
   ]}/></div>
   {error&&<div role="alert" className="production-inline-message error">{error}{snapshot?' Đang giữ kết quả đã tải trước đó.':''} <FeedbackActionButton type="button" disabled={loading} disabledExplanation="Đang tải dữ liệu. Vui lòng chờ hoàn tất rồi thử lại." onClick={()=>setRefresh(n=>n+1)}>Thử lại</FeedbackActionButton></div>}
   {notice&&<div role="status" className="production-inline-message success">{notice}</div>}

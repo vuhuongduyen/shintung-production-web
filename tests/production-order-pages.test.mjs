@@ -83,3 +83,14 @@ test('detail ordering uses production time with GMT+7 offsets, not the date a ba
  for(const r of [{...base,id:'NEWER',quantityOnly:true,reportingModel:'daily-finished-v1',productionAt:'2026-11-02T01:00:00Z',productionDate:'2026-11-02',reportedAt:'2026-11-03'}, {...base,id:'OLDER',completedAt:'2026-11-02T07:30:00+07:00',reportedAt:'2026-11-16'}, {...base,id:'BACKFILL',quantityOnly:true,reportingModel:'daily-finished-v1',productionDate:'2026-10-30',reportedAt:'2026-11-16'}])await c.put('production_report',r.id,r);
  const detail=await productionOrderPage(c.db,lineActor,new URLSearchParams({orderId:c.order.id}));assert.deepEqual(detail.reports.map(r=>r.id),['NEWER','OLDER','BACKFILL']);
 }));
+test('CSV enforces the existing exact export grant on the server; view, sibling/group grants and Quick Line cannot expand export access',()=>dailyFixture(async c=>{
+ const csv=new URLSearchParams('format=csv');
+ for(const viewer of [lineActor,{login:'VIEW',grants:['Quản lý sản xuất / Báo công sản xuất / Xem']},{login:'SIBLING',grants:['Quản lý sản xuất / Báo công sản xuất / Xem','Quản lý sản xuất / Tiến độ sản xuất / Xuất dữ liệu']},{login:'GROUP',grants:['Quản lý sản xuất / Xem','Quản lý sản xuất / Xuất dữ liệu']}])await assert.rejects(()=>productionOrderPage(c.db,viewer,csv),e=>e.status===403);
+ const allowed={login:'EXPORT-A',line:'A',grants:['Quản lý sản xuất / Báo công sản xuất / Xem','Quản lý sản xuất / Báo công sản xuất / Xuất dữ liệu']};
+ await c.put('in_transit','PRIVATE-B-EXPORT',{...c.order,id:'PRIVATE-B-EXPORT',line:'B',lsxCode:'PRIVATE-B-EXPORT'});
+ const text=await(await productionOrderPage(c.db,allowed,csv)).text();assert.equal(text.includes('PRIVATE-B-EXPORT'),false);assert.equal((await productionOrderPage(c.db,lineActor,new URLSearchParams())).rights.export,false);
+}));
+test('a changed or inconsistent order identity cannot silently disappear from page counts',()=>dailyFixture(async c=>{
+ await c.put('in_transit','BAD-KEY',{...c.order,id:'DIFFERENT-ID',lsxCode:'INCONSISTENT'});
+ await assert.rejects(()=>productionOrderPage(c.db,admin,new URLSearchParams('field=LSX&query=INCONSISTENT')),e=>e.status===409);
+}));

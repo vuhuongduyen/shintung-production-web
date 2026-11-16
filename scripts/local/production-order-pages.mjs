@@ -4,7 +4,7 @@ import {dailyOutputTotalsIndex} from '../../lib/production-daily-output.mjs';
 import {productionRuntime} from '../../lib/production-runtime.mjs';
 import {progressReviewSummary,progressOrderStatus} from '../../lib/production-progress-review.mjs';
 import {productionProgressDisplay} from '../../lib/production-progress-display.mjs';
-import {hasMenuPermission,productionMenus,writeActions} from '../../lib/menu-action-access.mjs';
+import {hasMenuPermission,productionMenus,writeActions,normalizePermission} from '../../lib/menu-action-access.mjs';
 import {monday,normalized} from '../../lib/production-plan.mjs';
 import {normalizeTransit} from '../../lib/in-transit.mjs';
 const fail=(message,status=422)=>{throw Object.assign(Error(message),{status});};
@@ -13,6 +13,7 @@ const sourceCode=value=>`CAST(coalesce(nullif(nullif(json_extract(${value},'$.ls
 const completed=new Set(['early','completed','late']);
 const fields={LSX:'lsxCode',SKU:'sku','Tên sản phẩm':'name','Plan ID':'planId'};
 const orderFields=['id','planId','planGroupId','week','lsxCode','sku','name','spec','unit','line','planningNote','sequence','lsxQty','completedQty','pendingReportQty','inTransitQty','planStart','planEnd','actualStartedAt','actualCompletedAt','status','productionState','progressStatus','syncStatus','revision'];
+export const canExportProductionWork=actor=>actor?.authMode!=='quick_line'&&Boolean(actor?.isAdmin||(actor?.grants||[]).some(g=>normalizePermission(g)===normalizePermission(productionMenus.work+' / Xuất dữ liệu')));
 const productionCursor=async db=>(await db.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first())?.payload??null;
 async function assertCursor(db,before){if(await productionCursor(db)!==before)fail('Báo công vừa thay đổi trong lúc đọc. Tải lại đúng trang và bộ lọc.',409);}
 export function productionPageQuery(params,actor){
@@ -65,7 +66,7 @@ export async function* matchingProductionOrders(db,actor,q,catalog=[]){
   if(!candidates.length)break;
   const orders=candidates.map(r=>({...r,id:r.record_key})),scope=productionOrderScope(db,orders);
   const state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true}),totals=dailyOutputTotalsIndex(state.rows,state.summaryReports),byId=new Map(state.rows.map(o=>[o.id,o]));
-  for(const candidate of orders){const o=byId.get(candidate.id);if(!o||o.syncStatus!=='ĐÃ ĐỒNG BỘ'||!o.lsxCode)continue;
+  for(const candidate of orders){const o=byId.get(candidate.id);if(!o)fail('Định danh lệnh đã thay đổi hoặc không khớp dữ liệu đã lưu. Tải lại và đối chiếu trước khi tiếp tục.',409);if(o.syncStatus!=='ĐÃ ĐỒNG BỘ'||!o.lsxCode)continue;
    const reports=state.summaryReports.filter(r=>r.transitId===o.id),events=state.summaryEvents.filter(e=>!e.voided&&(e.sourceId===o.id||e.destinationId===o.id)),runtime=productionRuntime(o,events),summary=progressReviewSummary(o,state.summaryReports,events);
    const badge=o.status==='HỦY'?{label:'Đã hủy',tone:'cancelled'}:!runtime.known&&!reports.length&&productionProgressDisplay(o.progressStatus)||progressOrderStatus(summary,runtime,events);
    if(rowMatches(o,badge,q))yield wireOrder(o,totals.get(o.id),badge,runtime);
@@ -76,7 +77,9 @@ export async function* matchingProductionOrders(db,actor,q,catalog=[]){
 const headers=['Lệnh sản xuất','SKU','Tên SP','Quy cách','Line','Ghi chú','Thứ tự SX','SL lệnh','SL đã duyệt','SL chờ duyệt','KH bắt đầu','KH hoàn thành','Trạng thái','Plan ID'];
 function csv(values){return values.map(value=>{let s=String(value??'');if(/^[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';}).join(',')+'\r\n';}
 export async function productionOrderPage(db,actor,params,catalog=[]){
- const query=productionPageQuery(params,actor),activation=await readDailyOutputPolicy(db);
+ const query=productionPageQuery(params,actor);
+ if(params.get('format')==='csv'&&!canExportProductionWork(actor))fail('Không có quyền xuất dữ liệu SX báo công.',403);
+ const activation=await readDailyOutputPolicy(db);
  if(activation.policy?.cutoverReached&&!activation.policy.active)fail(activation.policy.blockedReason,503);
  if(!activation.policy?.active)return {supported:false};
  const cursor=await productionCursor(db);
@@ -95,7 +98,7 @@ export async function productionOrderPage(db,actor,params,catalog=[]){
  }
  const pages=Math.max(1,Math.ceil(totals.orders/query.pageSize)),page=Math.min(query.page,pages);
  await assertCursor(db,cursor);
- return {supported:true,orders:page===query.page?rows:last.slice(-((totals.orders-1)%query.pageSize+1)),page,pageSize:query.pageSize,total:totals.orders,totals,filters:query,dailyOutputPolicy:activation.policy,rights:{work:hasMenuPermission(actor,productionMenus.work,writeActions),line:actor.line||null}};
+ return {supported:true,orders:page===query.page?rows:last.slice(-((totals.orders-1)%query.pageSize+1)),page,pageSize:query.pageSize,total:totals.orders,totals,filters:query,dailyOutputPolicy:activation.policy,rights:{work:hasMenuPermission(actor,productionMenus.work,writeActions),export:canExportProductionWork(actor),line:actor.line||null}};
 }
 const reportColumns=['id','transitId','planId','lsxCode','sku','name','spec','line','kind','reportingModel','quantityOnly','reportedQuantity','approvedQuantity','reviewStatus','warehouseStatus','version','productionAt','productionDate','productionLocalDateTime','startedAt','completedAt','reportedAt','reportedBy','reportedById','actorId','reviewedBy','reviewedById','reviewedAt','note','delayReason','stageName','stageCode','stageReporting','erpStageImport','stageQuantity','cancelled','voided','hours','standardUnit','rateBasis','rateStatus','rateIssue','earnedStandardHours','laborNotes','legacyEarnedBasis','sourceVerified','historicalImport','sourceLaborHours','sourcePeriodHours','pendingCorrection'];
 const eventColumns=['id','kind','sourceId','destinationId','line','destinationLine','effectiveAt','endsAt','recordedAt','actor','actorId','stageName','stageCode','stageReporting','stageAction','sourceTimeLog','sourceOperation','reportId','quantity','count','employees','reason','voided'];
