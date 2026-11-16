@@ -10,3 +10,11 @@ test('successful new report changes only pending quantities once; replay waits f
  const after=applyPagedProductionSave(snapshot,saved,seen);assert.equal(after.totals.approved,250);assert.equal(after.totals.pending,310);assert.equal(after.orders[0].serverSummary.totals.reported,500);assert.deepEqual(after.orders[1],snapshot.orders[1]);assert.equal(snapshot.totals.pending,10);
  assert.equal(applyPagedProductionSave(after,saved,seen),after);assert.equal(applyPagedProductionSave(after,{...saved,replayed:true},new Set()),after);
 });
+test('ACK refreshes the waiting badge immediately, retains a known pause and does not confirm pending completion',()=>{
+ const row={id:'O',lsxQty:1000,serverSummary:{totals:{approved:200,pending:0,reported:200},badge:{label:'Chưa SX',tone:'waiting'},runtime:{known:false,running:false}}};
+ const state={orders:[row],totals:{approved:200,pending:0}},save={report:{id:'R',transitId:'O',reportedQuantity:300}};
+ const after=applyPagedProductionSave(state,save,new Set());assert.equal(after.orders[0].serverSummary.badge.tone,'running');assert.equal(after.orders[0].serverSummary.totals.approved,200);
+ const final=applyPagedProductionSave(after,{report:{id:'R2',transitId:'O',reportedQuantity:500}},new Set());assert.equal(final.orders[0].serverSummary.badge.tone,'review');assert.equal(final.orders[0].serverSummary.totals.approved,200);assert.equal(final.orders[0].serverSummary.totals.pending,800);
+ const paused={...row,serverSummary:{...row.serverSummary,badge:{label:'Đang tạm ngưng',tone:'paused'},runtime:{known:true,running:false}}};
+ assert.equal(applyPagedProductionSave({...state,orders:[paused]},save,new Set()).orders[0].serverSummary.badge.tone,'paused');
+});
