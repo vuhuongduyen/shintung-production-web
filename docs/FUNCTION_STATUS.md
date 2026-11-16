@@ -87,3 +87,13 @@ Chưa đo propagation Sec-Fetch-Site trên đường GitHub từ probe cũ; chư
 - Backend keeps existing permissions, version checks, lifecycle, reservations and compare-and-swap writes. An enabled policy rejects creating a week, writes outside its Line, non-synthetic or out-of-date names, unnamed leave, transfers/cleaning, and replacing confirmed or dependency-bearing rosters.
 - No Worker/local API route enables the policy. No QA identity, runtime allowlist, seed, integration setting or deployment change is included. Production behavior remains unchanged.
 - **Not live acceptance:** QA overlay wiring and desktop/mobile end-to-end overtime/payroll QA are still pending. See `docs/CAPACITY-TEST-ROSTER.md` for activation contract and verification gates. Do not merge/deploy merely because component/unit checks pass.
+
+
+## Kho: tách kiểm kết nối và bật trigger (16/11/2026, ứng viên PR riêng)
+
+- Base GitHub staging `6e004e4657eee5072c908c36778ca49f4ca3d70a` sau PR #28. Sites MAIN v824 có source khác, không ghi đè source MAIN từ checkout này. Backend bridge/pending correction/withdrawal đã đối chiếu giống nhau; Apps Script đi kèm MAIN còn cũ.
+- `ONSPA_kiemTraKetNoi` và tên tương thích `ONSPA_khoiPhucKetNoi` chỉ ping bằng cấu hình đã lưu. Setup không tự bật lịch. Bật trigger là hàm riêng `ONSPA_batTriggerDongBo`; chưa chạy trên Sheet thật. Giữ code xử lý commandId/commandRevision và các guard từ staging, không đưa thay đổi vào dữ liệu hay cấu hình runtime.
+- Local: 34/34 ca Apps Script/formula/index/replay, 17/17 ca backend Kho/pending correction/selected confirm, 24/24 quick contracts và TypeScript đạt. Không cần build Worker cho thay đổi Apps Script/tài liệu này. Chưa có CI remote cho commit mới tại thời điểm ghi.
+- Bốn điểm kiểm: (1) source/baseline đã đối chiếu, chưa đọc đủ queue/ACK live theo ID; (2) thử cô lập nhập/sửa/hủy, ACK thất lạc/retry và race nhận hàng đạt trong các suite trên, chưa đủ điều kiện merge vì thiếu đối soát live; (3) chưa đồng bộ QA; (4) chưa nghiệm thu hoặc triển khai Apps Script/MAIN.
+- Browser MAIN chỉ kiểm mẫu Admin: thấy nút Báo công, tổng số cập nhật sau tải nền và chuyển được trang. Chưa đo mở mới, chưa kiểm Line A/B thật hoặc chứng nhận tốc độ. Apps Script hiện hiển thị 0 trigger cho tài khoản đang xem; không thay trigger.
+- Còn mở: phân loại toàn bộ khác biệt source, kiểm riêng quyền/tốc độ Line A/B, đối soát queue/ACK live trước mọi điều kiện khôi phục, rà công thức theo tháng và nghiệm thu trên Sheet TEST đã được phép. Không kết luận sai lệch tồn thật từ việc chỉ đọc một mẫu công thức.
