@@ -27,6 +27,7 @@ import {auditRoutes,auditMutation,clientReceipt} from './action-audit.mjs';
 import {readAllocationScope,saveAllocationScope} from '../scripts/local/production-allocation-scope.mjs';
 import {allocationSessionGroup,readAllocationQueue,mutateAllocationQueue} from '../scripts/local/production-allocation-queue.mjs';
 import {adminReadPaths,adminReadResponse} from '../lib/admin-readonly.mjs';
+import {warehouseSyncAlerts} from '../lib/warehouse-sync-alerts.mjs';
 import {pendingReportReview,reportReviewBlocker,reportDelayReasonError} from '../lib/production-progress-review.mjs';
 import {productionHistoryImport} from '../scripts/local/production-history-import.mjs';
 import {hrAttendancePermissions,withBusinessViews} from '../lib/user-permission-profiles.mjs';
@@ -219,6 +220,10 @@ async function handleSiteApi(request,env,timing){
     const definition=approvalDefinitions[row.entity],current=groups.get(row.entity)||{entity:row.entity,...definition,count:0,records:[]};
     current.count+=1;if(current.records.length<5)current.records.push({key:row.record_key,updatedAt:row.updated_at});groups.set(row.entity,current);
    }
+   if(monitored.includes('warehouse_in')){
+    const alerts=warehouseSyncAlerts(rows.filter(r=>r.entity==='warehouse_in').map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})));
+    if(alerts.length)groups.set('warehouse_sync_alerts',{entity:'warehouse_sync_alerts',label:'Cảnh báo đồng bộ Kho',view:'warehouse',child:'warehouse-in',count:alerts.length,records:alerts.slice(0,5).map(a=>({key:a.receiptId}))});
+   }
    const values=[...groups.values()];
    return json({total:values.reduce((sum,item)=>sum+item.count,0),groups:values,storedBomChangeStatuses});
   }
@@ -288,7 +293,8 @@ async function handleSiteApi(request,env,timing){
      reconciliation={approved:approved.length,receipts:receipts.length,pending:outputs.filter(r=>pendingReportReview(r)).length,missing};
     }
 
-    return json({reconciliation,records:rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),sourceCompletedAt:completed.get(r.record_key)||null,updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision}))});
+    const records=rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),sourceCompletedAt:completed.get(r.record_key)||null,updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision}));
+    return json({reconciliation,records,syncAlerts:warehouseSyncAlerts(records),syncAlertCheckedAt:new Date().toISOString()});
    }
    if(entity==='leadtime')return json({records:rows.map(r=>({key:r.record_key,payload:projectCancelledMaster('leadtime',JSON.parse(r.payload)),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision}))});
    if(entity==='bom'){const masters=(await loadCatalog()).map(row=>row.payload);return json({records:rows.map(r=>({key:r.record_key,payload:syncBomSources(JSON.parse(r.payload),masters),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision}))});}
