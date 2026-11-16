@@ -1,3 +1,4 @@
+import {activeProgressDatabase} from '../scripts/local/production-progress-read.mjs';
 import {importLaborReferenceSnapshot} from '../scripts/local/production-labor-reference-import.mjs';
 import {readLaborReferences} from '../scripts/local/production-labor-reference.mjs';
 import {readLaborHistory} from '../scripts/local/labor-rate-source.mjs';
@@ -253,9 +254,13 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/production-workflow'&&request.method==='GET'){
    const activation=await readDailyOutputPolicy(productionDb);
    if(activation.policy?.cutoverReached&&!activation.policy.active)return json({error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy},503);
-   const catalogRead=loadCatalog();
-   const legacyPreservation=await readLegacyPreservation(productionDb,activation.policy,actor,{full:url.searchParams.get('view')!=='work'});
-   const workflow=await readProductionWorkflow(workflowReadSnapshot(productionDb),actor,await catalogRead,{legacyPreservation,includeJournalHours:url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',stageValidation:url.searchParams.get('view')==='work'});
+   const progressRead=url.searchParams.get('view')==='progress';
+   if(progressRead&&url.searchParams.has('scope')&&!['active','all'].includes(url.searchParams.get('scope')))return json({error:'Phạm vi tiến độ không hợp lệ.'},422);
+   const catalogRead=progressRead?(examples?Promise.resolve([]):readProductionPageCatalog(env.DB,{includeProcesses:true})):loadCatalog();
+   const legacyPreservation=await readLegacyPreservation(productionDb,activation.policy,actor,{full:url.searchParams.get('view')!=='work',includeMonthly:!progressRead});
+   const progressCatalog=await catalogRead;
+   const workflowDb=progressRead&&url.searchParams.get('scope')!=='all'?await activeProgressDatabase(productionDb,actor,progressCatalog,legacyPreservation?.orders):productionDb;
+   const workflow=await readProductionWorkflow(workflowReadSnapshot(workflowDb),actor,progressCatalog,{legacyPreservation,progressRead,includeJournalHours:!progressRead&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',stageValidation:url.searchParams.get('view')==='work'});
    if(url.searchParams.get('unassignedAlerts')==='1'){if(productionReportingHold(url.hostname))return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,workflow));}
    return json({...await readLaborReferences(productionDb,workflow,env.LABOR_RATE_OMISSIONS_JSON,env.LABOR_RATE_SNAPSHOT_ID,env.LABOR_RATE_WARNING_SUPPRESSIONS_JSON),...(activation.policy?{dailyOutputPolicy:activation.policy}:{}),reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
   }

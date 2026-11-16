@@ -34,3 +34,33 @@ test('fresh full data is reused across work and payroll without downgrading its 
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host),render=mode=>act(async()=>root.render(React.createElement(Production,{mode,operator:'SYNTHETIC',preferenceUser:'SYNTHETIC'})));
  try{await render('payroll');await until(()=>host.querySelector('.production-payroll-screen'));await render('work');await until(()=>host.textContent.includes('LSX-A'));await render('payroll');await until(()=>host.querySelector('.production-payroll-screen'));assert.equal(calls,1);assert.equal(standards,0);}finally{await act(async()=>root.unmount());host.remove();clearProductionSnapshot();clearClientReads('session');globalThis.fetch=originalFetch;}
 });
+
+test('progress uses its own read, retains table after refresh failure and cannot substitute for full detail or payroll',async()=>{
+ clearProductionSnapshot();clearClientReads('session');window.sessionStorage.clear();window.localStorage.clear();
+ let progressCalls=0,fullCalls=0,fail=false,release;
+ const gate=new Promise(resolve=>{release=resolve;});
+ globalThis.fetch=async path=>{const url=String(path);if(url.includes('view=progress')){progressCalls++;return fail?new Response('Overloaded',{status:503}):Response.json(work);}if(url==='/api/production-workflow'){fullCalls++;return gate;}return Response.json({records:[]});};
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host),render=mode=>act(async()=>root.render(React.createElement(Production,{mode,operator:'SYNTHETIC',preferenceUser:'SYNTHETIC'})));
+ try{
+  await render('progress');await until(()=>host.querySelector('.production-progress-review-screen'));assert.equal(progressCalls,1);assert.equal(fullCalls,0);
+  fail=true;await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()==='Cập nhật dữ liệu').click());await until(()=>host.querySelector('[role="alert"]'));assert.match(host.textContent,/LSX-A/);assert.ok(host.querySelector('.production-progress-review-screen'));
+  fail=false;await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Thử lại').click());await until(()=>!host.querySelector('[role="alert"]'));assert.equal(progressCalls,3);
+  await render('payroll');await until(()=>fullCalls===1);assert.equal(host.querySelector('.production-payroll-screen'),null);assert.match(host.textContent,/Đang tải dữ liệu sản xuất/);
+  release(Response.json(full));await until(()=>host.querySelector('.production-payroll-screen'));
+ }finally{release(Response.json(full));await act(async()=>root.unmount());host.remove();clearProductionSnapshot();clearClientReads('session');globalThis.fetch=originalFetch;}
+});
+
+test('progress never requests completed/cancelled history until selected; history and active snapshots stay separate',async()=>{
+ clearProductionSnapshot();clearClientReads('session');window.localStorage.clear();
+ const activeOrder={...orders[0],lsxCode:'ACTIVE-ONLY'},done={...orders[0],id:'DONE',lsxCode:'DONE-ONLY',completedQty:1000,actualCompletedAt:'2026-11-03'},cancel={...orders[0],id:'CANCEL',lsxCode:'CANCEL-ONLY',status:'HỦY',cancelReason:'Test'};
+ const activeData={...work,orders:[activeOrder],progressOrders:[activeOrder],reports:[]},historyData={...activeData,orders:[activeOrder,done,cancel],progressOrders:[activeOrder,done,cancel],reports:[{id:'DONE-R',kind:'completion',transitId:'DONE',line:'A',reportedQuantity:1000,approvedQuantity:1000,completedAt:'2026-11-03',reviewStatus:'Đã xác nhận'}]};
+ const calls=[];globalThis.fetch=async path=>{const url=String(path);calls.push(url);return Response.json(url.includes('scope=all')?historyData:activeData);};
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{
+  await act(async()=>root.render(React.createElement(Production,{mode:'progress',operator:'SYNTHETIC',preferenceUser:'SYNTHETIC'})));await until(()=>host.textContent.includes('ACTIVE-ONLY'));
+  assert.equal(calls.some(u=>u.includes('scope=all')),false);assert.doesNotMatch(host.textContent,/DONE-ONLY|CANCEL-ONLY/);
+  const choose=async value=>{await act(async()=>{const select=[...host.querySelectorAll('.production-progress-review-screen select')].find(s=>[...s.options].some(o=>o.value==='hidden'));select.value=value;select.dispatchEvent(new window.Event('change',{bubbles:true}));});};
+  await choose('hidden');await until(()=>host.textContent.includes('CANCEL-ONLY'));assert.match(host.textContent,/DONE-ONLY/);assert.doesNotMatch(host.textContent,/ACTIVE-ONLY/);assert.equal(calls.filter(u=>u.includes('scope=all')).length,1);
+  await choose('active');await until(()=>host.textContent.includes('ACTIVE-ONLY'));assert.doesNotMatch(host.textContent,/DONE-ONLY|CANCEL-ONLY/);assert.equal(calls.filter(u=>u.includes('scope=all')).length,1);
+ }finally{await act(async()=>root.unmount());host.remove();clearProductionSnapshot();clearClientReads('session');globalThis.fetch=originalFetch;}
+});

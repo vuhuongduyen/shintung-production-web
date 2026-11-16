@@ -113,3 +113,9 @@ Chưa đo propagation Sec-Fetch-Site trên đường GitHub từ probe cũ; chư
 ## 16/11/2026 — ứng viên giảm thời gian mở SX báo công
 
 Chỉ SX báo công: giảm đọc lặp, giữ snapshot hết TTL khi mở lại để kiểm tra nền. Fixture 126 lệnh: 45 → 17 lượt DB, tổng/dữ liệu lưu giữ nguyên. 37 ca mục tiêu/hồi quy, TypeScript và build đạt. Chưa merge/deploy hoặc nghiệm thu tốc độ end-to-end MAIN. Các menu còn lại giữ nguyên. Chi tiết: docs/SX-FIRST-LOAD-2026-11-16.md.
+
+## 16/11/2026 — ứng viên Tiến độ sản xuất sau PR #32
+
+Tách profile progress, mặc định scoped workflow đang xử lý, loại hoàn thành và HỦY; chỉ đọc lịch sử khi người dùng chọn. Giữ phiếu chờ xác nhận kể cả sản lượng 0. Snapshot active/history riêng, cập nhật nền giữ bảng, timeout có thể thử lại, full detail theo yêu cầu. SQL bỏ bản sao audit nhưng giữ trường reviewSnapshot. Xem docs/PROGRESS-LOAD-2026-11-16.md. Chưa merge/triển khai hoặc nghiệm thu tốc độ trên web thật.
+
+Kiểm chứng ứng viên: 55 test mục tiêu/hồi quy, TypeScript và build đạt; fixture 59→37 lượt DB, 19.064.014→23.209 byte. Chưa coi số liệu test là thời gian người dùng chờ.

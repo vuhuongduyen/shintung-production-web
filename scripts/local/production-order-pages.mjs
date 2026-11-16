@@ -17,8 +17,9 @@ const fields={LSX:'lsxCode',SKU:'sku','Tên sản phẩm':'name','Plan ID':'plan
 const orderFields=['id','planId','planGroupId','week','lsxCode','sku','name','spec','unit','line','planningNote','sequence','lsxQty','completedQty','pendingReportQty','inTransitQty','planStart','planEnd','actualStartedAt','actualCompletedAt','status','productionState','progressStatus','syncStatus','revision'];
 // The list/detail only consumes SKU display metadata. Do not transport audit,
 // BOM or price history, or hash the complete catalog, for every page request.
-export async function readProductionPageCatalog(db){
+export async function readProductionPageCatalog(db,{includeProcesses=false}={}){
  const columns=['code','group','productGroup','category','name','productName','specification','spec','quyCach','quy_cach','unit','uom','unitOfMeasure','line','productionLine','_deleted','status','confirmation_status','usage_status'];
+ if(includeProcesses)columns.push('processes');
  const expression=`json_object(${columns.flatMap(k=>[`'${k}'`, `json_extract(payload,'$.${k}')`]).join(',')})`;
  const records=await readRecordPages(db,{where:"entity='sku'",payloadExpression:expression,sizeExpression:expression});
  return siteCatalog(records.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})));
@@ -40,13 +41,15 @@ export function productionPageQuery(params,actor){
 }
 // Read-only, request-local scope. Values originate in authorized order rows and
 // are SQL-quoted here; no caller can supply SQL or use this adapter for writes.
-export function productionOrderScope(db,orders){
+export function productionOrderScope(db,orders,{workflow=false}={}){
  const ids=literal(JSON.stringify(orders.map(o=>o.id))),codes=literal(JSON.stringify(orders.map(o=>String(o.lsxCode||'').trim().toUpperCase()))),plans=literal(JSON.stringify(orders.filter(o=>!o.planGroupId).map(o=>String(o.planId||'').trim().toUpperCase())));
  const complexOrder=orders.some(o=>[o.lsxCode,o.planId].some(v=>/[^ -~]|  /.test(String(v||''))));
  const inIds=value=>`${value} IN (SELECT value FROM json_each(${ids}))`;
  const matches=value=>`(${inIds(`json_extract(${value},'$.transitId')`)} OR (coalesce(json_extract(${value},'$.transitId'),'')='' AND (${complexOrder?1:0}=1 OR upper(trim(${sourceCode(value)})) IN (SELECT value FROM json_each(${codes})) OR (${sourceCode(value)}='' AND upper(trim(coalesce(json_extract(${value},'$.planId'),''))) IN (SELECT value FROM json_each(${plans}))) OR coalesce(json_extract(${value},'$.lsxCode'),json_extract(${value},'$.planId'),'') GLOB '*[^ -~]*' OR instr(coalesce(json_extract(${value},'$.lsxCode'),json_extract(${value},'$.planId'),''),'  ')>0)))`;
  const event=value=>`(${inIds(`json_extract(${value},'$.sourceId')`)} OR ${inIds(`json_extract(${value},'$.destinationId')`)})`;
- const source=`(SELECT entity,record_key,CASE WHEN entity='production_history_import' THEN json_object('_deleted',json_extract(payload,'$._deleted'),'reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')}))) WHEN entity='production_report' AND json_type(payload,'$.rows')='array' THEN json_set(payload,'$.rows',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.rows') WHERE ${matches('value')}))) ELSE payload END AS payload,updated_by,updated_at FROM app_records WHERE entity NOT IN ('in_transit','production_report','production_event','production_history_import') OR entity='in_transit' AND ${inIds('record_key')} OR entity='production_report' AND (json_type(payload,'$.rows')='array' OR ${matches('payload')}) OR entity='production_event' AND ${event('payload')} OR entity='production_history_import' AND EXISTS(SELECT 1 FROM json_each(payload,'$.reports') WHERE ${matches('value')}))`;
+ const historyPayload=workflow?`json_set(payload,'$.reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')})),'$.timeEvents',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.timeEvents') WHERE ${event('value')})))`:`json_object('_deleted',json_extract(payload,'$._deleted'),'reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')})))`;
+ const globalEvent=workflow?` OR (coalesce(json_extract(payload,'$.sourceId'),'')='' AND coalesce(json_extract(payload,'$.destinationId'),'')='')`:'';
+ const source=`(SELECT entity,record_key,CASE WHEN entity='production_history_import' THEN ${historyPayload} WHEN entity='production_report' AND json_type(payload,'$.rows')='array' THEN json_set(payload,'$.rows',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.rows') WHERE ${matches('value')}))) ELSE payload END AS payload,updated_by,updated_at FROM app_records WHERE entity NOT IN ('in_transit','production_report','production_event','production_history_import') OR entity='in_transit' AND ${inIds('record_key')} OR entity='production_report' AND (json_type(payload,'$.rows')='array' OR ${matches('payload')}) OR entity='production_event' AND (${event('payload')}${globalEvent}) OR entity='production_history_import' AND (EXISTS(SELECT 1 FROM json_each(payload,'$.reports') WHERE ${matches('value')})${workflow?` OR EXISTS(SELECT 1 FROM json_each(payload,'$.timeEvents') WHERE ${event('value')})`:''}))`;
  return {prepare(sql){if(!/^\s*SELECT\b/i.test(sql))fail('Phạm vi danh sách chỉ cho phép đọc.',403);return db.prepare(sql.replace(/\bapp_records\b/g,source));}};
 }
 function rowMatches(order,badge,q){

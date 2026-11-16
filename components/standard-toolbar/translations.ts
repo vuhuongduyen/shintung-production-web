@@ -165,8 +165,8 @@ Object.assign(chinese,{'Người trực tuần':'本週值班人員','Người p
 Object.assign(english,{'08:00 – 08:00 là giờ mặc định, chưa tính phụ kho. Nhập giờ kết thúc sau giờ bắt đầu rồi lưu ghi nhận.':'08:00 – 08:00 is the default and does not count as warehouse work. Enter a later end time and save.','Đã bỏ phân công ngày này. Bấm Lưu ghi nhận để lưu.':'This day’s assignment has been cleared. Save entries to apply.'});
 Object.assign(chinese,{'08:00 – 08:00 là giờ mặc định, chưa tính phụ kho. Nhập giờ kết thúc sau giờ bắt đầu rồi lưu ghi nhận.':'08:00–08:00為預設時間，不計倉庫支援工時。請填入晚於開始時間的結束時間後儲存。','Đã bỏ phân công ngày này. Bấm Lưu ghi nhận để lưu.':'已清除此日排班，請按儲存登錄以套用。'});
 
-Object.assign(english,{'Hiển thị':'Display','Đang xử lý':'In progress','Đã ẩn':'Hidden','Chọn tất cả tuần đủ điều kiện':'Select all eligible weeks'});
-Object.assign(chinese,{'Hiển thị':'顯示','Đang xử lý':'處理中','Đã ẩn':'已隱藏','Chọn tất cả tuần đủ điều kiện':'選取所有符合條件的週'});
+Object.assign(english,{'Hiển thị':'Display','Đang xử lý':'In progress','Đã ẩn':'Hidden','Hoàn thành / Đã hủy':'Completed / Cancelled','Chọn tất cả tuần đủ điều kiện':'Select all eligible weeks'});
+Object.assign(chinese,{'Hiển thị':'顯示','Đang xử lý':'處理中','Đã ẩn':'已隱藏','Hoàn thành / Đã hủy':'已完成／已取消','Chọn tất cả tuần đủ điều kiện':'選取所有符合條件的週'});
 
 Object.assign(english,{'giờ/người (nguồn)':'hours/person (source)'});
 Object.assign(chinese,{'giờ/người (nguồn)':'小時/人（來源）'});
