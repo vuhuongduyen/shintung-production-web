@@ -70,9 +70,13 @@ export async function* matchingProductionOrders(db,actor,q,catalog=[]){
  // SQLite lower()/NOCASE must not silently drop Vietnamese matches.
  if(q.query&&['LSX','SKU','Plan ID'].includes(q.field)&&/^[\x20-\x7e]+$/.test(q.query)){where.push(`instr(lower(${fields[q.field]}),lower(?))>0`);args.push(q.query);}
  if(q.field==='Tuần kế hoạch'){where.push('week=?');args.push(q.query);}
+ // Bound the aggregation window, independently of the 10-row UI page.
+ // 25-order windows repeatedly re-read the same import records for every page.
+ // Payload transport remains byte-bounded by readRecordPages (512 KiB).
+ const windowSize=100;
  const sortField=q.sort==='start'?'startDate':'dueDate';let offset=0;
  for(;;){
-  const candidates=(await db.prepare(orderDirectory+` SELECT record_key,lsxCode,planId,planGroupId FROM directory WHERE ${where.join(' AND ')} ORDER BY coalesce(week,'9999'),coalesce(${sortField},'9999'),record_key LIMIT 25 OFFSET ?`).bind(...args,offset).all()).results;
+  const candidates=(await db.prepare(orderDirectory+` SELECT record_key,lsxCode,planId,planGroupId FROM directory WHERE ${where.join(' AND ')} ORDER BY coalesce(week,'9999'),coalesce(${sortField},'9999'),record_key LIMIT ${windowSize} OFFSET ?`).bind(...args,offset).all()).results;
   if(!candidates.length)break;
   const orders=candidates.map(r=>({...r,id:r.record_key})),scope=productionOrderScope(db,orders);
   const state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true,skipLeadtime:true}),totals=dailyOutputTotalsIndex(state.rows,state.summaryReports),byId=new Map(state.rows.map(o=>[o.id,o]));
@@ -81,7 +85,7 @@ export async function* matchingProductionOrders(db,actor,q,catalog=[]){
    const badge=o.status==='HỦY'?{label:'Đã hủy',tone:'cancelled'}:!runtime.known&&!reports.length&&productionProgressDisplay(o.progressStatus)||progressOrderStatus(summary,runtime,events);
    if(rowMatches(o,badge,q))yield wireOrder(o,totals.get(o.id),badge,runtime);
   }
-  offset+=candidates.length;if(candidates.length<25)break;
+  offset+=candidates.length;if(candidates.length<windowSize)break;
  }
 }
 const headers=['Lệnh sản xuất','SKU','Tên SP','Quy cách','Line','Ghi chú','Thứ tự SX','SL lệnh','SL đã duyệt','SL chờ duyệt','KH bắt đầu','KH hoàn thành','Trạng thái','Plan ID'];

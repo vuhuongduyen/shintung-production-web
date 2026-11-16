@@ -143,7 +143,7 @@ export async function siteApi(request,env){
  response.headers.set('Server-Timing',`total;dur=${stats.totalMs.toFixed(1)}, auth;dur=${stats.authMs.toFixed(1)}, principal;dur=${stats.principalMs.toFixed(1)}, handler;dur=${stats.handlerMs.toFixed(1)}, db_sum;dur=${stats.dbMs.toFixed(1)}, db_max;dur=${stats.maxDbMs.toFixed(1)}, db_calls;desc="${stats.calls}"`);
  if(stats.totalMs>=2000){
   // Fixed route labels only: no query strings, entities, identities or payloads.
-  const route=['/api/site-session','/api/auth/session','/api/pending-approvals','/api/production-allocation','/api/production-allocation-scope','/api/production-workflow','/api/records','/api/production-plan','/api/in-transit','/api/capacity','/api/employees'].includes(path)?path:'other';
+  const route=['/api/site-session','/api/auth/session','/api/pending-approvals','/api/production-allocation','/api/production-allocation-scope','/api/production-workflow','/api/production-order-pages','/api/records','/api/production-plan','/api/in-transit','/api/capacity','/api/employees'].includes(path)?path:'other';
   console.info('ONSPA slow read',JSON.stringify({route,status:response.status,...Object.fromEntries(Object.entries(stats).map(([key,value])=>[key,Math.round(value)]))}));
  }
  return response;
