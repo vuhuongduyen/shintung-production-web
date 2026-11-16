@@ -194,7 +194,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
     .filter((r) => r.payload && !r.payload._deleted)
     .map((r) => r.payload)
     .sort((a, b) => text(b.at).localeCompare(text(a.at)));
-  const result={rows:withLeadtime,history};
+  const result={rows:withLeadtime,history,...(options.includeProductionSummary?{summaryReports:reportRows,summaryEvents:productionEvents}:{})};
   if(referenceOnly&&records[0]?.rawPayload){
     const row=records[0];let policy;try{policy=JSON.parse(row.reference_policy);}catch{policy=null;}
     const historyProtected=Boolean(row.reference_activation)||policy?.mode==='daily-finished-v1'&&policy.approved===true&&dateISO(policy.effectiveFrom)===policy.effectiveFrom&&policy.effectiveFrom<=vietnamDateISO();

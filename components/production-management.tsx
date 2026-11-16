@@ -1,6 +1,7 @@
 "use client";
 import {isDailyOutput} from '../lib/production-report-model.mjs';
 import ProductionDailyBoard from './production-daily-board';
+import ProductionPagedWork from './production-paged-work';
 import ProductionDetailRead from './production-detail-read';
 import {mergeProductionSavedResult} from '../lib/production-saved-result.mjs';
 import {createReviewRunner,submitReviewSelection} from '../lib/production-review-selection.mjs';
@@ -69,7 +70,11 @@ export function ProductionReadBoundary({hasData,loading,error,retry,children,qui
   return <>{error&&<div role="alert" className="production-inline-message error">Chưa cập nhật được dữ liệu sản xuất. Đang hiển thị dữ liệu đã tải trước đó. {error.message} <FeedbackActionButton type="button" disabled={loading} disabledExplanation={"Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại."} onClick={retry}>Thử lại</FeedbackActionButton></div>}{children}</>;
 }
 
-export default function ProductionManagement({ mode, sessionLine, preferenceUser, confirmReportAllowed=false, actualScheduleAllowed=false }: { actualScheduleAllowed?:boolean; confirmReportAllowed?:boolean; preferenceUser?:string; mode: Mode; sessionLine?: "A" | "B"; operator: string; isManager?: boolean }) {
+type ManagementProps={actualScheduleAllowed?:boolean;confirmReportAllowed?:boolean;preferenceUser?:string;mode:Mode;sessionLine?:"A"|"B";operator:string;isManager?:boolean};
+export default function ProductionManagement(props:ManagementProps){
+ return props.mode==='work'?<ProductionPagedWork key={`${props.preferenceUser||''}:${props.sessionLine||''}`} sessionLine={props.sessionLine} preferenceUser={props.preferenceUser} fallback={<ProductionManagementLegacy {...props}/>}/>:<ProductionManagementLegacy {...props}/>;
+}
+function ProductionManagementLegacy({ mode, sessionLine, preferenceUser, confirmReportAllowed=false, actualScheduleAllowed=false }: ManagementProps) {
   const [runSelectedReview]=useState(()=>createReviewRunner());
   const [assignmentOpen,setAssignmentOpen]=useState(false);
   const [incidentOrder,setIncidentOrder]=useState<Row|null>(null);
