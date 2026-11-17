@@ -268,7 +268,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   // Compact workspace already reads every production field used by transit.
   // Reuse these exact records within this request rather than a second scan.
   const transitRows=read=>read.then(records=>records.map(r=>({record_key:r.key,payload:r.payload,updated_at:r.updatedAt,updated_by:r.updatedBy})).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.record_key.localeCompare(b.record_key)));
-  const productionReads=compactAudit?{production_event:transitRows(eventRead),production_report:transitRows(reportRead),production_history_import:transitRows(historyRead)}:undefined;
+  const productionReads=compactAudit||progressRead?{production_event:transitRows(eventRead),production_report:transitRows(reportRead),production_history_import:transitRows(historyRead)}:undefined;
   const [state, eventRecords, reportRecords, directory, calendar, capacityRecords,accountRecords,historyRecords] = await Promise.all([
     transitState||getTransit(db, {}, catalog,{includeHistory:false,stageValidation,includeProductionSummary:progressRead||compactAudit,skipLeadtime:progressRead,preservedOrders:legacyPreservation?.orders,leadtimeAt:observationAt,productionReads}), eventRead, reportRead, rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),historyRead,
   ]);

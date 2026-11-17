@@ -134,3 +134,7 @@ Chỉ SX báo công: giảm đọc lặp, giữ snapshot hết TTL khi mở lạ
 Tách profile progress, mặc định scoped workflow đang xử lý, loại hoàn thành và HỦY; chỉ đọc lịch sử khi người dùng chọn. Giữ phiếu chờ xác nhận kể cả sản lượng 0. Snapshot active/history riêng, cập nhật nền giữ bảng, timeout có thể thử lại, full detail theo yêu cầu. SQL bỏ bản sao audit nhưng giữ trường reviewSnapshot. Xem docs/PROGRESS-LOAD-2026-11-16.md. Chưa merge/triển khai hoặc nghiệm thu tốc độ trên web thật.
 
 Kiểm chứng ứng viên: 55 test mục tiêu/hồi quy, TypeScript và build đạt; fixture 59→37 lượt DB, 19.064.014→23.209 byte. Chưa coi số liệu test là thời gian người dùng chờ.
+
+## 17/11/2026 — Tiến độ sản xuất: PR độc lập, chưa merge/triển khai
+
+Bổ sung giữ phạm vi/bộ lọc/trang của Tiến độ theo display scope đã xác minh; giảm đọc report/event/history lặp ở progress toàn bộ và tối ưu chọn lệnh đang xử lý. 37 ca liên quan, 24 hợp đồng CI, TypeScript/build đạt; fixture trình duyệt xác nhận giữ trang 2 qua đóng/mở và reload, tải nền cập nhật không đổi trang. Bản ghép cục bộ PR36 đạt 36 ca + TypeScript/build, không xung đột. Khôi phục toàn bộ sau đăng xuất phụ thuộc PR36. Chưa nghiệm thu tốc độ MAIN, phiên Line A/B thật và toàn bộ phiếu thật; không ghi D1/R2/quyền/dữ liệu. Chi tiết nguồn, phạm vi và release gate: [PRODUCTION-PROGRESS-PERFORMANCE-20261117.md](PRODUCTION-PROGRESS-PERFORMANCE-20261117.md).
