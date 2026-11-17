@@ -164,3 +164,7 @@ Bổ sung giữ phạm vi/bộ lọc/trang của Tiến độ theo display scope
 ## 17/11/2026 — PR39: giảm đọc lặp danh sách SX (chưa triển khai)
 
 Bỏ sớm kế hoạch chắc chắn thiếu mã/ngày mở hoặc lượng 0; tổng hợp tối đa 500 ứng viên/lượt thay 100, giữ trang 10 dòng và payload 512 KiB. Không bỏ kiểm tra lệnh hoàn thành bằng trạng thái cũ. 20 kiểm thử trang/byte/legacy/tổng/chờ duyệt đạt, gồm 501 lệnh hoàn thành qua hai cửa sổ; records giữ nguyên. Chờ CI và đo MAIN trước khi kết luận tốc độ đạt.
+
+## 17/11/2026 — khắc phục giới hạn câu SQL sau PR39
+
+Hậu kiểm v837 phát hiện D1 statement too long; đã đưa deployment về v836. Bản sửa riêng dùng ba tham số mảng thay JSON lặp trong SQL của scope, giữ cùng điều kiện đọc/Line và batching. Regression mã dài tái hiện lỗi trước sửa và đạt sau sửa (21.722 byte, 6 tham số), không đổi records. Chưa nghiệm thu tốc độ/triển khai bản sửa.
