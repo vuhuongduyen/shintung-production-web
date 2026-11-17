@@ -1,3 +1,4 @@
+import {observeReadDatabase} from '../worker/read-performance.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {dailyFixture} from './helpers/daily-output-fixture.mjs';
@@ -27,7 +28,9 @@ test('workspace retains V1/V2/missing bases and every calculated field; audit de
  assert.ok(JSON.stringify(workspace.body).length<JSON.stringify(full.body).length/5);
  const actor={login:'SYNTHETIC-REVIEWER',isAdmin:true};
  const raw=await readProductionWorkflow(c.db,actor,[],{includeDerivedHours:false,includeJournalHours:true});
- const compact=await readProductionWorkflow(c.db,actor,[],{compactAudit:true,includeDerivedHours:false,includeJournalHours:true});
+ const measured=observeReadDatabase(c.db);
+ const compact=await readProductionWorkflow(measured.database,actor,[],{compactAudit:true,includeDerivedHours:false,includeJournalHours:true});
+ assert.equal(measured.summary().production_reportCalls,2,'one metadata window and one payload page, no duplicate transit scan');
  assert.deepEqual(compact,workspaceDisplayWorkflow(raw));
  await assert.rejects(readProductionWorkflow(c.db,{login:'DENIED',grants:[]},[],{compactAudit:true}),e=>e.status===403);
  assert.deepEqual(await records(c.db),before);
