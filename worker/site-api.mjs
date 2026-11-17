@@ -1,3 +1,4 @@
+import {closeLegacyReport} from '../scripts/local/production-legacy-close.mjs';
 import {productionReadBatch} from './production-read-batch.mjs';
 import {activeProgressDatabase,workspaceDisplayWorkflow} from '../scripts/local/production-progress-read.mjs';
 import {importLaborReferenceSnapshot} from '../scripts/local/production-labor-reference-import.mjs';
@@ -401,6 +402,7 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/production-correction'){if(body.operation==='cancel-reporting-day'&&(await readDailyOutputPolicy(productionDb)).policy?.cutoverReached)return json({error:'Lịch sử công đoạn chỉ để tra cứu; không hủy ngày báo công cũ sau chuyển đổi.'},409);return json(body.operation==='cancel-reporting-day'?await cancelReportingDay(productionDb,body,actor,url.hostname):await correctProduction(productionDb,body,actor,['daily-output-edit','daily-output-cancel','daily-output-withdraw'].includes(body.operation)?[]:await loadCatalog()));}
   if(path==='/api/production-report'){
    if(!actor.isAdmin&&!hasMenuPermission(actor,productionMenus.progress,['Xác nhận']))return json({error:'Chỉ QLSX được duyệt báo công.'},403);
+   if(body.action==='close-legacy')return json(await closeLegacyReport(productionDb,body,actor));
    if(body.action!=='review'||!body.reportId)return json({error:'Yêu cầu kiểm tra báo công không hợp lệ.'},400);
    const reviewReads=workflowReadSnapshot(productionDb);
    const [cursorBefore,stored]=await Promise.all([
