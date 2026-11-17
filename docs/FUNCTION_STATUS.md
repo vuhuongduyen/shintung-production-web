@@ -1,3 +1,7 @@
+## 17/11/2026 — PR36: cập nhật kiểm thử trước merge
+
+Người dùng đã yêu cầu đẩy GitHub, merge và triển khai MAIN rồi kiểm trực tiếp. CI của e72e587 có 3 lỗi harness: callback Home thiếu ref/setter mới; mock workflow thiếu export compactWorkflowDisplay; dấu vân tay JSX phát hiện đúng hai dòng flush/suspend được thêm ở đăng xuất. Đã bổ sung dependency thật cho mock và chuẩn hóa riêng đúng hai dòng đăng xuất trước khi so dấu vân tay v807, không thay baseline hay bỏ kiểm tra quyền/callback còn lại. 52/52 kiểm thử liên quan đạt; chưa có thay đổi mã ứng dụng so với e72e587. Chờ CI của commit mới và kiểm web sau triển khai.
+
 ## 17/11/2026 — Tiếp tục giữ màn hình gần nhất và giảm lượt đọc nền (chưa triển khai)
 
 Bổ sung lưu tab thuộc Hệ thống báo công; Nhật ký giữ hạng mục, bộ lọc và trang; SX báo công giữ bộ lọc/sắp xếp/trang. Chỉ khôi phục sau xác minh tài khoản + quyền + Line; các route được kiểm quyền lại. Đăng xuất chủ động ẩn bộ nhớ và giữ snapshot lần gần nhất trên thiết bị cho lần đăng nhập lại đúng phạm vi; đổi tài khoản/quyền hoặc phản hồi từ chối vẫn loại dữ liệu không phù hợp. Không giữ dialog/bản nháp nghiệp vụ, không cấp quyền ghi từ snapshot.
