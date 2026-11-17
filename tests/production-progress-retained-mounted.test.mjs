@@ -49,7 +49,7 @@ test('applied lookup and lookup controls survive remount without persisting sele
   await act(async()=>{const select=[...screen.host.querySelectorAll('select')].find(s=>[...s.options].some(o=>o.value==='lsxCode'));select.value='lsxCode';select.dispatchEvent(new Event('change',{bubbles:true}));});
   await act(async()=>{const input=screen.host.querySelector('input[type="text"]')||screen.host.querySelector('input:not([type])');Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,'TEST-020');input.dispatchEvent(new Event('input',{bubbles:true}));});
   await act(async()=>button(screen.host,'Tìm kiếm').click());assert.match(screen.host.textContent,/TEST-020/);assert.doesNotMatch(screen.host.textContent,/TEST-000/);
-  await act(async()=>button(screen.host,'TEST-020').click());assert.ok(screen.host.querySelector('.progress-expanded'));
+  const codeCell=[...screen.host.querySelectorAll('.progress-order-table td')].find(cell=>cell.textContent==='TEST-020');assert.ok(codeCell);assert.equal(codeCell.querySelector('button,a'),null);await act(async()=>codeCell.click());assert.equal(screen.host.querySelector('.progress-expanded'),null);
   await screen.close();screen=await mount();assert.match(screen.host.textContent,/TEST-020/);assert.doesNotMatch(screen.host.textContent,/TEST-000/);assert.equal(screen.host.querySelector('.progress-expanded'),null);assert.ok(button(screen.host,'Tìm kiếm'));
  }finally{await screen.close();store.clear();clearProductionSnapshot();}
 });
