@@ -30,7 +30,7 @@ export function productionReadBatch(db) {
     const value=target[key]; return typeof value==='function'?value.bind(target):value;
   }});
   return new Proxy(db,{get(target,key){
-    if (key==='prepare') return sql=>/^\s*SELECT\b/i.test(sql)?wrap(target.prepare(sql)):target.prepare(sql);
+    if (key==='prepare') return sql=>/^\s*(?:SELECT\b|WITH\s+onspa_production_scope\s*\()/i.test(sql)?wrap(target.prepare(sql)):target.prepare(sql);
     const value=target[key]; return typeof value==='function'?value.bind(target):value;
   }});
 }

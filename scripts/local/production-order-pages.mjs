@@ -10,7 +10,6 @@ import {hasMenuPermission,productionMenus,writeActions,normalizePermission} from
 import {monday,normalized} from '../../lib/production-plan.mjs';
 import {normalizeTransit} from '../../lib/in-transit.mjs';
 const fail=(message,status=422)=>{throw Object.assign(Error(message),{status});};
-const literal=s=>"'"+String(s).replaceAll("'","''")+"'";
 const sourceCode=value=>`CAST(coalesce(nullif(nullif(json_extract(${value},'$.lsxCode'),''),0),nullif(nullif(json_extract(${value},'$.orderCode'),''),0),nullif(nullif(json_extract(${value},'$.mo'),''),0),'') AS TEXT)`;
 const completed=new Set(['early','completed','late']);
 const fields={LSX:'lsxCode',SKU:'sku','Tên sản phẩm':'name','Plan ID':'planId'};
@@ -46,9 +45,12 @@ export function productionPageQuery(params,actor){
  return {page,pageSize:10,sort,field,query:field==='Tuần kế hoạch'?monday(query):query,line:actor.line||line,status,filtered:!!field};
 }
 // Read-only, request-local scope. Values originate in authorized order rows and
-// are SQL-quoted here; no caller can supply SQL or use this adapter for writes.
+// are bound as data here; no caller can supply SQL or use this adapter for writes.
 export function productionOrderScope(db,orders,{workflow=false,summary=false}={}){
- const ids=literal(JSON.stringify(orders.map(o=>o.id))),codes=literal(JSON.stringify(orders.map(o=>String(o.lsxCode||'').trim().toUpperCase()))),plans=literal(JSON.stringify(orders.filter(o=>!o.planGroupId).map(o=>String(o.planId||'').trim().toUpperCase())));
+ // Bind each identifier array once. Repeating JSON literals throughout the
+ // scope exceeded D1's 100 KB statement limit for realistic 500-order windows.
+ const bindings=[JSON.stringify(orders.map(o=>o.id)),JSON.stringify(orders.map(o=>String(o.lsxCode||'').trim().toUpperCase())),JSON.stringify(orders.filter(o=>!o.planGroupId).map(o=>String(o.planId||'').trim().toUpperCase()))];
+ const ids='(SELECT ids FROM onspa_production_scope)',codes='(SELECT codes FROM onspa_production_scope)',plans='(SELECT plans FROM onspa_production_scope)';
  const complexOrder=orders.some(o=>[o.lsxCode,o.planId].some(v=>/[^ -~]|  /.test(String(v||''))));
  const inIds=value=>`${value} IN (SELECT value FROM json_each(${ids}))`;
  const matches=value=>`(${inIds(`json_extract(${value},'$.transitId')`)} OR (coalesce(json_extract(${value},'$.transitId'),'')='' AND (${complexOrder?1:0}=1 OR upper(trim(${sourceCode(value)})) IN (SELECT value FROM json_each(${codes})) OR (${sourceCode(value)}='' AND upper(trim(coalesce(json_extract(${value},'$.planId'),''))) IN (SELECT value FROM json_each(${plans}))) OR coalesce(json_extract(${value},'$.lsxCode'),json_extract(${value},'$.planId'),'') GLOB '*[^ -~]*' OR instr(coalesce(json_extract(${value},'$.lsxCode'),json_extract(${value},'$.planId'),''),'  ')>0)))`;
@@ -60,7 +62,16 @@ export function productionOrderScope(db,orders,{workflow=false,summary=false}={}
  const historyPayload=workflow?`json_set(payload,'$.reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')})),'$.timeEvents',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.timeEvents') WHERE ${event('value')})))`:`json_object('_deleted',json_extract(payload,'$._deleted'),'reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')}${pending})))`;
  const globalEvent=workflow?` OR (coalesce(json_extract(payload,'$.sourceId'),'')='' AND coalesce(json_extract(payload,'$.destinationId'),'')='')`:'';
  const source=`(SELECT entity,record_key,CASE WHEN entity='production_history_import' THEN ${historyPayload} WHEN entity='production_report' AND json_type(payload,'$.rows')='array' THEN json_set(payload,'$.rows',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.rows') WHERE ${matches('value')}))) ELSE payload END AS payload,updated_by,updated_at FROM app_records WHERE entity NOT IN ('in_transit','production_report','production_event','production_history_import') OR entity='in_transit' AND ${inIds('record_key')} OR entity='production_report' AND (json_type(payload,'$.rows')='array' OR ${matches('payload')}) OR entity='production_event' AND (${event('payload')}${globalEvent}) OR entity='production_history_import' AND (EXISTS(SELECT 1 FROM json_each(payload,'$.reports') WHERE ${matches('value')})${workflow?` OR EXISTS(SELECT 1 FROM json_each(payload,'$.timeEvents') WHERE ${event('value')})`:''}))`;
- return {prepare(sql){if(!/^\s*SELECT\b/i.test(sql))fail('Phạm vi danh sách chỉ cho phép đọc.',403);return db.prepare(sql.replace(/\bapp_records\b/g,source));}};
+ return {prepare(sql){
+  if(!/^\s*SELECT\b/i.test(sql))fail('Phạm vi danh sách chỉ cho phép đọc.',403);
+  const statement=db.prepare(`WITH onspa_production_scope(ids,codes,plans) AS (VALUES (?,?,?)) ${sql.replace(/\bapp_records\b/g,source)}`);
+  const wrap=(values=[])=>new Proxy(statement,{get(target,key){
+   if(key==='bind')return (...next)=>wrap(next);
+   if(['all','first','raw','run'].includes(key))return (...args)=>target.bind(...bindings,...values)[key](...args);
+   const value=target[key];return typeof value==='function'?value.bind(target):value;
+  }});
+  return wrap();
+ }};
 }
 function rowMatches(order,badge,q){
  if(!q.filtered)return !completed.has(badge.tone);
