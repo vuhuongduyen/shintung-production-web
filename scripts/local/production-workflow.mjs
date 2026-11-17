@@ -1,4 +1,5 @@
-import {hrImportActions,employeeAttendanceWhere} from '../../lib/hr-absence-import.mjs';
+import {readEmployeeAttendance} from './hr-attendance-records.mjs';
+import {hrImportActions} from '../../lib/hr-absence-import.mjs';
 import {handleHrAbsenceImport} from './hr-absence-import.mjs';
 import {progressReadPayload,workspaceReadPayload} from './production-progress-read.mjs';
 import {quantitySourceDatabase} from './production-quantity-cutover.mjs';
@@ -396,7 +397,7 @@ async function dailyAttendanceContext(db,actor,calendar,body={}){
  const projection=`json_object(${orderFields.flatMap(k=>[`'${k}'`,`json_extract(payload,'$.${k}')`]).join(',')})`;
  const [orderRows,eventRows,directory]=await Promise.all([
   hrOnly?Promise.resolve([]):readRecordPages(db,{where:"entity='in_transit'",payloadExpression:projection}),
-  readRecordPages(db,{where:hrOnly?employeeAttendanceWhere:"entity='production_event'",args:hrOnly?[JSON.stringify(ids)]:[],payloadExpression:"json_remove(payload,'$.sourceSnapshot','$.sourceRow','$.history','$.overlapWarnings')"}),
+  hrOnly?readEmployeeAttendance(db,ids,{payloadExpression:"json_remove(payload,'$.sourceSnapshot','$.sourceRow','$.history','$.overlapWarnings')"}):readRecordPages(db,{where:"entity='production_event'",payloadExpression:"json_remove(payload,'$.sourceSnapshot','$.sourceRow','$.history','$.overlapWarnings')"}),
   rows(db,'employees')
  ]);
  const payrollEmployees=directory.map(r=>({...r.payload,id:r.key})),employees=payrollEmployees.map(p=>({...p,active:employeeActiveOn(p)})).filter(p=>p.active!==false);
@@ -614,8 +615,8 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
       event={...original,id:crypto.randomUUID(),kind:"attendance-cancel",supersedes:original.id,approvedFrom:original.approvedFrom,approved:true,before:original,after:{cancelled:true},reason,recordedAt:now,actor:actor.login,requestIdempotency:requestId||undefined};
     } else if(action==='attendance-edit'&&original.kind!=='line-movement') {
       const absenceType=String(body.absenceType||original.absenceType);let line=upper(body.line||original.line);
-      const personal=personalHrEvent(original);if(personal&&!['Nghỉ','Đi trễ','Về sớm'].includes(absenceType))fail('HR theo nhân viên chỉ ghi Nghỉ, Đi trễ hoặc Về sớm.');
-      if(!['Nghỉ','Đi trễ','Về sớm','Phụ kho','CV khác'].includes(absenceType)||(!personal&&!['A','B'].includes(line))||!permitted(actor,line))fail('Chọn loại và Line hợp lệ.');
+      const personal=personalHrEvent(original);if(personal&&!['Nghỉ','Đi trễ','Về sớm','Đi trễ, về sớm'].includes(absenceType))fail('HR theo nhân viên chỉ ghi Nghỉ, Đi trễ hoặc Về sớm.');
+      if(!['Nghỉ','Đi trễ','Về sớm','Đi trễ, về sớm','Phụ kho','CV khác'].includes(absenceType)||(!personal&&!['A','B'].includes(line))||!permitted(actor,line))fail('Chọn loại và Line hợp lệ.');
       if(isManagerWork(absenceType)?!canManage(actor):!canHr(actor))fail('Không có quyền sửa loại biến động này.',403);
       const employees=[...new Set((body.employees||original.employees||[]).map(upper))];
       if(!employees.length||employees.some(id=>!state.employees.some(p=>upper(p.id)===id)))fail('Chọn nhân viên trong danh sách.');
@@ -693,9 +694,9 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
       fail("Khoảng nhiều ngày hiện chỉ áp dụng cho đăng ký nghỉ.");
     const directory = new Map(state.employees.map(item=>[upper(item.id),item]));
     if (employees.some(id=>!directory.has(id))) fail("Nhân viên không có trong Danh sách nhân viên đang làm.");
-    if(personal){if(action!=='line-absence'||employees.length!==1||!['Nghỉ','Đi trễ','Về sớm'].includes(body.absenceType))fail('HR theo nhân viên chỉ ghi một người với Nghỉ, Đi trễ hoặc Về sớm.');line=upper(directory.get(employees[0])?.line)||null;}
+    if(personal){if(action!=='line-absence'||employees.length!==1||!['Nghỉ','Đi trễ','Về sớm','Đi trễ, về sớm'].includes(body.absenceType))fail('HR theo nhân viên chỉ ghi một người với Nghỉ, Đi trễ hoặc Về sớm.');line=upper(directory.get(employees[0])?.line)||null;}
     const absenceType=action==="attendance-override"?"Có mặt":String(body.absenceType||"Nghỉ");
-    if(action==="line-absence"&&!["Nghỉ","Đi trễ","Về sớm","Phụ kho","CV khác"].includes(absenceType)) fail("Loại biến động không hợp lệ.");
+    if(action==="line-absence"&&!["Nghỉ","Đi trễ","Về sớm","Đi trễ, về sớm","Phụ kho","CV khác"].includes(absenceType)) fail("Loại biến động không hợp lệ.");
     if(!isManagerWork(absenceType))assertHrAttendancePeriod(fromDate);
     if(isOtherWork(absenceType)&&!String(body.reason||" ").trim())fail("Nhập nội dung công việc khác.");
     const reason=String(body.reason||"").trim()||absenceType;
@@ -897,7 +898,7 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   if (["pause", "incident", "absence"].includes(action) && !String(body.reason || "").trim()) fail("Cần nhập lý do hoặc nội dung sự cố.");
   let endsAt = null;
   if (action === "absence") {
-    if (!["Nghỉ", "Đi trễ", "Về sớm", "Phụ kho", "Việc khác"].includes(body.absenceType || "Nghỉ")) fail("Loại biến động không hợp lệ.");
+    if (!["Nghỉ", "Đi trễ", "Về sớm", "Đi trễ, về sớm", "Phụ kho", "Việc khác"].includes(body.absenceType || "Nghỉ")) fail("Loại biến động không hợp lệ.");
     endsAt = new Date(clock(body.endsAt)).toISOString();
     if (clock(endsAt) <= instant) fail("Thời gian kết thúc phải sau bắt đầu.");
     if (events.some((event) => event.kind === "absence" && event.sourceId === order.id && event.approved !== false &&

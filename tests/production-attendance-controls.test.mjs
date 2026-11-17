@@ -187,3 +187,14 @@ test('schedule provisional range does not become a numeric cleaning limit or cha
  const cleaning=f.find(n=>n.type==='input'&&n.props['aria-label']==='Số người vệ sinh 19/10/2026 nhóm 1');assert.equal(cleaning.props.max,2);assert.equal(typeof cleaning.props.max,'number');
  f.change({events:[{id:'actual-leave',kind:'line-absence',line:'A',absenceType:'Nghỉ',employees:['TEST-NV'],effectiveAt:date+'T09:00:00+07:00',endsAt:date+'T17:00:00+07:00'}]});assert.equal(f.find(n=>n.type==='input'&&n.props['aria-label']==='Số người vệ sinh 19/10/2026 nhóm 1').props.max,1);assert.equal(f.find(n=>n.type==='input'&&n.props['aria-label']==='Số người vệ sinh 19/10/2026 nhóm 1').props.value,1,'staff change updates constraint without overwriting the cleaning draft');
 });
+
+test('legacy late/early edits show the combined choice without rewriting their stored type on view or time-only edit',()=>{
+ for(const oldType of ['Đi trễ','Về sớm']){
+  const original={...entry,absenceType:oldType},before=JSON.stringify(original);
+  const f=fixture('actual-labor-edit.tsx',{entry:original,employees:[],busy:false,close(){},...HR});f.commit();
+  const type=f.find(n=>n.type==='select'&&n.props.value==='Đi trễ, về sớm');assert.ok(type);
+  assert.deepEqual(descendants(type).filter(n=>n.type==='option').map(n=>n.props.children),['Nghỉ','Đi trễ, về sớm']);
+  assert.equal(f.saves.length,0);assert.equal(JSON.stringify(original),before);
+  f.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});assert.equal(f.saves[0].absenceType,oldType);assert.equal(JSON.stringify(original),before);
+ }
+});

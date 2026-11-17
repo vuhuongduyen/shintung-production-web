@@ -59,7 +59,7 @@ export function selectToolbarBack(actions: readonly Action[]): Action | undefine
     !selected || levels[action.backLevel || 'parent'] > levels[selected.backLevel || 'parent'] ? action : selected, undefined);
 }
 /** Shared rendering only; business callbacks and backend authorization remain with each menu. */
-export function StandardToolbar({ items, name = 'ONSPA', permissionFeedback = true }: { items: Items; name?: string; permissionFeedback?: boolean }) {
+export function StandardToolbar({ items, name = 'ONSPA', permissionFeedback = true, preserveOrder = false }: { items: Items; name?: string; permissionFeedback?: boolean; preserveOrder?: boolean }) {
   const canUse = useContext(ToolbarPermissions);
   const locale = useSyncExternalStore(subscribeToolbarLocale, toolbarLocale, () => 'vi');
   const id = useId();
@@ -198,12 +198,14 @@ export function StandardToolbar({ items, name = 'ONSPA', permissionFeedback = tr
   return <section className={styles.frame} data-own-language="true" data-standard-toolbar={name} aria-label={`${name}: ${translateToolbar('CHỨC NĂNG',locale)}`} aria-busy={pending}>
     <div className={styles.scroll} tabIndex={0} role="region" aria-label={translateToolbar('CHỨC NĂNG',locale)}>
       <div className={styles.row}>
+        {preserveOrder ? list.filter(item=>item.kind!=='action'||role(item)!=='back'||item===backAction).map((item,i)=>control(item,`ordered${i}`)) : <>
         <div className={styles.actions} data-toolbar-actions="true">{actions.filter(a=>role(a)==='action').map((a,i)=>button(a,`a${i}`))}</div>
         <FilterPanel className={styles.fields}>{fields.map((f,i)=>control(f,`f${i}`))}</FilterPanel>
         {(['lookup','search'] as const).flatMap(kind=>actions.filter(a=>role(a)===kind).map((a,i)=>button(a,`${kind}${i}`)))}
         {hasSearch && !hasExplicitSearch && <FeedbackActionButton ref={searchButton} type="button" className={`${styles.button} ${styles.search}`} onClick={applyDraft} disabled={pending} disabledExplanation={actionFeedbackMessage('busy', locale)}>{translateToolbar('Tìm kiếm',locale)}</FeedbackActionButton>}
         {actions.filter(a=>role(a)==='clear').map((a,i)=>button(a,`clear${i}`))}
         {backAction && button(backAction, 'back')}
+        </>}
       </div>
     </div>
   </section>;
