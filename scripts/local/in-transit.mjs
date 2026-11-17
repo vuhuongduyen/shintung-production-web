@@ -116,6 +116,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
           const row=await db.prepare("SELECT entity,record_key,payload,updated_by,updated_at,(SELECT payload FROM app_records WHERE entity='production_reporting_policy' AND record_key='global') AS reference_policy,(SELECT payload FROM app_records WHERE entity='production_reporting_activation' AND record_key='global') AS reference_activation FROM app_records WHERE entity='in_transit' AND record_key=?").bind(options.referenceId).first();
           return row?[parse(row)]:[];
         }
+        if(options.productionReads?.[e])return options.productionReads[e];
         if(options.skipLeadtime&&['leadtime','leadtime_versions'].includes(e))return [];
         if(options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly&&['in_transit_audit','leadtime','leadtime_versions'].includes(e))return [];
         return read(db,e,options.stageValidation,options.includeProductionSummary===true);

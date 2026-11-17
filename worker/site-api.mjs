@@ -1,3 +1,4 @@
+import {productionReadBatch} from './production-read-batch.mjs';
 import {activeProgressDatabase,workspaceDisplayWorkflow} from '../scripts/local/production-progress-read.mjs';
 import {importLaborReferenceSnapshot} from '../scripts/local/production-labor-reference-import.mjs';
 import {readLaborReferences} from '../scripts/local/production-labor-reference.mjs';
@@ -203,7 +204,7 @@ async function handleSiteApi(request,env,timing){
   if(examples&&!exampleRoute)return json({error:'Chế độ mẫu chỉ áp dụng cho báo công, lịch thực tế và nhật ký.'},400);
   if((examples||path==='/api/production-examples')&&(!actor.isAdmin||actor.line))return json({error:'Chỉ admin không giới hạn Line được dùng LSX mẫu.'},403);
   if(examples||path==='/api/production-examples')return json({error:'Đã ngừng dữ liệu mẫu trong Quản lý sản xuất. Hãy tải lại để xem dữ liệu thực tế.'},410);
-  const productionDb=examples?exampleDatabase(env.DB):env.DB;
+  const productionDb=examples?exampleDatabase(env.DB):request.method==='GET'&&['/api/production-workflow','/api/production-order-pages'].includes(path)?productionReadBatch(env.DB):env.DB;
   let catalogPromise;
   const loadCatalog=()=>examples?Promise.resolve([]):catalogPromise||=readRecordPages(env.DB,{where:"entity='sku'"}).then(result=>Promise.all(result.map(async r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:await recordRevision(r.payload)}))).then(siteCatalog));
   if(path==='/api/sku-capabilities')return json({canConfirm:await skuCapability(env.DB,actor)});
@@ -246,7 +247,7 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/in-transit'&&request.method==='GET'){if(url.searchParams.get('creationRecovery')==='1'){if(!canWrite(actor,'In Transit')&&!canWrite(actor,'In_transit'))return json({error:'Không có quyền cập nhật In Transit'},403);return json(await readAdditionalCreationScope(env.DB,actor));}if(!hasGrant(actor,'Kế hoạch sản xuất / In_transit',['Xem']))return json({error:'Không có quyền xem In Transit'},403);const activation=await readDailyOutputPolicy(env.DB);if(activation.policy?.cutoverReached&&!activation.policy.active)return json({error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy},503);const preservation=await readLegacyPreservation(env.DB,activation.policy,actor,{full:false});return json(await getTransit(env.DB,Object.fromEntries(url.searchParams),await loadCatalog(),{preservedOrders:preservation?.orders}));}
   if(path==='/api/production-order-pages'&&request.method==='GET'){
    productionPageQuery(url.searchParams,actor);
-   const result=await productionOrderPage(productionDb,actor,url.searchParams,examples?[]:await readProductionPageCatalog(env.DB));
+   const result=await productionOrderPage(productionDb,actor,url.searchParams,examples?[]:await readProductionPageCatalog(productionDb));
    if(result instanceof Response)return result;
    const projected=result.reports?await readLaborReferences(productionDb,result,env.LABOR_RATE_OMISSIONS_JSON,env.LABOR_RATE_SNAPSHOT_ID,env.LABOR_RATE_WARNING_SUPPRESSIONS_JSON):result;
    return json({...projected,reportingHold:productionReportingHold(url.hostname)});
@@ -254,13 +255,13 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/production-workflow'&&request.method==='GET'){
    const activation=await readDailyOutputPolicy(productionDb);
    if(activation.policy?.cutoverReached&&!activation.policy.active)return json({error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy},503);
-   const progressRead=url.searchParams.get('view')==='progress',workspaceRead=url.searchParams.get('view')==='workspace';
+   const progressRead=url.searchParams.get('view')==='progress',workspaceRead=['workspace','journal'].includes(url.searchParams.get('view')),journalRead=url.searchParams.get('view')==='journal';
    if(progressRead&&url.searchParams.has('scope')&&!['active','all'].includes(url.searchParams.get('scope')))return json({error:'Phạm vi tiến độ không hợp lệ.'},422);
-   const catalogRead=progressRead||workspaceRead||url.searchParams.get('view')==='work'?(examples?Promise.resolve([]):readProductionPageCatalog(env.DB,{includeProcesses:true})):loadCatalog();
+   const catalogRead=progressRead||workspaceRead||url.searchParams.get('view')==='work'?(examples?Promise.resolve([]):readProductionPageCatalog(productionDb,{includeProcesses:true})):loadCatalog();
    const legacyPreservation=await readLegacyPreservation(productionDb,activation.policy,actor,{full:url.searchParams.get('view')!=='work',includeMonthly:!progressRead});
    const progressCatalog=await catalogRead;
    const workflowDb=progressRead&&url.searchParams.get('scope')!=='all'?await activeProgressDatabase(productionDb,actor,progressCatalog,legacyPreservation?.orders):productionDb;
-   const workflow=await readProductionWorkflow(workflowReadSnapshot(workflowDb),actor,progressCatalog,{legacyPreservation,progressRead,transitState:workflowDb.transitState,compactAudit:workspaceRead&&!legacyPreservation?.required,includeJournalHours:!progressRead&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',stageValidation:url.searchParams.get('view')==='work'});
+   const workflow=await readProductionWorkflow(workflowReadSnapshot(workflowDb),actor,progressCatalog,{legacyPreservation,progressRead,transitState:workflowDb.transitState,compactAudit:workspaceRead&&!legacyPreservation?.required,includeJournalHours:(!workspaceRead||journalRead)&&!progressRead&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',stageValidation:url.searchParams.get('view')==='work'});
    if(url.searchParams.get('unassignedAlerts')==='1'){if(productionReportingHold(url.hostname))return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,workflow));}
    const referenced=await readLaborReferences(productionDb,workflow,env.LABOR_RATE_OMISSIONS_JSON,env.LABOR_RATE_SNAPSHOT_ID,env.LABOR_RATE_WARNING_SUPPRESSIONS_JSON);
    return json({...(workspaceRead?workspaceDisplayWorkflow(referenced):referenced),...(activation.policy?{dailyOutputPolicy:activation.policy}:{}),reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});

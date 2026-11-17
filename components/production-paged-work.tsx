@@ -21,7 +21,7 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
  const held=editing||!!detail;
  const lastRead=useRef({url:'',refresh:0,revision:0});
  const identity=JSON.stringify([preferenceUser||'',sessionLine||'all']);
- useEffect(()=>{if(!active||held)return;const timer=window.setInterval(()=>{if(!document.hidden)setRefresh(n=>n+1);},15000);return()=>window.clearInterval(timer);},[active,held]);
+ useEffect(()=>{if(!active||held)return;const timer=window.setInterval(()=>{if(!document.hidden&&!loading&&!error)setRefresh(n=>n+1);},15000);return()=>window.clearInterval(timer);},[active,held,loading,error]);
  useEffect(()=>{if(!active||held)return;const id=++generation.current;
   const cached=cachedProductionPage(url,identity),retained=cached||retainedProductionPage(url,identity);
   if(retained?.supported===true&&loadedUrl.current!==url){loadedUrl.current=cached?url:'';setSnapshot(retained);setLegacy(false);}

@@ -64,3 +64,20 @@ test('progress never requests completed/cancelled history until selected; histor
   await choose('active');await until(()=>host.textContent.includes('ACTIVE-ONLY'));assert.doesNotMatch(host.textContent,/DONE-ONLY|CANCEL-ONLY/);assert.equal(calls.filter(u=>u.includes('scope=all')).length,1);
  }finally{await act(async()=>root.unmount());host.remove();clearProductionSnapshot();clearClientReads('session');globalThis.fetch=originalFetch;}
 });
+
+test('journal opens daily display without time-history calculation and requests it only on selection',async()=>{
+ clearProductionSnapshot();clearClientReads('session');const calls=[];let release;
+ const deferred=new Promise(resolve=>{release=resolve;});
+ globalThis.fetch=async path=>{const url=String(path);calls.push(url);return url.endsWith('view=journal')?deferred:Response.json(full);};
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{
+  await act(async()=>root.render(React.createElement(Production,{mode:'journal',operator:'SYNTHETIC',preferenceUser:'SYNTHETIC'})));
+  await until(()=>host.querySelector('.production-journal-title'));
+  assert.ok(calls.includes('/api/production-workflow?view=workspace'));
+  assert.equal(calls.some(u=>u.endsWith('view=journal')),false);
+  await act(async()=>{const select=[...host.querySelectorAll('select')].find(s=>[...s.options].some(o=>o.value==='time'));select.value='time';select.dispatchEvent(new window.Event('change',{bubbles:true}));});
+  await until(()=>calls.some(u=>u.endsWith('view=journal')));
+  release(Response.json(full));await until(()=>host.querySelector('.production-time-journal'));
+  assert.equal([...host.querySelectorAll('select')].find(s=>[...s.options].some(o=>o.value==='time')).value,'time');
+ }finally{release(Response.json(full));await act(async()=>root.unmount());host.remove();clearProductionSnapshot();clearClientReads('session');globalThis.fetch=originalFetch;}
+});
