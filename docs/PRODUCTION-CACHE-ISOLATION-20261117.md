@@ -10,6 +10,8 @@ SX báo công đọc song song chính sách, cursor và metadata SKU; metadata c
 
 ## Điều phối
 
+Khi mở lại SX hoặc workspace báo công, yêu cầu cập nhật nền bắt đầu ngay cả khi memory cache chưa hết TTL 30 giây. Các lượt đang chạy vẫn gộp chung; chuyển sang trang đã tải trước tiếp tục dùng prefetch. Không chờ nhịp poll để cập nhật menu vừa mở.
+
 PR #37 xử lý Tiến độ sản xuất và bộ nhớ trạng thái riêng của menu đó. Không sửa các tệp ứng dụng của PR #37: production-management, production-progress-review, production-progress-view-state, production-progress-read hoặc production-workflow. Tệp FUNCTION_STATUS thêm trạng thái ở vị trí riêng, tránh phần cuối PR #37.
 
 PR #13 cũng sửa worker/site-api.mjs; thay đổi ở đây chỉ một đối số của route production-order-pages. Phải kiểm bản ghép, không thay toàn bộ tệp của PR khác. PR #8 chỉ quy trình/CI. Trước merge/deploy phải đọc lại head, staging và MAIN; chỉ phát hành delta lên source MAIN mới nhất, từng lần một.

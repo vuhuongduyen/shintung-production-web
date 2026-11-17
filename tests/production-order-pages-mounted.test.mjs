@@ -30,6 +30,14 @@ test('a new page session displays its verified-scope saved rows while the fresh 
   assert.equal(m.host.querySelector('button[aria-label="Báo công · SAVED"]'),null);
  }finally{await m.close();productionDisplayStore.clear();clearProductionPages();}
 });
+test('reopening a fresh page keeps rows and starts a background read immediately without waiting for TTL',async()=>{
+ const first=await mount(async()=>Response.json(snapshot('FRESH-CACHED')));await first.close();
+ let calls=0,release;const second=await mount(async()=>{calls++;return new Promise(r=>{release=()=>r(Response.json(snapshot('JUST-UPDATED')));});},{},false);
+ try{
+  assert.equal(calls,1);assert.ok(second.host.querySelector('[aria-label="Báo công · FRESH-CACHED"]'));assert.equal(second.host.querySelector('main').getAttribute('aria-busy'),'true');
+  await act(async()=>release());await flush();assert.ok(second.host.querySelector('[aria-label="Báo công · JUST-UPDATED"]'));assert.equal(calls,1);
+ }finally{await second.close();clearClientReads();}
+});
 test('expired page reopens with retained rows, then verifies before enabling writes',async()=>{
  const first=await mount(async()=>Response.json(snapshot('RETAINED')));await first.close();
  const now=Date.now,future=now()+31000;Date.now=()=>future;let release;
