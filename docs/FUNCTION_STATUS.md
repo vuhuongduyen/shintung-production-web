@@ -145,6 +145,8 @@ Chưa đo propagation Sec-Fetch-Site trên đường GitHub từ probe cũ; chư
 
 Nhánh riêng; hợp nhất snapshot theo từng khóa trong cùng phạm vi đã xác minh, chuyển khóa lưu để tab phiên bản cũ không ghi đè. Giảm đọc SKU không liên quan, kế hoạch chưa đồng bộ và lịch sử nhập đã duyệt trong scope tóm tắt SX; giữ dữ liệu và quyền. TypeScript/build cùng kiểm thử cache/API mục tiêu đạt; chưa nghiệm thu tốc độ MAIN sau sửa. Tách khỏi PR #37 Tiến độ sản xuất. Chi tiết: docs/PRODUCTION-CACHE-ISOLATION-20261117.md.
 
+Bổ sung sau MAIN v836: giữ trang/dữ liệu đã xác minh trên trình duyệt, nhưng Admin còn đọc 8–10 giây. Nhánh riêng tiếp tục lọc sớm kế hoạch có nhãn đồng bộ nhưng chưa đủ mã LSX/lượng/ngày mở; không đổi kết quả hoặc dữ liệu. Xem docs/SX-READY-SCAN-20261117.md; chưa nghiệm thu tốc độ bản bổ sung.
+
 ## 16/11/2026 — ứng viên giảm thời gian mở SX báo công
 
 Chỉ SX báo công: giảm đọc lặp, giữ snapshot hết TTL khi mở lại để kiểm tra nền. Fixture 126 lệnh: 45 → 17 lượt DB, tổng/dữ liệu lưu giữ nguyên. 37 ca mục tiêu/hồi quy, TypeScript và build đạt. Chưa merge/deploy hoặc nghiệm thu tốc độ end-to-end MAIN. Các menu còn lại giữ nguyên. Chi tiết: docs/SX-FIRST-LOAD-2026-11-16.md.
@@ -158,3 +160,7 @@ Kiểm chứng ứng viên: 55 test mục tiêu/hồi quy, TypeScript và build 
 ## 17/11/2026 — Tiến độ sản xuất: PR độc lập, chưa merge/triển khai
 
 Bổ sung giữ phạm vi/bộ lọc/trang của Tiến độ theo display scope đã xác minh; mỗi lần mở/kích hoạt yêu cầu tải nền ngay, không chờ TTL 30 giây; giảm đọc report/event/history lặp ở progress toàn bộ và tối ưu chọn lệnh đang xử lý. 38 ca liên quan, 24 hợp đồng CI, TypeScript/build đạt; fixture trình duyệt xác nhận giữ trang 2 qua đóng/mở và reload, tải nền cập nhật không đổi trang. Bản ghép cục bộ PR36 đạt 36 ca + TypeScript/build, không xung đột. Khôi phục toàn bộ sau đăng xuất phụ thuộc PR36. Chưa nghiệm thu tốc độ MAIN, phiên Line A/B thật và toàn bộ phiếu thật; không ghi D1/R2/quyền/dữ liệu. Chi tiết nguồn, phạm vi và release gate: [PRODUCTION-PROGRESS-PERFORMANCE-20261117.md](PRODUCTION-PROGRESS-PERFORMANCE-20261117.md).
+
+## 17/11/2026 — PR39: giảm đọc lặp danh sách SX (chưa triển khai)
+
+Bỏ sớm kế hoạch chắc chắn thiếu mã/ngày mở hoặc lượng 0; tổng hợp tối đa 500 ứng viên/lượt thay 100, giữ trang 10 dòng và payload 512 KiB. Không bỏ kiểm tra lệnh hoàn thành bằng trạng thái cũ. 20 kiểm thử trang/byte/legacy/tổng/chờ duyệt đạt, gồm 501 lệnh hoàn thành qua hai cửa sổ; records giữ nguyên. Chờ CI và đo MAIN trước khi kết luận tốc độ đạt.
