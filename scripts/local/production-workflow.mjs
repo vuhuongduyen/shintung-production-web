@@ -241,7 +241,7 @@ function reportCalculation(calendar, events, report, directory, calculateHours=t
 
  if(report.stageReporting){const policy=policyFor?policyFor(report.line):attendancePolicy(calendar,events,report.line);policy.extraPresent=(id,date,minute,part)=>{
   return isPresent(null,events,id,report.line,date,minute,part);
- };return {hours:stageHours(events,report,toScheduleMap(calendar,report.startedAt,report.completedAt,report.line),policy,hoursForOrder),laborNotes:[],pendingAttendance:[],unresolvedAttendance:[]};}
+ };return {hours:stageHours(events,report,toScheduleMap(calendar,report.startedAt,report.completedAt,report.line),policy,hoursForOrder,readContext?.stageHourSegments),laborNotes:[],pendingAttendance:[],unresolvedAttendance:[]};}
 
  const schedule=toScheduleMap(calendar,report.startedAt,report.completedAt,report.line);
  const hours=calculateHours&&report.staffingIncomplete!==true?hoursForOrder(events,schedule,report.transitId,report.startedAt,report.completedAt,policyFor?policyFor(report.line):attendancePolicy(calendar,events,report.line)):null;
@@ -287,7 +287,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   const policies=new Map(),policyFor=line=>{if(!policies.has(line))policies.set(line,attendancePolicy(calendar,calculationEvents,line,true));return policies.get(line);};
   const journalPolicies=new Map(),journalPolicy=line=>{if(calculationEvents===allEvents)return policyFor(line);if(!journalPolicies.has(line))journalPolicies.set(line,attendancePolicy(calendar,allEvents,line,true));return journalPolicies.get(line);};
   const orderEvents=new Map();if(includeDerivedHours||includeJournalHours)for(const event of allEvents)for(const id of new Set([event.sourceId,event.destinationId].filter(Boolean))){if(!orderEvents.has(id))orderEvents.set(id,[]);orderEvents.get(id).push(event);}
-  const readContext=includeDerivedHours||includeJournalHours?{orderEvents,attendance:effectiveAttendance(calculationEvents),pending:effectiveAttendance(calculationEvents,true).filter(e=>e.approved===false&&["absence","line-absence","attendance-override"].includes(e.kind))}:null;
+  const readContext=includeDerivedHours||includeJournalHours?{stageHourSegments:new Map(),orderEvents,attendance:effectiveAttendance(calculationEvents),pending:effectiveAttendance(calculationEvents,true).filter(e=>e.approved===false&&["absence","line-absence","attendance-override"].includes(e.kind))}:null;
   const events = eventRows(scopedJournal, readActor).map(event => ({...event, employeeDetails:eventEmployees(event, employeeDirectory),
     affectedOrderIds:includeDerivedHours&&!reviewReportId&&!event.sourceId&&["line-absence","attendance-override"].includes(event.kind)?(()=>{
       const start=Date.parse(event.effectiveAt),end=Date.parse(event.endsAt),points=[start,end,...allEvents.map(e=>Date.parse(e.effectiveAt)).filter(t=>t>start&&t<end)].sort((a,b)=>a-b);

@@ -7,12 +7,17 @@ export function productionReadBatch(db) {
   const flush = async () => {
     scheduled = false;
     const pending = queue; queue = [];
-    for (let i=0; i<pending.length; i+=3) {
-      const group = pending.slice(i,i+3);
-      try {
-        const results = await db.batch(group.map(item=>item.statement));
-        group.forEach((item,index)=>item.resolve(results[index]));
-      } catch (error) { group.forEach(item=>item.reject(error)); }
+    for (let i=0; i<pending.length; i+=9) {
+      // Independent entity reads must not wait behind earlier batches. Keep
+      // at most three byte-bounded batches in flight for this flush.
+      await Promise.all([0,3,6].map(async offset=>{
+        const group=pending.slice(i+offset,Math.min(i+offset+3,i+9));
+        if(!group.length)return;
+        try {
+          const results = await db.batch(group.map(item=>item.statement));
+          group.forEach((item,index)=>item.resolve(results[index]));
+        } catch (error) { group.forEach(item=>item.reject(error)); }
+      }));
     }
   };
   const enqueue = statement => new Promise((resolve,reject)=>{
