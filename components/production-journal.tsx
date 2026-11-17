@@ -28,11 +28,12 @@ const reviewActor=(row:Record<string,any>)=>{const review=productionReviewResult
 type Row=Record<string,any>;
 const time=(value?:string)=>productionDisplayTime(value,'—');
 const num=(value:any)=>value===null||value===undefined?'—':Number(value).toLocaleString('vi-VN',{maximumFractionDigits:2});
-function ProductionJournal({reports,events,orders,employees,open,refresh,busy,extraItems=[],initialCategory='report',canImportHistory=false}:{reports:Row[];events:Row[];orders:Row[];employees:Row[];open:(row:Row)=>void;refresh:()=>void;busy:boolean;extraItems?:any[];initialCategory?:string;canImportHistory?:boolean}) {
+function ProductionJournal({reports,events,orders,employees,open,refresh,busy,extraItems=[],initialCategory='report',canImportHistory=false,onCategoryChange}:{reports:Row[];events:Row[];orders:Row[];employees:Row[];open:(row:Row)=>void;refresh:()=>void;busy:boolean;extraItems?:any[];initialCategory?:string;canImportHistory?:boolean;onCategoryChange?:(category:string)=>void}) {
  const [importOpen,setImportOpen]=useState(false);
  const [reasonOpen,setReasonOpen]=useState<string|null>(null);
  const locale=useSyncExternalStore(subscribeToolbarLocale,toolbarLocale,()=> 'vi'),t=(v:string)=>translateToolbar(v,locale);
- const [category,setCategory]=useState(initialCategory),[filters,setFilters]=useState<Record<string,Row>>({}),[applied,setApplied]=useState<Record<string,Row>>({}),[searches,setSearches]=useState<Record<string,boolean>>({});
+ const [category,setLocalCategory]=useState(initialCategory),[filters,setFilters]=useState<Record<string,Row>>({}),[applied,setApplied]=useState<Record<string,Row>>({}),[searches,setSearches]=useState<Record<string,boolean>>({});
+ const setCategory=(value:string)=>{setLocalCategory(value);onCategoryChange?.(value);};
  const laborView=category==='labor'?<ProductionLaborJournal reports={reports} events={events} orders={orders} employees={employees} t={t} open={open} refresh={refresh} busy={busy} extraItems={extraItems} setCategory={setCategory}/>:null;
  const current=filters[category]||{field:'lsx',value:'',line:'all',status:'all',from:'',to:''};
  const patch=(change:Row)=>setFilters(old=>({...old,[category]:{...current,...change}}));

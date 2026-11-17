@@ -192,3 +192,16 @@ test('acknowledged save updates held assignments immediately and fences the old 
  const refresh=reader.setHeld(false);next.resolve(workflow('verified'));await refresh;
  assert.equal(reader.getState().value.orders[0].id,'SYNTHETIC-verified');
 });
+
+test('automatic poll never restarts a slow cold read or clears its timeout; explicit retry recovers',async()=>{
+ let calls=0;const slow=deferred();const reader=createProductionWorkspaceReader({read:()=>{calls++;return calls===1?slow.promise:Promise.resolve(workflow('RECOVERED'));}});
+ const opened=reader.setActive(true);await tick();
+ for(let i=0;i<4;i++)await reader.poll();
+ assert.equal(calls,1);assert.equal(reader.getState().loading,true);
+ slow.reject(Error('Synthetic timeout'));await opened;
+ const failure=reader.getState().error;
+ for(let i=0;i<4;i++)await reader.poll();
+ assert.equal(calls,1);assert.equal(reader.getState().error,failure);
+ await reader.refresh(true);assert.equal(calls,2);assert.equal(reader.getState().value.orders[0].id,'SYNTHETIC-RECOVERED');
+ await reader.poll();assert.equal(calls,3);
+});

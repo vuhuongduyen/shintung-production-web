@@ -1,3 +1,9 @@
+# 17/11/2026 — Sửa lỗi đọc lần đầu sau PR34
+
+PR34 đã merge nhưng MAIN v830 không đạt: Nhật ký hết hạn 15 giây và tự lặp; MAIN đã quay lại v829. Bản sửa tiếp tách `workspace` khỏi tính giờ lũy kế của Nhật ký thời gian; chỉ yêu cầu `journal` khi chọn đúng hạng mục, lưu snapshot riêng và giữ đầy đủ công thức/căn cứ lịch sử khi xem. Gộp SELECT độc lập thành lô nhỏ trong một GET sau xác thực, không lưu cache máy chủ qua request. Poll không thay thế lượt đọc đang chạy hoặc xóa lỗi rồi lặp liên tục; người dùng vẫn có Thử lại.
+
+Kiểm local: 30 ca lỗi gốc/profile/batch + 71 ca hồi quy/quyền/cache/lịch sử + 24 hợp đồng CI đạt; TypeScript và build đạt. Không đổi DB/FILES, schema, tài khoản hay dữ liệu nghiệp vụ. Full CI và kiểm thời gian thực tế trên bản triển khai còn chờ; chưa tuyên bố đạt toàn bộ yêu cầu hiển thị sẵn/cập nhật nhanh.
+
 # Trạng thái chức năng đang thay đổi
 
 
