@@ -17,11 +17,17 @@ const fields={LSX:'lsxCode',SKU:'sku','Tên sản phẩm':'name','Plan ID':'plan
 const orderFields=['id','planId','planGroupId','week','lsxCode','sku','name','spec','unit','line','planningNote','sequence','lsxQty','completedQty','pendingReportQty','inTransitQty','planStart','planEnd','actualStartedAt','actualCompletedAt','status','productionState','progressStatus','syncStatus','revision'];
 // The list/detail only consumes SKU display metadata. Do not transport audit,
 // BOM or price history, or hash the complete catalog, for every page request.
-export async function readProductionPageCatalog(db,{includeProcesses=false}={}){
+export async function readProductionPageCatalog(db,{includeProcesses=false,ordersOnly=false}={}){
  const columns=['code','group','productGroup','category','name','productName','specification','spec','quyCach','quy_cach','unit','uom','unitOfMeasure','line','productionLine','_deleted','status','confirmation_status','usage_status'];
  if(includeProcesses)columns.push('processes');
  const expression=`json_object(${columns.flatMap(k=>[`'${k}'`, `json_extract(payload,'$.${k}')`]).join(',')})`;
- const records=await readRecordPages(db,{where:"entity='sku'",payloadExpression:expression,sizeExpression:expression});
+ const orderSku="coalesce(nullif(nullif(json_extract(payload,'$.sku'),''),0),json_extract(payload,'$.columns[1]'),'')";
+ const masterCode="coalesce(nullif(nullif(json_extract(payload,'$.code'),''),0),record_key)";
+ const needed=`SELECT upper(trim(${orderSku})) FROM app_records WHERE entity='in_transit' AND coalesce(json_extract(payload,'$._deleted'),0)=0`;
+ // Keep unusual Unicode/control-space identifiers for the established JS matcher.
+ // Matching the record key also preserves live overrides of bundled legacy SKUs.
+ const where="entity='sku'"+(ordersOnly?` AND (upper(trim(${masterCode})) IN (${needed}) OR upper(trim(record_key)) IN (${needed}) OR ${masterCode} GLOB '*[^ -~]*' OR record_key GLOB '*[^ -~]*' OR EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND ${orderSku} GLOB '*[^ -~]*'))`:'');
+ const records=await readRecordPages(db,{where,payloadExpression:expression,sizeExpression:expression});
  return siteCatalog(records.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})));
 }
 export const canExportProductionWork=actor=>actor?.authMode!=='quick_line'&&Boolean(actor?.isAdmin||(actor?.grants||[]).some(g=>normalizePermission(g)===normalizePermission(productionMenus.work+' / Xuất dữ liệu')));
@@ -41,13 +47,17 @@ export function productionPageQuery(params,actor){
 }
 // Read-only, request-local scope. Values originate in authorized order rows and
 // are SQL-quoted here; no caller can supply SQL or use this adapter for writes.
-export function productionOrderScope(db,orders,{workflow=false}={}){
+export function productionOrderScope(db,orders,{workflow=false,summary=false}={}){
  const ids=literal(JSON.stringify(orders.map(o=>o.id))),codes=literal(JSON.stringify(orders.map(o=>String(o.lsxCode||'').trim().toUpperCase()))),plans=literal(JSON.stringify(orders.filter(o=>!o.planGroupId).map(o=>String(o.planId||'').trim().toUpperCase())));
  const complexOrder=orders.some(o=>[o.lsxCode,o.planId].some(v=>/[^ -~]|  /.test(String(v||''))));
  const inIds=value=>`${value} IN (SELECT value FROM json_each(${ids}))`;
  const matches=value=>`(${inIds(`json_extract(${value},'$.transitId')`)} OR (coalesce(json_extract(${value},'$.transitId'),'')='' AND (${complexOrder?1:0}=1 OR upper(trim(${sourceCode(value)})) IN (SELECT value FROM json_each(${codes})) OR (${sourceCode(value)}='' AND upper(trim(coalesce(json_extract(${value},'$.planId'),''))) IN (SELECT value FROM json_each(${plans}))) OR coalesce(json_extract(${value},'$.lsxCode'),json_extract(${value},'$.planId'),'') GLOB '*[^ -~]*' OR instr(coalesce(json_extract(${value},'$.lsxCode'),json_extract(${value},'$.planId'),''),'  ')>0)))`;
  const event=value=>`(${inIds(`json_extract(${value},'$.sourceId')`)} OR ${inIds(`json_extract(${value},'$.destinationId')`)})`;
- const historyPayload=workflow?`json_set(payload,'$.reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')})),'$.timeEvents',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.timeEvents') WHERE ${event('value')})))`:`json_object('_deleted',json_extract(payload,'$._deleted'),'reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')})))`;
+ // Summary consumers only use pending import quantities. Filter before building
+ // scoped JSON; otherwise approved history/source copies are repeatedly rebuilt
+ // by SQLite for every projected field, then discarded by the summary reader.
+ const pending=summary?" AND json_extract(value,'$.reviewStatus') IN ('Chờ kiểm tra','Lịch sử chờ đối chiếu')":'';
+ const historyPayload=workflow?`json_set(payload,'$.reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')})),'$.timeEvents',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.timeEvents') WHERE ${event('value')})))`:`json_object('_deleted',json_extract(payload,'$._deleted'),'reports',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.reports') WHERE ${matches('value')}${pending})))`;
  const globalEvent=workflow?` OR (coalesce(json_extract(payload,'$.sourceId'),'')='' AND coalesce(json_extract(payload,'$.destinationId'),'')='')`:'';
  const source=`(SELECT entity,record_key,CASE WHEN entity='production_history_import' THEN ${historyPayload} WHEN entity='production_report' AND json_type(payload,'$.rows')='array' THEN json_set(payload,'$.rows',json((SELECT json_group_array(json(value)) FROM json_each(payload,'$.rows') WHERE ${matches('value')}))) ELSE payload END AS payload,updated_by,updated_at FROM app_records WHERE entity NOT IN ('in_transit','production_report','production_event','production_history_import') OR entity='in_transit' AND ${inIds('record_key')} OR entity='production_report' AND (json_type(payload,'$.rows')='array' OR ${matches('payload')}) OR entity='production_event' AND (${event('payload')}${globalEvent}) OR entity='production_history_import' AND (EXISTS(SELECT 1 FROM json_each(payload,'$.reports') WHERE ${matches('value')})${workflow?` OR EXISTS(SELECT 1 FROM json_each(payload,'$.timeEvents') WHERE ${event('value')})`:''}))`;
  return {prepare(sql){if(!/^\s*SELECT\b/i.test(sql))fail('Phạm vi danh sách chỉ cho phép đọc.',403);return db.prepare(sql.replace(/\bapp_records\b/g,source));}};
@@ -64,7 +74,7 @@ const transitValue=(field,index,alternate)=>`coalesce(nullif(json_extract(payloa
 const dateSql=value=>{const iso=`CASE WHEN length(${value})=10 AND substr(${value},3,1)='/' AND substr(${value},6,1)='/' THEN substr(${value},7,4)||'-'||substr(${value},4,2)||'-'||substr(${value},1,2) ELSE ${value} END`;return `CASE WHEN length(${iso})=10 AND date(${iso},'+0 days')=${iso} THEN ${iso} ELSE NULL END`;};
 const rawLine=transitValue('line',4),lineSql=`CASE WHEN upper(trim(${rawLine})) LIKE 'LINE %' THEN trim(substr(trim(${rawLine}),6)) ELSE trim(${rawLine}) END`;
 const rawWeek=`coalesce(nullif(json_extract(payload,'$.week'),''),nullif(json_extract(payload,'$.planStart'),''),nullif(json_extract(payload,'$.start'),''),json_extract(payload,'$.columns[6]'),'')`,weekDate=dateSql(rawWeek),weekSql=`date(${weekDate},'-'||((cast(strftime('%w',${weekDate}) AS INTEGER)+6)%7)||' days')`;
-const orderDirectory=`WITH directory AS (SELECT record_key,${transitValue('lsxCode',5)} AS lsxCode,${transitValue('planId',0)} AS planId,json_extract(payload,'$.planGroupId') AS planGroupId,${transitValue('sku',1)} AS sku,${lineSql} AS line,${weekSql} AS week,${dateSql(transitValue('planStart',6,'start'))} AS startDate,${dateSql(transitValue('planEnd',7,'end'))} AS dueDate FROM app_records WHERE entity='in_transit' AND coalesce(json_extract(payload,'$._deleted'),0)=0)`;
+const orderDirectory=`WITH directory AS (SELECT record_key,${transitValue('lsxCode',5)} AS lsxCode,${transitValue('planId',0)} AS planId,json_extract(payload,'$.planGroupId') AS planGroupId,${transitValue('sku',1)} AS sku,${lineSql} AS line,${weekSql} AS week,${dateSql(transitValue('planStart',6,'start'))} AS startDate,${dateSql(transitValue('planEnd',7,'end'))} AS dueDate FROM app_records WHERE entity='in_transit' AND coalesce(json_extract(payload,'$._deleted'),0)=0 AND coalesce(nullif(json_extract(payload,'$.syncStatus'),''),json_extract(payload,'$.columns[29]'),'') NOT IN ('','CHƯA ĐỒNG BỘ','CÓ THAY ĐỔI','LỖI ĐỒNG BỘ'))`;
 export async function* matchingProductionOrders(db,actor,q,catalog=[]){
  const where=['1'],args=[];
  if(q.line!=='all'){where.push('line=?');args.push(q.line);}
@@ -81,7 +91,7 @@ export async function* matchingProductionOrders(db,actor,q,catalog=[]){
  for(;;){
   const candidates=(await db.prepare(orderDirectory+` SELECT record_key,lsxCode,planId,planGroupId FROM directory WHERE ${where.join(' AND ')} ORDER BY coalesce(week,'9999'),coalesce(${sortField},'9999'),record_key LIMIT ${windowSize} OFFSET ?`).bind(...args,offset).all()).results;
   if(!candidates.length)break;
-  const orders=candidates.map(r=>({...r,id:r.record_key})),scope=productionOrderScope(db,orders);
+  const orders=candidates.map(r=>({...r,id:r.record_key})),scope=productionOrderScope(db,orders,{summary:true});
   const state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true,skipLeadtime:true}),totals=dailyOutputTotalsIndex(state.rows,state.summaryReports),byId=new Map(state.rows.map(o=>[o.id,o]));
   for(const candidate of orders){const o=byId.get(candidate.id);if(!o)fail('Định danh lệnh đã thay đổi hoặc không khớp dữ liệu đã lưu. Tải lại và đối chiếu trước khi tiếp tục.',409);if(o.syncStatus!=='ĐÃ ĐỒNG BỘ'||!o.lsxCode)continue;
    const reports=state.summaryReports.filter(r=>r.transitId===o.id),events=state.summaryEvents.filter(e=>!e.voided&&(e.sourceId===o.id||e.destinationId===o.id)),runtime=productionRuntime(o,events),summary=progressReviewSummary(o,state.summaryReports,events);
@@ -96,10 +106,10 @@ function csv(values){return values.map(value=>{let s=String(value??'');if(/^[=+@
 export async function productionOrderPage(db,actor,params,catalog=[]){
  const query=productionPageQuery(params,actor);
  if(params.get('format')==='csv'&&!canExportProductionWork(actor))fail('Không có quyền xuất dữ liệu SX báo công.',403);
- const activation=await readDailyOutputPolicy(db);
+ const [activation,cursor,loadedCatalog]=await Promise.all([readDailyOutputPolicy(db),productionCursor(db),typeof catalog==='function'?catalog():catalog]);
+ catalog=loadedCatalog;
  if(activation.policy?.cutoverReached&&!activation.policy.active)fail(activation.policy.blockedReason,503);
  if(!activation.policy?.active)return {supported:false};
- const cursor=await productionCursor(db);
  if(params.has('orderId')){const result=await readProductionOrderDetail(db,actor,params,catalog,activation.policy);await assertCursor(db,cursor);return result;}
  if(params.get('format')==='csv'){
   const encoder=new TextEncoder(),iterator=matchingProductionOrders(db,actor,query,catalog)[Symbol.asyncIterator]();let first=true;
@@ -125,7 +135,7 @@ async function readProductionOrderDetail(db,actor,params,catalog,policy){
  if(!id||id.length>250||!['reports','events'].includes(kind)||!Number.isSafeInteger(page)||page<1)fail('Phạm vi chi tiết không hợp lệ.');
  const row=await db.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(id).first();if(!row)fail('Không còn lệnh để tra cứu.',404);
  const stored=JSON.parse(row.payload),raw=normalizeTransit({...stored,id});if(stored._deleted)fail('Lệnh đã lưu trữ; tra cứu tại lịch sử được phân quyền.',404);if(actor.line&&raw.line!==actor.line)fail('Không có quyền đọc Line khác.',403);
- const scope=productionOrderScope(db,[{...raw,id}]),state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true,skipLeadtime:true}),order=state.rows.find(o=>o.id===id);if(!order)fail('Không còn lệnh để tra cứu.',404);
+ const scope=productionOrderScope(db,[{...raw,id}],{summary:true}),state=await getTransit(scope,{},catalog,{includeHistory:false,includeProductionSummary:true,skipLeadtime:true}),order=state.rows.find(o=>o.id===id);if(!order)fail('Không còn lệnh để tra cứu.',404);
  const totals=dailyOutputTotalsIndex([order],state.summaryReports).get(id);
  const code=String(raw.lsxCode||'').trim(),plan=String(raw.planId||'').trim();
  const match=`(json_extract(p,'$.transitId')=? OR (coalesce(json_extract(p,'$.transitId'),'')='' AND (upper(trim(${sourceCode('p')}))=upper(?) OR (?=1 AND ${sourceCode('p')}='' AND upper(trim(coalesce(json_extract(p,'$.planId'),'')))=upper(?)))))`;

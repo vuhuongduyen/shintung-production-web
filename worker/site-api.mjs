@@ -247,7 +247,7 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/in-transit'&&request.method==='GET'){if(url.searchParams.get('creationRecovery')==='1'){if(!canWrite(actor,'In Transit')&&!canWrite(actor,'In_transit'))return json({error:'Không có quyền cập nhật In Transit'},403);return json(await readAdditionalCreationScope(env.DB,actor));}if(!hasGrant(actor,'Kế hoạch sản xuất / In_transit',['Xem']))return json({error:'Không có quyền xem In Transit'},403);const activation=await readDailyOutputPolicy(env.DB);if(activation.policy?.cutoverReached&&!activation.policy.active)return json({error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy},503);const preservation=await readLegacyPreservation(env.DB,activation.policy,actor,{full:false});return json(await getTransit(env.DB,Object.fromEntries(url.searchParams),await loadCatalog(),{preservedOrders:preservation?.orders}));}
   if(path==='/api/production-order-pages'&&request.method==='GET'){
    productionPageQuery(url.searchParams,actor);
-   const result=await productionOrderPage(productionDb,actor,url.searchParams,examples?[]:await readProductionPageCatalog(productionDb));
+   const result=await productionOrderPage(productionDb,actor,url.searchParams,examples?[]:()=>readProductionPageCatalog(productionDb,{ordersOnly:true}));
    if(result instanceof Response)return result;
    const projected=result.reports?await readLaborReferences(productionDb,result,env.LABOR_RATE_OMISSIONS_JSON,env.LABOR_RATE_SNAPSHOT_ID,env.LABOR_RATE_WARNING_SUPPRESSIONS_JSON):result;
    return json({...projected,reportingHold:productionReportingHold(url.hostname)});

@@ -48,7 +48,7 @@ test('a stalled refresh body has a deadline; late results cannot become the next
 test('a storage operation already waiting when another tab changes scope cannot commit the old snapshot',async()=>{
  const listeners=new Set(),sync={subscribe:fn=>listeners.add(fn),publish:message=>{for(const fn of listeners)fn(message);}};
  let saved=null,delay=false,release;
- const storage={read:async()=>saved,clear:async()=>{saved=null;},write:async(value,{current})=>{if(delay){delay=false;await new Promise(r=>{release=r;});}if(current())saved=structuredClone(value);}};
+ const storage={read:async()=>saved,clear:async({scope})=>{if(saved?.scope===scope)saved=null;},write:async(value,{current})=>{if(delay){delay=false;await new Promise(r=>{release=r;});}if(current())saved=structuredClone(value);}};
  const a=createProductionDisplayStore({storage,sync}),b=createProductionDisplayStore({storage,sync});
  await a.activate('A');await a.settled();delay=true;a.put('rows',['OLD']);await Promise.resolve();
  await b.activate('B');b.put('rows',['NEW']);await b.settled();release();await a.settled();
