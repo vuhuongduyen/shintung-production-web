@@ -112,11 +112,11 @@ test('hidden production workspaces defer initial and event reads, then revalidat
   const initial=reader.setActive(true); await tick(); assert.equal(calls,1);
   const first=workflow('INITIAL'); next.resolve(first); await initial;
   assert.equal(reader.getState().value,first);
-  await reader.setActive(false); await reader.setActive(true); assert.equal(calls,1,'clean menu switching needs no new request');
+  await reader.setActive(false); await reader.setActive(true); assert.equal(calls,2,'opening a retained menu verifies immediately, even inside the cache TTL');
   await reader.setActive(false); next=deferred();
   for(let i=0;i<8;i++)await reader.refresh(true);
-  assert.equal(calls,1); assert.equal(reader.getState().value,first);
-  const reactivated=reader.setActive(true); await tick(); assert.equal(calls,2);
+  assert.equal(calls,2); assert.equal(reader.getState().value,first);
+  const reactivated=reader.setActive(true); await tick(); assert.equal(calls,3);
   assert.equal(reader.getState().value,first,'loaded business view stays mounted during background refresh');
   assert.equal(reader.getState().loading,true);
   next.resolve(workflow('CHANGED')); await reactivated;

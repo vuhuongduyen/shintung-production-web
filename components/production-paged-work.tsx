@@ -21,14 +21,14 @@ export default function ProductionPagedWork({sessionLine,preferenceUser,fallback
  const generation=useRef(0),owner=useRef({}),seen=useRef(new Set<string>()),revision=useDataRefresh(['production_workflow','production_report'],{ignoreSource:owner.current,poll:false});
  const url=productionOrderPageUrl({page,sort,applied,line:sessionLine||'all'});
  const held=editing||!!detail;
- const lastRead=useRef({url:'',refresh:0,revision:0});
+ const lastRead=useRef({url:'',refresh:0,revision:0}),readingActive=useRef(false);
  const identity=JSON.stringify([preferenceUser||'',sessionLine||'all']);
  useEffect(()=>{if(!active||held)return;const timer=window.setInterval(()=>{if(!document.hidden&&!loading&&!error)setRefresh(n=>n+1);},15000);return()=>window.clearInterval(timer);},[active,held,loading,error]);
- useEffect(()=>{if(!active||held)return;const id=++generation.current;
+ useEffect(()=>{if(!active||held){readingActive.current=false;return;}const activated=!readingActive.current;readingActive.current=true;const id=++generation.current;
   const cached=cachedProductionPage(url,identity),retained=cached||retainedProductionPage(url,identity);
   if(retained?.supported===true&&loadedUrl.current!==url){loadedUrl.current=cached?url:'';setSnapshot(retained);setLegacy(false);}
   setLoading(true);setError('');
-  const force=lastRead.current.url===url&&(lastRead.current.refresh!==refresh||lastRead.current.revision!==revision);lastRead.current={url,refresh,revision};
+  const force=activated||lastRead.current.url===url&&(lastRead.current.refresh!==refresh||lastRead.current.revision!==revision);lastRead.current={url,refresh,revision};
   void readProductionPage(url,identity,force).then(data=>{if(id!==generation.current)return;
    if(data.supported===false){setLegacy(true);setLoading(false);return;}
    loadedUrl.current=url;setLegacy(false);setSnapshot(data);setPage(data.page);setLoading(false);
