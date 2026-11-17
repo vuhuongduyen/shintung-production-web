@@ -174,3 +174,8 @@ Bỏ sớm kế hoạch chắc chắn thiếu mã/ngày mở hoặc lượng 0; 
 ## 17/11/2026 — khắc phục giới hạn câu SQL sau PR39
 
 Hậu kiểm v837 phát hiện D1 statement too long; đã đưa deployment về v836. Bản sửa riêng dùng ba tham số mảng thay JSON lặp trong SQL của scope, giữ cùng điều kiện đọc/Line và batching. Regression mã dài tái hiện lỗi trước sửa và đạt sau sửa (21.722 byte, 6 tham số), không đổi records. Chưa nghiệm thu tốc độ/triển khai bản sửa.
+
+
+## 17/11/2026 — Excel vắng mặt và hủy lần nhập (ứng viên, chưa triển khai)
+
+Thêm hai nút trong màn HR, xem trước/đối chiếu và lưu một giao dịch tối đa 100 dòng; lịch sử chọn lần nhập, xem tác động/lý do rồi hủy nguyên lần. Chặn hậu chỉnh sửa, trùng, kỳ khóa và sai quyền; giữ thủ công và lịch sử. Giảm đọc và refresh lặp của lưu thủ công. 81 test mục tiêu/hồi quy cuối, 24 hợp đồng CI local, TypeScript/build đạt. Browser preview bị approval review chặn; chưa QA web thật hoặc đo MAIN, chưa merge/deploy hay đối chiếu phiếu thật. Xem [HR-ABSENCE-EXCEL.md](HR-ABSENCE-EXCEL.md).
