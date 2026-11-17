@@ -63,7 +63,7 @@ export default function ActualWorkSchedule({viewKey="default",week,setWeek,line,
   const tabs=attendanceInputTypes({hr,manager:canLaborManage});
   const currentEvents:Row[]=useMemo(()=>effectiveAttendance(events,true),[events]);
   const [selectedTab,setTab]=viewField('selectedTab'),[showHistory,setShowHistory]=viewField('showHistory'),[reason,setReason]=useState("");
-  const tab=selectedTab||attendanceInputType('',{hr,manager:canLaborManage});
+  const tab=attendanceInputType(selectedTab,{hr,manager:canLaborManage});
   useEffect(()=>{setLeavePeople([]);setCorrection(null);setEditEntry(null);setOpenArrival(false);},[hr,canLaborManage]);
   const [leaveStart,setLeaveStart]=useState(()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10)+"T08:00");
   const [leaveEnd,setLeaveEnd]=useState(()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10)+"T17:00");

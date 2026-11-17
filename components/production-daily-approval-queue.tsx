@@ -1,4 +1,5 @@
 'use client';
+import './production-daily-approval-queue.css';
 import {Fragment,useRef,useState} from 'react';
 import {DataTable} from './onspa-ui/DataTable';
 import {DataCell} from './onspa-ui/DataCell';
@@ -31,7 +32,7 @@ export default function ProductionDailyApprovalQueue({entries,manager,busy,onCon
   finally{latch.current=false;setSaving('');}
  }
  return <section className="data-card daily-approval-queue" aria-label={t('Sản lượng chờ xác nhận theo ngày')}>
- <DataTable className="table-wrap"><table className="production-table" data-no-pagination="true"><thead><tr>{['Xác nhận','LSX','SKU','Tên sản phẩm','Quy cách','Line','SL lệnh','SL chờ xác nhận','Người báo (ID)','Ghi chú'].map(label=><th key={label}>{t(label)}</th>)}</tr></thead><tbody>
+ <DataTable className="table-wrap"><table className="production-table" data-no-pagination="true"><colgroup>{[9,11,10,27,8,4,7,9,8,7].map((width,index)=><col key={index} style={{width:`${width}%`}}/>)}</colgroup><thead><tr>{['Xác nhận','LSX','SKU','Tên sản phẩm','Quy cách','Line','SL lệnh','SL chờ xác nhận','Người báo (ID)','Ghi chú'].map(label=><th key={label}>{t(label)}</th>)}</tr></thead><tbody>
  {rows.map((entry,index)=>{const {order,report}=entry,day=outputDate(report),blocker=reviewEligibility(order,report,reason(report));return <Fragment key={report.id}>
  {(index===0||outputDate(rows[index-1].report)!==day)&&<tr className="it-week-divider progress-week-divider"><th colSpan={10}>{t('Ngày hoàn thành')}: {day?day.split('-').reverse().join('/'):t('Chưa xác định')}</th></tr>}
  <tr><DataCell><FeedbackActionButton type="button" className="primary-button" aria-label={`${t('Xác nhận')} ${order.lsxCode} ${num(report.reportedQuantity)}`} disabled={busy||!!saving||!manager||!!blocker} disabledExplanation={!manager?t('Bạn không có quyền xác nhận báo công.'):blocker?t(blocker):t('Đang xử lý. Vui lòng chờ hoàn tất.')} onClick={()=>void confirm(entry)}>{t(saving===report.id?'Đang xác nhận…':'Xác nhận')}</FeedbackActionButton></DataCell>
