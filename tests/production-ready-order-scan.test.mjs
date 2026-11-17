@@ -22,3 +22,25 @@ test('legacy column fallbacks and nonstandard positive quantities remain eligibl
  for(const id of ['COLUMN-ORDER','FALSY-COLUMN','FORMATTED'])assert.ok(current.orders.some(o=>o.id===id),id);
  assert.deepEqual(await records(c.db),stored);
 }));
+
+// A real list may contain mostly finished LSX; skipping incomplete plans alone
+// does not reduce those reads. Keep their shared status calculation intact.
+test('completed candidates are summarized in bounded windows without hiding pending or legacy orders',()=>dailyFixture(async c=>{
+ const baseline=await productionOrderPage(c.db,admin,new URLSearchParams());
+ for(let i=0;i<501;i++){
+  const id='FINISHED-'+String(i).padStart(3,'0');
+  await c.put('in_transit',id,{...c.order,id,lsxCode:id,completedQty:1000,actualCompletedAt:'2026-11-02'});
+ }
+ await c.put('in_transit','PENDING-FINAL',{...c.order,id:'PENDING-FINAL',lsxCode:'PENDING-FINAL'});
+ await c.put('production_report','PENDING-FINAL-REPORT',{id:'PENDING-FINAL-REPORT',transitId:'PENDING-FINAL',kind:'completion',quantityOnly:true,reportingModel:'daily-finished-v1',reportedQuantity:1000,reviewStatus:'Chờ kiểm tra',productionDate:'2026-11-02'});
+ const stored=await records(c.db),measured=observeReadDatabase(c.db);
+ const current=await productionOrderPage(measured.database,admin,new URLSearchParams());
+ assert.equal(current.total,baseline.total+1);
+ for(const row of baseline.orders)assert.deepEqual(current.orders.find(r=>r.id===row.id),row);
+ const pending=current.orders.find(r=>r.id==='PENDING-FINAL');
+ assert.equal(pending.serverSummary.badge.tone,'review');assert.equal(pending.serverSummary.totals.pending,1000);
+ assert.equal(measured.summary().in_transitCalls,2);
+ const completed=await productionOrderPage(c.db,admin,new URLSearchParams('field=Trạng thái&status=completed&page=51'));
+ assert.equal(completed.total,501);assert.equal(completed.orders.length,1);assert.equal(completed.orders[0].id,'FINISHED-500');
+ assert.deepEqual(await records(c.db),stored);
+}));
