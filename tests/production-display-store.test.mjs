@@ -27,9 +27,30 @@ test('storage failure never blocks memory; expiry and bounded storage do not ret
  cache.put('1',{rows:[1]});cache.put('2',{rows:[2]});cache.put('3',{rows:[3]});await cache.settled();assert.equal(cache.get('1'),null);assert.deepEqual(cache.get('3'),{rows:[3]});
  now=111;assert.equal(cache.get('3'),null);
 });
+test('another tab changing account or logging out disables old-scope persistence without deleting the new account snapshot',async()=>{
+ const listeners=new Set(),sync={subscribe:fn=>listeners.add(fn),publish:scope=>{for(const fn of listeners)fn(scope);}},storage=disk();
+ const a=createProductionDisplayStore({storage,sync}),b=createProductionDisplayStore({storage,sync});
+ await a.activate('ACCOUNT-A');a.put('rows',{ids:['A']});await a.settled();
+ await b.activate('ACCOUNT-B');b.put('rows',{ids:['B']});await b.settled();
+ assert.equal(a.active(),false);assert.equal(a.get('rows'),null);
+ a.put('rows',{ids:['LATE-RESPONSE']});await a.settled();
+ a.clear();await a.settled();assert.equal(b.active(),true,'an old-tab denial cannot log out the latest display scope');
+ const reload=createProductionDisplayStore({storage,sync});await reload.activate('ACCOUNT-B');assert.deepEqual(reload.get('rows'),{ids:['B']});
+ b.clear();await b.settled();assert.equal(reload.active(),false);assert.equal(reload.get('rows'),null);
+ reload.put('rows',{ids:['AFTER-LOGOUT']});await reload.settled();assert.equal(await storage.read(),null);
+});
 test('a stalled refresh body has a deadline; late results cannot become the next response',async()=>{
  let release;const old=productionBoundedRead(async()=>({ok:true,status:200,json:()=>new Promise(r=>{release=r;})}),'/read',{},10);
  await assert.rejects(old,/phản hồi quá lâu/);release({rows:['OLD']});
  assert.deepEqual(await productionBoundedRead(async()=>Response.json({rows:['NEW']}),'/read'),{rows:['NEW']});
  await assert.rejects(productionBoundedRead(async()=>new Response('denied',{status:403}),'/read'),{status:403});
+});
+test('a storage operation already waiting when another tab changes scope cannot commit the old snapshot',async()=>{
+ const listeners=new Set(),sync={subscribe:fn=>listeners.add(fn),publish:message=>{for(const fn of listeners)fn(message);}};
+ let saved=null,delay=false,release;
+ const storage={read:async()=>saved,clear:async()=>{saved=null;},write:async(value,{current})=>{if(delay){delay=false;await new Promise(r=>{release=r;});}if(current())saved=structuredClone(value);}};
+ const a=createProductionDisplayStore({storage,sync}),b=createProductionDisplayStore({storage,sync});
+ await a.activate('A');await a.settled();delay=true;a.put('rows',['OLD']);await Promise.resolve();
+ await b.activate('B');b.put('rows',['NEW']);await b.settled();release();await a.settled();
+ assert.equal(saved.scope,'B');assert.deepEqual(saved.entries[0][1].value,['NEW']);
 });
