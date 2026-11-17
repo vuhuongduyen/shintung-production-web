@@ -18093,7 +18093,7 @@ export default function Home() {
     const timer=window.setTimeout(()=>{void loadProductionManagement().catch(()=>{});void import('../lib/production-menu-warmup').then(({warmProductionMenus})=>warmProductionMenus({
       login:identity.session?.login||'',line:identity.session?.kind==='line'?identity.session.line:undefined,
       work:canOpenMenu(identity.session,'production','report-work'),progress:canOpenMenu(identity.session,'production','report-progress'),
-      schedule:canOpenMenu(identity.session,'production','report-review'),capacity:['capacity-calendar','capacity-summary'].some(section=>canOpenMenu(identity.session,'production',section)),
+      schedule:canOpenMenu(identity.session,'production','report-review'),capacity:['capacity-calendar','capacity-summary'].some(section=>canOpenLegacyMenu(identity.session,'production',section)),
       stopped:()=>stopped||document.hidden,
     })).catch(()=>{});},150);
     return()=>{stopped=true;window.clearTimeout(timer);};

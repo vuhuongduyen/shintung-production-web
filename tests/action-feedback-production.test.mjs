@@ -45,11 +45,11 @@ async function choose(s,value){assert.ok(s);await act(async()=>{s.value=value;s.
 async function change(input,value){assert.ok(input);await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new window.Event('input',{bubbles:true}));});}
 async function search(host,method,control){if(method==='click')await click(button(toolbar(host),'Tìm kiếm'));else{assert.ok(control);await act(async()=>control.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true})));}}
 function scheduleProps(extra={}){return{week,setWeek:()=>{},line:'A',setLine:()=>{},locked:false,days,setDays:()=>{},version:2,approved:{key:`${week}:A`,version:3,days},approvedSchedules:[],history:[],events,orders:[],employees,manager:true,hr:true,busy:false,save:async()=>{throw Error('Unexpected save');},openAction:()=>{throw Error('Unexpected action');},refresh:async()=>true,...extra};}
-test('work board defers full history until explicit detail request and does not first reload work',async()=>{
+test('work board opens assignment with the richer workspace profile without reloading work or audit detail',async()=>{
  const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
   assert.deepEqual(requests,['/api/production-workflow?view=work']);
   await click(button(view.host,'Phân công'));
-  assert.deepEqual(requests,['/api/production-workflow?view=work','/api/production-workflow']);
+  assert.deepEqual(requests,['/api/production-workflow?view=work','/api/production-workflow?view=workspace']);
  }finally{await view.close();}
 });
 test('work detail never presents a partial work snapshot while full history is pending',async()=>{
