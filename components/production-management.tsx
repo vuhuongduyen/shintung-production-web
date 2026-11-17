@@ -125,7 +125,7 @@ function ProductionManagementLegacy({ mode, sessionLine, preferenceUser, confirm
   },[reader,requiredProfile,mode,workspaceActive,stageRequest,assignmentOpen]);
   useLayoutEffect(()=>{void reader.setHeld(!!stageRequest||!!action||!!incidentOrder||mode==='work'&&!!detail||dailyEditing);},[reader,stageRequest,action,incidentOrder,mode,detail,dailyEditing]);
   const [workSort,setWorkSort]=useState("due"),[absenceEndLocal,setAbsenceEndLocal]=useState(localNow),[effectiveLocal,setEffectiveLocal]=useState(localNow),[selectionTouched,setSelectionTouched]=useState(false);
-  const scheduleField=useActualScheduleViewFields(`calendar:${preferenceUser||''}:${sessionLine||''}`,{week:monday(new Date()),line:viewLine||"A"});
+  const scheduleField=useActualScheduleViewFields<{week:string;line:string}>(`calendar:${preferenceUser||''}:${sessionLine||''}`,{week:monday(new Date()),line:viewLine||"A"});
   const [week,setWeek]=scheduleField('week'),[savedCalendarLine,setCalendarLine]=scheduleField('line');
   const calendarLine=viewLine||(['A','B'].includes(savedCalendarLine)?savedCalendarLine:'A');
   const [days,setDays]=useState<Row[]>([]),[calendarVersion,setCalendarVersion]=useState(0);
