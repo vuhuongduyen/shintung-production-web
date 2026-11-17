@@ -1,6 +1,6 @@
 ## 17/11/2026 — Tối ưu lượt đọc tổng hợp sau PR35 (đang kiểm)
 
-Chỉ truyền trường pending cần cho tổng hợp lịch sử; đọc các lô độc lập đồng thời; dùng lại đoạn tính giờ giống nhau trong một request. Không lưu cache tính giờ qua request, không ghi lại phiếu/V1/V2/căn cứ thiếu, không đổi quyền/DB/FILES. Local 54/54 hồi quy và 24/24 hợp đồng đạt bằng dữ liệu giả; TypeScript/build đạt. Full CI và kiểm ứng dụng còn chờ; chưa tuyên bố hoàn tất.
+Chỉ truyền trường pending cần cho tổng hợp lịch sử; đọc các lô độc lập đồng thời; dùng lại đoạn tính giờ giống nhau trong một request. Không lưu cache tính giờ qua request, không ghi lại phiếu/V1/V2/căn cứ thiếu, không đổi quyền/DB/FILES. Local 54/54 hồi quy và 24/24 hợp đồng đạt bằng dữ liệu giả; TypeScript/build đạt. Bổ sung giữ giờ công chuẩn theo phạm vi đăng nhập đã xác minh cho menu tiền sản lượng; vẫn cập nhật nền, giữ giá trị khi lỗi mạng, xóa khi mất quyền và chặn phản hồi từ phiên cũ. Nhóm mounted bổ sung 11/11 đạt. Full CI của revision cuối và kiểm ứng dụng còn chờ; chưa tuyên bố hoàn tất.
 
 ## Điều chỉnh giờ công kế hoạch ngày 05/11 — thay quyết định bắt tách trước đó
 
