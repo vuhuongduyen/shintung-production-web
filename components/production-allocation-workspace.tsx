@@ -1,4 +1,5 @@
 "use client";
+import {productionDisplayStore} from '../lib/production-display-store.mjs';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import PlanningFeedback from './planning-feedback';
 import ProductionAllocationQueue,{type AllocationQueueView} from './production-allocation-queue';
@@ -13,6 +14,7 @@ export default function ProductionAllocationWorkspace({identity,refresh,planning
 function AllocationWorkspaceSession({refresh,planningDate,contextReady}:{refresh:()=>Promise<boolean>;planningDate?:string;contextReady:boolean}){
  const [data,setData]=useState<QueueData|null>(()=>retainedAllocation()),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[ready,setReady]=useState(false),[verifiedDate,setVerifiedDate]=useState<string|undefined>();
  const [success,setSuccess]=useState('');
+ useEffect(()=>productionDisplayStore.subscribe(()=>setData(current=>current||retainedAllocation())),[]);
  const generation=useRef(0),loadSequence=useRef(0),mutation=useRef(false),verified=useRef(false);
  const canAct=ready&&verifiedDate===planningDate&&contextReady;
  verified.current=canAct;

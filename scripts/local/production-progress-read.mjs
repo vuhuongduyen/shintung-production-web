@@ -23,5 +23,22 @@ export async function activeProgressDatabase(db,actor,catalog,preservedOrders){
  // reconciliation; it must not disappear merely because the row is archived.
  const known=new Set(state.rows.map(o=>o.id));
  for(const r of pending)if(r.transitId&&!known.has(r.transitId)&&(!actor.line||r.line===actor.line))orders.push({id:r.transitId,lsxCode:r.lsxCode||'',planId:r.planId||''});
- return productionOrderScope(db,orders,{workflow:true});
+ const scoped=productionOrderScope(db,orders,{workflow:true});
+ // The active-order scan already computed these rows. Reuse them only inside
+ // this request; do not scan quantities and status a second time.
+ scoped.transitState={rows:state.rows.filter(o=>orders.some(active=>active.id===o.id)),history:[]};
+ return scoped;
+}
+
+export function workspaceReadPayload(entity){
+ if(entity==='production_report'||entity==='production_event')return "json_remove(payload,'$.sourceSnapshot')";
+ if(entity==='production_history_import')return `CASE WHEN json_type(payload,'$.reports')='array' THEN json_set(payload,'$.reports',json((SELECT json_group_array(json(json_remove(value,'$.sourceSnapshot'))) FROM json_each(payload,'$.reports')))) ELSE payload END`;
+ return 'payload';
+}
+
+// Strip audit transport only after legacy signatures and labor references have
+// been checked against raw records. Detail disclosures keep the complete data.
+export function workspaceDisplayWorkflow(workflow){
+ const display=row=>{const {sourceSnapshot,...value}=row;return value;};
+ return {...workflow,reports:workflow.reports.map(display),events:workflow.events.map(display)};
 }

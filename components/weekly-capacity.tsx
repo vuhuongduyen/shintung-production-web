@@ -1,4 +1,5 @@
 'use client';
+import {productionDisplayStore} from '../lib/production-display-store.mjs';
 import {readAllocationWorkspace} from '../lib/allocation-workspace-cache';
 import {AlertDialog as CleaningDialog} from 'radix-ui';
 import {FeedbackActionButton} from './action-feedback';
@@ -41,7 +42,8 @@ export default function WeeklyCapacity({view='summary',onNavigateSummary,session
  const [weekReady,setWeekReady]=useState(initial.ready),[weekLookupError,setWeekLookupError]=useState(()=>capacityRestrictedError()?.message||'');
  const [readLoading,setReadLoading]=useState(true),[readError,setReadError]=useState(''),[updatedAt,setUpdatedAt]=useState(initial.snapshot?.updatedAt||0),[permissionsReady,setPermissionsReady]=useState(false),[readVersion,setReadVersion]=useState(initial.version),[retryRevision,setRetryRevision]=useState(0);
  const resetVersion=useSyncExternalStore(subscribeCapacityReset,capacityResetVersion,capacityResetVersion),scopeValid=readVersion===resetVersion;
- const live=useRef({week,dirty,busy,calendarLine});live.current={week,dirty,busy:busy||Boolean(cleaningReminder),calendarLine};
+ const live=useRef({week,dirty,busy,calendarLine,hasData:Boolean(state)});live.current={week,dirty,busy:busy||Boolean(cleaningReminder),calendarLine,hasData:Boolean(state)};
+ useEffect(()=>productionDisplayStore.subscribe(()=>{if(manualWeek.current||live.current.hasData||live.current.dirty||live.current.busy)return;const saved=initialCapacityWeek(live.current.week);if(saved.snapshot){setWeek(saved.week);setState(saved.snapshot.data);setRows(saved.snapshot.data.rows);setUpdatedAt(saved.snapshot.updatedAt);setWeekReady(true);}}),[]);
  const manualWeek=useRef(false),latestAttempt=useRef('');
  const [legacyEditOpen,setLegacyEditOpen]=useState(false);
  const [intendedChange,setIntendedChange]=useState(''),[nowDate,setNowDate]=useState(today);
