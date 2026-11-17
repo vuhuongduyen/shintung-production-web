@@ -1,3 +1,4 @@
+import {mergeProductionSavedResult} from './production-saved-result.mjs';
 import {productionBoundedRead} from './production-bounded-read.mjs';
 import {productionDisplayStore,displayOnlyWorkflow,compactWorkflowDisplay} from './production-display-store.mjs';
 import {readProgressResponse} from './production-progress-request.mjs';
@@ -32,3 +33,6 @@ export function clearProductionSnapshot(){full.clear();work.clear();progress.cle
 export function readProductionWorkflow(force=false,profile:WorkflowReadProfile='full'){
   return (typeof window==='undefined'?fetchWorkflow(force,profile):(profile==='work'&&!force&&(full.freshSnapshot()||workspace.freshSnapshot())?Promise.resolve((full.freshSnapshot()||workspace.freshSnapshot())):cache(profile).read(force))).catch(error=>{if(error?.status===401||error?.status===403){clearProductionSnapshot();productionDisplayStore.clear();}throw error;});
 }
+
+// Update only existing scoped display snapshots from an acknowledged report.
+export function acceptProductionReview(report:any){for(const entry of [full,work,progress,progressAll,workspace,journal])entry.applyMutation((value:any)=>mergeProductionSavedResult(value,{reports:[report]}));}
