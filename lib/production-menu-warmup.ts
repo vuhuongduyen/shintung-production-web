@@ -11,7 +11,7 @@ export async function warmProductionMenus({login,line,work,progress,schedule,cap
  const tasks:Array<()=>Promise<unknown>>=[];
  if(work)tasks.push(()=>readProductionPage(productionOrderPageUrl({line:line||'all'}),JSON.stringify([login,line||'all'])));
  if(progress)tasks.push(()=>readProductionWorkflow(false,'progress'));
- if(schedule)tasks.push(()=>readProductionWorkflow(false,'work'));
+ if(schedule)tasks.push(()=>readProductionWorkflow(false,'schedule'));
  if(capacity)tasks.push(()=>readCapacityLatest());
  for(const task of tasks){if(!valid())break;try{await task();}catch(error:any){if(error?.status===401||error?.status===403)break;}}
 }
