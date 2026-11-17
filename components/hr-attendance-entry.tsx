@@ -1,3 +1,4 @@
+import HrAbsenceImport from './hr-absence-import';
 'use client';
 import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {StandardToolbar,toolbar} from './standard-toolbar/StandardToolbar';
@@ -99,7 +100,7 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
  if(!active)return null;
  return <section className={styles.entry} aria-label={t('Ghi nhận chấm công')} data-hr-attendance-entry="true">
   <h2>{t('Ghi nhận chấm công')}{!globalHr&&` · Line ${line}`}</h2>
-  <StandardToolbar name="HrAttendanceEntry" items={[
+  <HrAbsenceImport month={month} allowed={allowed&&globalHr} busy={saving||busy} t={t} items={[
    toolbar.field('Tháng ghi nhận',[toolbar.input({type:'month',value:month,'aria-label':'Tháng ghi nhận',disabled:saving||busy,onChange:event=>{if(/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value))setMonth(event.target.value);}})]),
    toolbar.note(`${t('Hạn ghi nhận')}: ${hrAttendanceDeadline(month)?.split('-').reverse().join('/')} · GMT+7`),
    toolbar.action({disabled:saving,disabledExplanation:'Đang lưu. Vui lòng chờ hoàn tất trước khi quay lại.',onClick:back},'Quay lại',true,'back'),
