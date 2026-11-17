@@ -1,5 +1,6 @@
 'use client';
 import {productionOrderIndex} from '../lib/production-order-index.mjs';
+import {useProgressViewFields} from '../lib/production-progress-view-state';
 import ProductionReportDayReview, {type ReviewSelection} from './production-report-day-review';
 import ProductionStatusLegend from './production-status-legend';
 import {notifyActionFailure} from '../lib/action-feedback';
@@ -23,23 +24,25 @@ const orderProgress=(order:Row,summary:Row,runtime:Row,events:Row[])=>order.stat
 const time=(v?:string)=>productionDisplayTime(v,'—');
 export default function ProductionProgressReview({orders,reports,events,employees,manager,busy,refresh,open,active,onConfirm,extraItems=[],sessionLine,preferenceUser,legacyReadOnly=false,visibility,onVisibilityChange}:{visibility?:string;onVisibilityChange?:(value:string)=>void;legacyReadOnly?:boolean;orders:Row[];reports:Row[];events:Row[];employees:Row[];manager:boolean;busy:boolean;refresh:()=>void;open:(row:Row)=>void;active:(row:Row)=>Row;onConfirm:(items:ReviewSelection[])=>Promise<any>;extraItems?:any[];sessionLine?:string;preferenceUser?:string}){
  const locale=useSyncExternalStore(subscribeToolbarLocale,toolbarLocale,()=> 'vi'),t=(s:string)=>translateToolbar(s,locale);
- const [localVisibility,setLocalVisibility]=useState('active');
+ const field=useProgressViewFields(`table:${preferenceUser||''}:${sessionLine||''}`,{visibility:'active',view:'all',search:false,filters:initialProgressSearchFilters(sessionLine) as Row,applied:{line:sessionLine||'all'} as Row,page:1});
+ const [localVisibility,setLocalVisibility]=field('visibility');
  const visibilityMode=visibility??localVisibility,setVisibilityMode=(value:string)=>{setLocalVisibility(value);onVisibilityChange?.(value);};
  const [hideConfirmed,setHideConfirmed]=useState<boolean|null>(preferenceUser?null:false);
  const preferenceKey=preferenceUser?`onspa-ui:${encodeURIComponent(preferenceUser)}:production-progress:hide-confirmed`:null;
  useEffect(()=>{try{setHideConfirmed(preferenceKey?localStorage.getItem(preferenceKey)==="1":false);}catch{setHideConfirmed(false);}},[preferenceKey]);
  const toggleConfirmed=()=>{const next=!hideConfirmed;setHideConfirmed(next);setPage(1);try{if(preferenceKey)localStorage.setItem(preferenceKey,next?"1":"0");}catch{}};
- const [selected,setSelected]=useState(''),[tab,setTab]=useState('detail'),[view,setView]=useState('all'),[search,setSearch]=useState(false),[filters,setFilters]=useState<Row>(initialProgressSearchFilters(sessionLine)),[applied,setApplied]=useState<Row>({line:sessionLine||'all'});
+ const [selected,setSelected]=useState(''),[tab,setTab]=useState('detail');
+ const [view,setView]=field('view'),[search,setSearch]=field('search'),[filters,setFilters]=field('filters'),[applied,setApplied]=field('applied');
  const dayKey=new Date(Date.now()+7*3600000).toISOString().slice(0,10);
  const {summaries,eventsByOrder}=useMemo(()=>productionOrderIndex(orders,reports,events),[orders,reports,events,dayKey]);
  const ownEvents=(id:string):Row[]=>(eventsByOrder.get(id)||[]).filter((e:Row)=>!e.voided);
- const archivedWeeks=completedWeeks(orders,(o:Row)=>fullyConfirmedProgressOrder(o,summaries.get(o.id),active(o))&&o.syncStatus==='ĐÃ ĐỒNG BỘ'&&summaries.get(o.id)!.outputs.every((r:Row)=>Boolean(r.warehouseStatus)&&r.warehouseStatus!=='Chưa tạo phiếu'));
+ const archivedWeeks=visibility===undefined?completedWeeks(orders,(o:Row)=>fullyConfirmedProgressOrder(o,summaries.get(o.id),active(o))&&o.syncStatus==='ĐÃ ĐỒNG BỘ'&&summaries.get(o.id)!.outputs.every((r:Row)=>Boolean(r.warehouseStatus)&&r.warehouseStatus!=='Chưa tạo phiếu')):new Set<string>();
  const weeks=[...new Set<string>(orders.map(o=>monday(o.week)).filter(Boolean))].sort();
  const weekLabel=(week:string)=>`${t('Tuần kế hoạch')} ${weekNumber(week)}: ${displayDate(monday(week))} – ${displayDate(weekEnd(week))}`;
  const searchValue=(o:Row,s:Row,key:string)=>{const runtime=active(o);if(key==='progressLabel')return t(orderProgress(o,s,runtime,ownEvents(o.id)).label);if(['planStart','planEnd'].includes(key))return time(o[key]);if(['startedAt','completedAt'].includes(key))return s[key]?time(s[key]):'';if(['qty','pendingQty'].includes(key))return String(s[key]??0);if(key==='count')return String(runtime.count??0);if(key==='pendingCount')return String(s.pending.length);return String(o[key]??'');};
  const query=String(applied.value||'').toLocaleLowerCase('vi').trim();
  const visible=(hideConfirmed===null?[]:orders).filter(o=>{const s=summaries.get(o.id)!;return matchesVisibility(visibilityMode,visibility!==undefined?(o.status==='HỦY'||Boolean(s.pending.length===0&&Number(o.lsxQty)>0&&s.qty>=Number(o.lsxQty))):o.status!=='HỦY'&&(archivedWeeks.has(visibilityWeek(o))||Boolean(hideConfirmed&&fullyConfirmedProgressOrder(o,s,active(o)))))&&(!query||(applied.field==='week'?monday(o.week)===query:searchValue(o,s,applied.field||'lsxCode').toLocaleLowerCase('vi').includes(query)))&&(!applied.line||applied.line==='all'||o.line===applied.line)&&(view!=='pending'||s.pending.length)&&(applied.state!=='completed'||s.completedAt)&&(applied.state!=='running'||active(o).running)&&(applied.state!=='waiting'||!active(o).known)&&(applied.state!=='overdue'||s.timing==='Quá hạn');}).sort((a,b)=>((monday(a.week)||'9999').localeCompare(monday(b.week)||'9999'))||(summaries.get(b.id)!.pending.length-summaries.get(a.id)!.pending.length)||String(a.planEnd||'9999').localeCompare(String(b.planEnd||'9999')));
- const [page,setPage]=useState(1);
+ const [page,setPage]=field('page');
  const applySearch=()=>{if(!progressSearchCanApply(filters)){notifyActionFailure(filters.field==='planId'?'Vui lòng nhập Plan ID':'Nhập nội dung tra cứu trước khi tìm kiếm.');return;}setApplied({...filters});setPage(1);};
  const totalPages=Math.max(1,Math.ceil(visible.length/20)),currentPage=Math.min(page,totalPages),pageOrders=visible.slice((currentPage-1)*20,currentPage*20);
  const pending=reports.filter(r=>r.kind==='completion'&&pendingReportReview(r));

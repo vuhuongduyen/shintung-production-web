@@ -3,6 +3,7 @@ import {productionDisplayStore} from '../lib/production-display-store.mjs';
 import {isDailyOutput} from '../lib/production-report-model.mjs';
 import ProductionDailyBoard from './production-daily-board';
 import ProductionPagedWork from './production-paged-work';
+import {useProgressViewFields} from '../lib/production-progress-view-state';
 import ProductionDetailRead from './production-detail-read';
 import {mergeProductionSavedResult} from '../lib/production-saved-result.mjs';
 import {createReviewRunner,submitReviewSelection} from '../lib/production-review-selection.mjs';
@@ -82,14 +83,16 @@ function ProductionManagementLegacy({ mode, sessionLine, preferenceUser, confirm
   const [stageRequest,setStageRequest]=useState<{order:Row;action:string}|null>(null),[stageState,setStageState]=useState<Record<string,Row>>({});
   const requestToken=useRef<string>("");
   const workspaceActive=useContext(WorkspaceActivityContext);
-  const [progressScope,setProgressScope]=useState('active');
+  const progressField=useProgressViewFields(`scope:${preferenceUser||''}:${sessionLine||''}`,{visibility:'active'});
+  const [progressScope,setProgressScope]=progressField('visibility');
   const [journalCategory,setJournalCategory]=useState<string|null>(null);
   const requiredProfile:WorkflowReadProfile=(mode==='progress'||mode==='review')?(progressScope==='active'?'progress':'progress-all'):(mode==='schedule'||mode==='work'&&!assignmentOpen)?'work':mode==='journal'&&journalCategory==='time'?'journal':'workspace';
   const readProfile=useRef<WorkflowReadProfile>(requiredProfile);
   const snapshotProfiles=useRef(new WeakMap<WorkflowData,WorkflowReadProfile>());
   const [reader]=useState(()=>{
     const initial=productionSnapshot(requiredProfile);if(initial)snapshotProfiles.current.set(initial,requiredProfile);
-    return createProductionWorkspaceReader<WorkflowData>({read:async(force:boolean)=>{const requested=readProfile.current,value=await readProductionWorkflow(force,requested);if(requested==='full'||!snapshotProfiles.current.has(value))snapshotProfiles.current.set(value,requested);return value;},initial});
+    // Progress keeps its displayed snapshot but revalidates on activation, without waiting for the cache TTL.
+    return createProductionWorkspaceReader<WorkflowData>({read:async(force:boolean)=>{const requested=readProfile.current,value=await readProductionWorkflow(force||requested==='progress'||requested==='progress-all',requested);if(requested==='full'||!snapshotProfiles.current.has(value))snapshotProfiles.current.set(value,requested);return value;},initial});
   });
   const [readState,setReadState]=useState(reader.getState);
 
