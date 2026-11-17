@@ -1,5 +1,6 @@
 import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
 import {transitProductionPayload} from './transit-production-read.mjs';
+import {readTransitSummary,transitSummaryEntities} from './transit-summary-read.mjs';
 import {stageValidationPayload} from './production-stage-read.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {transitStandardLeadtime} from '../../lib/transit-leadtime.mjs';
@@ -108,6 +109,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
   // Internal creation path: planning references need no report/event projection.
   const referenceOnly=Object.hasOwn(options,'referenceId');
   if(referenceOnly&&(!text(options.referenceId)||typeof options.referenceId!=='string'))fail('invalidSelection',422);
+  const summaryRead=options.includeProductionSummary===true&&!referenceOnly&&!options.productionReads&&!options.planningOnly?readTransitSummary(db):null;
   const [records, audits, reports, leadtimes, events, historyImports, leadVersions] = await Promise.all(
     ["in_transit", "in_transit_audit", "production_report", "leadtime", "production_event", "production_history_import", "leadtime_versions"].map(
       async(e) => {
@@ -117,6 +119,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
           return row?[parse(row)]:[];
         }
         if(options.productionReads?.[e])return options.productionReads[e];
+        if(summaryRead&&transitSummaryEntities.includes(e))return (await summaryRead).get(e).map(parse);
         if(options.skipLeadtime&&['leadtime','leadtime_versions'].includes(e))return [];
         if(options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly&&['in_transit_audit','leadtime','leadtime_versions'].includes(e))return [];
         return read(db,e,options.stageValidation,options.includeProductionSummary===true);

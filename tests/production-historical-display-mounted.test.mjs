@@ -210,3 +210,24 @@ for(const screen of ['journal','output'])test(`${screen} observed menu preservat
  const data=JSON.parse(host.querySelector('table[data-report-source]').dataset.reportSource);assert.equal(data.rows[0][data.headers.indexOf('Giờ công chuẩn/SP')],.046);assert.ok(!host.textContent.includes('Thiếu căn cứ định mức'));assert.deepEqual(value.hours,report.hours);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+test('journal retains category and page across remounts under one verified scope only',async()=>{
+ const {productionDisplayStore}=await vite.ssrLoadModule('/lib/production-display-store.mjs');
+ await productionDisplayStore.activate('SYNTHETIC-JOURNAL-A');
+ const rows=Array.from({length:25},(_,i)=>({...report,id:'SYNTHETIC-DAILY-'+i,reportingModel:'daily-finished-v1',quantityOnly:true,productionAt:'2026-11-02T09:00:00+07:00',rateStatus:'missing'}));
+ const mount=async()=>{const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(React.createElement(Journal,{orders:[order],reports:rows,events:[],employees:[],open:()=>{},refresh:()=>{},busy:false,initialCategory:'output'})));return {host,close:async()=>{await act(async()=>root.unmount());host.remove();}};};
+ const first=await mount();await act(async()=>first.host.querySelector('button[aria-label="Trang 2"]').click());
+ const before=first.host.querySelector('tbody').textContent;assert.equal(first.host.querySelectorAll('tbody tr').length,5);await first.close();
+ const second=await mount();assert.equal(second.host.querySelectorAll('tbody tr').length,5);assert.equal(second.host.querySelector('tbody').textContent,before);await second.close();
+ await productionDisplayStore.activate('SYNTHETIC-JOURNAL-B');const other=await mount();assert.equal(other.host.querySelectorAll('tbody tr').length,20);await other.close();productionDisplayStore.clear();
+});
+
+test('cold journal does not pin legacy mode before policy arrives; retained category requests its matching profile',async()=>{
+ const {productionDisplayStore}=await vite.ssrLoadModule('/lib/production-display-store.mjs');
+ productionDisplayStore.clear();const seen=[];
+ const mount=async category=>{const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(React.createElement(Journal,{orders:[],reports:[],events:[],employees:[],open:()=>{},refresh:()=>{},busy:false,initialCategory:category,onCategoryChange:value=>seen.push(value)})));return {host,close:async()=>{await act(async()=>root.unmount());host.remove();}};};
+ const cold=await mount('report');assert.deepEqual(seen,[]);await cold.close();
+ const daily=await mount('output');assert.equal(daily.host.querySelector('select').value,'output');assert.deepEqual(seen,[]);await daily.close();
+ await productionDisplayStore.activate('SYNTHETIC-JOURNAL-PROFILE');productionDisplayStore.put('view:journal',{category:'time',filters:{},applied:{},searches:{},page:1});
+ const retained=await mount('output');assert.equal(retained.host.querySelector('select').value,'time');assert.deepEqual(seen,['time']);await retained.close();productionDisplayStore.clear();
+});

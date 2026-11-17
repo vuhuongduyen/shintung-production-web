@@ -1,5 +1,5 @@
 import {productionBoundedRead} from './production-bounded-read.mjs';
-import {productionDisplayStore,displayOnlyWorkflow} from './production-display-store.mjs';
+import {productionDisplayStore,displayOnlyWorkflow,compactWorkflowDisplay} from './production-display-store.mjs';
 import {readProgressResponse} from './production-progress-request.mjs';
 export type WorkflowReadProfile='full'|'work'|'progress'|'progress-all'|'workspace'|'journal';
 import {productionApiFetch} from './production-api';
@@ -20,7 +20,7 @@ function validateWorkflow(body:any){
 
 // Browser-session cache only. SSR reads never enter this module's shared cache.
 const full=createProductionSnapshotCache({fetcher:(force:boolean)=>fetchWorkflow(force,'full'),getGeneration:clientReadGeneration});
-const work=createProductionSnapshotCache({fetcher:(force:boolean)=>fetchWorkflow(force,'work'),getGeneration:clientReadGeneration,restore:()=>displayOnlyWorkflow(productionDisplayStore.get('workflow:work')),remember:(value:any)=>productionDisplayStore.put('workflow:work',value)});
+const work=createProductionSnapshotCache({fetcher:(force:boolean)=>fetchWorkflow(force,'work'),getGeneration:clientReadGeneration,restore:()=>displayOnlyWorkflow(productionDisplayStore.get('workflow:work')),remember:(value:any)=>productionDisplayStore.put('workflow:work',compactWorkflowDisplay(value))});
 const progress=createProductionSnapshotCache({fetcher:(force:boolean)=>fetchWorkflow(force,'progress'),getGeneration:clientReadGeneration,restore:()=>displayOnlyWorkflow(productionDisplayStore.get('workflow:progress')),remember:(value:any)=>productionDisplayStore.put('workflow:progress',value)});
 const progressAll=createProductionSnapshotCache({fetcher:(force:boolean)=>fetchWorkflow(force,'progress-all'),getGeneration:clientReadGeneration,restore:()=>displayOnlyWorkflow(productionDisplayStore.get('workflow:progress-all')),remember:(value:any)=>productionDisplayStore.put('workflow:progress-all',value)});
 const workspace=createProductionSnapshotCache({fetcher:(force:boolean)=>fetchWorkflow(force,'workspace'),getGeneration:clientReadGeneration,restore:()=>displayOnlyWorkflow(productionDisplayStore.get('workflow:workspace')),remember:(value:any)=>productionDisplayStore.put('workflow:workspace',value)});

@@ -20,6 +20,7 @@ import {DataCell} from '../components/onspa-ui/DataCell';
 import SkuStock from "../components/sku-stock";
 import SkuListImport from "../components/sku-list-import";
 import {productionDisplayStore} from '../lib/production-display-store.mjs';
+import {savedProductionWorkspace,restoreProductionWorkspace} from '../lib/production-workspace-state.mjs';
 import {clearProductionSnapshot} from "../lib/production-workflow-cache";
 import WorkspacePinnedHeader from "../components/workspace-pinned-header";
 import WorkspaceInteractions,{ApprovalNavigationContext,useApprovalNavigation} from "../components/workspace-interactions";
@@ -18059,6 +18060,8 @@ const WorkspaceLiveContext=createContext<{activeViewers:ActiveViewer[];notificat
 export default function Home() {
   const [identity,setIdentity]=useState<WorkspaceIdentity>({language:"vi",authenticated:false,session:null});
   const [workspaces,setWorkspaces]=useState<WorkspaceState>({overviewRoute:workspaceHome,tabs:[],active:null,nextId:1});
+  const [workspaceRestored,setWorkspaceRestored]=useState('');
+  const workspaceTouched=useRef(false);
   const identityRef=useRef(identity);
   const [homeEpoch,setHomeEpoch]=useState(0);
   const [authorizationChanged,setAuthorizationChanged]=useState(false);
@@ -18066,6 +18069,7 @@ export default function Home() {
     const previous=identityRef.current;
     identityRef.current=next;
     if(workspaceIdentityKey(previous)!==workspaceIdentityKey(next)) {
+      workspaceTouched.current=false;setWorkspaceRestored('');
       clearActionFeedback();
       clearProductionSnapshot();
       clearClientReads();
@@ -18087,6 +18091,21 @@ export default function Home() {
   const viewersRefresh=useRef<()=>Promise<void>>(async()=>{});
   const refreshViewers=useCallback(()=>viewersRefresh.current(),[]);
   const accountKey=workspaceIdentityKey(identity);
+  useEffect(()=>{
+    if(!identity.authenticated||!accountKey)return;
+    let restored=false;
+    const restore=()=>{
+      if(restored||!productionDisplayStore.ready()||workspaceIdentityKey(identityRef.current)!==accountKey)return;
+      restored=true;
+      const saved=productionDisplayStore.get('view:production-tabs');
+      if(!workspaceTouched.current)setWorkspaces(current=>restoreProductionWorkspace(current,saved,(child:string)=>canOpenMenu(identityRef.current.session,'production',child)));
+      setWorkspaceRestored(accountKey);
+    };
+    restore();return productionDisplayStore.subscribe(restore);
+  },[accountKey,identity.authenticated]);
+  useEffect(()=>{
+    if(workspaceRestored===accountKey&&accountKey&&productionDisplayStore.ready())productionDisplayStore.put('view:production-tabs',savedProductionWorkspace(workspaces));
+  },[workspaces,workspaceRestored,accountKey]);
   useEffect(()=>{
     if(!identity.authenticated||!accountKey)return;
     let stopped=false;
@@ -18179,11 +18198,12 @@ export default function Home() {
   },[accountKey]);
   const navigate=useCallback((route:WorkspaceRoute)=>{
     if(!canOpenMenu(identityRef.current.session,route.view,route.child||undefined)){notifyActionFailure("Bạn không có quyền mở chức năng này. Vui lòng liên hệ quản trị viên.");return;}
+    workspaceTouched.current=true;
     clearActionFeedback();
     setWorkspaces(current=>openWorkspace(current,route));
   },[]);
-  const select=useCallback((id:string)=>{clearActionFeedback();setWorkspaces(current=>({...current,active:id}));},[]);
-  const close=useCallback((id:string)=>{clearActionFeedback();setWorkspaces(current=>closeWorkspace(current,id));},[]);
+  const select=useCallback((id:string)=>{workspaceTouched.current=true;clearActionFeedback();setWorkspaces(current=>({...current,active:id}));},[]);
+  const close=useCallback((id:string)=>{workspaceTouched.current=true;clearActionFeedback();setWorkspaces(current=>closeWorkspace(current,id));},[]);
   const tabBar=<WorkspaceTabs tabs={workspaces.tabs.map(tab=>({id:tab.id,title:workspaceTitle(tab.route,identity.language)}))} active={workspaces.active} onSelect={select} onClose={close} language={identity.language}/>;
   return <WorkspaceLiveContext.Provider value={{activeViewers,notificationGroups,notificationCount,refreshViewers}}>
     {authorizationChanged&&<div role="alert" className="production-inline-message error">{identity.language==='zh'?'存取權限已變更。畫面已重新整理，並將依目前權限重新讀取資料。先前權限下未儲存的編輯不會保留。':identity.language==='en'?'Access permissions changed. The view has been reset to reload data under your current permissions. Unsaved edits from the previous permission context were not retained.':'Quyền truy cập đã thay đổi. Màn hình đã được làm mới để tải dữ liệu theo quyền hiện tại. Các thay đổi chưa lưu của phiên quyền trước không được giữ lại.'} <FeedbackActionButton type="button" onClick={()=>setAuthorizationChanged(false)}>{identity.language==='zh'?'關閉':identity.language==='en'?'Close':'Đóng'}</FeedbackActionButton></div>}
@@ -19035,6 +19055,8 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
                     },
                   );
                   if (!response.ok) throw new Error();
+                  await productionDisplayStore.settled();
+                  productionDisplayStore.suspend();
                   onIdentity({...identity,authenticated:false,session:null});
                   window.location.reload();
                 } catch {
