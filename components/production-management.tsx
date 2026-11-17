@@ -91,7 +91,8 @@ function ProductionManagementLegacy({ mode, sessionLine, preferenceUser, confirm
   const snapshotProfiles=useRef(new WeakMap<WorkflowData,WorkflowReadProfile>());
   const [reader]=useState(()=>{
     const initial=productionSnapshot(requiredProfile);if(initial)snapshotProfiles.current.set(initial,requiredProfile);
-    return createProductionWorkspaceReader<WorkflowData>({read:async(force:boolean)=>{const requested=readProfile.current,value=await readProductionWorkflow(force,requested);if(requested==='full'||!snapshotProfiles.current.has(value))snapshotProfiles.current.set(value,requested);return value;},initial});
+    // Progress keeps its displayed snapshot but revalidates on activation, without waiting for the cache TTL.
+    return createProductionWorkspaceReader<WorkflowData>({read:async(force:boolean)=>{const requested=readProfile.current,value=await readProductionWorkflow(force||requested==='progress'||requested==='progress-all',requested);if(requested==='full'||!snapshotProfiles.current.has(value))snapshotProfiles.current.set(value,requested);return value;},initial});
   });
   const [readState,setReadState]=useState(reader.getState);
 

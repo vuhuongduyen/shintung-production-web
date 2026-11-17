@@ -53,3 +53,14 @@ test('applied lookup and lookup controls survive remount without persisting sele
   await screen.close();screen=await mount();assert.match(screen.host.textContent,/TEST-020/);assert.doesNotMatch(screen.host.textContent,/TEST-000/);assert.equal(screen.host.querySelector('.progress-expanded'),null);assert.ok(button(screen.host,'Tìm kiếm'));
  }finally{await screen.close();store.clear();clearProductionSnapshot();}
 });
+
+test('reopening a still-fresh progress cache starts background revalidation immediately instead of waiting for TTL or polling',async()=>{
+ store.clear();clearProductionSnapshot();await store.activate('TEST:permission-v1:A');let calls=0;globalThis.fetch=async()=>{calls++;return Response.json(data);};let screen=await mount();
+ try{
+  await until(()=>screen.host.textContent.includes('TEST-000'));assert.equal(calls,1);await screen.close();
+  let release;const gate=new Promise(r=>{release=r;});globalThis.fetch=async()=>{calls++;return gate;};screen=await mount();
+  assert.match(screen.host.textContent,/TEST-000/);assert.equal(calls,2,'must refresh immediately despite the 30-second cache TTL');
+  await act(async()=>button(screen.host,'Cập nhật dữ liệu').click());assert.equal(calls,2,'manual refresh joins the pending request');
+  release(Response.json({...data,progressOrders:orders.map(o=>({...o,name:'Updated immediately'}))}));await until(()=>screen.host.textContent.includes('Updated immediately'));
+ }finally{await screen.close();store.clear();clearProductionSnapshot();}
+});
