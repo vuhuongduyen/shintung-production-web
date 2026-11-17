@@ -86,7 +86,7 @@ function ProductionManagementLegacy({ mode, sessionLine, preferenceUser, confirm
   const progressField=useProgressViewFields(`scope:${preferenceUser||''}:${sessionLine||''}`,{visibility:'active'});
   const [progressScope,setProgressScope]=progressField('visibility');
   const [journalCategory,setJournalCategory]=useState<string|null>(null);
-  const requiredProfile:WorkflowReadProfile=(mode==='progress'||mode==='review')?(progressScope==='active'?'progress':'progress-all'):(mode==='schedule'||mode==='work'&&!assignmentOpen)?'work':mode==='journal'&&journalCategory==='time'?'journal':'workspace';
+  const requiredProfile:WorkflowReadProfile=(mode==='progress'||mode==='review')?(progressScope==='active'?'progress':'progress-all'):mode==='schedule'?'schedule':(mode==='work'&&!assignmentOpen)?'work':mode==='journal'&&journalCategory==='time'?'journal':'workspace';
   const readProfile=useRef<WorkflowReadProfile>(requiredProfile);
   const snapshotProfiles=useRef(new WeakMap<WorkflowData,WorkflowReadProfile>());
   const [reader]=useState(()=>{
