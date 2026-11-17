@@ -52,7 +52,7 @@ import ProductionDateTimeInput from "./production-date-time-input";
 import { eligibleStaff, isPresent, vnMoment } from "../lib/production-attendance.mjs";
 
 import {createScheduleDraftSync} from "../lib/actual-schedule-draft.mjs";
-import {productionSnapshot,readProductionWorkflow,type WorkflowReadProfile} from "../lib/production-workflow-cache";
+import {acceptProductionReview,productionSnapshot,readProductionWorkflow,type WorkflowReadProfile} from "../lib/production-workflow-cache";
 import {useDataRefresh,WorkspaceActivityContext} from '../lib/data-sync';
 import {createProductionWorkspaceReader} from '../lib/production-workspace-reader.mjs';
 type Row = Record<string, any>;
@@ -252,6 +252,7 @@ function ProductionManagementLegacy({ mode, sessionLine, preferenceUser, confirm
    setBusy(true);
    try{return await runSelectedReview(items,{allowed:!!data.rights.confirm&&confirmReportAllowed,
     submit:(item:ReviewSelection)=>submitReviewSelection(item,fetch),
+    onSaved:(result:Row)=>{if(!result.report||!isDailyOutput(result.report))return false;acceptProductionReview(result.report);reader.applyMutation((value:WorkflowData)=>mergeSaved(value,{reports:[result.report]}));return true;},
     refresh:()=>load(true,true)});
    }finally{setBusy(false);}
   }

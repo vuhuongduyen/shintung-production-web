@@ -419,7 +419,7 @@ async function handleSiteApi(request,env,timing){
    if(body.expectedVersion!==undefined&&Number(body.expectedVersion)!==Number(report.version||0))return json({error:'Báo công đã thay đổi. Vui lòng cập nhật dữ liệu và kiểm tra lại.'},409);
    if(actor.line&&actor.line!==report.line)return json({error:'Không được duyệt báo công của Line khác.'},403);
    if(!pendingReportReview(report))return json({error:'Báo công này đã được xử lý trước đó.'},409);
-   if(isDailyOutput(report)&&stored)return json(await reviewDailyOutput(productionDb,body,actor,{stored,cursorBefore}));
+   if(isDailyOutput(report)&&stored)return json(await reviewDailyOutput(productionDb,body,actor,{stored,cursorBefore,policyState:reviewPolicyState}));
    const reviewPolicy=reviewPolicyState.policy;
    const receiptLegacy=reviewPolicy?.intakeModel==='server-receipt-quantity-v1'&&await frozenPendingReport(productionDb,reviewPolicy,String(body.reportId));
    if(reviewPolicy?.cutoverReached&&!receiptLegacy)return json({error:'Chỉ duyệt phiếu cũ đang chờ trong tập dữ liệu đã chốt.'},409);
