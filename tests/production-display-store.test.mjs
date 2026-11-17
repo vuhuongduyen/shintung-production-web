@@ -54,3 +54,23 @@ test('a storage operation already waiting when another tab changes scope cannot 
  await b.activate('B');b.put('rows',['NEW']);await b.settled();release();await a.settled();
  assert.equal(saved.scope,'B');assert.deepEqual(saved.entries[0][1].value,['NEW']);
 });
+
+test('explicit logout hides rows immediately but the latest verified account can restore after signing in again',async()=>{
+ const storage=disk(),store=createProductionDisplayStore({storage});await store.activate('A:CURRENT-GRANTS');
+ store.put('rows',{ids:['LATEST']});store.put('view:journal',{category:'time',page:2});await store.settled();
+ store.suspend();assert.equal(store.get('rows'),null);assert.equal(store.ready(),false);
+ store.put('rows',{ids:['LATE-OLD-SESSION']});await store.settled();
+ await store.activate('A:CURRENT-GRANTS');assert.deepEqual(store.get('rows'),{ids:['LATEST']});assert.equal(store.get('view:journal').page,2);
+ store.suspend();await store.activate('B:CURRENT-GRANTS');assert.equal(store.get('rows'),null);
+ await store.activate('A:CURRENT-GRANTS');assert.equal(store.get('rows'),null,'only latest identity remains');
+ store.clear();
+});
+
+test('display compaction retains historical hours, rate basis, correction history and staffing evidence',async()=>{
+ const {compactWorkflowDisplay}=await import('../lib/production-display-store.mjs');
+ const original={reports:[{id:'R',hours:{total:12},legacyEarnedBasis:{version:1},rateBasis:{value:.16},history:[{old:1}],sourceSnapshot:{catalog:'x'.repeat(100000),attendance:[{sourceId:'O',destinationId:'D',employees:['PERSON'],unneeded:'x'.repeat(1000)}]}}],events:[{id:'E',hours:{total:1},sourceSnapshot:{catalog:'x'.repeat(100000)}}]};
+ const before=JSON.stringify(original),result=compactWorkflowDisplay(original);
+ for(const key of ['hours','legacyEarnedBasis','rateBasis','history'])assert.deepEqual(result.reports[0][key],original.reports[0][key]);
+ assert.deepEqual(result.reports[0].sourceSnapshot.attendance,[{sourceId:'O',destinationId:'D',employees:['PERSON']}]);
+ assert.equal(result.events[0].sourceSnapshot,undefined);assert.equal(JSON.stringify(original),before);assert.ok(JSON.stringify(result).length<1000);
+});

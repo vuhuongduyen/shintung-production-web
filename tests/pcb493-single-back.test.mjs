@@ -89,7 +89,17 @@ test('existing Back translation remains VI English and Traditional Chinese witho
 });
 test('menu callbacks, disabled and permission props retain the approved v807 snapshot fingerprints',()=>{
  const baseline=JSON.parse(read('tests/back-action-props-baseline.json'));assert.equal(baseline.files.length,3);assert.equal(baseline.baseCommit,'c84775445ed3ef4c09fc583ac06b19881f9ae6d9');
- for(const {file,...expected}of baseline.files)assert.deepEqual(actionPropsFingerprint(file,read(file)),expected,file);
+ for(const {file,...expected}of baseline.files){
+  let source=read(file);
+  if(file==='app/page.tsx'){
+   // PR36 intentionally flushes and hides the saved display on logout. Keep the
+   // v807 fingerprint for every other callback/permission/disabled expression.
+   const logoutPersistence='                  await productionDisplayStore.settled();\n                  productionDisplayStore.suspend();\n';
+   assert.equal(source.split(logoutPersistence).length,2,'one explicit logout persistence change');
+   source=source.replace(logoutPersistence,'');
+  }
+  assert.deepEqual(actionPropsFingerprint(file,source),expected,file);
+ }
 });
 test('action fingerprint detects callback, disabled, permission and JSX guard changes while allowing explanation copy',()=>{
  const source="toolbar.action({disabled:busy||!allowed,onClick:()=>save()},'Save',allowed); const button=<button disabled={busy} onClick={save}/>;";

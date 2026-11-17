@@ -26,3 +26,11 @@ test('one failed batch rejects its queued readers and does not poison subsequent
  assert.ok(outcomes.every(r=>r.status==='rejected'));assert.equal(calls,1);fail=false;
  assert.deepEqual(await wrapped.prepare('SELECT 2').all(),{results:[{sql:'SELECT 2'}]});
 });
+test('independent batches run concurrently with bounded groups and preserve queued order',async()=>{
+ const waiting=[];let running=0,peak=0;
+ const db={prepare(sql){return {sql};},batch(statements){assert.ok(statements.length<=3);running++;peak=Math.max(peak,running);return new Promise(resolve=>waiting.push(()=>{running--;resolve(statements.map(s=>({results:[s.sql]})));}));}};
+ const wrapped=productionReadBatch(db),reads=Array.from({length:12},(_,i)=>wrapped.prepare('SELECT '+i).all());
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(waiting.length,3);assert.equal(peak,3);
+ waiting.splice(0).reverse().forEach(resolve=>resolve());await new Promise(resolve=>setImmediate(resolve));assert.equal(waiting.length,1);waiting.shift()();
+ assert.deepEqual(await Promise.all(reads),Array.from({length:12},(_,i)=>({results:['SELECT '+i]})));
+});

@@ -141,3 +141,17 @@ test('unchanged background results still renew the next-page prefetch after its 
  try{await act(async()=>new Promise(r=>setTimeout(r,300)));await flush();assert.equal(calls.filter(p=>p.includes('page=2')).length,1);const future=realNow()+31000;Date.now=()=>future;await click(button(m.host,'Cập nhật dữ liệu'));await act(async()=>new Promise(r=>setTimeout(r,300)));await flush();assert.equal(calls.filter(p=>p.includes('page=2')).length,2);}
  finally{Date.now=realNow;await m.close();}
 });
+
+test('closing and reopening work restores the last page with saved rows before the network reply',async()=>{
+ const {productionDisplayStore}=await vite.ssrLoadModule('/lib/production-display-store.mjs');
+ const {clearProductionPages}=await vite.ssrLoadModule('/lib/production-page-cache.ts');
+ clearClientReads();await productionDisplayStore.activate('SYNTHETIC-PAGE-PREFERENCES');
+ const first=await mount(async path=>{const page=Number(new URL(String(path),'https://synthetic.test').searchParams.get('page'));return Response.json(snapshot('SAVED-PAGE-'+page,page));},{},false);
+ await click(first.host.querySelector('button[aria-label="Trang 2"]'));await first.close();clearProductionPages();
+ const calls=[];let release;
+ const second=await mount(async path=>{calls.push(String(path));return new Promise(r=>{release=()=>r(Response.json(snapshot('REFRESHED-PAGE-2',2)));});},{},false);
+ try{
+  assert.ok(calls[0].includes('page=2'));assert.match(second.host.textContent,/SAVED-PAGE-2/);assert.doesNotMatch(second.host.textContent,/Đang tải dữ liệu sản xuất/);
+  await act(async()=>release());await flush();assert.match(second.host.textContent,/REFRESHED-PAGE-2/);
+ }finally{await second.close();productionDisplayStore.clear();clearProductionPages();}
+});

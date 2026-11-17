@@ -41,3 +41,18 @@ test('summary pages budget the projected bytes rather than splitting removed aud
  const state=await getTransit(tracked,{},[],{includeHistory:false,includeProductionSummary:true});assert.equal(state.rows[0].pendingReportQty,16);assert.ok(calls<=3,`projected history requires ${calls} DB round trips`);
  assert.equal((await db.prepare("SELECT count(*) AS n FROM app_records WHERE entity='production_history_import' AND length(json_extract(payload,'$.reports[0].sourceSnapshot.audit'))=600000").first()).n,16);
 }));
+test('imported quantity summary transports only pending fields, retaining boolean types and reviewed replacement semantics',()=>fixture(async({db})=>{
+ await put(db,'in_transit',order.id,{...order,completedQty:400});
+ const bulky={orderSnapshot:{audit:'x'.repeat(600000)},hours:{details:'y'.repeat(600000)},version:1,legacyEarnedBasis:{version:1}};
+ const pending={id:'PENDING',transitId:order.id,kind:'completion',reportedQuantity:200,reviewStatus:'Chờ kiểm tra',voided:false,cancelled:false};
+ const source=[{...pending,...bulky},{...pending,id:'VOID',voided:true,...bulky},{...pending,id:'REPLACED',...bulky},{...pending,id:'APPROVED',reviewStatus:'Đã xác nhận',...bulky}];
+ for(let i=0;i<source.length;i++)await put(db,'production_history_import','IMPORT-'+i,{reports:[source[i]]});
+ await put(db,'production_report','REPLACED',{...pending,id:'REPLACED',reportedQuantity:300,approvedQuantity:300,reviewStatus:'Đã xác nhận',version:2});
+ const before=await records(db),expression=transitProductionPayload('production_history_import');
+ const projected=await readRecordPages(db,{where:"entity='production_history_import'",payloadExpression:expression});
+ assert.ok(projected.reduce((sum,r)=>sum+Buffer.byteLength(r.payload),0)<1000);
+ assert.deepEqual(projected.flatMap(r=>JSON.parse(r.payload).reports),[pending,{...pending,id:'VOID',voided:true},{...pending,id:'REPLACED'}]);
+ const state=await getTransit(db,{},[],{includeHistory:false,includeProductionSummary:true});
+ assert.equal(state.rows[0].pendingReportQty,200);assert.equal(state.summaryReports.filter(r=>r.id==='REPLACED').length,1);
+ assert.deepEqual(await records(db),before);
+}));

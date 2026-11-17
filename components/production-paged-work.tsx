@@ -1,5 +1,6 @@
 'use client';
 import {productionDisplayStore} from '../lib/production-display-store.mjs';
+import {useProductionViewFields} from '../lib/production-view-state';
 import {useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {WorkspaceActivityContext,useDataRefresh} from '../lib/data-sync';
 import {cachedProductionPage,retainedProductionPage,readProductionPage} from '../lib/production-page-cache';
@@ -12,7 +13,8 @@ import ProductionPagedWorkDetail from './production-paged-work-detail';
 type Row=Record<string,any>;
 export default function ProductionPagedWork({sessionLine,preferenceUser,fallback}:{sessionLine?:string;preferenceUser?:string;fallback:ReactNode}){
  const active=useContext(WorkspaceActivityContext),exportAllowed=useContext(ExportPermissionContext),[snapshot,setSnapshot]=useState<Row|null>(null),[legacy,setLegacy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const [search,setSearch]=useState(false),[field,setField]=useState(''),[query,setQuery]=useState(''),[line,setLine]=useState(sessionLine||'all'),[status,setStatus]=useState('all'),[applied,setApplied]=useState<Row|null>(null),[sort,setSort]=useState('due'),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0);
+ const viewField=useProductionViewFields('work',{search:false,field:'',query:'',line:sessionLine||'all',status:'all',applied:null as Row|null,sort:'due',page:1});
+ const [search,setSearch]=viewField('search'),[field,setField]=viewField('field'),[query,setQuery]=viewField('query'),[line,setLine]=viewField('line'),[status,setStatus]=viewField('status'),[applied,setApplied]=viewField('applied'),[sort,setSort]=viewField('sort'),[page,setPage]=viewField('page'),[refresh,setRefresh]=useState(0);
  const [editing,setEditing]=useState(false),[detail,setDetail]=useState<Row|null>(null),[notice,setNotice]=useState(''),[holdExpired,setHoldExpired]=useState(false);
  const loadedUrl=useRef('');
  const [displayRevision,setDisplayRevision]=useState(0);useEffect(()=>productionDisplayStore.subscribe(()=>setDisplayRevision(n=>n+1)),[]);
