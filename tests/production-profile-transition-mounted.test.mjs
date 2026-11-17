@@ -43,7 +43,7 @@ test('progress uses its own read, retains table after refresh failure and cannot
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host),render=mode=>act(async()=>root.render(React.createElement(Production,{mode,operator:'SYNTHETIC',preferenceUser:'SYNTHETIC'})));
  try{
   await render('progress');await until(()=>host.querySelector('.production-progress-review-screen'));assert.equal(progressCalls,1);assert.equal(fullCalls,0);
-  fail=true;await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()==='Cập nhật dữ liệu').click());await until(()=>host.querySelector('[role="alert"]'));assert.match(host.textContent,/LSX-A/);assert.ok(host.querySelector('.production-progress-review-screen'));
+  fail=true;await act(async()=>window.dispatchEvent(new CustomEvent('onspa-production-updated')));await until(()=>host.querySelector('[role="alert"]'));assert.match(host.textContent,/LSX-A/);assert.ok(host.querySelector('.production-progress-review-screen'));
   fail=false;await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Thử lại').click());await until(()=>!host.querySelector('[role="alert"]'));assert.equal(progressCalls,3);
   await render('payroll');await until(()=>fullCalls===1);assert.equal(host.querySelector('.production-payroll-screen'),null);assert.match(host.textContent,/Đang tải dữ liệu sản xuất/);
   release(Response.json(full));await until(()=>host.querySelector('.production-payroll-screen'));

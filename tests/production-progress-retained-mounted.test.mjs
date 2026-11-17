@@ -60,7 +60,7 @@ test('reopening a still-fresh progress cache starts background revalidation imme
   await until(()=>screen.host.textContent.includes('TEST-000'));assert.equal(calls,1);await screen.close();
   let release;const gate=new Promise(r=>{release=r;});globalThis.fetch=async()=>{calls++;return gate;};screen=await mount();
   assert.match(screen.host.textContent,/TEST-000/);assert.equal(calls,2,'must refresh immediately despite the 30-second cache TTL');
-  await act(async()=>button(screen.host,'Cập nhật dữ liệu').click());assert.equal(calls,2,'manual refresh joins the pending request');
+  assert.equal(button(screen.host,'Cập nhật dữ liệu'),undefined,'approval toolbar uses automatic background refresh');assert.equal(calls,2);
   release(Response.json({...data,progressOrders:orders.map(o=>({...o,name:'Updated immediately'}))}));await until(()=>screen.host.textContent.includes('Updated immediately'));
  }finally{await screen.close();store.clear();clearProductionSnapshot();}
 });
