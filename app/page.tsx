@@ -19,6 +19,7 @@ import {DataTable} from '../components/onspa-ui/DataTable';
 import {DataCell} from '../components/onspa-ui/DataCell';
 import SkuStock from "../components/sku-stock";
 import SkuListImport from "../components/sku-list-import";
+import {productionDisplayStore} from '../lib/production-display-store.mjs';
 import {clearProductionSnapshot} from "../lib/production-workflow-cache";
 import WorkspacePinnedHeader from "../components/workspace-pinned-header";
 import WorkspaceInteractions,{ApprovalNavigationContext,useApprovalNavigation} from "../components/workspace-interactions";
@@ -18075,6 +18076,8 @@ export default function Home() {
         setAuthorizationChanged(next.authenticated&&previous.session?.login===next.session?.login&&previous.session?.kind===next.session?.kind);
       }
     }
+    if(next.authenticated)void productionDisplayStore.activate(workspaceIdentityKey(next));
+    else if(previous.authenticated)productionDisplayStore.clear();
     setIdentity(current=>current.language===next.language&&current.authenticated===next.authenticated&&current.session===next.session?current:next);
     if(!next.authenticated)setWorkspaces(current=>current.tabs.length?{...current,tabs:[],active:null}:current);
   },[]);
@@ -18086,13 +18089,14 @@ export default function Home() {
   const accountKey=workspaceIdentityKey(identity);
   useEffect(()=>{
     if(!identity.authenticated||!accountKey)return;
-    const workAllowed=['report-work','report-review'].some(section=>canOpenMenu(identity.session,'production',section));
-    const fullAllowed=canOpenMenu(identity.session,'production','report-progress')||canOpenMenu(identity.session,'production','report-dashboard');
-    if(!workAllowed&&!fullAllowed)return;
-    // Preload code only. Business data belongs to the active workspace reader;
-    // warming both full/work on every focus/timer multiplies expensive reads.
-    const timer=window.setTimeout(()=>{void loadProductionManagement().catch(()=>{});},150);
-    return()=>window.clearTimeout(timer);
+    let stopped=false;
+    const timer=window.setTimeout(()=>{void loadProductionManagement().catch(()=>{});void import('../lib/production-menu-warmup').then(({warmProductionMenus})=>warmProductionMenus({
+      login:identity.session?.login||'',line:identity.session?.kind==='line'?identity.session.line:undefined,
+      work:canOpenMenu(identity.session,'production','report-work'),progress:canOpenMenu(identity.session,'production','report-progress'),
+      schedule:canOpenMenu(identity.session,'production','report-review'),capacity:['capacity-calendar','capacity-summary'].some(section=>canOpenLegacyMenu(identity.session,'production',section)),
+      stopped:()=>stopped||document.hidden,
+    })).catch(()=>{});},150);
+    return()=>{stopped=true;window.clearTimeout(timer);};
   },[accountKey,identity.authenticated]);
   useEffect(()=>{
     if(LOCAL_TEST||!accountKey)return;

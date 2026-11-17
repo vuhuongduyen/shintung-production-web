@@ -1,4 +1,4 @@
-import {progressReadPayload} from './production-progress-read.mjs';
+import {progressReadPayload,workspaceReadPayload} from './production-progress-read.mjs';
 import {quantitySourceDatabase} from './production-quantity-cutover.mjs';
 import {quantityCompletion} from '../../lib/production-quantity-intake.mjs';
 import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
@@ -44,7 +44,7 @@ import { effectiveAttendance, activeStaffMovement, transferStaffCandidates, atte
 
 const fail = (message, status = 422) => { throw Object.assign(new Error(message), { status }); };
 const parse = (r) => ({ key: r.record_key, payload: JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at });
-const rows = async (db, entity, stageValidation=false, progressRead=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:progressRead?progressReadPayload(entity):stageValidation?stageValidationPayload(entity):'payload'})).sort((a,b)=>String(a.updated_at).localeCompare(String(b.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
+const rows = async (db, entity, stageValidation=false, progressRead=false,compactAudit=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:compactAudit?workspaceReadPayload(entity):progressRead?progressReadPayload(entity):stageValidation?stageValidationPayload(entity):'payload'})).sort((a,b)=>String(a.updated_at).localeCompare(String(b.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
 const upper = (value) => String(value || "").trim().toUpperCase();
 const clock = (value) => {
   const result = Date.parse(value);
@@ -255,7 +255,7 @@ function reportMetadata(calendar,events,row,directory) {
  if(row.kind!=="completion")return {};
  const {hours,sourceSnapshot,...meta}=reportCalculation(calendar,events,row,directory,false);return meta;
 }
-export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, includeJournalHours=includeDerivedHours, reviewReportId=null, stageValidation=false,progressRead=false,legacyPreservation=null,observationAt=undefined} = {}) {
+export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, includeJournalHours=includeDerivedHours, reviewReportId=null, stageValidation=false,progressRead=false,legacyPreservation=null,observationAt=undefined,compactAudit=false,transitState=null} = {}) {
   if (!canWork(actor) && !canHr(actor) && !hasRole(actor, "xem")) fail("Không có quyền xem Quản lý sản xuất.", 403);
   // Menu visibility does not broaden the authenticated Line data boundary.
   const crossLineView=false,readActor=actor;
@@ -265,7 +265,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   const observationDay=new Date(observationTime+25200000).toISOString().slice(0,10);
   const capacityRead = rows(db, "capacity");
   const [state, eventRecords, reportRecords, directory, calendar, capacityRecords,accountRecords,historyRecords] = await Promise.all([
-    getTransit(db, {}, catalog,{includeHistory:false,stageValidation,includeProductionSummary:progressRead,skipLeadtime:progressRead,preservedOrders:legacyPreservation?.orders,leadtimeAt:observationAt}), rows(db, "production_event",false,progressRead), rows(db, "production_report",stageValidation,progressRead), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,'production_history_import',stageValidation,progressRead),
+    transitState||getTransit(db, {}, catalog,{includeHistory:false,stageValidation,includeProductionSummary:progressRead||compactAudit,skipLeadtime:progressRead,preservedOrders:legacyPreservation?.orders,leadtimeAt:observationAt}), rows(db, "production_event",false,progressRead,compactAudit), rows(db, "production_report",stageValidation,progressRead,compactAudit), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,'production_history_import',stageValidation,progressRead,compactAudit),
   ]);
   const preservedMetadata=new Map((legacyPreservation?.orders||[]).map(b=>[b.orderId,b]));
   const orders = state.rows.filter((row) => ((row.syncStatus === "ĐÃ ĐỒNG BỘ" && row.lsxCode) || row.status === "HỦY") && permitted(readActor, row.line));
@@ -282,7 +282,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   const policies=new Map(),policyFor=line=>{if(!policies.has(line))policies.set(line,attendancePolicy(calendar,calculationEvents,line,true));return policies.get(line);};
   const journalPolicies=new Map(),journalPolicy=line=>{if(calculationEvents===allEvents)return policyFor(line);if(!journalPolicies.has(line))journalPolicies.set(line,attendancePolicy(calendar,allEvents,line,true));return journalPolicies.get(line);};
   const orderEvents=new Map();if(includeDerivedHours||includeJournalHours)for(const event of allEvents)for(const id of new Set([event.sourceId,event.destinationId].filter(Boolean))){if(!orderEvents.has(id))orderEvents.set(id,[]);orderEvents.get(id).push(event);}
-  const readContext=includeDerivedHours?{orderEvents,attendance:effectiveAttendance(calculationEvents),pending:effectiveAttendance(calculationEvents,true).filter(e=>e.approved===false&&["absence","line-absence","attendance-override"].includes(e.kind))}:null;
+  const readContext=includeDerivedHours||includeJournalHours?{orderEvents,attendance:effectiveAttendance(calculationEvents),pending:effectiveAttendance(calculationEvents,true).filter(e=>e.approved===false&&["absence","line-absence","attendance-override"].includes(e.kind))}:null;
   const events = eventRows(scopedJournal, readActor).map(event => ({...event, employeeDetails:eventEmployees(event, employeeDirectory),
     affectedOrderIds:includeDerivedHours&&!reviewReportId&&!event.sourceId&&["line-absence","attendance-override"].includes(event.kind)?(()=>{
       const start=Date.parse(event.effectiveAt),end=Date.parse(event.endsAt),points=[start,end,...allEvents.map(e=>Date.parse(e.effectiveAt)).filter(t=>t>start&&t<end)].sort((a,b)=>a-b);

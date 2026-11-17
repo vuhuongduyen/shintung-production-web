@@ -13,6 +13,23 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
 async function flush(){await act(async()=>{await tick();await tick();});}
 async function mount(fetcher,props={},reset=true){if(reset)clearClientReads();globalThis.fetch=fetcher;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);await act(async()=>root.render(React.createElement(Work,{sessionLine:'A',preferenceUser:'SYNTHETIC-LINE-A',fallback:React.createElement('div',null,'Legacy fallback'),...props})));await flush();return {host,close:async()=>{await act(async()=>root.unmount());host.remove();}};}
 const button=(host,text)=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===text),click=async n=>{assert.ok(n);await act(async()=>n.click());await flush();};
+test('a new page session displays its verified-scope saved rows while the fresh response is pending, then replaces them silently',async()=>{
+ const {productionDisplayStore}=await vite.ssrLoadModule('/lib/production-display-store.mjs');
+ const {clearProductionPages}=await vite.ssrLoadModule('/lib/production-page-cache.ts');
+ clearClientReads();await productionDisplayStore.activate('SYNTHETIC-VERIFIED-LINE-A-GRANTS');
+ const url='/api/production-order-pages?page=1&sort=due&line=A',identity=JSON.stringify(['SYNTHETIC-LINE-A','A']);
+ productionDisplayStore.put('page:'+JSON.stringify([identity,url]),snapshot('SAVED'));clearProductionPages();
+ let release;const m=await mount(async()=>new Promise(r=>{release=()=>r(Response.json(snapshot('NEW')));}),{},false);
+ try{
+  assert.ok(m.host.querySelector('button[aria-label="Báo công · SAVED"]'));
+  assert.equal(m.host.querySelector('button[aria-label="Báo công · SAVED"]').disabled,true);
+  assert.doesNotMatch(m.host.textContent,/Đang kiểm tra dữ liệu/);
+  await act(async()=>release());await flush();
+  assert.ok(m.host.querySelector('button[aria-label="Báo công · NEW"]'));
+  assert.equal(m.host.querySelector('button[aria-label="Báo công · NEW"]').disabled,false);
+  assert.equal(m.host.querySelector('button[aria-label="Báo công · SAVED"]'),null);
+ }finally{await m.close();productionDisplayStore.clear();clearProductionPages();}
+});
 test('expired page reopens with retained rows, then verifies before enabling writes',async()=>{
  const first=await mount(async()=>Response.json(snapshot('RETAINED')));await first.close();
  const now=Date.now,future=now()+31000;Date.now=()=>future;let release;
@@ -113,9 +130,9 @@ test('memory pages survive reopening the same session, but a session or permissi
 
 test('a timed-out page read releases loading and can be retried without a permanent pager lock',async()=>{
  const {readProductionPage}=await vite.ssrLoadModule('/lib/production-page-cache.ts');clearClientReads();const originalTimeout=globalThis.setTimeout;
- globalThis.setTimeout=(fn,ms,...args)=>originalTimeout(fn,ms===25000?5:ms,...args);
+ globalThis.setTimeout=(fn,ms,...args)=>originalTimeout(fn,ms===15000?5:ms,...args);
  globalThis.fetch=async(_path,init)=>new Promise((_resolve,reject)=>init.signal.addEventListener('abort',()=>reject(Object.assign(Error('aborted'),{name:'AbortError'}))));
- try{await assert.rejects(readProductionPage('/api/production-order-pages?page=1','TIMEOUT'),/Tải dữ liệu quá lâu/);globalThis.fetch=async()=>Response.json(snapshot('RETRIED'));assert.equal((await readProductionPage('/api/production-order-pages?page=1','TIMEOUT')).orders[0].id,'RETRIED');}
+ try{await assert.rejects(readProductionPage('/api/production-order-pages?page=1','TIMEOUT'),/phản hồi quá lâu/);globalThis.fetch=async()=>Response.json(snapshot('RETRIED'));assert.equal((await readProductionPage('/api/production-order-pages?page=1','TIMEOUT')).orders[0].id,'RETRIED');}
  finally{globalThis.setTimeout=originalTimeout;clearClientReads();}
 });
 

@@ -12,7 +12,7 @@ assert.ok(callback,'exercise the actual Home callback, not a copied implementati
 const account=(changes={})=>({language:'vi',authenticated:true,session:{kind:'account',login:'synthetic-a',name:'Original',role:'HR',grants:['SKU','Capacity'],...changes}});
 function harness(initial=account()){
  const state={identity:initial,workspaces:{overviewRoute:{view:'production'},tabs:[{id:'draft-tab'}],active:'draft-tab',nextId:2},epoch:7,notice:false,clears:0,productionClears:0,feedbackClears:0,viewers:[1],groups:[1],count:1};
- const context={identityRef:{current:initial},workspaceIdentityKey:clientAuthorizationKey,workspaceHome:{view:'sku',child:null,planTab:'base'},clearProductionSnapshot:()=>state.productionClears++,clearActionFeedback:()=>state.feedbackClears++,clearClientReads:()=>state.clears++};
+ const context={productionDisplayStore:{activate:async()=>{},clear:()=>{}},identityRef:{current:initial},workspaceIdentityKey:clientAuthorizationKey,workspaceHome:{view:'sku',child:null,planTab:'base'},clearProductionSnapshot:()=>state.productionClears++,clearActionFeedback:()=>state.feedbackClears++,clearClientReads:()=>state.clears++};
  for(const [name,key] of [['setIdentity','identity'],['setWorkspaces','workspaces'],['setHomeEpoch','epoch'],['setAuthorizationChanged','notice'],['setActiveViewers','viewers'],['setNotificationGroups','groups'],['setNotificationCount','count']])context[name]=value=>state[key]=typeof value==='function'?value(state[key]):value;
  vm.runInNewContext(ts.transpileModule(`const receiveIdentity=${callback};globalThis.receiveIdentity=receiveIdentity;`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText,context);
  return {state,receive:context.receiveIdentity};
