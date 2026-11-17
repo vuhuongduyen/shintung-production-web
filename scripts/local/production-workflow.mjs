@@ -1,3 +1,4 @@
+import {progressReadPayload} from './production-progress-read.mjs';
 import {quantitySourceDatabase} from './production-quantity-cutover.mjs';
 import {quantityCompletion} from '../../lib/production-quantity-intake.mjs';
 import {preservedOrderMetadata} from '../../lib/production-legacy-preservation.mjs';
@@ -43,7 +44,7 @@ import { effectiveAttendance, activeStaffMovement, transferStaffCandidates, atte
 
 const fail = (message, status = 422) => { throw Object.assign(new Error(message), { status }); };
 const parse = (r) => ({ key: r.record_key, payload: JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at });
-const rows = async (db, entity, stageValidation=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:stageValidation?stageValidationPayload(entity):'payload'})).sort((a,b)=>String(a.updated_at).localeCompare(String(b.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
+const rows = async (db, entity, stageValidation=false, progressRead=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:progressRead?progressReadPayload(entity):stageValidation?stageValidationPayload(entity):'payload'})).sort((a,b)=>String(a.updated_at).localeCompare(String(b.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
 const upper = (value) => String(value || "").trim().toUpperCase();
 const clock = (value) => {
   const result = Date.parse(value);
@@ -254,7 +255,7 @@ function reportMetadata(calendar,events,row,directory) {
  if(row.kind!=="completion")return {};
  const {hours,sourceSnapshot,...meta}=reportCalculation(calendar,events,row,directory,false);return meta;
 }
-export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, includeJournalHours=includeDerivedHours, reviewReportId=null, stageValidation=false,legacyPreservation=null,observationAt=undefined} = {}) {
+export async function readProductionWorkflow(db, actor, catalog = [], {includeDerivedHours=true, includeJournalHours=includeDerivedHours, reviewReportId=null, stageValidation=false,progressRead=false,legacyPreservation=null,observationAt=undefined} = {}) {
   if (!canWork(actor) && !canHr(actor) && !hasRole(actor, "xem")) fail("Không có quyền xem Quản lý sản xuất.", 403);
   // Menu visibility does not broaden the authenticated Line data boundary.
   const crossLineView=false,readActor=actor;
@@ -264,7 +265,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
   const observationDay=new Date(observationTime+25200000).toISOString().slice(0,10);
   const capacityRead = rows(db, "capacity");
   const [state, eventRecords, reportRecords, directory, calendar, capacityRecords,accountRecords,historyRecords] = await Promise.all([
-    getTransit(db, {}, catalog,{includeHistory:false,stageValidation,preservedOrders:legacyPreservation?.orders,leadtimeAt:observationAt}), rows(db, "production_event"), rows(db, "production_report",stageValidation), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,'production_history_import',stageValidation),
+    getTransit(db, {}, catalog,{includeHistory:false,stageValidation,includeProductionSummary:progressRead,skipLeadtime:progressRead,preservedOrders:legacyPreservation?.orders,leadtimeAt:observationAt}), rows(db, "production_event",false,progressRead), rows(db, "production_report",stageValidation,progressRead), rows(db, "employees"), schedules(db, capacityRead), capacityRead,rows(db,"users"),rows(db,'production_history_import',stageValidation,progressRead),
   ]);
   const preservedMetadata=new Map((legacyPreservation?.orders||[]).map(b=>[b.orderId,b]));
   const orders = state.rows.filter((row) => ((row.syncStatus === "ĐÃ ĐỒNG BỘ" && row.lsxCode) || row.status === "HỦY") && permitted(readActor, row.line));
@@ -301,10 +302,10 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
       }
     }
   }
-  const scheduleHistory = reviewReportId ? [] : [...calendar.actual.values()].filter((row) => permitted(readActor, row.line)).flatMap((row) =>
+  const scheduleHistory = reviewReportId || progressRead ? [] : [...calendar.actual.values()].filter((row) => permitted(readActor, row.line)).flatMap((row) =>
     (row.history || []).map((entry, index) => ({ id: `schedule:${row.key}:${index}`, kind: "schedule", sourceId: null, line: row.line,
       week: row.week, effectiveAt: entry.at, recordedAt: entry.at, actor: entry.by, actorId:productionEntryActorId(entry,accounts), reason: entry.reason, before: entry.before, after: entry.after })));
-  const capacityHistory = !reviewReportId&&(canManage(actor)||hasQuickLineReadScope(actor)) ? capacityRecords.flatMap((record) => (record.payload.rows || []).filter((row) => permitted(readActor, row.line)).flatMap((row) =>
+  const capacityHistory = !progressRead&&!reviewReportId&&(canManage(actor)||hasQuickLineReadScope(actor)) ? capacityRecords.flatMap((record) => (record.payload.rows || []).filter((row) => permitted(readActor, row.line)).flatMap((row) =>
     (row.history || []).map((entry, index) => ({ id: `capacity:${record.key}:${row.line}:${index}`, kind: "capacity", sourceId: null,
       line: row.line, week: record.key, effectiveAt: entry.at, recordedAt: entry.at, actor: entry.actor, actorId:productionEntryActorId(entry,accounts), reason: entry.reason,
       capacityAction: entry.action, capacityDecision:entry.decision, requestDescription:entry.request?.intendedChange||entry.request?.reason, before: entry.previousHours, after: entry.newHours })))) : [];
