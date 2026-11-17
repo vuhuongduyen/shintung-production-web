@@ -145,6 +145,8 @@ Chưa đo propagation Sec-Fetch-Site trên đường GitHub từ probe cũ; chư
 
 Nhánh riêng; hợp nhất snapshot theo từng khóa trong cùng phạm vi đã xác minh, chuyển khóa lưu để tab phiên bản cũ không ghi đè. Giảm đọc SKU không liên quan, kế hoạch chưa đồng bộ và lịch sử nhập đã duyệt trong scope tóm tắt SX; giữ dữ liệu và quyền. TypeScript/build cùng kiểm thử cache/API mục tiêu đạt; chưa nghiệm thu tốc độ MAIN sau sửa. Tách khỏi PR #37 Tiến độ sản xuất. Chi tiết: docs/PRODUCTION-CACHE-ISOLATION-20261117.md.
 
+Bổ sung sau MAIN v836: giữ trang/dữ liệu đã xác minh trên trình duyệt, nhưng Admin còn đọc 8–10 giây. Nhánh riêng tiếp tục lọc sớm kế hoạch có nhãn đồng bộ nhưng chưa đủ mã LSX/lượng/ngày mở; không đổi kết quả hoặc dữ liệu. Xem docs/SX-READY-SCAN-20261117.md; chưa nghiệm thu tốc độ bản bổ sung.
+
 ## 16/11/2026 — ứng viên giảm thời gian mở SX báo công
 
 Chỉ SX báo công: giảm đọc lặp, giữ snapshot hết TTL khi mở lại để kiểm tra nền. Fixture 126 lệnh: 45 → 17 lượt DB, tổng/dữ liệu lưu giữ nguyên. 37 ca mục tiêu/hồi quy, TypeScript và build đạt. Chưa merge/deploy hoặc nghiệm thu tốc độ end-to-end MAIN. Các menu còn lại giữ nguyên. Chi tiết: docs/SX-FIRST-LOAD-2026-11-16.md.
