@@ -74,7 +74,10 @@ const transitValue=(field,index,alternate)=>`coalesce(nullif(json_extract(payloa
 const dateSql=value=>{const iso=`CASE WHEN length(${value})=10 AND substr(${value},3,1)='/' AND substr(${value},6,1)='/' THEN substr(${value},7,4)||'-'||substr(${value},4,2)||'-'||substr(${value},1,2) ELSE ${value} END`;return `CASE WHEN length(${iso})=10 AND date(${iso},'+0 days')=${iso} THEN ${iso} ELSE NULL END`;};
 const rawLine=transitValue('line',4),lineSql=`CASE WHEN upper(trim(${rawLine})) LIKE 'LINE %' THEN trim(substr(trim(${rawLine}),6)) ELSE trim(${rawLine}) END`;
 const rawWeek=`coalesce(nullif(json_extract(payload,'$.week'),''),nullif(json_extract(payload,'$.planStart'),''),nullif(json_extract(payload,'$.start'),''),json_extract(payload,'$.columns[6]'),'')`,weekDate=dateSql(rawWeek),weekSql=`date(${weekDate},'-'||((cast(strftime('%w',${weekDate}) AS INTEGER)+6)%7)||' days')`;
-const orderDirectory=`WITH directory AS (SELECT record_key,${transitValue('lsxCode',5)} AS lsxCode,${transitValue('planId',0)} AS planId,json_extract(payload,'$.planGroupId') AS planGroupId,${transitValue('sku',1)} AS sku,${lineSql} AS line,${weekSql} AS week,${dateSql(transitValue('planStart',6,'start'))} AS startDate,${dateSql(transitValue('planEnd',7,'end'))} AS dueDate FROM app_records WHERE entity='in_transit' AND coalesce(json_extract(payload,'$._deleted'),0)=0 AND coalesce(nullif(json_extract(payload,'$.syncStatus'),''),json_extract(payload,'$.columns[29]'),'') NOT IN ('','CHƯA ĐỒNG BỘ','CÓ THAY ĐỔI','LỖI ĐỒNG BỘ'))`;
+// A stored sync label alone is not a runnable order: normalizeTransit also
+// requires an LSX code, positive quantity and opening date. Skip only definite
+// empty/zero values here; unusual spellings/formats still use the shared matcher.
+const orderDirectory=`WITH directory AS (SELECT record_key,${transitValue('lsxCode',5)} AS lsxCode,${transitValue('planId',0)} AS planId,json_extract(payload,'$.planGroupId') AS planGroupId,${transitValue('sku',1)} AS sku,${lineSql} AS line,${weekSql} AS week,${dateSql(transitValue('planStart',6,'start'))} AS startDate,${dateSql(transitValue('planEnd',7,'end'))} AS dueDate FROM app_records WHERE entity='in_transit' AND coalesce(json_extract(payload,'$._deleted'),0)=0 AND coalesce(nullif(json_extract(payload,'$.syncStatus'),''),json_extract(payload,'$.columns[29]'),'') NOT IN ('','CHƯA ĐỒNG BỘ','CÓ THAY ĐỔI','LỖI ĐỒNG BỘ') AND ${transitValue('lsxCode',5)}<>'' AND ${transitValue('lsxOpenedAt',15)}<>'' AND coalesce(json_extract(payload,'$.lsxQty'),json_extract(payload,'$.columns[14]'),0) NOT IN (0,'','0'))`;
 export async function* matchingProductionOrders(db,actor,q,catalog=[]){
  const where=['1'],args=[];
  if(q.line!=='all'){where.push('line=?');args.push(q.line);}
@@ -84,9 +87,11 @@ export async function* matchingProductionOrders(db,actor,q,catalog=[]){
  if(q.query&&['LSX','SKU','Plan ID'].includes(q.field)&&/^[\x20-\x7e]+$/.test(q.query)){where.push(`instr(lower(${fields[q.field]}),lower(?))>0`);args.push(q.query);}
  if(q.field==='Tuần kế hoạch'){where.push('week=?');args.push(q.query);}
  // Bound the aggregation window, independently of the 10-row UI page.
- // 25-order windows repeatedly re-read the same import records for every page.
- // Payload transport remains byte-bounded by readRecordPages (512 KiB).
- const windowSize=100;
+ // Completed orders still need the shared summary (corrections can reopen
+ // them). Aggregate at most 500 candidates per window rather than re-reading
+ // the same imported history for every 100. UI pages remain 10 rows and
+ // payload transport remains byte-bounded by readRecordPages (512 KiB).
+ const windowSize=500;
  const sortField=q.sort==='start'?'startDate':'dueDate';let offset=0;
  for(;;){
   const candidates=(await db.prepare(orderDirectory+` SELECT record_key,lsxCode,planId,planGroupId FROM directory WHERE ${where.join(' AND ')} ORDER BY coalesce(week,'9999'),coalesce(${sortField},'9999'),record_key LIMIT ${windowSize} OFFSET ?`).bind(...args,offset).all()).results;
