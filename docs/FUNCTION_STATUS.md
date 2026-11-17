@@ -1,3 +1,9 @@
+## 17/11/2026 — Tiến độ sản xuất: một nơi xác nhận
+
+- Tất cả LSX bỏ cột Mở và checkbox. Bấm LSX xem kế hoạch, lịch sử báo công và sự cố chỉ đọc; không dựng form chọn phiếu/xác nhận tại chi tiết.
+- Xác nhận báo công giữ danh sách phiếu theo ngày và quyền/Line hiện có. Bộ lọc Hiển thị, Tra cứu và phân trang không đổi.
+- Không thay API, D1/R2, giờ công, số lượng hoặc quyền. Kiểm thử DOM cho luồng chỉ đọc và luồng duyệt riêng; trạng thái triển khai theo PR #48, không suy diễn đã duyệt phiếu thật.
+
 ## 17/11/2026 — PR36: cập nhật kiểm thử trước merge
 
 Người dùng đã yêu cầu đẩy GitHub, merge và triển khai MAIN rồi kiểm trực tiếp. CI của e72e587 có 3 lỗi harness: callback Home thiếu ref/setter mới; mock workflow thiếu export compactWorkflowDisplay; dấu vân tay JSX phát hiện đúng hai dòng flush/suspend được thêm ở đăng xuất. Đã bổ sung dependency thật cho mock và chuẩn hóa riêng đúng hai dòng đăng xuất trước khi so dấu vân tay v807, không thay baseline hay bỏ kiểm tra quyền/callback còn lại. 52/52 kiểm thử liên quan đạt; chưa có thay đổi mã ứng dụng so với e72e587. Chờ CI của commit mới và kiểm web sau triển khai.
