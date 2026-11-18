@@ -20,7 +20,7 @@ test('Site APIs use trusted identity, isolate bindings, retain D1/R2 data and ne
   }
   if(url==='/api/labor-hours'&&body?.expectedVersion===undefined){
    const current=await c.db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(body.sku||'').first();
-   body={...body,expectedVersion:current?Number(JSON.parse(current.payload).version||0):0};
+   body={effectiveFrom:'2026-09-01',...body,expectedVersion:current?Number(JSON.parse(current.payload).version||0):0};
   }
   return siteApi(req(url,body,who),{DB:c.db,FILES:c.bucket});
  };

@@ -1,4 +1,7 @@
-import test,{after} from 'node:test';
+import test,{after,beforeEach,afterEach,mock} from 'node:test';
+// Keep October entry tests before the real business deadline.
+beforeEach(()=>mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-09T09:00:00Z')}));
+afterEach(()=>mock.timers.reset());
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createServer} from 'vite';
