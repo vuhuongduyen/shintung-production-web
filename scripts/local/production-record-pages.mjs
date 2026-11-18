@@ -2,11 +2,11 @@
 // predicates from server code are accepted here; values always use bindings.
 // Scan lightweight keys in larger windows; reuse the remaining keys when a
 // payload page reaches 512 KiB. This avoids two round trips per 100 small rows.
-export async function readRecordPages(db,{table='app_records',where='1',args=[],columns='entity,record_key,payload,updated_by,updated_at',payloadExpression='payload'}={}){
+export async function readRecordPages(db,{table='app_records',where='1',args=[],columns='entity,record_key,payload,updated_by,updated_at',payloadExpression='payload',sizeExpression=payloadExpression}={}){
  const selectedColumns=payloadExpression==='payload'?columns:columns.replace(/\bpayload\b/g,`(${payloadExpression}) AS payload`);
  const rows=[];let entity='',key='';
  for(;;){
-  const candidates=(await db.prepare(`SELECT entity,record_key,length(CAST((${payloadExpression}) AS BLOB)) AS bytes FROM ${table} WHERE (${where}) AND (entity>? OR (entity=? AND record_key>?)) ORDER BY entity,record_key LIMIT 1000`).bind(...args,entity,entity,key).all()).results;
+  const candidates=(await db.prepare(`SELECT entity,record_key,length(CAST((${sizeExpression}) AS BLOB)) AS bytes FROM ${table} WHERE (${where}) AND (entity>? OR (entity=? AND record_key>?)) ORDER BY entity,record_key LIMIT 1000`).bind(...args,entity,entity,key).all()).results;
   if(!candidates.length)break;
   // The key window already tells us every page boundary. Fetch up to three
   // independent, byte-bounded pages together rather than waiting for each one.

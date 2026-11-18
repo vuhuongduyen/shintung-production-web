@@ -1,4 +1,5 @@
 "use client";
+import {isDailyOutput} from '../lib/production-report-model.mjs';
 import {FeedbackActionButton} from './action-feedback';
 import {DataTable} from './onspa-ui/DataTable';
 import {DataCell} from './onspa-ui/DataCell';
@@ -12,12 +13,13 @@ const n=(v:any)=>Number(v||0).toLocaleString('vi-VN',{maximumFractionDigits:2});
 const t=productionDisplayTime;
 const date=(r:Row)=>r.productionDate||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date(r.completedAt));
 export function ProductionDailySummary({reports,open}:{reports:Row[];open:(r:Row)=>void}) {
+ const legacyHours=reports.some(r=>!isDailyOutput(r));
  const outputReports=reports.filter(hasFinishedOutput),days=[...new Set(outputReports.map(date))].sort();let cumulative=0;
  if(!days.length)return null;
- return <><h3>Sản lượng theo ngày</h3><DataTable className="table-wrap"><table className="production-table"><thead><tr><th>Ngày sản lượng</th><th>Đã duyệt</th><th>Chờ duyệt</th><th>Lũy kế đã duyệt</th><th>Giờ HC / TC</th><th>Chi tiết</th></tr></thead><tbody>{days.map(day=>{const rows=outputReports.filter(r=>date(r)===day),approved=rows.filter(r=>r.reviewStatus==='Đã xác nhận');const qty=approved.reduce((s,r)=>s+Number(r.approvedQuantity??r.reportedQuantity),0);cumulative+=qty;
+ return <><h3>Sản lượng theo ngày</h3><DataTable className="table-wrap"><table className="production-table"><thead><tr><th>Ngày sản lượng</th><th>Đã duyệt</th><th>Chờ duyệt</th><th>Lũy kế đã duyệt</th>{legacyHours&&<th>Giờ HC / TC</th>}<th>Chi tiết</th></tr></thead><tbody>{days.map(day=>{const rows=outputReports.filter(r=>date(r)===day),approved=rows.filter(r=>r.reviewStatus==='Đã xác nhận');const qty=approved.reduce((s,r)=>s+Number(r.approvedQuantity??r.reportedQuantity),0);cumulative+=qty;
  // Hours follow their civil working date, independently of the quantity date.
  const allHours=reports.filter(r=>r.reviewStatus==='Đã xác nhận');const hc=allHours.reduce((s,r)=>s+Number(r.hours?.perDay?(r.hours.perDay.find((p:Row)=>p.date===day)?.hc||0):(date(r)===day?r.hours?.hc||0:0)),0),ot=allHours.reduce((s,r)=>s+Number(r.hours?.perDay?(r.hours.perDay.find((p:Row)=>p.date===day)?.ot||0):(date(r)===day?r.hours?.ot||0:0)),0);
- return <tr key={day}><DataCell>{day.split('-').reverse().join('/')}</DataCell><DataCell kind="number">{n(qty)}</DataCell><DataCell kind="number">{n(rows.filter(r=>r.reviewStatus==='Chờ kiểm tra').reduce((s,r)=>s+Number(r.reportedQuantity),0))}</DataCell><DataCell kind="number">{n(cumulative)}</DataCell><DataCell kind="number">{n(hc)} / {n(ot)}</DataCell><DataCell>{rows.map((r,i)=><FeedbackActionButton key={r.id} onClick={()=>open(r)}>Lần {i+1}</FeedbackActionButton>)}</DataCell></tr>;})}</tbody></table></DataTable></>;
+ return <tr key={day}><DataCell>{day.split('-').reverse().join('/')}</DataCell><DataCell kind="number">{n(qty)}</DataCell><DataCell kind="number">{n(rows.filter(r=>r.reviewStatus==='Chờ kiểm tra').reduce((s,r)=>s+Number(r.reportedQuantity),0))}</DataCell><DataCell kind="number">{n(cumulative)}</DataCell>{legacyHours&&<DataCell kind="number">{n(hc)} / {n(ot)}</DataCell>}<DataCell>{rows.map((r,i)=><FeedbackActionButton key={r.id} onClick={()=>open(r)}>Lần {i+1}</FeedbackActionButton>)}</DataCell></tr>;})}</tbody></table></DataTable></>;
 }
 export default function ProductionReportHistory({reports,employees,open}:{reports:Row[];employees:Row[];open:(r:Row)=>void}) {
  const [tab,setTab]=useState<'report'|'day'>('report');const sorted=reports.slice().sort((a,b)=>String(a.completedAt).localeCompare(String(b.completedAt)));const cumulative=new Map<string,number>();

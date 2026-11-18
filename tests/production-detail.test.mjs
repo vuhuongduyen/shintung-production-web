@@ -138,11 +138,12 @@ test('progress review separates pending quantities from approved planning output
  assert.equal(reportReviewBlocker({...pending,hours:{hc:null,ot:0,total:0}}),'Chưa đủ dữ liệu giờ công');
  assert.equal(reportReviewBlocker({...pending,pendingAttendance:[{}]}),'Có điều chỉnh giờ chờ duyệt');
 });
-test('QLSX progress workspace presents review quantities, separate sync destinations and compact square selectors',async()=>{
+test('QLSX progress workspace presents review quantities without selectors or duplicate approval controls',async()=>{
  const {default:Progress}=await vite.ssrLoadModule('/components/production-progress-review.tsx');
  const html=renderToStaticMarkup(React.createElement(Progress,{orders,reports:[{...report,reviewStatus:'Chờ kiểm tra'}],events:[event],employees,manager:true,busy:false,refresh:()=>{},open:()=>{},active:()=>({count:1,employees:['NV1'],running:true}),onReview:async()=>true,late:[],onApproveHours:()=>{}}));
  for(const label of ['SL đã xác nhận','SL chờ xác nhận','Báo công chờ kiểm tra','LSX-01','Sản phẩm giả kiểm thử','80cm'])assert.ok(html.includes(label),label);
- assert.ok(html.includes('type="checkbox"'));assert.ok(!html.includes('type="radio"'));assert.ok(html.includes('data-no-pagination="true"'));
+ assert.ok(!html.includes('type="checkbox"'));assert.ok(!html.includes('type="radio"'));assert.ok(html.includes('data-no-pagination="true"'));
+ const table=JSDOM.fragment(html).querySelector('.progress-order-table');assert.equal(table.querySelector('thead th').textContent,'LSX');assert.equal(table.querySelectorAll(':scope > thead > tr > th').length,18);assert.equal(table.querySelector('.report-day-review'),null);
 });
 
 test('progress opens with every planning-synced order, including orders without any production reports or events',async()=>{

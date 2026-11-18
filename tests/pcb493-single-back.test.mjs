@@ -89,7 +89,17 @@ test('existing Back translation remains VI English and Traditional Chinese witho
 });
 test('menu callbacks, disabled and permission props retain the approved v807 snapshot fingerprints',()=>{
  const baseline=JSON.parse(read('tests/back-action-props-baseline.json'));assert.equal(baseline.files.length,3);assert.equal(baseline.baseCommit,'c84775445ed3ef4c09fc583ac06b19881f9ae6d9');
- for(const {file,...expected}of baseline.files)assert.deepEqual(actionPropsFingerprint(file,read(file)),expected,file);
+ for(const {file,...expected}of baseline.files){
+  let source=read(file);
+  if(file==='app/page.tsx'){
+   // PR36 intentionally flushes and hides the saved display on logout. Keep the
+   // v807 fingerprint for every other callback/permission/disabled expression.
+   const logoutPersistence='                  await productionDisplayStore.settled();\n                  productionDisplayStore.suspend();\n';
+   assert.equal(source.split(logoutPersistence).length,2,'one explicit logout persistence change');
+   source=source.replace(logoutPersistence,'');
+  }
+  assert.deepEqual(actionPropsFingerprint(file,source),expected,file);
+ }
 });
 test('action fingerprint detects callback, disabled, permission and JSX guard changes while allowing explanation copy',()=>{
  const source="toolbar.action({disabled:busy||!allowed,onClick:()=>save()},'Save',allowed); const button=<button disabled={busy} onClick={save}/>;";
@@ -118,8 +128,8 @@ test('Labor history has one whole-screen Back in the foreground; callback and di
  function collect(n){if(ts.isVariableDeclaration(n)&&ts.isArrayBindingPattern(n.name)&&n.initializer&&ts.isCallExpression(n.initializer)&&n.initializer.expression.getText(ast)==='useState')names.push(n.name.elements[0].getText(ast));ts.forEachChild(n,collect)}collect(ast);
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText;
  function harness(panel,dirty=false){
-  let cursor=0,listResets=0;const states={panel,dirty,selected:'TEST-SKU',loading:false,records:[{sku:'TEST-SKU',laborHour:1,version:1}]};
-  const hooks={...React,useEffect:()=>{},useMemo:fn=>fn(),useState:init=>{const name=names[cursor++];if(!(name in states))states[name]=typeof init==='function'?init():init;return [states[name],v=>states[name]=typeof v==='function'?v(states[name]):v];}};
+  let cursor=0,refCursor=0,listResets=0;const refs=[];const states={panel,dirty,selected:'TEST-SKU',loading:false,records:[{sku:'TEST-SKU',laborHour:1,version:1}]};
+  const hooks={...React,useEffect:()=>{},useMemo:fn=>fn(),useRef:init=>{const index=refCursor++;return refs[index]??= {current:init};},useState:init=>{const name=names[cursor++];if(!(name in states))states[name]=typeof init==='function'?init():init;return [states[name],v=>states[name]=typeof v==='function'?v(states[name]):v];}};
   const flatten=items=>items.flatMap(i=>!i?[]:Array.isArray(i)?flatten(i):i.kind==='group'?flatten(i.items):[i]);
   function BackOnlyToolbar({items}){const action=selectToolbarBack(flatten(items).filter(i=>i.kind==='action'));return action?React.createElement('button',action.props,'Quay lại'):null;}
   const req=name=>{
@@ -136,7 +146,7 @@ test('Labor history has one whole-screen Back in the foreground; callback and di
   };
   const module={exports:{}};new Function('require','module','exports','React',js)(req,module,module.exports,React);
   const props={masterSkus:[{code:'TEST-SKU',name:'Synthetic',group:'TEST',line:'A',status:'Đang sử dụng',specification:''}],operator:'TEST',language:'vi',onListReset:()=>listResets++};
-  function buttons(){cursor=0;const tree=module.exports.default(props),backs=[];
+  function buttons(){cursor=0;refCursor=0;const tree=module.exports.default(props),backs=[];
    const text=n=>Array.isArray(n)?n.map(text).join(''):React.isValidElement(n)?typeof n.type==='function'?text(n.type(n.props)):text(n.props.children):typeof n==='string'?n:'';
    function walk(n){if(Array.isArray(n)){n.forEach(walk);return;}if(!React.isValidElement(n))return;if(typeof n.type==='function'){walk(n.type(n.props));return;}if(n.type==='button'&&/Quay lại/.test(text(n.props.children)))backs.push(n);walk(n.props.children);}walk(tree);return backs;
   }

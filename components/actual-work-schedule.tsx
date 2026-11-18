@@ -1,4 +1,5 @@
 "use client";
+import {useActualScheduleViewFields} from "../lib/actual-schedule-view-state";
 import {actualCleaningLimit,cleaningLimitError} from '../lib/actual-cleaning-limit.mjs';
 import {moveCleaningDate} from '../lib/actual-cleaning-date.mjs';
 import AttendanceReportRecalculation from "./attendance-report-recalculation";
@@ -34,23 +35,25 @@ const labels = ["Thứ Hai","Thứ Ba","Thứ Tư","Thứ Năm","Thứ Sáu","Th
 const localDate = (iso: string) => iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }) : "";
 const localTime = (iso:string)=>productionDisplayTime(iso,'');
 
-export default function ActualWorkSchedule({week,setWeek,line,setLine,locked,days,setDays,version,approved,approvedSchedules,history,events,orders,employees,displayEmployees=employees,restrictedLine=false,manager,attendanceManager=manager,hr=false,attendanceOnly=false,busy,save,openAction,refresh,extraToolbarItems=[],recalculationAllowed=false}: {
-  recalculationAllowed?:boolean;
+export default function ActualWorkSchedule({viewKey="default",week,setWeek,line,setLine,locked,days,setDays,version,approved,approvedSchedules,history,events,orders,employees,displayEmployees=employees,restrictedLine=false,manager,attendanceManager=manager,hr=false,attendanceOnly=false,busy,save,openAction,refresh,extraToolbarItems=[],recalculationAllowed=false}: {
+  viewKey?:string;recalculationAllowed?:boolean;
   displayEmployees?:Row[];restrictedLine?:boolean;
   extraToolbarItems?:React.ComponentProps<typeof StandardToolbar>["items"];
   week:string;setWeek:(week:string)=>void;line:string;setLine:(line:string)=>void;locked:boolean;
   days:Row[];setDays:React.Dispatch<React.SetStateAction<Row[]>>;version:number;approved?:Row;approvedSchedules:Row[];history:Row[];
   events:Row[];orders:Row[];employees:Row[];manager:boolean;attendanceManager?:boolean;hr?:boolean;attendanceOnly?:boolean;busy:boolean;save:(body:Row)=>Promise<boolean>;openAction:(order:Row,action:string,people:string[],at:string)=>void;refresh:()=>Promise<boolean>;
 }) {
+  const viewField=useActualScheduleViewFields(`filters:${viewKey}`,{monthly:false,searchOpen:false,searchBy:'',employeeQuery:'',lookupValue:'',monthDraft:{month:week.slice(0,7),line:locked?line:'',kind:'',query:'',showCancelled:false} as ActualLaborFilters,monthApplied:{month:week.slice(0,7),line:locked?line:'',kind:'',query:'',showCancelled:false} as ActualLaborFilters,selectedTab:'',showHistory:false});
   const [recalculationOpen,setRecalculationOpen]=useState(false);
   const [openArrival,setOpenArrival]=useState(false),[correction,setCorrection]=useState<Row|null>(null),[arrivalTime,setArrivalTime]=useState("09:00"),[correctionStart,setCorrectionStart]=useState("08:00"),[correctionMode,setCorrectionMode]=useState("arrival");
-  const [sourceLine,setSourceLine]=useState(employees.some(p=>p.line==="C")?"C":""),[monthly,setMonthly]=useState(false),[editEntry,setEditEntry]=useState<Row|null>(null),[cancelEntry,setCancelEntry]=useState(false);
-  const [searchOpen,setSearchOpen]=useState(false),[searchBy,setSearchBy]=useState(''),[employeeQuery,setEmployeeQuery]=useState('');
+  const [sourceLine,setSourceLine]=useState(employees.some(p=>p.line==="C")?"C":""),[monthly,setMonthly]=viewField('monthly'),[editEntry,setEditEntry]=useState<Row|null>(null),[cancelEntry,setCancelEntry]=useState(false);
+  const [searchOpen,setSearchOpen]=viewField('searchOpen'),[searchBy,setSearchBy]=viewField('searchBy'),[employeeQuery,setEmployeeQuery]=viewField('employeeQuery');
   const [hrEntryOpen,setHrEntryOpen]=useState(false),[hrEntryVisited,setHrEntryVisited]=useState(false);
-  const [lookupValue,setLookupValue]=useState('');
+  const [lookupValue,setLookupValue]=viewField('lookupValue');
   const [otherWorkNote,setOtherWorkNote]=useState('');
-  const [monthDraft,setMonthDraft]=useState<ActualLaborFilters>(()=>({month:week.slice(0,7),line:locked?line:'',kind:'',query:'',showCancelled:false}));
-  const [monthApplied,setMonthApplied]=useState<ActualLaborFilters>(monthDraft),[monthVisited,setMonthVisited]=useState(false);
+  const [monthDraft,setMonthDraft]=viewField('monthDraft');
+  const [monthApplied,setMonthApplied]=viewField('monthApplied'),[monthVisited,setMonthVisited]=useState(monthly);
+  useEffect(()=>{if(monthly)setMonthVisited(true);},[monthly]);
   const monthKinds=['Nghỉ','Đi trễ','Về sớm','Phụ kho','CV khác','Chuyển Line','Thu hồi nhân sự'];
   const monthLines=[...new Set(['A','B',...employees.map(person=>person.line).filter(Boolean)])];
   const applyMonth=(patch:Partial<ActualLaborFilters>)=>{const next={...monthApplied,...patch,line:locked?line:patch.line??monthApplied.line};setMonthApplied(next);setMonthDraft(next);};
@@ -59,9 +62,9 @@ export default function ActualWorkSchedule({week,setWeek,line,setLine,locked,day
   const canAttendance=canLaborManage||hr;
   const tabs=attendanceInputTypes({hr,manager:canLaborManage});
   const currentEvents:Row[]=useMemo(()=>effectiveAttendance(events,true),[events]);
-  const [selectedTab,setTab]=useState(()=>attendanceInputType("",{hr,manager:canLaborManage})),[showHistory,setShowHistory]=useState(false),[reason,setReason]=useState("");
+  const [selectedTab,setTab]=viewField('selectedTab'),[showHistory,setShowHistory]=viewField('showHistory'),[reason,setReason]=useState("");
   const tab=attendanceInputType(selectedTab,{hr,manager:canLaborManage});
-  useEffect(()=>{setTab(attendanceInputType("",{hr,manager:canLaborManage}));setLookupValue("");setLeavePeople([]);setCorrection(null);setEditEntry(null);setOpenArrival(false);},[hr,canLaborManage]);
+  useEffect(()=>{setLeavePeople([]);setCorrection(null);setEditEntry(null);setOpenArrival(false);},[hr,canLaborManage]);
   const [leaveStart,setLeaveStart]=useState(()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10)+"T08:00");
   const [leaveEnd,setLeaveEnd]=useState(()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10)+"T17:00");
   const [leavePeople,setLeavePeople]=useState<string[]>([]),[leaveToDate,setLeaveToDate]=useState("");

@@ -17,7 +17,7 @@ test('same output rule across monthly efficiency and order labor: no output rows
  const {hasFinishedOutput,hasOrderOutput}=await import('../lib/production-output-summary.mjs');
  const order={id:'o',line:'A',lsxQty:250,laborHour:.1};
  const cut={id:'cut',transitId:'o',kind:'completion',stageName:'CUT',productionDate:'2026-09-30',reportedQuantity:0,approvedQuantity:0,reviewStatus:'Đã xác nhận',hours:{hc:10,ot:0,total:10}};
- const final={...cut,id:'final',stageName:'FINAL',productionDate:'2026-10-01',reportedQuantity:250,approvedQuantity:250,hours:{hc:2,ot:0,total:2}};
+ const final={...cut,id:'final',stageName:'FINAL',standardUnit:.1,productionDate:'2026-10-01',reportedQuantity:250,approvedQuantity:250,hours:{hc:2,ot:0,total:2}};
  assert.equal(hasFinishedOutput(cut),false);assert.equal(hasOrderOutput(orderLaborOutput(order,[cut])),false);
  assert.deepEqual(monthlyEarnedOrders([order],[cut,final],'2026-09','A'),[]);
  assert.equal(monthlyEarnedOrders([order],[cut,final],'2026-10','A')[0].earned,25);

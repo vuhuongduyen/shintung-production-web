@@ -7,7 +7,7 @@ import {mutateProductionWorkflow,readProductionWorkflow} from '../scripts/local/
 import {warehouseHelperNames,dutyDates,dutyRows} from '../lib/warehouse-duty.mjs';
 import {effectiveAttendance} from '../lib/production-attendance.mjs';
 const manager={login:'vthduyen',isAdmin:true},week='2026-10-19';
-async function fixture(fn){mkdirSync(resolve(root,'.local-data/tests'),{recursive:true});const conn=await openDatabase(mkdtempSync(resolve(root,'.local-data/tests/duty-')));try{await migrate(conn.db);const db=conn.db,put=(entity,key,payload)=>db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(entity,key,JSON.stringify(payload),'TEST','2026-10-18').run();for(const [i,name] of warehouseHelperNames.entries())await put('employees',`NV${i}`,{name,line:'A',active:true});await put('employees','OTHER',{name:'Người khác',line:'A',active:true});const days=[...dutyDates(week),'2026-10-25'].map(date=>({date,working:date!=='2026-10-25',hcStart:'08:00',hcEnd:'17:00',lunchStart:'12:00',lunchEnd:'13:00',ot:false}));await put('capacity',week,{schemaVersion:1,week,rows:[{line:'A',status:'Đã xác nhận',reviewStatus:'approved',version:1,input:{workers:3,dailySchedule:days,dailyRoster:days.map(d=>({date:d.date,hc:['NV0','NV1','NV2'],ot:[]}))}}]});await fn(db);}finally{await conn.close();}}
+async function fixture(fn){mkdirSync(resolve(root,'.local-data/tests'),{recursive:true});const conn=await openDatabase(mkdtempSync(resolve(root,'.local-data/tests/duty-')));try{await migrate(conn.db);const db=conn.db,put=(entity,key,payload)=>db.prepare('INSERT INTO app_records VALUES(?,?,?,?,?)').bind(entity,key,JSON.stringify(payload),'TEST','2026-10-18').run();for(const [i,name] of warehouseHelperNames.entries())await put('employees',`NV${i}`,{name,line:'A',active:true});await put('employees','OTHER',{name:'Người khác',line:'A',active:true});await put('employees','OTHER-LINE',{name:'Nhân viên Line B',line:'B',active:true});const days=[...dutyDates(week),'2026-10-25'].map(date=>({date,working:date!=='2026-10-25',hcStart:'08:00',hcEnd:'17:00',lunchStart:'12:00',lunchEnd:'13:00',ot:false}));await put('capacity',week,{schemaVersion:1,week,rows:[{line:'A',status:'Đã xác nhận',reviewStatus:'approved',version:1,input:{workers:3,dailySchedule:days,dailyRoster:days.map(d=>({date:d.date,hc:['NV0','NV1','NV2'],ot:[]}))}}]});await fn(db);}finally{await conn.close();}}
 const payload=()=>({action:'warehouse-duty',week,line:'A',expectedId:null,requestIdempotency:crypto.randomUUID(),rows:dutyDates(week).map(date=>({date,employee:'NV0',start:'',end:''}))});
 test('weekly plan, substitute, open interval, completion persist atomically and retry does not duplicate',()=>fixture(async db=>{
  const body=payload();body.rows[2].employee='NV1';let result=await mutateProductionWorkflow(db,body,manager);assert.equal(result.events.length,1);const first=result.event;
@@ -20,7 +20,7 @@ test('weekly plan, substitute, open interval, completion persist atomically and 
 }));
 test('permissions, allowed people, invalid time, stale version and overlap reject without partial writes',()=>fixture(async db=>{
  const body=payload();await assert.rejects(()=>mutateProductionWorkflow(db,body,{login:'haquyen',grants:['Quản lý sản xuất / Lịch SX thực tế / Ghi vắng mặt']}),{status:403});
- body.rows[0].employee='OTHER';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),/ba nhân viên/);body.rows[0].employee='NV0';body.rows[0].start='24:00';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),/24h/);body.rows[0].start='';body.expectedId='stale';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),{status:409});body.expectedId=null;
+ body.rows[0].employee='OTHER-LINE';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),/thuộc Line A/);body.rows[0].employee='NV0';body.rows[0].start='24:00';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),/24h/);body.rows[0].start='';body.expectedId='stale';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),{status:409});body.expectedId=null;
  await mutateProductionWorkflow(db,{action:'line-absence',line:'A',absenceType:'Phụ kho',employees:['NV0'],effectiveAt:'2026-10-20T01:00:00Z',endsAt:'2026-10-20T02:00:00Z'},manager);
  body.rows[0].start='08:00';body.rows[0].end='09:00';body.rows[1].start='08:30';body.rows[1].end='09:30';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),/trùng khoảng/);const state=await readProductionWorkflow(db,manager);assert.equal(state.events.filter(e=>e.kind==='warehouse-duty').length,0);assert.equal(state.events.filter(e=>e.kind==='line-absence').length,1);
 }));
@@ -41,4 +41,31 @@ test('multiple intervals on one day persist separately and reject overlapping ad
  body.rows.push({date:week,rowId:'third-slot',employee:'NV0',start:'14:30',end:'16:00'});
  await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),/trùng khoảng/);
  state=await readProductionWorkflow(db,manager);assert.equal(state.events.filter(e=>e.kind==='line-absence').length,2);
+}));
+
+test('any active employee of the selected Line may be planned, without the historical name whitelist',()=>fixture(async db=>{const body=payload();body.rows[0].employee='OTHER';const result=await mutateProductionWorkflow(db,body,manager);assert.equal(result.event.rows[0].employee,'OTHER');assert.equal(result.events.length,1);const saved=await readProductionWorkflow(db,manager);assert.equal(saved.events.find(e=>e.id===result.event.id).rows[0].employee,'OTHER');}));
+
+for(const variant of ['moved','inactive','removed','deleted','cancelled'])test(`unchanged incomplete historical duty survives directory change: ${variant}`,()=>fixture(async db=>{
+ const original=payload();original.rows[0].start='08:00';const first=await mutateProductionWorkflow(db,original,manager);
+ if(variant==='removed')await db.prepare("DELETE FROM app_records WHERE entity='employees' AND record_key='NV0'").run();
+ else{const field={moved:'line',inactive:'active',deleted:'_deleted',cancelled:'cancelled'}[variant],value={moved:'B',inactive:false,deleted:true,cancelled:true}[variant];await db.prepare("UPDATE app_records SET payload=json_set(payload,?,json(?)) WHERE entity='employees' AND record_key='NV0'").bind('$.'+field,JSON.stringify(value)).run();}
+ const next={...original,expectedId:first.event.id,requestIdempotency:crypto.randomUUID(),rows:original.rows.map(r=>({...r}))};next.rows[1].employee='NV1';
+ const result=await mutateProductionWorkflow(db,next,manager);assert.equal(result.events.length,1,'incomplete plans never deduct actual hours');assert.equal(result.event.rows[0].employee,'NV0');assert.equal(result.event.rows[0].start,'08:00');assert.equal(result.event.rows[0].end,'');assert.equal(result.event.rows[1].employee,'NV1');
+ const state=await readProductionWorkflow(db,manager);assert.deepEqual(state.events.find(e=>e.id===first.event.id).rows,first.event.rows,'original plan history is retained');assert.equal(state.events.filter(e=>e.kind==='line-absence').length,0);
+}));
+test('historical eligibility retention cannot authorize changed times, new assignments or copied new rows',()=>fixture(async db=>{
+ const original=payload();original.rows.forEach((r,i)=>r.employee=i===0?'NV0':'NV1');original.rows[0].start='08:00';const first=await mutateProductionWorkflow(db,original,manager);
+ await db.prepare("UPDATE app_records SET payload=json_set(payload,'$.active',json('false')) WHERE entity='employees' AND record_key='NV0'").run();
+ for(const change of ['start','end','assignment','new-row']){const next={...original,expectedId:first.event.id,requestIdempotency:crypto.randomUUID(),rows:original.rows.map(r=>({...r}))};
+  if(change==='start')next.rows[0].start='08:30';if(change==='end')next.rows[0].end='09:00';if(change==='assignment')next.rows[1].employee='NV0';if(change==='new-row')next.rows.push({date:week,rowId:'NEW-HISTORICAL-COPY',employee:'NV0',start:'',end:''});
+  await assert.rejects(()=>mutateProductionWorkflow(db,next,manager),{status:422});
+ }
+ const state=await readProductionWorkflow(db,manager);assert.equal(state.events.filter(e=>e.kind==='warehouse-duty').length,1);assert.equal(state.events.filter(e=>e.kind==='line-absence').length,0);
+}));
+test('unchanged recorded duty and its employee attribution remain intact after an employee becomes inactive',()=>fixture(async db=>{
+ const original=payload();original.rows.forEach((r,i)=>r.employee=i===0?'NV0':'NV1');original.rows[0].start='08:00';original.rows[0].end='09:00';const first=await mutateProductionWorkflow(db,original,manager);
+ await db.prepare("UPDATE app_records SET payload=json_set(payload,'$.active',json('false')) WHERE entity='employees' AND record_key='NV0'").run();
+ const state=await readProductionWorkflow(db,manager),next={...original,expectedId:first.event.id,requestIdempotency:crypto.randomUUID(),rows:dutyRows(state.events,week,'A',effectiveAttendance(state.events,true)).map(r=>({...r,employee:r.date==='2026-10-20'?'NV1':r.employee}))};
+ const result=await mutateProductionWorkflow(db,next,manager);assert.equal(result.events.length,1);assert.equal(result.event.rows[0].attendanceId,first.events[1].id);assert.equal(result.event.rows[0].employee,'NV0');
+ const after=await readProductionWorkflow(db,manager);assert.deepEqual(after.events.find(e=>e.id===first.events[1].id),state.events.find(e=>e.id===first.events[1].id));
 }));

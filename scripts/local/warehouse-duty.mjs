@@ -16,7 +16,7 @@ export function buildWarehouseDuty({body,state,actor,now,canManage,permitted,aff
  const ids=body.rows.map(r=>String(r.rowId||r.date));
  if(new Set(ids).size!==ids.length||ids.some(id=>!/^[-a-zA-Z0-9]{1,80}$/.test(id)))fail('Dòng phụ kho không hợp lệ hoặc bị trùng.');
  if(before.some(r=>r.attendanceId&&!ids.includes(r.rowId)))fail('Dùng Hủy để hủy khoảng phụ kho đã ghi nhận.',409);
- const candidates=warehouseHelpers(state.employees),created=[],rows=[];
+ const candidates=warehouseHelpers(state.employees,line),created=[],rows=[];
  for(const input of [...body.rows].sort((a,b)=>a.date.localeCompare(b.date))){
   const date=input.date,rowId=String(input.rowId||date),previous=before.find(r=>r.rowId===rowId);
   if(previous&&previous.date!==date)fail('Không thể đổi ngày của dòng phụ kho.');
@@ -25,7 +25,11 @@ export function buildWarehouseDuty({body,state,actor,now,canManage,permitted,aff
    if(['employee','start','end'].some(k=>row[k]!==previous[k]))fail(`Ngày ${date}: đã ghi giờ thực tế. Dùng Sửa hoặc Hủy bản ghi trong Biến động đã ghi.`,409);
    rows.push({...row,attendanceId:previous.attendanceId});continue;
   }
-  if(row.employee&&!candidates.some(p=>p.id===row.employee))fail(`Ngày ${date}: chọn một trong ba nhân viên phụ kho.`);
+  // Retain an unchanged saved plan with no actual interval. It is historical
+  // scheduling only, not authority to assign that employee or record new hours.
+  const unchangedIncomplete=previous&&(!previous.start||!previous.end)&&['employee','start','end'].every(k=>row[k]===String(previous[k]||''));
+  if(unchangedIncomplete){rows.push(row);continue;}
+  if(row.employee&&!candidates.some(p=>p.id===row.employee))fail(`Ngày ${date}: chọn nhân viên đang làm việc thuộc Line ${line}.`);
   if((row.start||row.end)&&!row.employee)fail(`Ngày ${date}: chọn nhân viên trước khi nhập giờ.`);
   if(row.start&&!validTime(row.start)||row.end&&!validTime(row.end)||row.end&&(!row.start||row.end<=row.start))fail(`Ngày ${date}: nhập giờ 24h và Đến giờ sau Từ giờ.`);
   if(!row.end){rows.push(row);continue;}
@@ -34,7 +38,7 @@ export function buildWarehouseDuty({body,state,actor,now,canManage,permitted,aff
   if(duplicate)fail(`Ngày ${date}: nhân viên có nghỉ hoặc phụ kho trùng khoảng giờ. Chưa lưu thay đổi nào.`,409);
   const reference=state.approvedSchedules.find(r=>r.key===`${week}:${line}`);
   if(!reference?.days?.some(d=>d.date===date&&d.working))fail(`Ngày ${date}: chưa có lịch làm việc được duyệt tại Line ${line}.`,409);
-  const eligible=transferStaffCandidates({references:state.approvedSchedules,events:state.events,employees:state.employees,line,effectiveAt,endsAt});
+  const eligible=transferStaffCandidates({references:state.approvedSchedules,events:state.events,employees:candidates.filter(p=>p.id===row.employee),line,effectiveAt,endsAt});
   if(!eligible.some(p=>p.id===row.employee))fail(`Ngày ${date}: nhân viên không có mặt đủ khoảng giờ tại Line ${line}. Kiểm tra lịch, nghỉ hoặc chuyển Line.`,409);
   const person=candidates.find(p=>p.id===row.employee);
   const event={id:crypto.randomUUID(),kind:'line-absence',absenceType:'Phụ kho',sourceId:null,line,employees:[row.employee],employeeDetails:[{id:person.id,name:person.name}],count:1,effectiveAt,endsAt,approved:true,recordedAt:now,actor:actor.login,reason:'Phụ kho · ghi giờ từ lịch trực tuần',warehouseDutyKey:`${week}:${line}:${rowId}`};

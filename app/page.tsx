@@ -1,4 +1,6 @@
 "use client";
+import {LinePlanAccess} from '../components/quick-line-plan';
+import {laborHourNumber,formatLaborHour} from '../lib/labor-hour-display.mjs';
 import {SkuTransfer} from '../components/sku-transfer';
 import {hasMenuPermission} from '../lib/menu-action-access.mjs';
 import {DepartmentChangeRequests,useChangeRequests,requestDepartment,requestWorkspace,canReplyDepartments} from "../components/department-change-requests";
@@ -18,6 +20,8 @@ import {DataTable} from '../components/onspa-ui/DataTable';
 import {DataCell} from '../components/onspa-ui/DataCell';
 import SkuStock from "../components/sku-stock";
 import SkuListImport from "../components/sku-list-import";
+import {productionDisplayStore} from '../lib/production-display-store.mjs';
+import {savedProductionWorkspace,restoreProductionWorkspace} from '../lib/production-workspace-state.mjs';
 import {clearProductionSnapshot} from "../lib/production-workflow-cache";
 import WorkspacePinnedHeader from "../components/workspace-pinned-header";
 import WorkspaceInteractions,{ApprovalNavigationContext,useApprovalNavigation} from "../components/workspace-interactions";
@@ -63,6 +67,7 @@ import { canBomAction } from "../lib/bom-permissions.mjs";
 import { normalizeBomWaste } from "../lib/bom-waste.mjs";
 import { bomMetadataResolver, bomClassifications } from "../lib/bom-metadata.mjs";
 import { bomSourceResolver, bomSourceLabel, projectBomSources, syncBomSources, syncBomCatalogSources } from "../lib/bom-source.mjs";
+const LaborBasisImportPanel = deferredScreen(() => import("../components/labor-basis-import-panel"));
 const StorageHandover = deferredScreen(() => import("../components/storage-handover"));
 import {
   useSkuApproval,
@@ -7231,7 +7236,8 @@ function TopModules({
 }) {
   const moduleButton = (key: MainView, label: string) => {
     if (!allowedViews.has(key)) return null;
-    const restricted = Boolean(sessionLine && key !== "production");
+    // allowedViews already verifies the explicit Pro Plan grant for Line sessions.
+    const restricted = Boolean(sessionLine && key !== "production" && key !== "planning");
     return (
       <FeedbackActionButton
         className={`${view === key ? "active " : ""}${restricted ? "permission-disabled" : ""}`}
@@ -7811,8 +7817,8 @@ const initialSystemUsers: SystemUser[] = [
     department: "SHINTUNG",
     login: "admin",
     name: "系統管理員admin",
-    phone: "",
-    mobile: "",
+    phone: "867511",
+    mobile: "12345678",
     active: true,
   },
   {
@@ -9503,6 +9509,7 @@ function PermissionManagement() {
   };
   return (
     <main data-report-auto-preview="false" className="workspace">
+      <LinePlanAccess/>
       <div className="page-heading">
         <div>
           <p className="eyebrow">QUẢN TRỊ HỆ THỐNG</p>
@@ -9703,6 +9710,7 @@ toolbarSearchOpen && toolbarConfig.group([toolbarConfig.field("TRA THEO",[toolba
                 <span>Họ và tên *</span>
                 <input name="name" required readOnly value={formRecord.name} />
               </label>
+              {selectedIsLine && <p role="note">Biểu mẫu Line này chỉ hiển thị quyền mặc định và không chỉnh sửa được. Quyền Xem Pro Plan được quản lý riêng tại khung “Line A / B · Quyền Xem Pro Plan” phía trên; ô mặc định tại đây không thể hiện quyền bổ sung đó.</p>}
               <label className="permission-mode-field">
                 <span>Cách áp dụng quyền</span>
                 <select
@@ -13736,10 +13744,10 @@ type LoginSession =
       isSetupAdmin?: boolean;
       setupAdminExpiresAt?: string | null;
     }
-  | { kind: "line"; line: "A" | "B"; login?: string; name: string; detail: string };
+  | { kind: "line"; line: "A" | "B"; grants?: string[]; login?: string; name: string; detail: string };
 
 function restoredLoginSession(user: {login:string; name?:string; email?:string; role?:string; isAdmin?:boolean; grants?:string[]; allocationGroup?:"C"|"AB"|null; authMode?:string; line?:"A"|"B"; isSetupAdmin?:boolean; setupAdminExpiresAt?:string|null}): LoginSession {
-  if(user.authMode === "quick_line" && (user.line === "A" || user.line === "B"))return {kind:"line",login:user.login,line:user.line,name:user.name || `Line ${user.line}`,detail:`Sản xuất · Line ${user.line}`};
+  if(user.authMode === "quick_line" && (user.line === "A" || user.line === "B"))return {kind:"line",grants:Array.isArray(user.grants)?user.grants:[],login:user.login,line:user.line,name:user.name || `Line ${user.line}`,detail:`Sản xuất · Line ${user.line}`};
   return {kind:"account",login:user.login,name:user.name || user.email || user.login,detail:user.isSetupAdmin?"SUPER_ADMIN · CHẾ ĐỘ THIẾT LẬP":user.isAdmin?"Quản trị ONSPA":"Tài khoản ONSPA",role:user.role || "USER",isAdmin:user.isAdmin===true,grants:Array.isArray(user.grants)?user.grants:[],allocationGroup:user.allocationGroup === "C" || user.allocationGroup === "AB" ? user.allocationGroup : null,isSetupAdmin:user.isSetupAdmin===true,setupAdminExpiresAt:user.setupAdminExpiresAt||null};
 }
 
@@ -13816,7 +13824,7 @@ const canOpenLegacyMenu = (
   child?: string,
 ) => {
   if (!session) return false;
-  if (session.kind === "line") return view === "production" && (!child || ["production-report","report-work","report-review","report-progress","report-dashboard","report-cancel","report-output","report-payroll","weekly-capacity","capacity-calendar","capacity-summary"].includes(child));
+  if (session.kind === "line") return (view === "planning" && (!child || child === "plan") && !!session.grants?.includes("Kế hoạch sản xuất / Production_plan / Xem")) || view === "production" && (!child || ["production-report","report-work","report-review","report-progress","report-dashboard","report-cancel","report-output","report-payroll","weekly-capacity","capacity-calendar","capacity-summary"].includes(child));
   if (session.isAdmin) return true;
   if (view === "users") return false;
   const resolvedChild = child;
@@ -18061,6 +18069,8 @@ const WorkspaceLiveContext=createContext<{activeViewers:ActiveViewer[];notificat
 export default function Home() {
   const [identity,setIdentity]=useState<WorkspaceIdentity>({language:"vi",authenticated:false,session:null});
   const [workspaces,setWorkspaces]=useState<WorkspaceState>({overviewRoute:workspaceHome,tabs:[],active:null,nextId:1});
+  const [workspaceRestored,setWorkspaceRestored]=useState('');
+  const workspaceTouched=useRef(false);
   const identityRef=useRef(identity);
   const [homeEpoch,setHomeEpoch]=useState(0);
   const [authorizationChanged,setAuthorizationChanged]=useState(false);
@@ -18068,6 +18078,7 @@ export default function Home() {
     const previous=identityRef.current;
     identityRef.current=next;
     if(workspaceIdentityKey(previous)!==workspaceIdentityKey(next)) {
+      workspaceTouched.current=false;setWorkspaceRestored('');
       clearActionFeedback();
       clearProductionSnapshot();
       clearClientReads();
@@ -18078,6 +18089,8 @@ export default function Home() {
         setAuthorizationChanged(next.authenticated&&previous.session?.login===next.session?.login&&previous.session?.kind===next.session?.kind);
       }
     }
+    if(next.authenticated)void productionDisplayStore.activate(workspaceIdentityKey(next));
+    else if(previous.authenticated)productionDisplayStore.clear();
     setIdentity(current=>current.language===next.language&&current.authenticated===next.authenticated&&current.session===next.session?current:next);
     if(!next.authenticated)setWorkspaces(current=>current.tabs.length?{...current,tabs:[],active:null}:current);
   },[]);
@@ -18089,13 +18102,29 @@ export default function Home() {
   const accountKey=workspaceIdentityKey(identity);
   useEffect(()=>{
     if(!identity.authenticated||!accountKey)return;
-    const workAllowed=['report-work','report-review'].some(section=>canOpenMenu(identity.session,'production',section));
-    const fullAllowed=canOpenMenu(identity.session,'production','report-progress')||canOpenMenu(identity.session,'production','report-dashboard');
-    if(!workAllowed&&!fullAllowed)return;
-    // Preload code only. Business data belongs to the active workspace reader;
-    // warming both full/work on every focus/timer multiplies expensive reads.
-    const timer=window.setTimeout(()=>{void loadProductionManagement().catch(()=>{});},150);
-    return()=>window.clearTimeout(timer);
+    let restored=false;
+    const restore=()=>{
+      if(restored||!productionDisplayStore.ready()||workspaceIdentityKey(identityRef.current)!==accountKey)return;
+      restored=true;
+      const saved=productionDisplayStore.get('view:production-tabs');
+      if(!workspaceTouched.current)setWorkspaces(current=>restoreProductionWorkspace(current,saved,(child:string)=>canOpenMenu(identityRef.current.session,'production',child)));
+      setWorkspaceRestored(accountKey);
+    };
+    restore();return productionDisplayStore.subscribe(restore);
+  },[accountKey,identity.authenticated]);
+  useEffect(()=>{
+    if(workspaceRestored===accountKey&&accountKey&&productionDisplayStore.ready())productionDisplayStore.put('view:production-tabs',savedProductionWorkspace(workspaces));
+  },[workspaces,workspaceRestored,accountKey]);
+  useEffect(()=>{
+    if(!identity.authenticated||!accountKey)return;
+    let stopped=false;
+    const timer=window.setTimeout(()=>{void loadProductionManagement().catch(()=>{});void import('../lib/production-menu-warmup').then(({warmProductionMenus})=>warmProductionMenus({
+      login:identity.session?.login||'',line:identity.session?.kind==='line'?identity.session.line:undefined,
+      work:canOpenMenu(identity.session,'production','report-work'),progress:canOpenMenu(identity.session,'production','report-progress'),
+      schedule:canOpenMenu(identity.session,'production','report-review'),capacity:['capacity-calendar','capacity-summary'].some(section=>canOpenLegacyMenu(identity.session,'production',section)),
+      stopped:()=>stopped||document.hidden,
+    })).catch(()=>{});},150);
+    return()=>{stopped=true;window.clearTimeout(timer);};
   },[accountKey,identity.authenticated]);
   useEffect(()=>{
     if(LOCAL_TEST||!accountKey)return;
@@ -18178,11 +18207,12 @@ export default function Home() {
   },[accountKey]);
   const navigate=useCallback((route:WorkspaceRoute)=>{
     if(!canOpenMenu(identityRef.current.session,route.view,route.child||undefined)){notifyActionFailure("Bạn không có quyền mở chức năng này. Vui lòng liên hệ quản trị viên.");return;}
+    workspaceTouched.current=true;
     clearActionFeedback();
     setWorkspaces(current=>openWorkspace(current,route));
   },[]);
-  const select=useCallback((id:string)=>{clearActionFeedback();setWorkspaces(current=>({...current,active:id}));},[]);
-  const close=useCallback((id:string)=>{clearActionFeedback();setWorkspaces(current=>closeWorkspace(current,id));},[]);
+  const select=useCallback((id:string)=>{workspaceTouched.current=true;clearActionFeedback();setWorkspaces(current=>({...current,active:id}));},[]);
+  const close=useCallback((id:string)=>{workspaceTouched.current=true;clearActionFeedback();setWorkspaces(current=>closeWorkspace(current,id));},[]);
   const tabBar=<WorkspaceTabs tabs={workspaces.tabs.map(tab=>({id:tab.id,title:workspaceTitle(tab.route,identity.language)}))} active={workspaces.active} onSelect={select} onClose={close} language={identity.language}/>;
   return <WorkspaceLiveContext.Provider value={{activeViewers,notificationGroups,notificationCount,refreshViewers}}>
     {authorizationChanged&&<div role="alert" className="production-inline-message error">{identity.language==='zh'?'存取權限已變更。畫面已重新整理，並將依目前權限重新讀取資料。先前權限下未儲存的編輯不會保留。':identity.language==='en'?'Access permissions changed. The view has been reset to reload data under your current permissions. Unsaved edits from the previous permission context were not retained.':'Quyền truy cập đã thay đổi. Màn hình đã được làm mới để tải dữ liệu theo quyền hiện tại. Các thay đổi chưa lưu của phiên quyền trước không được giữ lại.'} <FeedbackActionButton type="button" onClick={()=>setAuthorizationChanged(false)}>{identity.language==='zh'?'關閉':identity.language==='en'?'Close':'Đóng'}</FeedbackActionButton></div>}
@@ -18313,7 +18343,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
   const [skuStatusFilter, setSkuStatusFilter] = useState("all");
   const [customSkus, setCustomSkus] = useState<Sku[]>(()=>skuRecordSnapshot<Sku>()?.map(record=>record.payload)||[]);
   const skuDataNeeded =
-    authenticated && active && activeChild !== null && view !== "users" && view !== "production" && !(view === "sku" && activeChild === "employees");
+    authenticated && active && session?.kind !== "line" && activeChild !== null && view !== "users" && view !== "production" && !(view === "sku" && activeChild === "employees");
   const skuApproval = useSkuApproval<Sku>(skuDataNeeded, setCustomSkus);
   useEffect(() => {
     setSelected(current => current
@@ -18454,7 +18484,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
       versions: [],
       rules: [],
     });
-  const [skuLaborHours, setSkuLaborHours] = useState<Map<string, number>>(
+  const [skuLaborHours, setSkuLaborHours] = useState<Map<string, number | null>>(
     new Map(),
   );
   useEffect(() => {
@@ -18474,7 +18504,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
             laborData.records.map(
               (record: { key: string; payload: { laborHour: number } }) => [
                 normalizeSkuCode(record.key),
-                Number(record.payload.laborHour || 0),
+                laborHourNumber(record.payload.laborHour),
               ],
             ),
           ),
@@ -19034,6 +19064,8 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
                     },
                   );
                   if (!response.ok) throw new Error();
+                  await productionDisplayStore.settled();
+                  productionDisplayStore.suspend();
                   onIdentity({...identity,authenticated:false,session:null});
                   window.location.reload();
                 } catch {
@@ -19132,7 +19164,7 @@ function WorkspaceSession({initialRoute,identity,onIdentity,onNavigate,active,sc
           )
         ) : view === "users" ? (
           isAdmin ? (
-            <UserContent section={activeChild} />
+            <><LaborBasisImportPanel key={changeLogin} allowed={isAdmin&&!sessionLine} /><UserContent section={activeChild} /></>
           ) : (
             <main className="workspace">
               <section className="data-card">
@@ -19888,8 +19920,10 @@ toolbarConfig.action({"onClick": () => {
           selectedPlanningReport ? <PlanningReports key={selectedPlanningReport} language={language} reportType={selectedPlanningReport} onClose={()=>navigateWorkspace({view:"planning",child:"report",planTab:"report"})} /> : <main className="workspace" />
         ) : planTab === "plan" ? (
           <ProductionPlan
+            key={session?.kind === "line" ? `line-${session.line}` : "account"}
+            readOnlyLine={session?.kind === "line" ? session.line : undefined}
             language={language}
-            initialWeek={planningSessionCache?.engineWeek || ""}
+            initialWeek={session?.kind === "line" ? "" : planningSessionCache?.engineWeek || ""}
           />
         ) : (
           <PlanningView
@@ -20192,12 +20226,7 @@ toolbarConfig.action({"onClick": () => {
                       <div>
                         <dt>Giờ công chuẩn</dt>
                         <dd>
-                          {(
-                            skuLaborHours.get(
-                              normalizeSkuCode(selected.code),
-                            ) ?? 0
-                          ).toFixed(3)}{" "}
-                          giờ/SP
+                          {formatLaborHour(skuLaborHours.get(normalizeSkuCode(selected.code)))}
                         </dd>
                       </div>
                     </dl>

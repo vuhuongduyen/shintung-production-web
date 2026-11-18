@@ -17,10 +17,11 @@ test('stage time journal accumulates its own hours and stage quantity, excludes 
  assert.equal(result.find(r=>r.id==='f2').cumulativeQuantity,2000);
 });
 
-test('journal displays per-unit standard while deviation compares total standard hours',async()=>{
+test('journal uses saved per-report standard and total hours, never the mutable order or menu estimate',async()=>{
  const {journalStandardHours}=await import('../lib/production-journal-standards.mjs');
- const calculate=o=>journalStandardHours(rows,[o],new Map([['SKU',.021]]),new Set(['f2']),new Map([['f2',{orderCumulativeHours:15}]] )).get('f2');
- const saved=calculate({...order,sku:'SKU',laborHour:.07});
+ const calculate=(input,o)=>journalStandardHours(input,[o],new Map([['SKU',.021]]),new Set(['f2']),new Map([['f2',{orderCumulativeHours:15}]])).get('f2');
+ const evidence=rows.map(r=>({...r,standardUnit:.07}));
+ const saved=calculate(evidence,{...order,sku:'SKU',laborHour:99});
  assert.equal(saved.standardUnitHours,.07);assert.equal(saved.standardLaborHours,140);assert.equal(saved.laborDeviation,15/140-1);
- assert.equal(calculate({...order,sku:'SKU'}).standardUnitHours,.021);
+ assert.equal(calculate(rows,{...order,sku:'SKU',laborHour:.07}).standardUnitHours,null,'missing saved evidence cannot use current or order rate');
 });
