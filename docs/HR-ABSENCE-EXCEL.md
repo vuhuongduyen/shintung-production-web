@@ -1,14 +1,14 @@
 # Nhập và hủy Excel vắng mặt
 
-Ứng viên PR riêng; chưa merge, triển khai hoặc nghiệm thu trên web thật.
+PR #49 đã merge staging và triển khai QA v29. Bản bổ sung TRVS/giao diện đang kiểm, chưa phát hành MAIN.
 
 ## Chức năng
 
 - Ghi nhận chấm công: sau Quay lại có Tải file Excel và Hủy lần nhập. Giữ nhập thủ công.
-- XLSX một sheet, tối đa 5 MB/100 dòng mỗi lần, giới hạn giải nén 20 MB. Đọc tại trình duyệt; không ghi R2/file gốc. Chọn file không gọi API ghi.
-- Đối chiếu id/sourceEmployeeId duy nhất và tên. PN/VR/HL1 là Nghỉ, 15P là Đi trễ đúng khoảng giờ; TRVS cần chọn Đi trễ/Về sớm. Không suy đoán mã mới.
+- XLSX một sheet, tối đa 5 MB/100 dòng mỗi lần, giới hạn giải nén 20 MB. Đọc tại trình duyệt; không ghi R2/file gốc. Theo yêu cầu mới 17/11, chọn file tự kiểm tra/lưu bằng một request; không thêm nút kiểm tra/xác nhận/hủy tải hoặc bỏ dòng.
+- Đối chiếu id/sourceEmployeeId duy nhất và tên. PN/VR/HL1 là Nghỉ, 15P là Đi trễ đúng khoảng giờ; TRVS tự nhận diện chung Đi trễ, về sớm. Nhập thủ công chỉ chọn Nghỉ hoặc Đi trễ, về sớm; nhóm lịch sử gom hai loại cũ khi xem/lọc, không ghi lại payload. Không suy đoán mã mới.
 - Cột thời lượng giữ để đối chiếu; giờ vắng tính theo lịch hiện hành và loại các khoảng nghỉ. Không trừ giải lao hai lần.
-- Xem trước không ghi. Phải xử lý/bỏ dòng lỗi và kiểm lại trước xác nhận. Bỏ qua dòng trùng cả với nhập thủ công, không ghi đè.
+- Máy chủ kiểm lại quyền, tháng, nhân viên, giờ và mã; lưu dòng hợp lệ, bỏ qua dòng trùng/lỗi và hiển thị số lượng/lý do. Không ghi đè. Khi lỗi mạng/quá tải, không tự retry; kết quả chưa xác nhận phải tra lịch sử lần nhập trước khi người dùng chủ động tải lại. API preview cũ giữ tương thích, không dùng trong luồng tự lưu.
 - Chỉ HR không giới hạn Line và Admin. Giữ kỳ khóa ngày 10 tháng sau, policy bảo toàn lịch sử, các quyền và bindings hiện có.
 - Một giao dịch tạo sự kiện và metadata lần nhập. Guard cursor/policy/manifest/danh mục, mã lần nhập và kiểm trùng chống lưu lặp, thay đổi đồng thời và phản hồi mất.
 - Lịch sử phân trang 20 lần nhập. Chọn theo tên/thời điểm/người nhập, xem tác động và nhập lý do trước hủy. Sự kiện gốc giữ nguyên; cancellation và trạng thái lần nhập được ghi trong một giao dịch.
@@ -29,9 +29,14 @@ Nhập rồi hủy trả giờ về trước nhập nếu dữ liệu khác khô
 - HTTP TEST xác minh phiên HR, từ chối viewer giả quyền, chặn generic record overwrite.
 - Kiểm tra preview không ghi, replay, trùng, thủ công/file khác, chỉnh sửa hậu nhập, kỳ khóa, sai dữ liệu, nghỉ trưa/giải lao, lịch đổi, cursor/directory/policy đổi đồng thời.
 - Parser thực tế đọc đủ cấu trúc file mẫu, không nhập vào DB. Không đưa file mẫu hoặc dữ liệu người dùng vào repository. Mọi test ghi dùng database TEST tạm riêng.
-- Browser QA chưa thực hiện: preview bị automatic approval review chặn vì lo ngại chuyển source sang dịch vụ ngoài; không đi vòng hạn chế. Cần preview được phép trước nghiệm thu giao diện và tốc độ Site.
-- Chưa đối chiếu toàn bộ phiếu thật, chưa merge/deploy QA hoặc MAIN; chưa thể tuyên bố nghiệm thu đầy đủ.
+- QA v29: đã đăng nhập Admin, mở màn HR và đọc lịch sử nhập không lỗi. Browser upload chưa kiểm do tiện ích chưa được cấp quyền đọc file; cần hoàn tất bước này trước nghiệm thu. Bản bổ sung TRVS/toolbar cần QA lại sau triển khai.
+- Chưa đối chiếu toàn bộ phiếu thật, chưa phát hành MAIN; chưa thể tuyên bố nghiệm thu đầy đủ.
 
 ## Source
 
 Base staging 518d501 (PR47), đối chiếu ba tệp HR/duration/workflow khớp MAIN v844 b2f5357 trước sửa. Điểm nối chung: production-management, production-workflow, report-model, route guard, translations. Trước merge/deploy phải đọc lại PR/head/base/live, kiểm phần giao nhau và triển khai lần lượt.
+
+
+17/11: cập nhật yêu cầu TRVS dùng chung “Đi trễ, về sớm”; nhập thủ công chỉ chọn Nghỉ hoặc Đi trễ, về sớm. Bản ghi cũ giữ nguyên payload, gom nhãn khi xem/lọc. Điều chỉnh thứ tự thanh HR theo vị trí đã chọn, bỏ phân trang trùng của lịch sử nhập. Chưa triển khai bản bổ sung này.
+
+Bản bổ sung tự lưu: chỉ một request thay vì preview + save, giảm đọc dữ liệu/lịch lặp. Chuỗi sửa/hủy đọc khóa liên kết nhẹ một lượt có phân trang, duyệt bằng map trong bộ nhớ rồi chỉ tải payload của nhân viên liên quan; bỏ truy vấn SQL đệ quy quét JSON lặp. Cần đo trên QA; chưa kết luận đã hết quá tải D1 thật.

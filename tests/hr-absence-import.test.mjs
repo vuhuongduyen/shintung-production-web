@@ -69,7 +69,7 @@ test('manual daily HR stays compatible and skips unrelated orders/allocation tim
  assert.equal(result.recordedDays,1);assert.equal(result.events[0].absenceType,'Đi trễ');
  assert.ok(!sqls.some(sql=>/entity='in_transit'|entity IN \('production_event','employees'\)/.test(sql)));
 }));
-test('validation keeps one minute 15P, requires explicit TRVS subtype and rejects invalid dates',()=>{
+test('validation keeps one minute 15P, requires the combined TRVS type and rejects invalid dates',()=>{
  const options={month:'2026-11',now:Date.parse('2026-11-17')};
  assert.equal(previewAbsences([{...row,leaveCode:'15P',kind:'Đi trễ',end:'08:01',duration:'00:01'}],[person],[],options)[0].status,'valid');
  for(const r of [{...row,leaveCode:'TRVS',kind:''},{...row,date:'2026-11-31'}])assert.equal(previewAbsences([r],[person],[],options)[0].status,'error');
@@ -106,4 +106,40 @@ test('authenticated HTTP imports and cancels through existing session; viewer ca
  const r=await post('/api/production-workflow',{...b,action:'hr-import-save',previewHash:preview.sourceHash},'TEST-HR-HTTP');assert.equal(r.status,200);assert.equal((await r.json()).count,1);
  assert.notEqual((await post('/api/records',{entity:'hr_absence_import',key:b.importId,payload:{status:'cancelled'}},'TEST-HR-HTTP')).status,200);
  const cancelled=await post('/api/production-workflow',{action:'hr-import-cancel',importId:b.importId,reason:'HTTP thử nghiệm'},'TEST-HR-HTTP');assert.equal(cancelled.status,200);assert.equal((await cancelled.json()).count,1);
+}));
+
+test('TRVS morning and afternoon use one type; hours, headcount, duplicates and cancellation preserve legacy records',()=>fixture(async c=>{
+ const combined='Đi trễ, về sớm',body={...input(),rows:[{...row,leaveCode:'TRVS',kind:combined,end:'09:00',duration:'01:00'},{...row,row:3,leaveCode:'TRVS',kind:combined,start:'16:00',duration:'01:00'}]};
+ const saved=await save(c.db,body);assert.equal(saved.result.count,2);assert.ok(saved.result.events.every(e=>e.absenceType===combined));
+ const events=await eventList(c.db),day={date:row.date,working:true,hcStart:'08:00',hcEnd:'17:00',lunchStart:'12:00',lunchEnd:'13:00',ot:false},schedule={line:'A',days:[day],roster:[{date:row.date,hc:[person.id],ot:[]}]};
+ const hours=items=>monthlyAttendance({events:items,schedules:[schedule],employees:[person],month:'2026-11',line:'A',dateFrom:row.date,dateUntil:'2026-11-17'}).people[0];
+ const legacy=events.map(e=>e.importId?{...e,absenceType:e.effectiveAt.endsWith('01:00:00.000Z')?'Đi trễ':'Về sớm'}:e);
+ assert.deepEqual(hours(events),hours(legacy),'same intervals use the same existing break/hour calculation');
+ const {productionDailyAbsences}=await import('../lib/production-daily-absences.mjs');
+ assert.deepEqual(productionDailyAbsences({date:row.date,events,employees:[person]}).map(r=>r.kind),[combined,combined]);
+ const {scheduleHeadcount}=await import('../lib/production-schedule-headcount.mjs');
+ const count=items=>scheduleHeadcount({reference:schedule,events:items,employees:[person],line:'A',day});assert.deepEqual(count(events),count(legacy));
+ for(const kind of ['Đi trễ','Về sớm'])assert.equal(previewAbsences([body.rows[0]],[person],[{...saved.result.events[0],absenceType:kind}],{month:body.month,now:Date.parse('2026-11-17')})[0].status,'duplicate');
+ await call(c.db,'hr-import-cancel',{importId:body.importId,reason:'Kết thúc kiểm thử TRVS'});assert.equal(hours(await eventList(c.db)).absentHc,0);
+ const manual=await mutateProductionWorkflow(c.db,{action:'line-absence',attendanceScope:'employee',absenceType:combined,employees:[person.id],effectiveAt:'2026-11-17T01:00:00Z',endsAt:'2026-11-17T02:00:00Z',requestIdempotency:crypto.randomUUID()},hr);assert.equal(manual.events[0].absenceType,combined);
+}));
+
+test('automatic import saves valid rows once, skips errors and duplicates, and cancellation only reverses that batch',()=>fixture(async c=>{
+ const first=await save(c.db),body={...input(),automatic:true,rows:[row,{...row,row:3,date:'2026-11-17'},{...row,row:4,code:'MISSING'}]};
+ const result=await call(c.db,'hr-import-save',body);assert.equal(result.count,1);assert.deepEqual(result.results.map(r=>r.status),['duplicate','valid','error']);
+ const before=await records(c.db);assert.equal((await call(c.db,'hr-import-save',body)).replayed,true);assert.deepEqual(await records(c.db),before);
+ await call(c.db,'hr-import-cancel',{importId:body.importId,reason:'Kết thúc thử nghiệm'});
+ assert.equal((await call(c.db,'hr-import-cancel-preview',first.body)).canCancel,true);
+ const duplicate=await call(c.db,'hr-import-save',{...input(),automatic:true});assert.equal(duplicate.count,0);assert.equal(duplicate.results[0].status,'duplicate');
+ const invalid=await call(c.db,'hr-import-save',{...input(),automatic:true,rows:[{...row,code:'MISSING'}]});assert.equal(invalid.count,0);assert.equal(invalid.saved,false);
+}));
+
+test('employee history reads lightweight links once and follows reassignment chains without recursive SQL',()=>fixture(async c=>{
+ const {readEmployeeAttendance}=await import('../scripts/local/hr-attendance-records.mjs');
+ await c.put('production_event','TEST-CHAIN-0',{id:'TEST-CHAIN-0',kind:'line-absence',employees:[person.id]});
+ for(let i=1;i<=40;i++)await c.put('production_event','TEST-CHAIN-'+i,{id:'TEST-CHAIN-'+i,kind:'line-absence',employees:['OTHER'],[i%2?'supersedes':'approvedFrom']:'TEST-CHAIN-'+(i-1)});
+ await c.put('production_event','TEST-UNRELATED',{id:'TEST-UNRELATED',employees:['OTHER']});
+ const sqls=[],db=new Proxy(c.db,{get(target,key){if(key==='prepare')return sql=>{sqls.push(sql);return target.prepare(sql);};const v=target[key];return typeof v==='function'?v.bind(target):v;}});
+ const found=await readEmployeeAttendance(db,[person.id]);assert.equal(found.length,41);assert.ok(!found.some(r=>r.record_key==='TEST-UNRELATED'));
+ assert.ok(!sqls.some(sql=>/RECURSIVE/i.test(sql)));assert.equal(sqls.length,4,'one bounded link page and one selected-payload page');
 }));

@@ -30,5 +30,5 @@ export async function readAbsenceXlsx(file:File){
  if(!parsed.length||parsed.length>HR_IMPORT_LIMIT)throw Error(`Mỗi lần nhập tối đa ${HR_IMPORT_LIMIT} dòng. Hãy chia file nếu vượt giới hạn.`);
  const date=(v:string)=>{const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);if(m)return `${m[3]}-${m[2]}-${m[1]}`;if(/^\d+(\.0+)?$/.test(v)){const n=Number(v);if(n>60&&n<100000)return new Date(Date.UTC(1899,11,30)+n*86400000).toISOString().slice(0,10);}return v;};
  const time=(v:string)=>{if(/^\d*\.\d+$/.test(v)||v==='0'){const n=Number(v)*1440;if(n>=0&&n<1440&&Math.abs(n-Math.round(n))<0.001)return `${String(Math.floor(Math.round(n)/60)).padStart(2,'0')}:${String(Math.round(n)%60).padStart(2,'0')}`;}return v;};
- return {fileHash:hash,rows:parsed.map(({number,cells})=>{const v=columns.map(i=>(cells[i]||'').trim());return {row:number,date:date(v[0]),code:v[1],name:v[2],leaveCode:v[3],leaveName:v[4],start:time(v[5]),end:time(v[6]),duration:time(v[7]),kind:['PN','VR','HL1'].includes(v[3])?'Nghỉ':v[3]==='15P'?'Đi trễ':''};})};
+ return {fileHash:hash,rows:parsed.map(({number,cells})=>{const v=columns.map(i=>(cells[i]||'').trim());return {row:number,date:date(v[0]),code:v[1],name:v[2],leaveCode:v[3],leaveName:v[4],start:time(v[5]),end:time(v[6]),duration:time(v[7]),kind:['PN','VR','HL1'].includes(v[3])?'Nghỉ':v[3]==='15P'?'Đi trễ':v[3]==='TRVS'?'Đi trễ, về sớm':''};})};
 }

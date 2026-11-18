@@ -1,5 +1,6 @@
+import {readEmployeeAttendance} from './hr-attendance-records.mjs';
 import {dailyPolicyGuards} from './production-daily-output.mjs';
-import {previewAbsences,cancellationIssues,matchAbsenceEmployee,HR_IMPORT_LIMIT,employeeAttendanceWhere} from '../../lib/hr-absence-import.mjs';
+import {previewAbsences,cancellationIssues,matchAbsenceEmployee,HR_IMPORT_LIMIT} from '../../lib/hr-absence-import.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {productionActorId} from '../../lib/production-actor.mjs';
 import {productionEventDuration} from '../../lib/production-event-duration.mjs';
@@ -33,7 +34,7 @@ export async function handleHrAbsenceImport(db,body,actor,{commit,calendar,polic
  const ids=cancel?[...new Set(old.events.map(e=>e.employeeId))]:[...new Set(body.rows.flatMap(r=>matchAbsenceEmployee(r.code,directory).map(e=>e.id)))];
  // One JSON binding avoids D1 parameter limits. Include all versions for these
  // people, not just current dates, so supersession and cancellation stay correct.
- const eventRows=ids.length?await readRecordPages(db,{where:employeeAttendanceWhere,args:[JSON.stringify(ids)]}):[];
+ const eventRows=await readEmployeeAttendance(db,ids);
  const events=eventRows.map(decode),now=new Date().toISOString();
  const guards=dailyPolicyGuards(policy);
  if(cancel){
@@ -51,8 +52,8 @@ export async function handleHrAbsenceImport(db,body,actor,{commit,calendar,polic
   const schedules=await calendar();
   return {results:results.map(r=>r.status!=='valid'?r:{...r,durationResult:productionEventDuration({kind:'line-absence',employees:[r.employeeId],line:directory.find(p=>p.id===r.employeeId)?.line,effectiveAt:r.effectiveAt,endsAt:r.endsAt},schedules,{events,employees:directory})}),sourceHash:hash};
  }
- if(body.previewHash!==hash)fail('Nội dung thay đổi; hãy kiểm tra lại trước khi nhập.',409);
- if(results.some(r=>r.status==='error'))return {saved:false,count:0,results};
+ if(body.automatic!==true&&body.previewHash!==hash)fail('Nội dung thay đổi; hãy kiểm tra lại trước khi nhập.',409);
+ if(body.automatic!==true&&results.some(r=>r.status==='error'))return {saved:false,count:0,results};
  const valid=results.filter(r=>r.status==='valid');
  if(!valid.length)return {saved:false,count:0,results};
  const directoryGuard={sql:"NOT EXISTS(SELECT 1 FROM json_each(?) x WHERE NOT EXISTS(SELECT 1 FROM app_records a WHERE a.entity='employees' AND a.record_key=json_extract(x.value,'$.id') AND a.payload=json_extract(x.value,'$.payload')))",args:[JSON.stringify([...new Set(valid.map(r=>r.employeeId))].map(id=>({id,payload:directoryRaw.find(r=>r.record_key===id).payload})))]};

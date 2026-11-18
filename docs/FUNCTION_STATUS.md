@@ -179,3 +179,8 @@ Hậu kiểm v837 phát hiện D1 statement too long; đã đưa deployment về
 ## 17/11/2026 — Excel vắng mặt và hủy lần nhập (ứng viên, chưa triển khai)
 
 Thêm hai nút trong màn HR, xem trước/đối chiếu và lưu một giao dịch tối đa 100 dòng; lịch sử chọn lần nhập, xem tác động/lý do rồi hủy nguyên lần. Chặn hậu chỉnh sửa, trùng, kỳ khóa và sai quyền; giữ thủ công và lịch sử. Giảm đọc và refresh lặp của lưu thủ công. 81 test mục tiêu/hồi quy cuối, 24 hợp đồng CI local, TypeScript/build đạt. Browser preview bị approval review chặn; chưa QA web thật hoặc đo MAIN, chưa merge/deploy hay đối chiếu phiếu thật. Xem [HR-ABSENCE-EXCEL.md](HR-ABSENCE-EXCEL.md).
+
+
+17/11: cập nhật yêu cầu TRVS dùng chung “Đi trễ, về sớm”; nhập thủ công chỉ chọn Nghỉ hoặc Đi trễ, về sớm. Bản ghi cũ giữ nguyên payload, gom nhãn khi xem/lọc. Điều chỉnh thứ tự thanh HR theo vị trí đã chọn, bỏ phân trang trùng của lịch sử nhập. Chưa triển khai bản bổ sung này.
+
+17/11 — yêu cầu mới: chọn Excel tự kiểm/lưu dòng hợp lệ trong một request, bỏ thanh kiểm tra/xác nhận/hủy tải và thao tác bỏ dòng. Hủy dùng lịch sử phía trên. Không retry ghi khi lỗi; giữ chống trùng/khóa kỳ/quyền. Tối ưu chuỗi đọc sự kiện tránh quét JSON lặp. Đang kiểm local, chưa QA/deploy bản bổ sung.

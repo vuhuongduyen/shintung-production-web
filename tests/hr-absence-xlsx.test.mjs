@@ -13,9 +13,9 @@ function file(rows,formula=false){
  const bytes=zipSync({'xl/workbook.xml':strToU8('<workbook xmlns:r="r"><sheets><sheet name="Data" r:id="r1"/></sheets></workbook>'),'xl/_rels/workbook.xml.rels':strToU8('<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/></Relationships>'),'xl/worksheets/sheet1.xml':strToU8(sheet)});
  return new File([bytes],'TEST.xlsx');
 }
-test('Excel structure: exact headers, strings, serial date/time and source row, no inferred TRVS classification',async()=>{
+test('Excel structure: exact headers, strings, serial date/time and source row, TRVS uses the agreed combined type',async()=>{
  const r=await readAbsenceXlsx(file([['16/11/2026','TEST001','Minh Anh','TRVS','Đến trễ về sớm','08:00','09:00','01:00'],['46342','TEST002','Lan Anh','15P','Dưới 15 phút','0.3333333333333333','0.33402777777777776','0.0006944444444444445']]));
- assert.equal(r.rows.length,2);assert.equal(r.rows[0].row,2);assert.equal(r.rows[0].date,'2026-11-16');assert.equal(r.rows[0].kind,'');assert.equal(r.rows[1].start,'08:00');assert.equal(r.rows[1].end,'08:01');assert.equal(r.rows[1].duration,'00:01');assert.match(r.fileHash,/^[a-f0-9]{64}$/);
+ assert.equal(r.rows.length,2);assert.equal(r.rows[0].row,2);assert.equal(r.rows[0].date,'2026-11-16');assert.equal(r.rows[0].kind,'Đi trễ, về sớm');assert.equal(r.rows[1].start,'08:00');assert.equal(r.rows[1].end,'08:01');assert.equal(r.rows[1].duration,'00:01');assert.match(r.fileHash,/^[a-f0-9]{64}$/);
 });
 test('reject formulas, empty data and over-limit file without writes',async()=>{
  const row=['16/11/2026','TEST001','Minh Anh','PN','Phép năm','08:00','17:00','08:00'];
