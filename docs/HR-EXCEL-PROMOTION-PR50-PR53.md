@@ -17,3 +17,9 @@ Ghép phần nhập/hủy Excel của PR49 (phụ thuộc còn thiếu trên MAI
 - Fixture của nhánh main cũ thiếu daily-output và mock hook giữ trạng thái. Dùng fixture synthetic và harness hiện có của staging đã kiểm, không bỏ assertion; chạy lại nhóm liên quan đạt.
 - QA v31 đã kiểm nút và bàn phím của PR53. Ứng viên ghép v848 này chưa được triển khai hoặc nghiệm thu trên trình duyệt; không dùng kết quả QA cũ thay nghiệm thu ứng viên mới.
 - PR HR tạm nhắm nhánh nền để diff chỉ có phần chức năng. Sau khi #54 được duyệt/merge, retarget về main và chạy đầy đủ CI đúng merge tree trước khi xét merge. Không tự merge, không triển khai MAIN trong lượt tạo PR này.
+
+## Kiểm lại sau sửa CI nền (18/11/2026)
+
+Ghép commit sửa kiểm thử của PR54 `264fedd8e11ddb885b54133291220d5a24494955`. Cây ứng viên `6a4b6fe6bc8d376876d99186b00179f548f6fbdf` giữ nguyên toàn bộ runtime HR của PR55, chỉ cập nhật kiểm thử/tài liệu. Local đạt 89/89 kiểm thử HR/Excel/API/hủy/quyền/tra cứu/bàn phím/Phụ kho/cô lập, TypeScript và build đạt. Kiểm thử dùng DB tạm synthetic, không tải lại file tháng 10.
+
+Theo yêu cầu xử lý lỗi để merge, PR55 đã chuyển đích sang main cho CI kiểm tra cây ghép; vẫn chỉ merge sau PR54 và sau CI toàn bộ thành công. Đây là cập nhật trình tự CI, không phải deploy hoặc xác nhận đã QA toàn bộ ứng viên trên trình duyệt.
