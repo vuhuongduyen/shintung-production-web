@@ -1,3 +1,6 @@
+import hosting from '../.openai/hosting.json';
+import {mainQuantityActivation} from './main-quantity-activation.mjs';
+import {maintenanceLock} from './maintenance-lock.mjs';
 import {productionCutover} from './production-cutover.mjs';
 import {orderTransfer} from './order-transfer.mjs';
 import {environmentRefresh,refreshGuard} from './environment-refresh.mjs';
@@ -10,6 +13,7 @@ import {sourceSyncApi} from './source-sync.mjs';
 import sourceSnapshot from 'virtual:onspa-source-snapshot';
 
 interface Env {
+  ONSPA_MAINTENANCE_MODE?: string;
   ASSETS: Fetcher;
   DB: D1Database;
   FILES: import('@cloudflare/workers-types').R2Bucket;
@@ -39,6 +43,9 @@ interface ExecutionContext {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const maintenance = maintenanceLock(request, env);
+    if (maintenance) return maintenance;
+    const activation=await mainQuantityActivation(request,env,{hosting,metadata:sourceSnapshot?.metadata});if(activation)return activation;
     const url = new URL(request.url);
     const cutoverResponse=await productionCutover(request,env);if(cutoverResponse)return cutoverResponse;
     const refreshResponse=await environmentRefresh(request,env);if(refreshResponse)return refreshResponse;

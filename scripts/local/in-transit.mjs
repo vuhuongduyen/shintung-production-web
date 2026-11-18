@@ -1,4 +1,6 @@
 import {stageValidationPayload} from './production-stage-read.mjs';
+import {transitProductionPayload} from './transit-production-read.mjs';
+import {readTransitSummary,transitSummaryEntities} from './transit-summary-read.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {transitStandardLeadtime} from '../../lib/transit-leadtime.mjs';
 import { randomUUID } from "node:crypto";
@@ -27,7 +29,12 @@ const parse = (r) => {
     return { ...r, payload: null };
   }
 };
-const read = async (db, entity, stageValidation=false) => (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:stageValidation?stageValidationPayload(entity):'payload'})).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
+const read = async (db, entity, stageValidation=false, projectedBudget=false) => {
+ const expression=transitProductionPayload(entity)!=='payload'?transitProductionPayload(entity):stageValidation?stageValidationPayload(entity):'payload';
+ // The paged quantity reader transports this exact projection, never the removed
+ // audit copies. Keep the 512 KiB limit on the bytes actually returned by D1.
+ return (await readRecordPages(db,{where:'entity=?',args:[entity],payloadExpression:expression,sizeExpression:projectedBudget?expression:'payload'})).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.record_key.localeCompare(b.record_key)).map(parse);
+};
 const write = (db, entity, key, payload, actor, now) =>
   db
     .prepare(
@@ -59,9 +66,10 @@ function vietnamDateISO(value = new Date()) {
 }
 
 export async function getTransit(db, filters = {}, catalog = [], options = {}) {
+  const summaryRead=options.includeProductionSummary===true&&!options.productionReads&&!options.planningOnly?readTransitSummary(db):null;
   const [records, audits, reports, leadtimes, events, historyImports, leadVersions] = await Promise.all(
     ["in_transit", "in_transit_audit", "production_report", "leadtime", "production_event", "production_history_import", "leadtime_versions"].map(
-      (e) => (options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly && ['in_transit_audit','leadtime','leadtime_versions'].includes(e)) ? Promise.resolve([]) : read(db, e,options.stageValidation),
+      (e) => options.productionReads?.[e] || (summaryRead&&transitSummaryEntities.includes(e)?summaryRead.then(grouped=>grouped.get(e).map(parse)):((options.skipLeadtime&&['leadtime','leadtime_versions'].includes(e)||options.includeHistory===false&&e==='in_transit_audit'||options.planningOnly && ['in_transit_audit','leadtime','leadtime_versions'].includes(e)) ? Promise.resolve([]) : read(db, e,options.stageValidation,options.includeProductionSummary===true))),
     ),
   );
   const masters = new Map(
@@ -109,7 +117,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
     }));
   const withLeadtime = rows
     .map((row) => {
-      const standardLeadtime = options.planningOnly ? null : transitStandardLeadtime(row,
+      const standardLeadtime = options.skipLeadtime||options.planningOnly ? null : transitStandardLeadtime(row,
         leadtimes.flatMap(r=>Array.isArray(r.payload?.rows)?r.payload.rows:[{...r.payload,sku:r.payload?.sku||r.record_key}]),
         leadVersions.map(r=>r.payload).filter(Boolean));
       return {
@@ -140,7 +148,7 @@ export async function getTransit(db, filters = {}, catalog = [], options = {}) {
     .filter((r) => r.payload && !r.payload._deleted)
     .map((r) => r.payload)
     .sort((a, b) => text(b.at).localeCompare(text(a.at)));
-  return { rows: withLeadtime, history };
+  return { rows: withLeadtime, history,...(options.includeProductionSummary?{summaryReports:reportRows,summaryEvents:productionEvents}:{}) };
 }
 
 function validateOpenFields(row, includeQuantity = false) {

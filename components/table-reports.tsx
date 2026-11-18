@@ -23,7 +23,7 @@ export default function TableReports({scopeId,resetKey,enabled}:{scopeId:string;
  // Existing explicit export actions retain their preview/download flow.
  function preview(workspace:HTMLElement){
   if(!allowed){setDenial(permissionDeniedMessage(toolbarLocale()));return false;}
-  const tables=Array.from(workspace.querySelectorAll<HTMLTableElement>('table')).filter(el=>el.tHead&&el.getClientRects().length&&!el.closest('.onspa-report-tools,.onspa-report-overlay,[role=dialog]')&&!el.parentElement?.closest('td')).map(readTable).filter(Boolean) as Data[];
+  const tables=Array.from(workspace.querySelectorAll<HTMLTableElement>('table')).filter(el=>el.tHead&&(el.getClientRects().length||el.dataset.reportSource&&el.dataset.reportIncludeHidden==='true')&&!el.closest('.onspa-report-tools,.onspa-report-overlay,[role=dialog]')&&!el.parentElement?.closest('td')).map(readTable).filter(Boolean) as Data[];
   const populated=tables.filter(d=>d.rows.length);if(!populated.length)return false;
   const reports=populated.map(d=>tableExportReport(d)),first=reports[0];
   setReport({...first,sheets:reports.flatMap(r=>r.sheets)});return true;

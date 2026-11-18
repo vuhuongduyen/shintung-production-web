@@ -1,9 +1,25 @@
+import {closeLegacyReport} from '../scripts/local/production-legacy-close.mjs';
+import {productionReadBatch} from './production-read-batch.mjs';
+import {activeProgressDatabase,workspaceDisplayWorkflow} from '../scripts/local/production-progress-read.mjs';
+import {quickLinePlanGrants,readLinePlanAccess,saveLinePlanAccess,readQuickLinePlan} from '../scripts/local/quick-line-plan-access.mjs';
+import {importLaborReferenceSnapshot} from '../scripts/local/production-labor-reference-import.mjs';
+import {readLaborReferences} from '../scripts/local/production-labor-reference.mjs';
+import {readLaborHistory} from '../scripts/local/labor-rate-source.mjs';
+import {frozenPendingReport} from '../scripts/local/production-quantity-cutover.mjs';
+import {decideDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
+import {readLegacyPreservation} from '../scripts/local/production-legacy-preservation.mjs';
+import {dailyAttendanceActions} from '../lib/production-report-model.mjs';
+import {reviewDailyOutput} from '../scripts/local/production-daily-review.mjs';
+import {buildLaborHoursRevision,laborBusinessDate} from '../lib/labor-hours-revision.mjs';
+import {isDailyOutput,dailyOutputTotals} from '../lib/production-daily-output.mjs';
+import {readDailyOrderReports,readDailyOutputPolicy,quantityBaselineForOrder} from '../scripts/local/production-daily-output.mjs';
 import {reviewSnapshot} from '../lib/production-review-selection.mjs';
 import {readRecordPages} from '../scripts/local/production-record-pages.mjs';
 import {productionUnassignedReminder} from '../scripts/local/production-unassigned-alert.mjs';
 import {cancelReportingDay} from './cancel-reporting-day.mjs';
 import {productionReportingHold,reportingWriteBlocked} from '../lib/production-reporting-hold.mjs';
 import {sheetBridge,sheetSetup} from './warehouse-sheet.mjs';
+import {productionOrderPage,productionPageQuery,readProductionPageCatalog} from '../scripts/local/production-order-pages.mjs';
 import {skuTransfer} from './sku-transfer.mjs';
 import {hasMenuPermission,entityPermissionMenu,productionMenus} from '../lib/menu-action-access.mjs';
 import {createProductionIncident} from './production-incidents.mjs';
@@ -15,13 +31,14 @@ import {auditRoutes,auditMutation,clientReceipt} from './action-audit.mjs';
 import {readAllocationScope,saveAllocationScope} from '../scripts/local/production-allocation-scope.mjs';
 import {allocationSessionGroup,readAllocationQueue,mutateAllocationQueue} from '../scripts/local/production-allocation-queue.mjs';
 import {adminReadPaths,adminReadResponse} from '../lib/admin-readonly.mjs';
+import {warehouseSyncAlerts} from '../lib/warehouse-sync-alerts.mjs';
 import {pendingReportReview,reportReviewBlocker,reportDelayReasonError} from '../lib/production-progress-review.mjs';
 import {productionHistoryImport} from '../scripts/local/production-history-import.mjs';
 import {hrAttendancePermissions,withBusinessViews} from '../lib/user-permission-profiles.mjs';
 import {readSkuStock} from "../lib/sku-stock.mjs";
 import {feedbackApi} from '../lib/user-feedback.mjs';
 import {readPermissionSetup,applyPermissionSetup} from '../scripts/local/user-permission-setup.mjs';
-import {quickLinePermissions,hasQuickLineReadScope} from '../lib/user-permission-profiles.mjs';
+import {hasQuickLineReadScope} from '../lib/user-permission-profiles.mjs';
 import {importTransitHistory,restoreTransitHistoryRemovals} from '../scripts/local/transit-history-import.mjs';
 import {readHrMonth,saveHrMonth} from '../lib/production-hr-storage.mjs';
 import {productionActorId} from "../lib/production-actor.mjs";
@@ -68,7 +85,7 @@ export function attributeChanges(value, before, email) {
 }
 export async function sitePrincipal(request,env){
  const db=env.DB,user=await sessionUser(request,env);if(!user)return null;
- if(user.authMode==='quick_line')return {login:user.login,userId:user.login,permissionLogin:user.login,name:user.name,email:null,department:'QLSX',role:'USER',isAdmin:false,isSetupAdmin:false,authMode:'quick_line',line:user.line,grants:quickLinePermissions,canReopenPlan:false};
+ if(user.authMode==='quick_line')return {login:user.login,userId:user.login,permissionLogin:user.login,name:user.name,email:null,department:'QLSX',role:'USER',isAdmin:false,isSetupAdmin:false,authMode:'quick_line',line:user.line,grants:await quickLinePlanGrants(db,user),canReopenPlan:false};
  // Read the two applicable permission records in one fresh DB round trip.
  const department=String(user.department||'').trim();
  const permissionRows=(await db.prepare("SELECT entity,payload FROM app_records WHERE (entity='permissions' AND lower(record_key)=lower(?)) OR (entity='department_permissions' AND ?<>'' AND lower(record_key)=lower(?))").bind(user.login,department,department).all()).results;
@@ -130,7 +147,7 @@ export async function siteApi(request,env){
  response.headers.set('Server-Timing',`total;dur=${stats.totalMs.toFixed(1)}, auth;dur=${stats.authMs.toFixed(1)}, principal;dur=${stats.principalMs.toFixed(1)}, handler;dur=${stats.handlerMs.toFixed(1)}, db_sum;dur=${stats.dbMs.toFixed(1)}, db_max;dur=${stats.maxDbMs.toFixed(1)}, db_calls;desc="${stats.calls}"`);
  if(stats.totalMs>=2000){
   // Fixed route labels only: no query strings, entities, identities or payloads.
-  const route=['/api/site-session','/api/auth/session','/api/pending-approvals','/api/production-allocation','/api/production-allocation-scope','/api/production-workflow','/api/records','/api/production-plan','/api/in-transit','/api/capacity','/api/employees'].includes(path)?path:'other';
+  const route=['/api/site-session','/api/auth/session','/api/pending-approvals','/api/production-allocation','/api/production-allocation-scope','/api/production-workflow','/api/production-order-pages','/api/records','/api/production-plan','/api/in-transit','/api/capacity','/api/employees'].includes(path)?path:'other';
   console.info('ONSPA slow read',JSON.stringify({route,status:response.status,...Object.fromEntries(Object.entries(stats).map(([key,value])=>[key,Math.round(value)]))}));
  }
  return response;
@@ -156,7 +173,7 @@ async function handleSiteApi(request,env,timing){
    const result=await adminReadResponse({path,method:request.method,authorized,db:env.DB,searchParams:url.searchParams});
    return json(result.body,result.status);
   }
-  if(actor.authMode==='quick_line'&&path!=='/api/production-workflow'&&!(request.method==='GET'&&['/api/capacity','/api/production-hr-hours','/api/production-standards'].includes(path)))return json({error:'User Line chỉ được xem Quản lý sản xuất và báo công tại Line của mình.'},403);
+  if(actor.authMode==='quick_line'&&path!=='/api/production-workflow'&&!(request.method==='GET'&&['/api/capacity','/api/production-hr-hours','/api/production-standards','/api/production-plan','/api/production-order-pages'].includes(path)))return json({error:'User Line chỉ được xem Quản lý sản xuất và báo công tại Line của mình.'},403);
   if(path==='/api/production-allocation-scope'){
    if(request.method==='GET')return json(await readAllocationScope(env.DB,actor));
    if(request.method!=='POST')return json({error:'Phương thức không hợp lệ'},405);
@@ -169,12 +186,13 @@ async function handleSiteApi(request,env,timing){
    if(request.headers.get('origin')!==url.origin)return json({error:'Origin không hợp lệ'},403);
    return json(await mutateAllocationQueue(env.DB,await request.json(),actor));
   }
+  if(path==='/api/quick-line-plan-access'){if(request.method==='GET')return json(await readLinePlanAccess(env.DB,actor));if(request.method!=='POST')return json({error:'Phương thức không hợp lệ'},405);if(request.headers.get('origin')!==url.origin)return json({error:'Origin không hợp lệ'},403);return json(await saveLinePlanAccess(env.DB,await request.json(),actor));}
   if(path==='/api/user-permission-setup'){if(request.method==='GET')return json(await readPermissionSetup(env.DB,actor));if(request.method!=='POST')return json({error:'Phương thức không hợp lệ'},405);if(request.headers.get('origin')!==url.origin)return json({error:'Origin không hợp lệ'},403);return json(await applyPermissionSetup(env.DB,await request.json(),actor));}
   if(path==='/api/production-standards'&&request.method==='GET'){
    if(!hasGrant(actor,'Quản lý sản xuất',['Xem']))return json({error:'Không có quyền xem giờ công sản xuất.'},403);
-   const rows=(await env.DB.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;
+   const rows=(await env.DB.prepare("SELECT record_key,payload,updated_at FROM app_records WHERE entity='labor_hours'").all()).results;
    const allowedSkus=hasQuickLineReadScope(actor)?new Set((await readProductionWorkflow(env.DB,actor)).orders.map(row=>row.sku)):null;
-   return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}))).filter(r=>!allowedSkus||allowedSkus.has(r.payload.sku||r.key)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});
+   return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedAt:r.updated_at})),laborBusinessDate(),await readLaborHistory(env.DB)).filter(r=>!allowedSkus||allowedSkus.has(r.payload.sku||r.key)).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});
   }
   if(path==='/api/production-hr-hours'){
    const hrExample=url.searchParams.get('examples')==='1';
@@ -189,7 +207,7 @@ async function handleSiteApi(request,env,timing){
   if(examples&&!exampleRoute)return json({error:'Chế độ mẫu chỉ áp dụng cho báo công, lịch thực tế và nhật ký.'},400);
   if((examples||path==='/api/production-examples')&&(!actor.isAdmin||actor.line))return json({error:'Chỉ admin không giới hạn Line được dùng LSX mẫu.'},403);
   if(examples||path==='/api/production-examples')return json({error:'Đã ngừng dữ liệu mẫu trong Quản lý sản xuất. Hãy tải lại để xem dữ liệu thực tế.'},410);
-  const productionDb=examples?exampleDatabase(env.DB):env.DB;
+  const productionDb=examples?exampleDatabase(env.DB):request.method==='GET'&&['/api/production-workflow','/api/production-order-pages'].includes(path)?productionReadBatch(env.DB):env.DB;
   let catalogPromise;
   const loadCatalog=()=>examples?Promise.resolve([]):catalogPromise||=readRecordPages(env.DB,{where:"entity='sku'"}).then(result=>Promise.all(result.map(async r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:await recordRevision(r.payload)}))).then(siteCatalog));
   if(path==='/api/sku-capabilities')return json({canConfirm:await skuCapability(env.DB,actor)});
@@ -206,6 +224,10 @@ async function handleSiteApi(request,env,timing){
     if(status!=='Chờ xác nhận')continue;
     const definition=approvalDefinitions[row.entity],current=groups.get(row.entity)||{entity:row.entity,...definition,count:0,records:[]};
     current.count+=1;if(current.records.length<5)current.records.push({key:row.record_key,updatedAt:row.updated_at});groups.set(row.entity,current);
+   }
+   if(monitored.includes('warehouse_in')){
+    const alerts=warehouseSyncAlerts(rows.filter(r=>r.entity==='warehouse_in').map(r=>({key:r.record_key,payload:JSON.parse(r.payload)})));
+    if(alerts.length)groups.set('warehouse_sync_alerts',{entity:'warehouse_sync_alerts',label:'Cảnh báo đồng bộ Kho',view:'warehouse',child:'warehouse-in',count:alerts.length,records:alerts.slice(0,5).map(a=>({key:a.receiptId}))});
    }
    const values=[...groups.values()];
    return json({total:values.reduce((sum,item)=>sum+item.count,0),groups:values,storedBomChangeStatuses});
@@ -224,12 +246,29 @@ async function handleSiteApi(request,env,timing){
   }
   if(path==='/api/capacity'&&request.method==='GET')return json(url.searchParams.get('requests')==='1'?{requests:await listCapacityRequests(env.DB,actor)}:url.searchParams.get('bootstrap')==='1'?await readLatestCapacity(env.DB,actor):url.searchParams.get('latest')==='1'?{week:await latestCapacityWeek(env.DB,actor)}:await readCapacity(env.DB,url.searchParams.get('week'),actor));
   if(path==='/api/employees'&&request.method==='GET')return json(await readEmployees(env.DB,actor));
-  if(path==='/api/production-plan'&&request.method==='GET'){if(!hasGrant(actor,'Kế hoạch sản xuất / Production_plan',['Xem']))return json({error:'Không có quyền xem kế hoạch'},403);return json(url.searchParams.get('capacityDetail')==='1'?await getPlanCapacityDetail(env.DB,url.searchParams.get('week'),url.searchParams.get('line')):url.searchParams.get('capacityOnly')==='1'?{capacity:await getPlanCapacity(env.DB,url.searchParams.get('week'))}:await getPlan(env.DB,url.searchParams.get('week'),actor.canReopenPlan,await loadCatalog()));}
-  if(path==='/api/in-transit'&&request.method==='GET'){if(!hasGrant(actor,'Kế hoạch sản xuất / In_transit',['Xem']))return json({error:'Không có quyền xem In Transit'},403);return json(await getTransit(env.DB,Object.fromEntries(url.searchParams),await loadCatalog()));}
+  if(path==='/api/production-plan'&&request.method==='GET'){if(actor.authMode==='quick_line'){if([...url.searchParams.keys()].some(key=>key!=='week')||url.searchParams.getAll('week').length>1)return json({error:'Line chỉ được xem danh sách Pro Plan của mình.'},403);return json(await readQuickLinePlan(env.DB,actor,url.searchParams.get('week')));}if(!hasGrant(actor,'Kế hoạch sản xuất / Production_plan',['Xem']))return json({error:'Không có quyền xem kế hoạch'},403);return json(url.searchParams.get('capacityDetail')==='1'?await getPlanCapacityDetail(env.DB,url.searchParams.get('week'),url.searchParams.get('line')):url.searchParams.get('capacityOnly')==='1'?{capacity:await getPlanCapacity(env.DB,url.searchParams.get('week'))}:await getPlan(env.DB,url.searchParams.get('week'),actor.canReopenPlan,await loadCatalog()));}
+  if(path==='/api/in-transit'&&request.method==='GET'){if(!hasGrant(actor,'Kế hoạch sản xuất / In_transit',['Xem']))return json({error:'Không có quyền xem In Transit'},403);const activation=await readDailyOutputPolicy(env.DB);if(activation.policy?.cutoverReached&&!activation.policy.active)return json({error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy},503);const preservation=await readLegacyPreservation(env.DB,activation.policy,actor,{full:false});return json(await getTransit(env.DB,Object.fromEntries(url.searchParams),await loadCatalog(),{preservedOrders:preservation?.orders}));}
+  if(path==='/api/production-order-pages'&&request.method==='GET'){
+   productionPageQuery(url.searchParams,actor);
+   const result=await productionOrderPage(productionDb,actor,url.searchParams,examples?[]:()=>readProductionPageCatalog(productionDb,{ordersOnly:true}));
+   if(result instanceof Response)return result;
+   const projected=result.reports?await readLaborReferences(productionDb,result,env.LABOR_RATE_OMISSIONS_JSON,env.LABOR_RATE_SNAPSHOT_ID,env.LABOR_RATE_WARNING_SUPPRESSIONS_JSON):result;
+   return json({...projected,reportingHold:productionReportingHold(url.hostname)});
+  }
   if(path==='/api/production-workflow'&&request.method==='GET'){
-   const workflow=await readProductionWorkflow(workflowReadSnapshot(productionDb),actor,await loadCatalog(),{includeDerivedHours:url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work',stageValidation:url.searchParams.get('view')==='work'});
+   const activation=await readDailyOutputPolicy(productionDb);
+   if(activation.policy?.cutoverReached&&!activation.policy.active)return json({error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy},503);
+   const scheduleRead=url.searchParams.get('view')==='schedule',lightWorkRead=scheduleRead||url.searchParams.get('view')==='work';
+   const progressRead=url.searchParams.get('view')==='progress',workspaceRead=['workspace','journal'].includes(url.searchParams.get('view')),journalRead=url.searchParams.get('view')==='journal';
+   if(progressRead&&url.searchParams.has('scope')&&!['active','all'].includes(url.searchParams.get('scope')))return json({error:'Phạm vi tiến độ không hợp lệ.'},422);
+   const catalogRead=progressRead||workspaceRead||lightWorkRead?(examples?Promise.resolve([]):readProductionPageCatalog(productionDb,{includeProcesses:true})):loadCatalog();
+   const legacyPreservation=await readLegacyPreservation(productionDb,activation.policy,actor,{full:!lightWorkRead,includeMonthly:!progressRead});
+   const progressCatalog=await catalogRead;
+   const workflowDb=progressRead&&url.searchParams.get('scope')!=='all'?await activeProgressDatabase(productionDb,actor,progressCatalog,legacyPreservation?.orders):productionDb;
+   const workflow=await readProductionWorkflow(workflowReadSnapshot(workflowDb),actor,progressCatalog,{legacyPreservation,progressRead,transitState:workflowDb.transitState,compactAudit:(workspaceRead||scheduleRead)&&!legacyPreservation?.required,includeJournalHours:(!workspaceRead||journalRead)&&!progressRead&&url.searchParams.get('unassignedAlerts')!=='1'&&!lightWorkRead,includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&!lightWorkRead,stageValidation:lightWorkRead});
    if(url.searchParams.get('unassignedAlerts')==='1'){if(productionReportingHold(url.hostname))return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,workflow));}
-   return json({...workflow,reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
+   const referenced=await readLaborReferences(productionDb,workflow,env.LABOR_RATE_OMISSIONS_JSON,env.LABOR_RATE_SNAPSHOT_ID,env.LABOR_RATE_WARNING_SUPPRESSIONS_JSON);
+   return json({...(workspaceRead?workspaceDisplayWorkflow(referenced):referenced),...(activation.policy?{dailyOutputPolicy:activation.policy}:{}),reportingHold:productionReportingHold(url.hostname),canCancelReportingDay:actor.isAdmin&&!actor.line,rights:{...workflow.rights,examples:actor.isAdmin&&!actor.line},examples:examples?await readExampleSet(productionDb):null});
   }
   if(path==='/api/records'&&request.method==='GET'){
    const entity=url.searchParams.get('entity');if(!entities.has(entity))return json({error:'Hạng mục không hợp lệ'},400);
@@ -247,12 +286,12 @@ async function handleSiteApi(request,env,timing){
    }
    if(entity==='sku'&&url.searchParams.get('view')!=='stored')return json({records:await loadCatalog()});
    const rows=await Promise.all((await env.DB.prepare('SELECT record_key,payload,updated_by,updated_at FROM app_records WHERE entity=? ORDER BY updated_at DESC').bind(entity).all()).results.map(async r=>({...r,revision:await recordRevision(r.payload)})));
-   if(entity==='labor_hours')return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at}))),importSummary:laborHoursImportSummary});
+   if(entity==='labor_hours')return json({records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at})),laborBusinessDate(),await readLaborHistory(env.DB)),importSummary:laborHoursImportSummary});
    if(entity==='labor_hours_history')return json({records:siteLaborHoursHistory(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at})),url.searchParams.get('sku')||'')});
    if(url.searchParams.get('view')==='stored'){if(!await isSuperAdmin(env.DB,actor))return json({error:'Forbidden'},403);return json({records:rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at}))});}
    if(entity==='demand_event')return json({records:siteDemand(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision})))});
    if(entity==='warehouse_in'){
-    const linked=(await env.DB.prepare("SELECT w.record_key,json_extract(p.payload,'$.completedAt') AS completed_at FROM app_records w LEFT JOIN app_records p ON p.entity='production_report' AND p.record_key=json_extract(w.payload,'$.reportId') AND coalesce(json_extract(p.payload,'$._deleted'),0)=0 WHERE w.entity='warehouse_in'").all()).results;
+    const linked=(await env.DB.prepare("SELECT w.record_key,CASE WHEN json_extract(p.payload,'$.reportingModel')='daily-finished-v1' AND json_extract(p.payload,'$.quantityOnly')=1 THEN json_extract(p.payload,'$.productionDate') ELSE json_extract(p.payload,'$.completedAt') END AS completed_at FROM app_records w LEFT JOIN app_records p ON p.entity='production_report' AND p.record_key=json_extract(w.payload,'$.reportId') AND coalesce(json_extract(p.payload,'$._deleted'),0)=0 WHERE w.entity='warehouse_in'").all()).results;
     const completed=new Map(linked.map(r=>[r.record_key,r.completed_at]));
     let reconciliation;
     if(actor.isAdmin&&url.searchParams.get('audit')==='1'){
@@ -261,11 +300,12 @@ async function handleSiteApi(request,env,timing){
      const ids=new Set(receipts.map(r=>r.reportId));
      const outputs=workflow.reports.filter(r=>r.kind==='completion'&&!r.cancelled&&!r.voided&&!r._deleted);
      const approved=outputs.filter(r=>r.reviewStatus==='Đã xác nhận'&&Number(r.approvedQuantity??r.reportedQuantity??0)>0);
-     const missing=approved.filter(r=>!ids.has(r.id)).map(r=>({reportId:r.id,lsxCode:r.lsxCode,sku:r.sku,completedAt:r.completedAt,quantity:r.approvedQuantity??r.reportedQuantity,warehouseStatus:r.warehouseStatus||'Chưa tạo phiếu'}));
+     const missing=approved.filter(r=>!ids.has(r.id)).map(r=>({reportId:r.id,lsxCode:r.lsxCode,sku:r.sku,completedAt:isDailyOutput(r)?r.productionDate:r.completedAt,...(isDailyOutput(r)?{productionDate:r.productionDate}:{}),quantity:r.approvedQuantity??r.reportedQuantity,warehouseStatus:r.warehouseStatus||'Chưa tạo phiếu'}));
      reconciliation={approved:approved.length,receipts:receipts.length,pending:outputs.filter(r=>pendingReportReview(r)).length,missing};
     }
 
-    return json({reconciliation,records:rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),sourceCompletedAt:completed.get(r.record_key)||null,updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision}))});
+    const records=rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload),sourceCompletedAt:completed.get(r.record_key)||null,updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision}));
+    return json({reconciliation,records,syncAlerts:warehouseSyncAlerts(records),syncAlertCheckedAt:new Date().toISOString()});
    }
    if(entity==='leadtime')return json({records:rows.map(r=>({key:r.record_key,payload:projectCancelledMaster('leadtime',JSON.parse(r.payload)),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision}))});
    if(entity==='bom'){const masters=(await loadCatalog()).map(row=>row.payload);return json({records:rows.map(r=>({key:r.record_key,payload:syncBomSources(JSON.parse(r.payload),masters),updatedBy:r.updated_by,updatedAt:r.updated_at,revision:r.revision}))});}
@@ -296,6 +336,7 @@ async function handleSiteApi(request,env,timing){
   const text=await request.text();if(text.length>8_000_000)return json({error:'Payload quá lớn'},413);const body=JSON.parse(text);
   const reportingHold=productionReportingHold(url.hostname);
   if(reportingHold&&reportingWriteBlocked(path,body))return json({error:reportingHold.message,code:'PRODUCTION_REPORTING_PAUSED',reportingHold},423);
+  if(path==='/api/labor-reference-snapshot-import')return json(await importLaborReferenceSnapshot(env.DB,body,actor,{hostname:url.hostname}));
   if(path==='/api/change-requests')return json(await changeRequests(env.DB,actor,body));
   if(path==='/api/bom-pdf-reconciliation')return json(await reconcileBomPdf(env.DB,body,actor));
   if(['/api/bom-bulk','/api/bom-change','/api/bom'].includes(path)){if(!canBomAction(actor,body.action,body.expectedRevision!=null,path==='/api/bom'?'Dữ liệu lượng dùng BOM':'Phiếu thay đổi BOM'))return json({error:'Không có quyền thực hiện thao tác BOM này.'},403);const catalog=await loadCatalog();return json(path==='/api/bom'?await mutateBom(env.DB,body,actor,catalog):await mutateBomBulk(env.DB,{...body,single:path==='/api/bom-change'},actor,catalog));}
@@ -307,7 +348,7 @@ async function handleSiteApi(request,env,timing){
    const canManage=canWrite(actor,'Dữ liệu cơ bản / Giờ công')||canWrite(actor,'Dữ liệu cơ bản / SKU Master');
    if(!canManage)return json({error:'Không có quyền cập nhật Giờ công.'},403);
    const sku=String(body.sku||'').trim().toUpperCase(),value=Number(body.laborHour),mode=body.mode==='edit'?'edit':'create',reason=String(body.reason||'').trim(),note=String(body.note||'').trim(),source=body.source==='PDF'?'PDF':'Nhập trực tiếp';
-   if(!sku||!Number.isFinite(value)||value<0)return json({error:'SKU hoặc Giờ công/SP không hợp lệ.'},400);
+   if(!sku||!['number','string'].includes(typeof body.laborHour)||String(body.laborHour).trim()===''||!Number.isFinite(value)||value<0)return json({error:'SKU hoặc Giờ công/SP không hợp lệ.'},400);
    if(mode==='edit'&&!reason)return json({error:'Vui lòng nhập lý do thay đổi.'},400);
    const catalog=await loadCatalog(),master=catalog.find(row=>String(row.key).toUpperCase()===sku&&usableSku(row.payload));if(!master)return json({error:'SKU không tồn tại hoặc chưa được xác nhận trong SKU Master.'},409);
    const saved=await env.DB.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(sku).first();
@@ -317,8 +358,8 @@ async function handleSiteApi(request,env,timing){
    if(mode==='edit'&&!old)return json({error:'SKU chưa có Giờ công/SP để sửa.'},409);
    if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==Number(old?.version||0))
     return json({error:conflictMessage,current:old,updatedBy:old?.updatedBy||null,updatedAt:old?.updatedAt||null},409);
-   const now=new Date().toISOString(),version=Number(old?.version||0)+1,current={sku,laborHour:value,note,source,configuredAt:old?.configuredAt||now,updatedAt:now,updatedBy:actor.login,version};
-   const history={id:crypto.randomUUID(),sku,version,oldLaborHour:old?.laborHour??null,newLaborHour:value,oldNote:old?.note||'',newNote:note,reason:mode==='edit'?reason:'Thêm mới Giờ công/SP',actor:actor.login,at:now,source};
+   const now=new Date().toISOString();let current,history;
+   try{({current,history}=buildLaborHoursRevision({old,sku,value,effectiveFrom:body.effectiveFrom,note,source,reason,actor:actor.login,now,mode}));}catch(e){return json({error:e.message},e.status||409);}
    const write=saved
     ?env.DB.prepare('UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity=? AND record_key=? AND payload=?').bind(JSON.stringify(current),actor.login,now,'labor_hours',sku,saved.payload)
     :env.DB.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING').bind('labor_hours',sku,JSON.stringify(current),actor.login,now);
@@ -354,54 +395,65 @@ async function handleSiteApi(request,env,timing){
   if(path==='/api/in-transit'){if(!canWrite(actor,'In Transit')&&!canWrite(actor,'In_transit'))return json({error:'Không có quyền cập nhật In Transit'},403);return json(await (body.action==='restore-history-removals'?restoreTransitHistoryRemovals(env.DB,body,actor):body.action==='import-history'?importTransitHistory(env.DB,body,actor,await loadCatalog()):mutateTransit(env.DB,body,actor,await loadCatalog())));}
   if(path==='/api/production-examples'){if(body.action!=='create')return json({error:'Chọn tạo bộ LSX mẫu.'},400);const skuRows=(await env.DB.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}));
    const reference=await exampleReference(env.DB,siteCatalog(skuRows));return json(await createProductionExamples(exampleDatabase(env.DB),actor,new Date(),reference));}
-  if(path==='/api/production-history-import')return json(await productionHistoryImport(productionDb,body,actor,await loadCatalog()));
+  if(path==='/api/production-history-import'){if((await readDailyOutputPolicy(productionDb)).policy?.cutoverReached)return json({error:'Lịch sử công đoạn đã khóa tại mốc chuyển đổi; không nhập đè dữ liệu cũ.'},409);return json(await productionHistoryImport(productionDb,body,actor,await loadCatalog()));}
   if(path==='/api/production-workflow'&&body.action==='unassigned-reminder'){if(reportingHold)return json({rows:[],serverNow:Date.now()});return json(await productionUnassignedReminder(productionDb,actor,await readProductionWorkflow(productionDb,actor,await loadCatalog(),{includeDerivedHours:false}),body.reminder));}
   if(path==='/api/production-workflow'&&body.action==='incident-create')return json(await createProductionIncident(productionDb,actor,body,await readProductionWorkflow(productionDb,actor,await loadCatalog())));
-  if(path==='/api/production-workflow')return json(await mutateProductionWorkflow(productionDb,body,actor,await loadCatalog()));
-  if(path==='/api/warehouse-confirm')return json(await confirmSelectedWarehouse(env.DB,body,actor));
+  if(path==='/api/production-workflow'){const quantityOnly=body.action==='daily-output',attendanceOnly=dailyAttendanceActions.has(body.action)&&(await readDailyOutputPolicy(productionDb)).policy?.active;return json(await mutateProductionWorkflow(productionDb,body,actor,quantityOnly||attendanceOnly?[]:await loadCatalog()));}
+  if(path==='/api/warehouse-confirm')return json(await (String(body.action||'').startsWith('withdrawal-')?decideDailyWithdrawal(env.DB,body,actor):confirmSelectedWarehouse(env.DB,body,actor)));
   if(path==='/api/warehouse-backfill')return json(await (String(body.action).startsWith('confirm')?confirmWarehouse(env.DB,body,actor):warehouseBackfill(env.DB,body,actor)));
-  if(path==='/api/production-correction')return json(body.operation==='cancel-reporting-day'?await cancelReportingDay(productionDb,body,actor,url.hostname):await correctProduction(productionDb,body,actor,await loadCatalog()));
+  if(path==='/api/production-correction'){if(body.operation==='cancel-reporting-day'&&(await readDailyOutputPolicy(productionDb)).policy?.cutoverReached)return json({error:'Lịch sử công đoạn chỉ để tra cứu; không hủy ngày báo công cũ sau chuyển đổi.'},409);return json(body.operation==='cancel-reporting-day'?await cancelReportingDay(productionDb,body,actor,url.hostname):await correctProduction(productionDb,body,actor,['daily-output-edit','daily-output-cancel','daily-output-withdraw'].includes(body.operation)?[]:await loadCatalog()));}
   if(path==='/api/production-report'){
    if(!actor.isAdmin&&!hasMenuPermission(actor,productionMenus.progress,['Xác nhận']))return json({error:'Chỉ QLSX được duyệt báo công.'},403);
+   if(body.action==='close-legacy')return json(await closeLegacyReport(productionDb,body,actor));
    if(body.action!=='review'||!body.reportId)return json({error:'Yêu cầu kiểm tra báo công không hợp lệ.'},400);
    const reviewReads=workflowReadSnapshot(productionDb);
    const [cursorBefore,stored]=await Promise.all([
     productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key='global'").first(),
     productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key=?").bind(String(body.reportId)).first(),
    ]);
+   const reviewPolicyState=await readDailyOutputPolicy(productionDb);
    let historySource=null,workflow=null;
    if(!stored){
     const batches=(await productionDb.prepare("SELECT record_key,payload FROM app_records WHERE entity='production_history_import'").all()).results;
     historySource=batches.find(b=>(JSON.parse(b.payload).reports||[]).some(r=>r.id===body.reportId));
     if(!historySource)return json({error:'Không tìm thấy báo công cần kiểm tra.'},404);
-    workflow=await readProductionWorkflow(reviewReads,actor,await loadCatalog(),{reviewReportId:String(body.reportId)});
+    workflow=await readProductionWorkflow(reviewReads,actor,await loadCatalog(),{reviewReportId:String(body.reportId),includeDerivedHours:reviewPolicyState.policy?.intakeModel!=='server-receipt-quantity-v1'});
    }
    const report=stored?JSON.parse(stored.payload):workflow.reports.find(r=>r.id===body.reportId);
    if(!report)return json({error:'Không có quyền xem báo công này.'},403);
    if(body.expectedVersion!==undefined&&Number(body.expectedVersion)!==Number(report.version||0))return json({error:'Báo công đã thay đổi. Vui lòng cập nhật dữ liệu và kiểm tra lại.'},409);
    if(actor.line&&actor.line!==report.line)return json({error:'Không được duyệt báo công của Line khác.'},403);
    if(!pendingReportReview(report))return json({error:'Báo công này đã được xử lý trước đó.'},409);
+   if(isDailyOutput(report)&&stored)return json(await reviewDailyOutput(productionDb,body,actor,{stored,cursorBefore,policyState:reviewPolicyState}));
+   const reviewPolicy=reviewPolicyState.policy;
+   const receiptLegacy=reviewPolicy?.intakeModel==='server-receipt-quantity-v1'&&await frozenPendingReport(productionDb,reviewPolicy,String(body.reportId));
+   if(reviewPolicy?.cutoverReached&&!receiptLegacy)return json({error:'Chỉ duyệt phiếu cũ đang chờ trong tập dữ liệu đã chốt.'},409);
+   if(receiptLegacy&&body.expectedVersion===undefined)return json({error:'Thiếu phiên bản phiếu cũ cần kiểm tra.'},409);
+   if(receiptLegacy)report.id=String(body.reportId); // Frozen storage key is the canonical legacy identity.
    // One request-scoped, byte-bounded read per entity, shared with workflow/transit.
    // Independent reads overlap; the original cursor and payload guards still fence the commit.
    const [eventRecords,reviewRecords,transitStored,reviewWorkflow]=await Promise.all([
     readRecordPages(reviewReads,{where:'entity=?',args:['production_event']}),
     readRecordPages(reviewReads,{where:'entity=?',args:['production_report']}),
     report.transitId?productionDb.prepare("SELECT payload FROM app_records WHERE entity='in_transit' AND record_key=?").bind(String(report.transitId)).first():null,
-    workflow||loadCatalog().then(catalog=>readProductionWorkflow(reviewReads,actor,catalog,{reviewReportId:String(body.reportId)})),
+    workflow||loadCatalog().then(catalog=>readProductionWorkflow(reviewReads,actor,catalog,{reviewReportId:String(body.reportId),includeDerivedHours:!receiptLegacy})),
    ]);
    workflow=reviewWorkflow;
    const binary=(a,b)=>a<b?-1:a>b?1:0;
    const adjustmentRows=eventRecords.sort((a,b)=>binary(a.updated_at,b.updated_at)||binary(a.record_key,b.record_key)).map(row=>JSON.parse(row.payload)).filter(e=>!e.voided);
-   if(adjustmentRows.some(event=>event.kind==='absence'&&event.approved===false&&event.sourceId===report.transitId&&
+   if(!isDailyOutput(report)&&adjustmentRows.some(event=>event.kind==='absence'&&event.approved===false&&event.sourceId===report.transitId&&
     Date.parse(event.effectiveAt)<Date.parse(report.completedAt)&&Date.parse(event.endsAt)>Date.parse(report.startedAt)&&
     !adjustmentRows.some(next=>next.approvedFrom===event.id)))return json({error:'Có điều chỉnh giờ đang chờ QLSX duyệt; xử lý trước khi xác nhận báo công.'},409);
-   const adjustedHours=adjustmentRows.filter(event=>event.kind==='hours-adjustment'&&(!report.correctedAt||event.recordedAt>report.correctedAt)).flatMap(event=>event.changes||[]).filter(change=>change.reportId===body.reportId).at(-1)?.after;
+   const adjustedHours=isDailyOutput(report)?null:adjustmentRows.filter(event=>event.kind==='hours-adjustment'&&(!report.correctedAt||event.recordedAt>report.correctedAt)).flatMap(event=>event.changes||[]).filter(change=>change.reportId===body.reportId).at(-1)?.after;
    const approve=body.approve===true,reason=String(body.reason||'').trim();
    if(!approve&&!reason)return json({error:'Vui lòng nhập lý do từ chối.'},422);
    const reportRows=reviewRecords.map(row=>({key:row.record_key,payload:JSON.parse(row.payload)}));
-   const approvedBefore=reportRows.filter(item=>item.key!==body.reportId&&item.payload.kind==='completion'&&item.payload.reviewStatus==='Đã xác nhận'&&(!item.payload.stageReporting||Number(item.payload.approvedQuantity??item.payload.reportedQuantity)>0)&&(report.transitId?item.payload.transitId===report.transitId:item.payload.lsxCode===report.lsxCode)).reduce((sum,item)=>sum+Number(item.payload.approvedQuantity??item.payload.reportedQuantity??0),0);
+   const dailyContext=(isDailyOutput(report)||receiptLegacy)&&transitStored?await readDailyOrderReports(productionDb,{...JSON.parse(transitStored.payload),id:report.transitId}):null;
+   const reviewQuantityBaseline=receiptLegacy?await quantityBaselineForOrder(productionDb,reviewPolicy,{...JSON.parse(transitStored.payload),id:report.transitId}):null;
+   const approvedBefore=dailyContext?dailyOutputTotals({...JSON.parse(transitStored.payload),id:report.transitId,...(reviewQuantityBaseline?{quantityBaseline:reviewQuantityBaseline}:{})},dailyContext.reports.filter(r=>r.id!==report.id)).approved:reportRows.filter(item=>item.key!==body.reportId&&item.payload.kind==='completion'&&item.payload.reviewStatus==='Đã xác nhận'&&(!item.payload.stageReporting||Number(item.payload.approvedQuantity??item.payload.reportedQuantity)>0)&&(report.transitId?item.payload.transitId===report.transitId:item.payload.lsxCode===report.lsxCode)).reduce((sum,item)=>sum+Number(item.payload.approvedQuantity??item.payload.reportedQuantity??0),0);
    const approvedQuantity=approve?Number(report.reportedQuantity||0):0,cumulative=approvedBefore+approvedQuantity,now=new Date().toISOString();
    const transit=transitStored?JSON.parse(transitStored.payload):{};
+   if(isDailyOutput(report)&&['line','sku','lsxCode'].some(k=>transit[k]!==report[k]))return json({error:'Lệnh đã đổi Line/SKU/LSX so với phiếu sản lượng. Đối chiếu lại trước khi xác nhận.'},409);
    if(transit.status==='HỦY'||transit.cancelReason)return json({error:'Lệnh đã hủy tại In transit. Không thể xác nhận hoặc điều chỉnh báo công.'},409);
    if(approve&&cumulative>Number(transit.lsxQty||report.lsxQty||0))return json({error:`LSX ${report.lsxCode}: sản lượng lũy kế vượt số lượng lệnh; kiểm tra các báo công trước khi xác nhận.`},409);
    const completed=Number(transit.lsxQty||report.lsxQty||0)>0&&cumulative>=Number(transit.lsxQty||report.lsxQty||0);
@@ -413,36 +465,50 @@ async function handleSiteApi(request,env,timing){
     const blocker=reportReviewBlocker(current||report);
     if(approve&&blocker)return json({error:blocker},409);
    }
-   if(approve&&current?.unresolvedAttendance?.length)return json({error:`LSX ${report.lsxCode}: chưa có giờ vào thực tế của ${current.unresolvedAttendance.flatMap(n=>n.employees).join(', ')}. QLSX cập nhật tại Lịch SX thực tế trước khi xác nhận và đồng bộ.`},409);
-   if(approve&&current?.pendingAttendance?.length)return json({error:`LSX ${report.lsxCode}: biến động của ${current.pendingAttendance.flatMap(n=>n.employees).join(', ')} đang chờ duyệt điều chỉnh giờ.`},409);
-   const completionTimes=reportRows.filter(item=>item.key!==report.id&&item.payload.kind==='completion'&&item.payload.reviewStatus==='Đã xác nhận'&&(!item.payload.stageReporting||Number(item.payload.approvedQuantity??item.payload.reportedQuantity)>0)&&(report.transitId?item.payload.transitId===report.transitId:item.payload.lsxCode===report.lsxCode)).map(item=>item.payload.completedAt).concat(approve&&(!report.stageReporting||approvedQuantity>0)?[report.completedAt]:[]).filter(Boolean).sort();
+   if(approve&&!isDailyOutput(report)&&current?.unresolvedAttendance?.length)return json({error:`LSX ${report.lsxCode}: chưa có giờ vào thực tế của ${current.unresolvedAttendance.flatMap(n=>n.employees).join(', ')}. QLSX cập nhật tại Lịch SX thực tế trước khi xác nhận và đồng bộ.`},409);
+   if(approve&&!isDailyOutput(report)&&current?.pendingAttendance?.length)return json({error:`LSX ${report.lsxCode}: biến động của ${current.pendingAttendance.flatMap(n=>n.employees).join(', ')} đang chờ duyệt điều chỉnh giờ.`},409);
+   const completionTimes=isDailyOutput(report)?workflow.reports.filter(r=>r.id!==report.id&&r.transitId===report.transitId&&r.kind==='completion'&&!r.cancelled&&!r.voided&&r.reviewStatus==='Đã xác nhận'&&Number(r.approvedQuantity??r.reportedQuantity)>0).map(r=>isDailyOutput(r)?r.productionDate:r.completedAt).concat(approve?[report.productionDate]:[]).filter(Boolean).sort():reportRows.filter(item=>item.key!==report.id&&item.payload.kind==='completion'&&item.payload.reviewStatus==='Đã xác nhận'&&(!item.payload.stageReporting||Number(item.payload.approvedQuantity??item.payload.reportedQuantity)>0)&&(report.transitId?item.payload.transitId===report.transitId:item.payload.lsxCode===report.lsxCode)).map(item=>isDailyOutput(item.payload)?item.payload.productionDate:item.payload.completedAt).concat(approve&&(!report.stageReporting||approvedQuantity>0)?[isDailyOutput(report)?report.productionDate:report.completedAt]:[]).filter(Boolean).sort();
    const finalAt=completed?completionTimes.at(-1)||'':'';
    const finalDate=finalAt?vnMoment(finalAt).date:'',planEnd=String(transit.planEnd||'').slice(0,10);
    const delayDays=finalDate&&planEnd?Math.max(0,Math.round((Date.parse(finalDate)-Date.parse(planEnd))/86400000)):0;
    const delayReason=String(body.delayReason??'').trim();
    const delayError=approve?reportDelayReasonError({...workflow.orders.find(o=>o.id===report.transitId),...transit},report,delayReason,workflow.reports):'';
    if(delayError)return json({error:delayError},422);
-   const updated={...report,version:Number(report.version||0)+1,...(current?.hours?{hours:current.hours}:{}),hourStatus:approve?"Đã xác nhận giờ":report.hourStatus,confirmationBasis:approve?{at:now,by:actor.login,hours:current?.hours||report.hours,laborNotes:current?.laborNotes||[]}:report.confirmationBasis,delayReason,...(adjustedHours?{hours:adjustedHours,hourStatus:'Đã duyệt điều chỉnh'}:{}),reviewStatus:approve?'Đã xác nhận':'Cần điều chỉnh',approvedQuantity,completedQty:cumulative,productionState:completed?'Hoàn thành sản xuất':'Đang sản xuất',actualStartedAt:transit.actualStartedAt||report.startedAt||'',actualCompletedAt:finalAt,reviewedBy:actor.login,reviewedById:productionActorId(actor),reviewedAt:now,rejectionReason:reason,warehouseStatus:approve?(approvedQuantity>0?'Chờ Kho xác nhận':'Không nhập kho tại công đoạn này'):'Chưa tạo phiếu',updatedAt:now,updatedBy:actor.login};
+   const quantityBaseline=reviewQuantityBaseline;
+   const updated={...report,...(quantityBaseline?{quantityBaseline,quantityAfterCutover:quantityBaseline.snapshotId}:{}),version:Number(report.version||0)+1,...(current?.hours?{hours:current.hours}:{}),hourStatus:approve?(isDailyOutput(report)?"Không áp dụng giờ theo lệnh":"Đã xác nhận giờ"):report.hourStatus,confirmationBasis:approve?(isDailyOutput(report)?{at:now,by:actor.login,productionDate:report.productionDate,quantity:approvedQuantity,rateBasis:report.rateBasis,rateStatus:report.rateStatus}:{at:now,by:actor.login,hours:current?.hours||report.hours,laborNotes:current?.laborNotes||[]}):report.confirmationBasis,delayReason,...(adjustedHours?{hours:adjustedHours,hourStatus:'Đã duyệt điều chỉnh'}:{}),reviewStatus:approve?'Đã xác nhận':'Cần điều chỉnh',approvedQuantity,completedQty:cumulative,productionState:completed?'Hoàn thành sản xuất':'Đang sản xuất',actualStartedAt:transit.actualStartedAt||(isDailyOutput(report)?workflow.orders.find(o=>o.id===report.transitId)?.actualStartedAt||report.productionDate:report.startedAt)||'',actualCompletedAt:finalAt,reviewedBy:actor.login,reviewedById:productionActorId(actor),reviewedAt:now,rejectionReason:reason,warehouseStatus:approve?(approvedQuantity>0?'Chờ Kho xác nhận':'Không nhập kho tại công đoạn này'):'Chưa tạo phiếu',updatedAt:now,updatedBy:actor.login};
+   const reviewPendingQty=receiptLegacy?dailyOutputTotals({...transit,id:report.transitId,quantityBaseline},dailyContext.reports.map(r=>r.id===report.id?updated:r)).pending:undefined;
    const cursorKey='global',initial=JSON.stringify({version:0,token:''});
    await productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('production_cursor',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(cursorKey,initial,actor.login,now).run();
    const cursor=await productionDb.prepare("SELECT payload FROM app_records WHERE entity='production_cursor' AND record_key=?").bind(cursorKey).first();
    if(cursor.payload!==(cursorBefore?.payload||initial))return json({error:'Dữ liệu SX vừa thay đổi; tải lại trước khi xác nhận.'},409);
    const nextCursor=JSON.stringify({version:Number(JSON.parse(cursor.payload).version||0)+1,token:crypto.randomUUID()});
+   const dailyGuards=[...(dailyContext?.guards||[]),...(receiptLegacy&&reviewPolicyState.snapshotGuard?[reviewPolicyState.snapshotGuard]:[]),...[['production_reporting_policy','global',reviewPolicyState.raw],['production_reporting_activation','global',reviewPolicyState.activationRaw],...(reviewPolicyState.manifestKey?[['production_legacy_manifest',reviewPolicyState.manifestKey,reviewPolicyState.manifestRaw]]:[])].map(([entity,key,raw])=>({sql:raw===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=?)":"EXISTS(SELECT 1 FROM app_records WHERE entity=? AND record_key=? AND payload=?)",args:raw===null?[entity,key]:[entity,key,raw]}))];
+   if(receiptLegacy){
+    // Fence every participating raw row before advancing the batch cursor. A
+    // failed order/report CAS must not leave a partial review or warehouse row.
+    dailyGuards.push({sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?)",args:[report.transitId,transitStored.payload]});
+    dailyGuards.push(stored?{sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)",args:[body.reportId,stored.payload]}:{sql:"EXISTS(SELECT 1 FROM app_records WHERE entity='production_history_import' AND record_key=? AND payload=?) AND NOT EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=?)",args:[historySource.record_key,historySource.payload,body.reportId]});
+    if(approve)dailyGuards.push({sql:"NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND (record_key=? OR json_extract(payload,'$.reportId')=?))",args:[`SX:${body.reportId}`,body.reportId]});
+   }
    const statements=[
-    productionDb.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key=? AND payload=?").bind(nextCursor,actor.login,now,cursorKey,cursor.payload),
+    productionDb.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_cursor' AND record_key=? AND payload=?"+(dailyGuards.length?' AND '+dailyGuards.map(g=>g.sql).join(' AND '):'')).bind(nextCursor,actor.login,now,cursorKey,cursor.payload,...dailyGuards.flatMap(g=>g.args)),
     historySource?productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'production_report',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_history_import' AND record_key=? AND payload=?) AND EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?) AND NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=?) ON CONFLICT(entity,record_key) DO NOTHING").bind(body.reportId,JSON.stringify(updated),actor.login,now,cursorKey,nextCursor,historySource.record_key,historySource.payload,report.transitId,transitStored.payload,`SX:${body.reportId}`):
     productionDb.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='production_report' AND record_key=? AND payload=? AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) AND (?=0 OR NOT EXISTS(SELECT 1 FROM app_records WHERE entity='warehouse_in' AND record_key=?)) AND (? IS NULL OR EXISTS(SELECT 1 FROM app_records WHERE entity='in_transit' AND record_key=? AND payload=?))").bind(JSON.stringify(updated),actor.login,now,body.reportId,stored.payload,cursorKey,nextCursor,approve?1:0,`SX:${body.reportId}`,transitStored?.payload??null,report.transitId||'',transitStored?.payload??null),
     productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'admin_audit',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)").bind(crypto.randomUUID(),JSON.stringify({entity:'production_report',key:body.reportId,before:report,after:updated,actor:actor.login,at:now}),actor.login,now,body.reportId,JSON.stringify(updated))
    ];
-   const reviewEvent={id:crypto.randomUUID(),kind:approve?'report-approval':'report-rejection',sourceId:report.transitId,line:report.line,reportId:report.id,effectiveAt:report.completedAt,recordedAt:now,actor:actor.login,actorId:productionActorId(actor),reason:approve?delayReason:reason,before:{quantity:report.approvedQuantity||0,status:report.reviewStatus},after:{quantity:approvedQuantity,status:updated.reviewStatus},employees:report.hours?.perEmployee?.map(p=>p.id)||[]};
+   if(receiptLegacy){
+    const nextTransit={...transit,quantityBaseline,completedQty:cumulative,pendingReportQty:reviewPendingQty,productionState:updated.productionState,actualStartedAt:updated.actualStartedAt,actualCompletedAt:updated.actualCompletedAt,delayReason:delayReason||transit.delayReason||'',updatedAt:now,updatedBy:actor.login};
+    statements.push(productionDb.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='in_transit' AND record_key=? AND payload=? AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_cursor' AND record_key=? AND payload=?) AND EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)").bind(JSON.stringify(nextTransit),actor.login,now,report.transitId,transitStored.payload,cursorKey,nextCursor,body.reportId,JSON.stringify(updated)));
+   }
+   const reviewEvent={id:crypto.randomUUID(),kind:approve?'report-approval':'report-rejection',sourceId:report.transitId,line:report.line,reportId:report.id,...(isDailyOutput(report)?{reportingModel:report.reportingModel,quantityOnly:true,productionDate:report.productionDate}:{}),effectiveAt:isDailyOutput(report)?now:report.completedAt,recordedAt:now,actor:actor.login,actorId:productionActorId(actor),reason:approve?delayReason:reason,before:{quantity:report.approvedQuantity||0,status:report.reviewStatus},after:{quantity:approvedQuantity,status:updated.reviewStatus},employees:report.hours?.perEmployee?.map(p=>p.id)||[]};
    statements.push(productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'production_event',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?)").bind(reviewEvent.id,JSON.stringify(reviewEvent),actor.login,now,body.reportId,JSON.stringify(updated)));
    if(approve&&approvedQuantity>0){
-    const warehouseKey=`SX:${body.reportId}`,warehouse={id:warehouseKey,source:'Sản xuất',reportId:body.reportId,planId:report.planId,lsxCode:report.lsxCode,sku:report.sku,name:report.name,spec:report.spec,line:report.line,proposedQuantity:approvedQuantity,receivedQuantity:null,status:'Chờ xác nhận',sourceCompletedAt:report.completedAt,sheetSync:{status:'pending'},createdBy:actor.login,createdAt:now};
+    const warehouseKey=`SX:${body.reportId}`,warehouse={id:warehouseKey,source:'Sản xuất',reportId:body.reportId,planId:report.planId,lsxCode:report.lsxCode,sku:report.sku,name:report.name,spec:report.spec,line:report.line,proposedQuantity:approvedQuantity,receivedQuantity:null,status:'Chờ xác nhận',sourceCompletedAt:isDailyOutput(report)?report.productionDate:report.completedAt,...(isDailyOutput(report)?{sourceProductionDate:report.productionDate}:{}),sheetSync:{status:'pending'},createdBy:actor.login,createdAt:now};
     statements.push(productionDb.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'warehouse_in',?,?,?,? WHERE EXISTS(SELECT 1 FROM app_records WHERE entity='production_report' AND record_key=? AND payload=?) ON CONFLICT(entity,record_key) DO NOTHING").bind(warehouseKey,JSON.stringify(warehouse),actor.login,now,body.reportId,JSON.stringify(updated)));
    }
    const changed=await productionDb.batch(statements);
    if(changed[0].meta.changes!==1||changed[1].meta.changes!==1||changed.slice(2).some(row=>row.meta.changes!==1))return json({error:'Báo công vừa được xử lý đồng thời; tải lại và kiểm tra.'},409);
-   return json({ok:true,payload:updated});
+   return json({ok:true,payload:updated,...(receiptLegacy?{pendingReportQty:reviewPendingQty}:{})});
   }
   if(path==='/api/engine-run'){
    if(!canWrite(actor,'Production Engine'))return json({error:'Không có quyền cập nhật dữ liệu tuần'},403);
@@ -453,7 +519,7 @@ async function handleSiteApi(request,env,timing){
   if(path!=='/api/records')return json({error:'API không hỗ trợ'},404);
   if(!entities.has(body.entity)||!body.key||!body.payload||typeof body.payload!=='object')return json({error:'Dữ liệu không hợp lệ'},400);
   if(['bom','bom_change'].includes(body.entity))return json({error:'Sử dụng API nghiệp vụ BOM để kiểm soát phê duyệt và lịch sử.'},409);
-  if(['sku','sku_history','labor_hours','labor_hours_history','production_plan','production_plan_audit','in_transit','in_transit_audit','admin_audit','production_engine','production_engine_snapshot','production_report','production_event','production_schedule','production_cursor'].includes(body.entity))return json({error:'Dùng API nghiệp vụ chuyên biệt'},409);
+  if(['sku','sku_history','labor_hours','labor_hours_history','production_plan','production_plan_audit','in_transit','in_transit_audit','admin_audit','production_engine','production_engine_snapshot','production_report','production_event','production_schedule','production_cursor','production_quantity_source','production_legacy_manifest','production_reporting_policy','production_reporting_activation'].includes(body.entity))return json({error:'Dùng API nghiệp vụ chuyên biệt'},409);
   if(['capacity','employees','inventory','forecast_import_history'].includes(body.entity))return json({error:'Sử dụng API nghiệp vụ để bảo vệ dữ liệu và lịch sử.'},403);
   if(['users','permissions','departments','department_permissions'].includes(body.entity)?!await isSuperAdmin(env.DB,actor):!hasMenuPermission(actor,entityLabel(body.entity),['Thêm','Sửa','Xác nhận','Hủy xác nhận','Hủy','Xóa','Lưu']))return json({error:'Không có quyền cập nhật'},403);
   if(body.entity==='leadtime_versions'){
@@ -469,6 +535,13 @@ async function handleSiteApi(request,env,timing){
    }
   }
   const oldRow=await env.DB.prepare('SELECT payload,updated_by,updated_at FROM app_records WHERE entity=? AND record_key=?').bind(body.entity,body.key).first(),old=oldRow?JSON.parse(oldRow.payload):(body.entity==='demand_event'?siteDemand([]).find(r=>r.key===body.key)?.payload:null);
+  if(body.entity==='warehouse_in'){
+   if(old?.pendingCorrection?.status==='pending'||['pending','approved-awaiting-sheet'].includes(old?.withdrawalRequest?.status))return json({error:'Phiếu đang đối soát điều chỉnh/thu hồi; dùng luồng nghiệp vụ, không ghi đè trực tiếp.'},409);
+   const reportIds=[...new Set([old?.reportId,old?.sourceReportId,body.payload.reportId,body.payload.sourceReportId,String(body.key).startsWith('SX:')?String(body.key).slice(3):null].filter(id=>typeof id==='string'&&id))];
+   if(reportIds.length){const linked=(await env.DB.prepare("SELECT payload FROM app_records WHERE entity='production_report' AND record_key IN (SELECT value FROM json_each(?))").bind(JSON.stringify(reportIds)).all()).results;
+    if(linked.some(row=>isDailyOutput(JSON.parse(row.payload))))return json({error:'Phiếu từ sản lượng ngày phải dùng quy trình sửa/xác nhận/thu hồi, không ghi đè hoặc tạo lại qua danh sách chung.'},409);
+   }
+  }
   if(body.entity==='users'&&(old?.authMode==='quick_line'||body.payload.authMode==='quick_line')){if(!old||body.payload.authMode!==old.authMode||body.payload.line!==old.line||body.payload.login!==old.login||body.key!==old.login||body.payload.role!=='USER')return json({error:'User Line giữ nguyên ID, Line và vai trò USER. Tạo user Line bằng chức năng riêng.'},409);}
   if(['leadtime','leadtime_versions','safety_rules','safety_rule_groups','safety_days'].includes(body.entity)&&old?.cancelled)return json({error:'Dữ liệu đã Hủy; không được áp dụng lại bằng thao tác sửa/xác nhận.'},409);
   const actualRevision=await recordRevision(oldRow?.payload);
@@ -492,5 +565,5 @@ async function handleSiteApi(request,env,timing){
   const results=await env.DB.batch([write,env.DB.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE changes()=1').bind('admin_audit',crypto.randomUUID(),JSON.stringify({entity:body.entity,key:body.key,before:old,after:p,actor:actor.login,userId:actor.userId,at:now}),actor.login,now),...(body.entity==='users'&&old?.authMode==='quick_line'?[env.DB.prepare('UPDATE auth_sessions SET revoked_at=? WHERE login=? AND revoked_at IS NULL AND changes()=1').bind(Date.now(),body.key)]:[])]);
   if(results[0].meta.changes!==1)return json({error:conflictMessage},409);
   return json({ok:true,payload:p,updatedAt:now,revision:await recordRevision(nextPayload)});
- }catch(e){console.error('Site API',e.message);const expected=e instanceof PlanError||['/api/warehouse-sheet/bridge','/api/warehouse-sheet/setup','/api/sku-transfer','/api/change-requests','/api/warehouse-confirm','/api/warehouse-backfill','/api/production-history-import','/api/user-permission-setup','/api/production-hr-hours','/api/production-correction','/api/production-examples','/api/basic-master-cancel','/api/capacity','/api/employees','/api/inventory-import','/api/forecast-import','/api/production-allocation','/api/production-allocation-scope','/api/production-workflow','/api/linked-records','/api/sku-unit-import','/api/bom-bulk','/api/bom-change','/api/bom','/api/bom-pdf-reconciliation'].includes(path);return json({error:expected?e.message:'Không thực hiện được thao tác; vui lòng thử lại.',...(e instanceof PlanError?{details:e.details.map(({id,sku,reason})=>({id,sku,reason}))}:{})},expected?e.status||400:500);}
+ }catch(e){console.error('Site API',e.message);const expected=e instanceof PlanError||e.linePlanAccessError===true||['/api/labor-reference-snapshot-import','/api/quick-line-plan-access','/api/warehouse-sheet/bridge','/api/warehouse-sheet/setup','/api/sku-transfer','/api/change-requests','/api/warehouse-confirm','/api/warehouse-backfill','/api/production-history-import','/api/user-permission-setup','/api/production-hr-hours','/api/production-report','/api/production-correction','/api/production-examples','/api/basic-master-cancel','/api/capacity','/api/employees','/api/inventory-import','/api/forecast-import','/api/production-allocation','/api/production-allocation-scope','/api/production-workflow','/api/production-order-pages','/api/linked-records','/api/sku-unit-import','/api/bom-bulk','/api/bom-change','/api/bom','/api/bom-pdf-reconciliation'].includes(path);return json({error:expected?e.message:'Không thực hiện được thao tác; vui lòng thử lại.',...(e instanceof PlanError?{details:e.details.map(({id,sku,reason})=>({id,sku,reason}))}:{})},expected?e.status||400:500);}
 }

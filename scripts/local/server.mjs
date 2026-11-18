@@ -15,6 +15,8 @@ import {commitLinkedRecords} from './linked-records.mjs';
 import {readCapacity,mutateCapacity,listCapacityRequests,latestCapacityWeek,readLatestCapacity} from './capacity.mjs';
 import {readEmployees,saveEmployee,importEmployees} from './employees.mjs';
 import {readProductionWorkflow,mutateProductionWorkflow} from './production-workflow.mjs';
+import {readDailyOutputPolicy} from './production-daily-output.mjs';
+import {readLegacyPreservation} from './production-legacy-preservation.mjs';
 import {usableSku} from '../../lib/sku-state.mjs';
 import {syncBomSources} from '../../lib/bom-source.mjs';
 import {validateNewDemand} from './demand-validation.mjs';
@@ -33,6 +35,17 @@ import {siteLaborHours,siteLaborHoursHistory} from '../../lib/site-labor-hours.m
 import {recordRevision,conflictMessage} from '../../lib/record-revision.mjs';
 
 const allowed=new Set(['users','permissions','departments','department_permissions','versions','sku','sku_history','leadtime','leadtime_versions','leadtime_audit','safety_days','safety_rules','safety_rule_groups','safety_rule_audit','labor_hours','labor_hours_history','production_engine_snapshot','inventory','warehouse_in','warehouse_out','warehouse_transfer','warehouse_docs','warehouse_count','inventory_snapshot','inventory_snapshot_audit','bom','bom_change','forecast','forecast_import_history','demand_event','production_engine','production_plan','in_transit','in_transit_audit','production_report','labor_adjustment','capacity']);
+// Trust the bound server socket, never a request or forwarded header, for the port.
+export function localTestRequestGuard(req,httpServer){
+ const loopback=new Set(['127.0.0.1','::1','::ffff:127.0.0.1']);
+ let address;try{address=httpServer?.address();}catch{}
+ if(!address||typeof address!=='object'||!loopback.has(address.address)||!Number.isInteger(address.port)||address.port<1||address.port>65535||!loopback.has(req.socket?.remoteAddress))return {status:403,error:'TEST chỉ chấp nhận loopback.'};
+ const hosts=['127.0.0.1','localhost'].map(host=>`${host}:${address.port}`);
+ if(!hosts.includes(req.headers.host))return {status:403,error:'TEST chỉ chấp nhận loopback.'};
+ const origin=req.headers.origin;
+ if(origin!==undefined&&!hosts.map(host=>`http://${host}`).includes(origin))return {status:403,error:'Origin không hợp lệ.'};
+ return {status:200,baseOrigin:`http://${req.headers.host}`};
+}
 export function localTestPlugin(testOptions = {}){
  return {name:'onspa-test-api',enforce:'pre',async configureServer(server){
   const config=configuration(),connection=await openDatabase(testOptions.persistPath);
@@ -40,13 +53,13 @@ export function localTestPlugin(testOptions = {}){
   const sessions=new Map(),attempts=new Map();const authFile=testOptions.authFile || resolve(root,'.local-data/auth.json');
   server.httpServer?.once('close',()=>connection.close());
   server.middlewares.use(async(req,res,next)=>{
-   const url=new URL(req.url||'/',`http://${config.host}:${config.port}`);
+   let url=new URL(req.url||'/',`http://${config.host}:${config.port}`);
    if(!url.pathname.startsWith('/api/'))return next();
    const send=(status,data)=>{res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(data));};
-   const host=req.headers.host;
-   if(!['127.0.0.1:5173','localhost:5173'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress))return send(403,{error:'TEST chỉ chấp nhận loopback.'});
+   const access=localTestRequestGuard(req,server.httpServer);
+   if(access.status!==200)return send(access.status,{error:access.error});
+   url=new URL(req.url||'/',access.baseOrigin);
    const origin=req.headers.origin;
-   if(origin&&!['http://127.0.0.1:5173','http://localhost:5173'].includes(origin))return send(403,{error:'Origin không hợp lệ.'});
    try{
     if(url.pathname==='/api/test-environment'&&req.method==='GET')return send(200,{environment:'TEST',remote:false,database:'.local-data/d1',engine:'Miniflare D1',setupRequired:!existsSync(authFile)});
     const cookie=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('onspa_test='))?.slice(11);
@@ -80,7 +93,16 @@ export function localTestPlugin(testOptions = {}){
     if(url.pathname==='/api/in-transit'&&req.method==='GET'){const sku=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}));return send(200,await getTransit(connection.db,Object.fromEntries(url.searchParams),sku));}
     if(url.pathname==='/api/production-standards'&&req.method==='GET'){if(!authenticated)return send(401,{error:'Vui lòng đăng nhập.'});const rows=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='labor_hours'").all()).results;return send(200,{records:siteLaborHours(rows.map(r=>({key:r.record_key,payload:JSON.parse(r.payload)}))).map(r=>({key:r.key,payload:{sku:r.payload.sku,laborHour:r.payload.laborHour,cancelled:r.payload.cancelled,status:r.payload.status,_deleted:r.payload._deleted}}))});}
     if(url.pathname==='/api/production-hr-hours'&&req.method==='GET')return send(200,await readHrMonth(connection.db,url.searchParams.get('month'),authenticated?{...session,isAdmin:true}:null,url.searchParams.get('examples')==='1'));
-    if(url.pathname==='/api/production-workflow'&&req.method==='GET'){const actor=authenticated?{...session,isAdmin:true}:null,workflow=await readProductionWorkflow(connection.db,actor,[],{includeDerivedHours:url.searchParams.get('unassignedAlerts')!=='1'});return send(200,url.searchParams.get('unassignedAlerts')==='1'?await productionUnassignedReminder(connection.db,actor,workflow):workflow);}
+    if(url.pathname==='/api/production-workflow'&&req.method==='GET'){
+     const actor=authenticated?{...session,isAdmin:true}:null;
+     if(!actor)return send(403,{error:'Không có quyền xem Quản lý sản xuất.'});
+     const activation=await readDailyOutputPolicy(connection.db);
+     if(activation.policy?.cutoverReached&&!activation.policy.active)return send(503,{error:activation.policy.blockedReason,dailyOutputPolicy:activation.policy});
+     const legacyPreservation=await readLegacyPreservation(connection.db,activation.policy,actor||{},{full:url.searchParams.get('view')!=='work'});
+     const workflow=await readProductionWorkflow(connection.db,actor,[],{legacyPreservation,includeDerivedHours:!activation.policy?.active&&url.searchParams.get('unassignedAlerts')!=='1'&&url.searchParams.get('view')!=='work'});
+     if(url.searchParams.get('unassignedAlerts')==='1')return send(200,await productionUnassignedReminder(connection.db,actor,workflow));
+     return send(200,{...workflow,...(activation.policy?{dailyOutputPolicy:activation.policy}:{})});
+    }
     if(adminReadPaths.has(url.pathname)){
      // Administrative reads require the existing Super Admin permission.
      const authorized=!!authenticated&&await isSuperAdmin(connection.db,session);

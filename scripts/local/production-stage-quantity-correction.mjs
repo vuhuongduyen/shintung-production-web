@@ -44,6 +44,9 @@ export async function correctStageQuantities(db,body,actor,catalog){
  }
  const reportImpacts=[],eventChanges=[...cancelled],writes=[],warehouseChanges=[],revised=[...originalReports];
  for(const stage of touched){
+  // Replay the unchanged prefix for stage state only. Earlier exits and their
+  // receipts are not part of a later correction (including a cancelled resume).
+  const affectedFrom=Math.min(...ops.filter(op=>correctionStage(events.find(e=>e.id===op.eventId)||{})===stage).flatMap(op=>[original.find(e=>e.id===op.eventId)?.effectiveAt,events.find(e=>e.id===op.eventId)?.effectiveAt].filter(Boolean).map(Date.parse)));
   const oldEvents=original.filter(e=>e.sourceId===order.id&&correctionStage(e)===stage&&e.stageReporting),sequence=events.filter(e=>!e.voided&&e.sourceId===order.id&&correctionStage(e)===stage&&e.stageReporting).sort((a,b)=>Date.parse(a.effectiveAt)-Date.parse(b.effectiveAt)||String(a.recordedAt||'').localeCompare(String(b.recordedAt||'')));
   if(original.some(e=>e.sourceId===order.id&&correctionStage(e)===stage&&e.backfillBatch))fail('Công đoạn có lô nhập bù liên kết; chưa thể thêm dòng riêng lẻ.');
   const mixed=original.some(e=>e.sourceId===order.id&&correctionStage(e)===stage&&e.erpStageImport);
@@ -73,6 +76,7 @@ export async function correctStageQuantities(db,body,actor,catalog){
     const completed=current.completed+q,remaining=current.admittedQuantity-completed;
     current={...current,completed,status:completed>=Number(order.lsxQty)?'done':remaining>0?'running':'partial',people:remaining>0?current.people:[],at:e.effectiveAt};
     const oldReport=originalReports.find(r=>r.id===e.reportId);if(old&&!oldReport)fail('Thiếu liên kết phiếu xuất trạm; tải lại dữ liệu.');
+    if(oldReport&&Date.parse(oldReport.completedAt)<affectedFrom&&Date.parse(e.effectiveAt)<affectedFrom){lastExit=e.effectiveAt;events[events.indexOf(e)]=old;continue;}
     const id=oldReport?.id||`CORR:${e.id}`,final=stage.toUpperCase()==='FINAL';
     const splitSource=ops.find(o=>o.eventId===e.id)?.splitFrom,sourceReport=oldReport||originalReports.find(r=>r.id===original.find(x=>x.id===splitSource)?.reportId),wasApproved=sourceReport?.reviewStatus==='Đã xác nhận';
     const next={...(oldReport||{}),id,kind:'completion',stageReporting:true,transitId:order.id,orderSnapshot:order,line:order.line,planId:order.planId,lsxCode:order.lsxCode,sku:order.sku,name:order.name,spec:order.spec,lsxQty:order.lsxQty,stageName:e.stageName,stageQuantity:q,reportedQuantity:final?q:0,startedAt,actualStartedAt:firstStart,completedAt:e.effectiveAt,productionDate:day(e.effectiveAt),employees:before.people,count:before.people.length,sourceCount:before.people.length,reportedBy:oldReport?.reportedBy||actor.login,reportedById:oldReport?.reportedById||by,reportedAt:oldReport?.reportedAt||now,reviewStatus:wasApproved?'Đã xác nhận':'Chờ kiểm tra',approvedQuantity:wasApproved&&final?q:0,reviewedAt:sourceReport?.reviewedAt||null,reviewedBy:sourceReport?.reviewedBy||null,reviewedById:sourceReport?.reviewedById||null,warehouseStatus:wasApproved?(final?'Chờ Kho xác nhận':'Không nhập kho tại công đoạn này'):'Chưa tạo phiếu',version:Number(oldReport?.version||0)+1,correctedAt:now,correctedBy:by,correctionReason:reason};
@@ -84,6 +88,7 @@ export async function correctStageQuantities(db,body,actor,catalog){
    else if(['add','transfer'].includes(action)){current={...current,people:e.correctionPeople||old?.stageAfter?.people||[],at:e.effectiveAt};if(!current.people.length)current.status='paused';}
    else fail(`${stage}: thao tác ${action} chưa hỗ trợ thêm/sửa số lượng.`);
    if(order.line==='B'&&stage.toUpperCase()==='PHAO'&&current.people.length>1)fail('B-PHAO tối đa 1 người tại một thời điểm.');
+   if(old&&Date.parse(old.effectiveAt)<affectedFrom&&Date.parse(e.effectiveAt)<affectedFrom){events[events.indexOf(e)]=old;continue;}
    e.stageBefore=before;e.stageAfter=structuredClone(current);e.employees=current.people;e.count=current.people.length;e.version=Number(old?.version||0)+1;e.correctedAt=now;e.correctedBy=by;e.correctionReason=reason;delete e.correctionQuantity;delete e.correctionPeople;
    eventChanges.push({eventId:e.id,before:old||null,after:e});
   }

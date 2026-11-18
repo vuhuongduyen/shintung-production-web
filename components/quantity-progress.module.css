@@ -1,0 +1,5 @@
+.container{display:inline-grid;inline-size:7em;max-inline-size:100%;min-inline-size:0;gap:2px;vertical-align:middle;font:inherit;color:inherit}
+.track{display:block;position:relative;inline-size:100%;block-size:1.65em;border:1px solid #a6bfa8;border-radius:4px;background:#f5f1e3;overflow:hidden;isolation:isolate}
+.fill{position:absolute;inset-block:0;inset-inline-start:0;background:#a6d3ad;pointer-events:none}
+.amount{position:absolute;inset-block:0;display:flex;align-items:center;max-inline-size:100%;padding-inline:3px;font:inherit;font-weight:700;color:#123c21;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.pending{display:block;white-space:normal;line-height:1.25;color:#715018;font-size:inherit}

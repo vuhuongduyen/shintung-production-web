@@ -1,3 +1,6 @@
+import {requestDailyWithdrawal} from './production-warehouse-withdrawal.mjs';
+import {readDailyOutputPolicy} from './production-daily-output.mjs';
+import {correctDailyOutput} from './production-daily-correction.mjs';
 import {readRecordPages} from './production-record-pages.mjs';
 import {cancelStageWork} from './production-stage-cancel.mjs';
 import {correctStageWork} from './production-stage-correction.mjs';
@@ -46,7 +49,10 @@ function validateTimeline(events,orders) {
 }
 
 async function runCorrection(db,body,actor,catalog=[]) {
+ if(body.operation==='daily-output-withdraw')return requestDailyWithdrawal(db,body,actor);
+ if(['daily-output-edit','daily-output-cancel'].includes(body.operation))return correctDailyOutput(db,body,actor);
  if(!productionMenuRights(actor).correct)fail("Không có quyền Điều chỉnh báo công.",403);
+ if((await readDailyOutputPolicy(db)).policy?.cutoverReached)fail('Lịch sử công đoạn chỉ để tra cứu sau mốc chuyển đổi; không hủy hoặc tính lại giờ cũ.',409);
  if(body.operation==='cancel-stage')return cancelStageWork(db,body,actor,catalog);
  if(body.stageWorkCorrection===true)return correctStageWork(db,body,actor,catalog);
  if(body.sourceTimeCorrection===true)return correctSourceTimes(db,body,actor,catalog);

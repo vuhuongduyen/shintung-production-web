@@ -1,12 +1,14 @@
+import {readDailyOutputPolicy} from './production-daily-output.mjs';
 import {PlanError} from './production-plan.mjs';
 import {readProductionWorkflow} from './production-workflow.mjs';
 import {productionActorId} from '../../lib/production-actor.mjs';
 import {allocationInstant} from '../../lib/production-allocation-queue.mjs';
 const fail=(text,status=422)=>{throw new PlanError(text,status);};
 const digest=async text=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))),b=>b.toString(16).padStart(2,'0')).join('');
-const entities="('in_transit','production_event','production_report','capacity','production_schedule','employees','labor_hours','production_history_import')";
+const entities="('in_transit','production_event','production_report','capacity','production_schedule','employees','labor_hours','production_history_import','production_reporting_policy','production_reporting_activation','production_legacy_manifest')";
 export async function importSourceTimeLog(db,body,input,actor,catalog){
  if(!actor?.isAdmin||actor.line)fail('Chỉ Admin toàn quyền được nhập lịch sử.',403);
+ if((await readDailyOutputPolicy(db)).policy?.cutoverReached)fail('Lịch sử đã khóa tại mốc chuyển đổi; không nhập đè nhật ký nguồn.',409);
  if(!['preview','save'].includes(body.action)||!Array.isArray(input.timeLog)||!input.timeLog.length||input.timeLog.length>500)fail('Nhập từ 1 đến 500 thao tác nguồn.');
  const records=(await db.prepare(`SELECT entity,record_key,payload FROM app_records WHERE entity IN ${entities} ORDER BY entity,record_key`).all()).results;
  const revision=await digest(JSON.stringify(records)),batchId=await digest(JSON.stringify(input));

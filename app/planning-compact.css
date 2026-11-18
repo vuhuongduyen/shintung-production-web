@@ -487,3 +487,8 @@ html body .app-shell main.production-workspace table:is(.work-table,.progress-or
 html body .production-workspace .production-compact-note{min-width:110px!important;width:140px!important;max-width:160px!important;white-space:normal!important;overflow-wrap:anywhere}
 html body .production-workspace .production-compact-note .khsx-planning-note{padding:4px 6px}
 html body .production-cancelled-lock,html body .onspa-progress-cancelled{display:inline-block;color:#a11b24!important;background:#ffe4e6!important;border:1px solid #e5a0a5;border-radius:5px;padding:5px 7px;font-weight:700}
+
+/* Quick Line keeps the shared table rhythm; overflow stays inside the table. */
+html body .app-shell .quick-line-plan .pp-table > table.quick-line-plan-table {min-width:1050px!important}
+html body .app-shell .quick-line-plan-table .quick-line-week-divider > td {background:#e8f1e5!important;color:#1f5b35!important;border-top:1px solid #acc9ae;border-bottom:1px solid #acc9ae;text-align:left!important}
+html body .app-shell .quick-line-plan-table .quick-line-week-divider strong {position:sticky;left:7px;display:inline-block}
