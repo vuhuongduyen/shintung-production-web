@@ -79,7 +79,7 @@ test('drafts can be corrected or deleted and existing month records expose scope
 test('month deadline is inclusive through day 10 GMT+7 and handles year rollover',async()=>{
  const {hrAttendancePeriodOpen,hrAttendanceDeadline}=await import('../lib/hr-attendance-period.mjs');
  assert.equal(hrAttendanceDeadline('2026-12'),'2027-01-10');assert.equal(hrAttendancePeriodOpen('2026-10',Date.parse('2026-11-10T16:59:59.999Z')),true);assert.equal(hrAttendancePeriodOpen('2026-10',Date.parse('2026-11-10T17:00:00.000Z')),false);
- const m=await mount();try{await change(m.host.querySelector('[aria-label="Tháng ghi nhận"]'),'2026-09');assert.equal(save(m.host).disabled,true);assert.match(save(m.host).closest('[role=button]').textContent,/Lưu ghi nhận/);}finally{await m.close();}
+ const m=await mount();try{await change(m.host.querySelector('[aria-label="Tháng ghi nhận"]'),'2026-09');assert.equal(save(m.host).disabled,true);assert.equal(save(m.host).textContent,'Lưu');}finally{await m.close();}
 });
 
 test('unrestricted HR enters C without approved schedule, preserves draft across Line changes and sends employee scope',async()=>{
@@ -160,5 +160,16 @@ test('October entry is open through the final Vietnam deadline millisecond, then
   assert.equal(save(m.host).disabled,true);await click(save(m.host));
   assert.match(m.host.textContent,/10\/11\/2026|10 tháng sau|hết hạn|khóa/i);
   assert.equal(calls,1,'crossing deadline and rendering never submits a mutation');
+ }finally{await m.close();}
+});
+
+test('clickable arrows follow the selected cell, add only at end and never save; footer has concise matching actions',async()=>{
+ let writes=0;const m=await mount(Entry,{...props,globalHr:true,save:async()=>{writes++;return true;}});try{
+  const footer=m.host.querySelector('[data-hr-save-footer]');assert.deepEqual([...footer.querySelectorAll('button')].map(b=>b.textContent),['Thêm dòng','Lưu']);
+  const down=m.host.querySelector('button[aria-label="Xuống dòng tiếp theo"]'),up=m.host.querySelector('button[aria-label="Lên dòng trước"]');
+  await act(async()=>field(m.host,1,'Ghi chú').focus());await click(down);assert.equal(document.activeElement,field(m.host,2,'Ghi chú'));
+  await click(up);assert.equal(document.activeElement,field(m.host,1,'Ghi chú'));await click(down);assert.equal(m.host.querySelectorAll('[data-hr-row]').length,2);
+  await click(button(m.host,'Thêm dòng'));assert.equal(document.activeElement,field(m.host,3,'Nhân viên'));assert.equal(writes,0);
+  await m.render({...props,globalHr:true,busy:true});assert.equal(down.disabled,true);assert.equal(up.disabled,true);
  }finally{await m.close();}
 });
