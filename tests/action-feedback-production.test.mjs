@@ -1,3 +1,5 @@
+// Existing work/full-detail assertions exercise the explicit legacy fallback.
+// The active quantity pager has separate mounted and ACK regressions.
 import test,{after,beforeEach,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -27,7 +29,7 @@ const events=employees.map((p,i)=>({id:`absence-${i}`,kind:'line-absence',absenc
 let requests=[],mutations=[],unexpected=[];
 beforeEach(()=>{
  requests=[];mutations=[];unexpected=[];document.documentElement.lang='vi';window.sessionStorage.clear();sync.clearClientReads('session');
- globalThis.fetch=async(input,init={})=>{const method=(init.method||'GET').toUpperCase();if(method!=='GET')mutations.push(`${method} ${input}`);assert.equal(method,'GET');const path=new URL(String(input),'https://synthetic.test').pathname;requests.push(path+new URL(String(input),'https://synthetic.test').search);
+ globalThis.fetch=async(input,init={})=>{const method=(init.method||'GET').toUpperCase();if(method!=='GET')mutations.push(`${method} ${input}`);assert.equal(method,'GET');const path=new URL(String(input),'https://synthetic.test').pathname;if(path==='/api/production-order-pages')return Response.json({supported:false});requests.push(path+new URL(String(input),'https://synthetic.test').search);
  if(path==='/api/production-workflow')return Response.json({orders,reports:[],events:[],employees,actualSchedules:[],approvedSchedules:[],rights:{manager:true,line:null}});
  unexpected.push(path);throw new Error(`Unexpected synthetic read ${path}`);};
 });
@@ -43,11 +45,11 @@ async function choose(s,value){assert.ok(s);await act(async()=>{s.value=value;s.
 async function change(input,value){assert.ok(input);await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new window.Event('input',{bubbles:true}));});}
 async function search(host,method,control){if(method==='click')await click(button(toolbar(host),'Tìm kiếm'));else{assert.ok(control);await act(async()=>control.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true})));}}
 function scheduleProps(extra={}){return{week,setWeek:()=>{},line:'A',setLine:()=>{},locked:false,days,setDays:()=>{},version:2,approved:{key:`${week}:A`,version:3,days},approvedSchedules:[],history:[],events,orders:[],employees,manager:true,hr:true,busy:false,save:async()=>{throw Error('Unexpected save');},openAction:()=>{throw Error('Unexpected action');},refresh:async()=>true,...extra};}
-test('work board defers full history until explicit detail request and does not first reload work',async()=>{
+test('work board opens assignment with the richer workspace profile without reloading work or audit detail',async()=>{
  const view=await mount(el(ProductionManagement,{mode:'work',operator:'SYNTHETIC'}));try{
   assert.deepEqual(requests,['/api/production-workflow?view=work']);
   await click(button(view.host,'Phân công'));
-  assert.deepEqual(requests,['/api/production-workflow?view=work','/api/production-workflow']);
+  assert.deepEqual(requests,['/api/production-workflow?view=work','/api/production-workflow?view=workspace']);
  }finally{await view.close();}
 });
 test('work detail never presents a partial work snapshot while full history is pending',async()=>{

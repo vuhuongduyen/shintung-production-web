@@ -39,8 +39,8 @@ test('HTTP login, origin guard, durable writes and logout work without any LIVE 
  const password='0'+String(randomBytes(2).readUInt16BE(0)%1000).padStart(3,'0');
  async function start(){let middleware;const server=createServer((req,res)=>middleware(req,res,()=>{res.statusCode=404;res.end()}));await localTestPlugin(options).configureServer({httpServer:server,middlewares:{use:fn=>middleware=fn}});await new Promise(r=>server.listen(0,'127.0.0.1',r));return server;}
  let server=await start();
- const request=(path,body,cookie,origin='http://127.0.0.1:5173')=>new Promise((accept,reject)=>{
-  const req=httpRequest(`http://127.0.0.1:${server.address().port}${path}`,{method:body?'POST':'GET',headers:{host:'127.0.0.1:5173',origin,'content-type':'application/json',...(cookie?{cookie}:{})}},res=>{const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>accept(new Response(Buffer.concat(chunks),{status:res.statusCode,headers:Object.fromEntries(Object.entries(res.headers).map(([k,v])=>[k,Array.isArray(v)?v.join(','):v]))})));});req.on('error',reject);req.end(body?JSON.stringify(body):undefined);
+ const request=(path,body,cookie,origin=`http://127.0.0.1:${server.address().port}`)=>new Promise((accept,reject)=>{
+  const req=httpRequest(`http://127.0.0.1:${server.address().port}${path}`,{method:body?'POST':'GET',headers:{host:`127.0.0.1:${server.address().port}`,origin,'content-type':'application/json',...(cookie?{cookie}:{})}},res=>{const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>accept(new Response(Buffer.concat(chunks),{status:res.statusCode,headers:Object.fromEntries(Object.entries(res.headers).map(([k,v])=>[k,Array.isArray(v)?v.join(','):v]))})));});req.on('error',reject);req.end(body?JSON.stringify(body):undefined);
  });
  try{
   assert.equal((await request('/api/test-environment')).status,200);

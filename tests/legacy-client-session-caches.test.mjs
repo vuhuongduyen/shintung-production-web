@@ -337,7 +337,7 @@ function identityReceiver(h,initial){
   visit(home);assert.ok(callback);
   const state={identity:initial,workspaces:{tabs:[{id:'synthetic-sensitive-tab'}],active:'synthetic-sensitive-tab'},epoch:0,authorizationChanged:false,feedbackClears:0};
   const identityRef={current:initial};
-  const bindings={identityRef,workspaceIdentityKey:h.workspaceIdentityKey,clearProductionSnapshot:()=>{},clearActionFeedback:()=>{state.feedbackClears++;},clearClientReads:sync.clearClientReads,workspaceHome:{view:'sku'},
+  const bindings={workspaceTouched:{current:false},setWorkspaceRestored:()=>{},productionDisplayStore:{activate:async()=>{},clear:()=>{}},identityRef,workspaceIdentityKey:h.workspaceIdentityKey,clearProductionSnapshot:()=>{},clearActionFeedback:()=>{state.feedbackClears++;},clearClientReads:sync.clearClientReads,workspaceHome:{view:'sku'},
     setActiveViewers:()=>{},setNotificationGroups:()=>{},setNotificationCount:()=>{},
     setWorkspaces:value=>{state.workspaces=typeof value==='function'?value(state.workspaces):value;},
     setHomeEpoch:value=>{state.epoch=typeof value==='function'?value(state.epoch):value;},
