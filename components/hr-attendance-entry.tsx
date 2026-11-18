@@ -6,7 +6,7 @@ import {StandardToolbar,toolbar} from './standard-toolbar/StandardToolbar';
 import {toolbarLocale,subscribeToolbarLocale,translateToolbar} from './standard-toolbar/translations';
 import {LookupInput} from './standard-toolbar/LookupInput';
 import {employeeLookupOptions} from '../lib/employee-lookup';
-import {hrAttendanceDeadline,hrAttendancePeriodOpen} from '../lib/hr-attendance-period.mjs';
+import {hrAttendanceDeadline,hrAttendancePeriodOpen,hrAttendancePeriodWarning} from '../lib/hr-attendance-period.mjs';
 import ActualLaborEdit from './actual-labor-edit';
 import {productionRequestId} from '../lib/production-request-id.mjs';
 import {effectiveAttendance,eligibleStaff} from '../lib/production-attendance.mjs';
@@ -121,6 +121,7 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
    toolbar.note(`${t('Hạn ghi nhận')}: ${hrAttendanceDeadline(month)?.split('-').reverse().join('/')} · GMT+7`),
    toolbar.action({disabled:saving,disabledExplanation:'Đang lưu. Vui lòng chờ hoàn tất trước khi quay lại.',onClick:back},'Quay lại',true,'back'),
   ]}/>
+  {!monthOpen&&<p role="alert" className={styles.error}>{t(hrAttendancePeriodWarning(month))}</p>}
   <p>{t(globalHr?'Nhập tất cả nhân viên A/B/C, không cần chọn Line. Chỉ tính giờ tại khoảng người đó thực sự tham gia sản xuất ở A/B.':'Mỗi dòng là một trường hợp. Nghỉ nhiều ngày dùng Từ ngày – Đến ngày; ngày không làm việc được bỏ qua.')}</p>
   <div className={styles.navigation}>
    <FeedbackActionButton type="button" aria-label={t('Xuống dòng tiếp theo')} disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." onClick={()=>navigateSelectedRow(1)}>↓</FeedbackActionButton>

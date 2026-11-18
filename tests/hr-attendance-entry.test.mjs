@@ -79,7 +79,7 @@ test('drafts can be corrected or deleted and existing month records expose scope
 test('month deadline is inclusive through day 10 GMT+7 and handles year rollover',async()=>{
  const {hrAttendancePeriodOpen,hrAttendanceDeadline}=await import('../lib/hr-attendance-period.mjs');
  assert.equal(hrAttendanceDeadline('2026-12'),'2027-01-10');assert.equal(hrAttendancePeriodOpen('2026-10',Date.parse('2026-11-10T16:59:59.999Z')),true);assert.equal(hrAttendancePeriodOpen('2026-10',Date.parse('2026-11-10T17:00:00.000Z')),false);
- const m=await mount();try{await change(m.host.querySelector('[aria-label="Tháng ghi nhận"]'),'2026-09');assert.equal(save(m.host).disabled,true);assert.equal(save(m.host).textContent,'Lưu');}finally{await m.close();}
+ const m=await mount();try{await change(m.host.querySelector('[aria-label="Tháng ghi nhận"]'),'2026-09');assert.equal(save(m.host).disabled,true);assert.equal(save(m.host).textContent,'Lưu');assert.match(m.host.querySelector('[role=alert]').textContent,/10\/10\/2026.*Không lưu/);}finally{await m.close();}
 });
 
 test('unrestricted HR enters C without approved schedule, preserves draft across Line changes and sends employee scope',async()=>{
