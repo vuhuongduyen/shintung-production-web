@@ -1,4 +1,6 @@
 'use client';
+import {attendanceDisplayType,hrAttendanceTypes} from '../lib/production-attendance-controls.mjs';
+import HrAbsenceImport from './hr-absence-import';
 import {useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {StandardToolbar,toolbar} from './standard-toolbar/StandardToolbar';
 import {toolbarLocale,subscribeToolbarLocale,translateToolbar} from './standard-toolbar/translations';
@@ -16,7 +18,7 @@ import ClockInput from './capacity-clock-input';
 import styles from './hr-attendance-entry.module.css';
 type Row=Record<string,any>;
 type Draft={id:string;employee:string;kind:string;from:string;to:string;start:string;end:string;note:string;error?:string;done?:boolean;token:string};
-const kinds=['Nghỉ','Đi trễ','Về sớm'];
+const kinds=['Nghỉ','Đi trễ, về sớm'];
 const validDate=(value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(`${value}T00:00:00Z`).toISOString().slice(0,10)===value;
 const validTime=(value:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 const displayClock=(value:string)=>value&&Number.isFinite(Date.parse(value))?new Date(Date.parse(value)+7*3600000).toISOString().slice(11,16):'—';
@@ -35,6 +37,7 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
  const makeRow=(copy?:Draft):Draft=>{const day=calendarDays.find(day=>day.working&&day.date>=firstDay&&day.date<=lastDay);return {...(copy||{employee:'',kind:'Nghỉ',from:day?.date||firstDay,to:day?.date||firstDay,start:day?.hcStart||'08:00',end:day?.hcEnd||'17:00',note:''}),id:productionRequestId(),token:productionRequestId(),error:undefined,done:false};};
  const [drafts,setDrafts]=useState<Record<string,Draft[]>>(()=>({[context]:[makeRow()]}));
  const [saving,setSaving]=useState(false),[message,setMessage]=useState(''),[historyKind,setHistoryKind]=useState('');
+ const lastCell=useRef<{context:string;id:string;column:number}|null>(null);
  const tableRef=useRef<HTMLDivElement>(null),pendingFocus=useRef<{context:string;id:string;column:number}|null>(null);
  const running=useRef(false),mounted=useRef(true),latest=useRef({context,allowed,active});latest.current={context,allowed,active};
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
@@ -51,7 +54,7 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
   for(const row of rows.filter(row=>!row.done)){
    const person=findPerson(row.employee);let error='';
    if(!person||!candidates(row).some(item=>item.id===person.id))error=globalHr?'Chọn mã hoặc tên nhân viên trong danh sách.':'Chọn đúng nhân viên trong danh sách của Line.';
-   else if(!kinds.includes(row.kind))error='Chọn Nghỉ, Đi trễ hoặc Về sớm.';
+   else if(!kinds.includes(row.kind))error='Chọn Nghỉ hoặc Đi trễ, về sớm.';
    else if(!validDate(row.from)||!validDate(row.to)||row.from<firstDay||row.to>lastDay||row.to<row.from)error='Chọn khoảng ngày hợp lệ trong tháng đang nhập.';
    else if(row.kind!=='Nghỉ'&&row.from!==row.to)error='Đi trễ hoặc về sớm cần ghi theo từng ngày.';
    else if((!validTime(row.start)||!validTime(row.end)||row.start>=row.end))error='Chọn giờ kết thúc sau giờ bắt đầu trong cùng ngày.';
@@ -80,8 +83,8 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
   }finally{running.current=false;if(mounted.current)setSaving(false);}
  }
  const outstanding=rows.filter(row=>!row.done).length;
- const monthEvents=effectiveAttendance(events,true).filter((event:Row)=>['absence','line-absence','attendance-override'].includes(event.kind)&&kinds.includes(event.absenceType)&&(globalHr||event.line===line)&&!event.hrScopeProjection&&new Date(Date.parse(event.effectiveAt)+7*3600000).toISOString().slice(0,7)===month).sort((a:Row,b:Row)=>String(b.effectiveAt).localeCompare(String(a.effectiveAt))||String(a.id).localeCompare(String(b.id)));
- const historyEvents=monthEvents.filter((event:Row)=>!historyKind||event.absenceType===historyKind);
+ const monthEvents=effectiveAttendance(events,true).filter((event:Row)=>['absence','line-absence','attendance-override'].includes(event.kind)&&hrAttendanceTypes.includes(event.absenceType)&&(globalHr||event.line===line)&&!event.hrScopeProjection&&new Date(Date.parse(event.effectiveAt)+7*3600000).toISOString().slice(0,7)===month).sort((a:Row,b:Row)=>String(b.effectiveAt).localeCompare(String(a.effectiveAt))||String(a.id).localeCompare(String(b.id)));
+ const historyEvents=monthEvents.filter((event:Row)=>!historyKind||attendanceDisplayType(event.absenceType)===historyKind);
  const focusRow=(id:string,column:number)=>{const tr=[...tableRef.current?.querySelectorAll<HTMLTableRowElement>('[data-hr-draft-id]')||[]].find(tr=>tr.dataset.hrDraftId===id);const cell=tr?.cells[column];const control=cell?.querySelector<HTMLElement>('input:not(:disabled),select:not(:disabled),button:not(:disabled)')||tr?.querySelector<HTMLElement>('input:not(:disabled),select:not(:disabled)');control?.focus();control?.scrollIntoView?.({block:'nearest',inline:'nearest'});};
  useLayoutEffect(()=>{const target=pendingFocus.current;if(target&&target.context===context&&active&&!disabled){pendingFocus.current=null;focusRow(target.id,target.column);}},[rows,context,active,disabled]);
  function moveRow(event:React.KeyboardEvent<HTMLTableRowElement>,row:Draft,index:number){
@@ -89,26 +92,44 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
   const target=event.target as HTMLElement,cell=target.closest('td');if(!cell||!event.currentTarget.contains(target))return;
   // Open autocomplete/clock pickers own their arrow keys until selection closes.
   if(target.getAttribute('role')==='combobox'&&target.getAttribute('aria-expanded')==='true'&&!findPerson(row.employee)||cell.querySelector('button[aria-expanded=true]')||target.closest('[role=listbox],.cap-clock-picker'))return;
-  event.preventDefault();event.stopPropagation();const column=(cell as HTMLTableCellElement).cellIndex,step=event.key==='ArrowDown'?1:-1;
+  event.preventDefault();event.stopPropagation();navigateRow(index,(cell as HTMLTableCellElement).cellIndex,event.key==='ArrowDown'?1:-1);
+ }
+ function navigateRow(index:number,column:number,step:number){
+  if(disabled)return;
   let next=index+step;while(next>=0&&next<rows.length&&rows[next].done)next+=step;
   if(next>=0&&next<rows.length){focusRow(rows[next].id,column);return;}
-  if(step===1&&rows.length<100){const added=makeRow();pendingFocus.current={context,id:added.id,column};setDrafts(old=>({...old,[context]:[...(old[context]||[]),added]}));}
+  if(step===1&&rows.length<100)addRow(column);
  }
+ function addRow(column=0){
+  if(disabled||rows.length>=100)return;
+  const added=makeRow();pendingFocus.current={context,id:added.id,column};
+  setDrafts(old=>({...old,[context]:[...(old[context]||[]),added]}));
+ }
+ function navigateSelectedRow(step:number){
+  const selected=lastCell.current;
+  const index=selected?.context===context?rows.findIndex(row=>row.id===selected.id&&!row.done):-1;
+  navigateRow(index>=0?index:rows.findIndex(row=>!row.done),index>=0?selected!.column:0,step);
+ }
+
 
  // Unmount input popovers when leaving this screen; row drafts remain in this component.
  if(!active)return null;
  return <section className={styles.entry} aria-label={t('Ghi nhận chấm công')} data-hr-attendance-entry="true">
   <h2>{t('Ghi nhận chấm công')}{!globalHr&&` · Line ${line}`}</h2>
-  <StandardToolbar name="HrAttendanceEntry" items={[
+  <HrAbsenceImport month={month} allowed={allowed&&globalHr} busy={saving||busy} t={t} items={[
    toolbar.field('Tháng ghi nhận',[toolbar.input({type:'month',value:month,'aria-label':'Tháng ghi nhận',disabled:saving||busy,onChange:event=>{if(/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value))setMonth(event.target.value);}})]),
    toolbar.note(`${t('Hạn ghi nhận')}: ${hrAttendanceDeadline(month)?.split('-').reverse().join('/')} · GMT+7`),
    toolbar.action({disabled:saving,disabledExplanation:'Đang lưu. Vui lòng chờ hoàn tất trước khi quay lại.',onClick:back},'Quay lại',true,'back'),
   ]}/>
   <p>{t(globalHr?'Nhập tất cả nhân viên A/B/C, không cần chọn Line. Chỉ tính giờ tại khoảng người đó thực sự tham gia sản xuất ở A/B.':'Mỗi dòng là một trường hợp. Nghỉ nhiều ngày dùng Từ ngày – Đến ngày; ngày không làm việc được bỏ qua.')}</p>
-  <p>{t('Nhấn ↓ để xuống dòng tiếp theo; ở dòng cuối sẽ tự thêm dòng. Nhấn ↑ để quay lại dòng trước.')}</p>
+  <div className={styles.navigation}>
+   <FeedbackActionButton type="button" aria-label={t('Xuống dòng tiếp theo')} disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." onClick={()=>navigateSelectedRow(1)}>↓</FeedbackActionButton>
+   <FeedbackActionButton type="button" aria-label={t('Lên dòng trước')} disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." onClick={()=>navigateSelectedRow(-1)}>↑</FeedbackActionButton>
+   <span>{t('Nhấn ↓ để xuống dòng tiếp theo; ở dòng cuối sẽ tự thêm dòng. Nhấn ↑ để quay lại dòng trước.')}</span>
+  </div>
   {message&&<p role="status">{message}</p>}
   <div ref={tableRef}><DataTable className={`table-wrap ${styles.table}`}><table data-no-pagination="true"><thead><tr>{['Nhân viên','Loại ghi nhận','Từ ngày','Đến ngày','Từ giờ','Đến giờ','Ghi chú','Trạng thái','Thao tác'].map(label=><th key={label}>{t(label)}</th>)}</tr></thead><tbody>
-   {rows.map((row,index)=>{const person=findPerson(row.employee),locked=disabled||row.done;return <tr key={row.id} data-hr-row={index+1} data-hr-draft-id={row.id} onKeyDownCapture={event=>moveRow(event,row,index)} onKeyDown={event=>{if(event.key!=='Enter'||event.defaultPrevented||event.nativeEvent.isComposing||event.nativeEvent.keyCode===229||event.repeat||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey)return;if(!(event.target instanceof HTMLInputElement)||event.target.getAttribute('aria-expanded')==='true')return;event.preventDefault();const inputs=[...event.currentTarget.querySelectorAll<HTMLInputElement|HTMLSelectElement>('input:not(:disabled),select:not(:disabled)')];const next=inputs[inputs.indexOf(event.target)+1];if(next)next.focus();else if(index===rows.length-1&&!disabled&&!row.done&&rows.length<100)setDrafts(old=>({...old,[context]:[...(old[context]||[]),makeRow()]}));}}>
+   {rows.map((row,index)=>{const person=findPerson(row.employee),locked=disabled||row.done;return <tr key={row.id} data-hr-row={index+1} data-hr-draft-id={row.id} onFocusCapture={event=>{const cell=(event.target as HTMLElement).closest('td');if(cell)lastCell.current={context,id:row.id,column:cell.cellIndex};}} onKeyDownCapture={event=>moveRow(event,row,index)} onKeyDown={event=>{if(event.key!=='Enter'||event.defaultPrevented||event.nativeEvent.isComposing||event.nativeEvent.keyCode===229||event.repeat||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey)return;if(!(event.target instanceof HTMLInputElement)||event.target.getAttribute('aria-expanded')==='true')return;event.preventDefault();const inputs=[...event.currentTarget.querySelectorAll<HTMLInputElement|HTMLSelectElement>('input:not(:disabled),select:not(:disabled)')];const next=inputs[inputs.indexOf(event.target)+1];if(next)next.focus();else if(index===rows.length-1&&!disabled&&!row.done&&rows.length<100)setDrafts(old=>({...old,[context]:[...(old[context]||[]),makeRow()]}));}}>
     <DataCell><LookupInput aria-label={`${t('Nhân viên')} ${index+1}`} value={person?`${person.sourceEmployeeId||person.id} · ${person.name||''}`:row.employee} disabled={locked} options={employeeLookupOptions(candidates(row) as {id:string}[]).map(option=>({...option,searchText:`${option.searchText} ${option.label}`}))} locale={locale} placeholder={t('Mã hoặc tên nhân viên')} onChange={event=>update(row.id,{employee:event.target.value})}/></DataCell>
     <DataCell><select aria-label={`${t('Loại ghi nhận')} ${index+1}`} value={row.kind} disabled={locked} onChange={event=>update(row.id,{kind:event.target.value,to:row.from})}>{kinds.map(kind=><option key={kind} value={kind}>{t(kind)}</option>)}</select></DataCell>
     <DataCell><input aria-label={`${t('Từ ngày')} ${index+1}`} type="date" min={firstDay} max={lastDay} value={row.from} disabled={locked} onChange={event=>update(row.id,{from:event.target.value,to:row.kind==='Nghỉ'&&row.to>=event.target.value?row.to:event.target.value})}/></DataCell>
@@ -120,13 +141,13 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
     <DataCell><div className={styles.actions}><FeedbackActionButton type="button" disabled={disabled||rows.length>=100} disabledExplanation={disabled?'Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận.':'Bảng đã có tối đa 100 dòng. Lưu các dòng hiện tại trước khi nhập tiếp.'} onClick={()=>setDrafts(old=>({...old,[context]:[...(old[context]||[]),makeRow(row)]}))}>{t('Sao chép')}</FeedbackActionButton>{!row.done&&<FeedbackActionButton type="button" disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." onClick={()=>{const empty=makeRow();setDrafts(old=>{const remaining=(old[context]||[]).filter(item=>item.id!==row.id);return {...old,[context]:remaining.some(item=>!item.done)?remaining:[...remaining,empty]};});}}>{t('Xóa dòng')}</FeedbackActionButton>}</div></DataCell>
    </tr>;})}
   </tbody></table></DataTable></div>
-  <div className="document-footer-actions" data-hr-save-footer="true"><FeedbackActionButton type="button" disabled={disabled||rows.length>=100} disabledExplanation={disabled?'Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận.':'Bảng đã có tối đa 100 dòng. Lưu các dòng hiện tại trước khi nhập tiếp.'} onClick={()=>setDrafts(old=>({...old,[context]:[...(old[context]||[]),makeRow()]}))}>{t('Thêm dòng')}</FeedbackActionButton><FeedbackActionButton type="button" className="primary-button" disabled={disabled||!outstanding} disabledExplanation={!allowed?'Bạn chưa có quyền ghi nhận chấm công.':!monthOpen?'Tháng này đã hết hạn ghi nhận. Hạn là hết ngày 10 tháng sau.':saving||busy?'Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại.':'Không có dòng mới để lưu.'} onClick={commit}>{saving?t('Đang lưu…'):`${t('Lưu ghi nhận')} · ${outstanding} ${t('dòng')}`}</FeedbackActionButton></div>
+  <div className={`document-footer-actions ${styles.footer}`} data-hr-save-footer="true"><FeedbackActionButton type="button" disabled={disabled||rows.length>=100} disabledExplanation={disabled?'Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận.':'Bảng đã có tối đa 100 dòng. Lưu các dòng hiện tại trước khi nhập tiếp.'} onClick={()=>addRow()}>{t('Thêm dòng')}</FeedbackActionButton><FeedbackActionButton type="button" className="primary-button" disabled={disabled||!outstanding} disabledExplanation={!allowed?'Bạn chưa có quyền ghi nhận chấm công.':!monthOpen?'Tháng này đã hết hạn ghi nhận. Hạn là hết ngày 10 tháng sau.':saving||busy?'Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại.':'Không có dòng mới để lưu.'} onClick={commit}>{saving?t('Đang lưu…'):t('Lưu')}</FeedbackActionButton></div>
   <h3>{t('Đã ghi nhận trong tháng')}</h3>
   <StandardToolbar name="HrAttendanceHistory" items={[
-   ...['',...kinds].map(kind=>toolbar.action({'aria-current':historyKind===kind?'true':undefined,onClick:()=>setHistoryKind(kind)},`${t(kind||'Tất cả')} · ${kind?monthEvents.filter((event:Row)=>event.absenceType===kind).length:monthEvents.length}`,true,'action')),
+   ...['',...kinds].map(kind=>toolbar.action({'aria-current':historyKind===kind?'true':undefined,onClick:()=>setHistoryKind(kind)},`${t(kind||'Tất cả')} · ${kind?monthEvents.filter((event:Row)=>attendanceDisplayType(event.absenceType)===kind).length:monthEvents.length}`,true,'action')),
    toolbar.note(`${historyEvents.length} / ${monthEvents.length} ${t('bản ghi')}`),
   ]}/>
-  <DataTable className={`table-wrap ${styles.table} ${styles.history}`}><table data-no-pagination="true"><thead><tr>{['Nhân viên','Loại ghi nhận','Ngày','Từ giờ','Đến giờ','Ghi chú','Người ghi nhận','Thời điểm ghi nhận','Thao tác'].map(label=><th key={label}>{t(label)}</th>)}</tr></thead><tbody>{historyEvents.map((event:Row)=><tr key={event.id} data-hr-history-row="true"><DataCell>{(event.employees||[]).map((id:string)=>{const person=employees.find(person=>person.id===id);return <div key={id}>{person?`${person.sourceEmployeeId||person.id} · ${person.name}`:event.employeeDetails?.find((person:Row)=>person.id===id)?.name||id}</div>;})}</DataCell><DataCell>{event.absenceType}</DataCell><DataCell>{new Date(Date.parse(event.effectiveAt)+7*3600000).toISOString().slice(0,10).split('-').reverse().join('/')}</DataCell><DataCell>{displayClock(event.effectiveAt)}</DataCell><DataCell>{event.openArrival?'Chưa đến':displayClock(event.endsAt)}</DataCell><DataCell>{event.reason||'—'}</DataCell><DataCell>{event.actor||'—'}</DataCell><DataCell>{event.recordedAt?new Date(event.recordedAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour12:false}):'—'}</DataCell><DataCell><div className={styles.actions}><FeedbackActionButton type="button" disabled={disabled} disabledExplanation={!monthOpen?'Tháng này đã hết hạn ghi nhận. Hạn là hết ngày 10 tháng sau.':'Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại.'} onClick={()=>{setEditEntry(event);setCancelOnly(false);}}>{t('Sửa')}</FeedbackActionButton><FeedbackActionButton type="button" disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." data-action-tone="danger" onClick={()=>{setEditEntry(event);setCancelOnly(true);}}>{t('Hủy bản ghi')}</FeedbackActionButton></div></DataCell></tr>)}{!historyEvents.length&&<tr><DataCell colSpan={9}>{t('Không có bản ghi phù hợp trong tháng.')}</DataCell></tr>}</tbody></table></DataTable>
+  <DataTable className={`table-wrap ${styles.table} ${styles.history}`}><table data-no-pagination="true"><thead><tr>{['Nhân viên','Loại ghi nhận','Ngày','Từ giờ','Đến giờ','Ghi chú','Người ghi nhận','Thời điểm ghi nhận','Thao tác'].map(label=><th key={label}>{t(label)}</th>)}</tr></thead><tbody>{historyEvents.map((event:Row)=><tr key={event.id} data-hr-history-row="true"><DataCell>{(event.employees||[]).map((id:string)=>{const person=employees.find(person=>person.id===id);return <div key={id}>{person?`${person.sourceEmployeeId||person.id} · ${person.name}`:event.employeeDetails?.find((person:Row)=>person.id===id)?.name||id}</div>;})}</DataCell><DataCell>{t(attendanceDisplayType(event.absenceType))}</DataCell><DataCell>{new Date(Date.parse(event.effectiveAt)+7*3600000).toISOString().slice(0,10).split('-').reverse().join('/')}</DataCell><DataCell>{displayClock(event.effectiveAt)}</DataCell><DataCell>{event.openArrival?'Chưa đến':displayClock(event.endsAt)}</DataCell><DataCell>{event.reason||'—'}</DataCell><DataCell>{event.actor||'—'}</DataCell><DataCell>{event.recordedAt?new Date(event.recordedAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour12:false}):'—'}</DataCell><DataCell><div className={styles.actions}><FeedbackActionButton type="button" disabled={disabled} disabledExplanation={!monthOpen?'Tháng này đã hết hạn ghi nhận. Hạn là hết ngày 10 tháng sau.':'Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại.'} onClick={()=>{setEditEntry(event);setCancelOnly(false);}}>{t('Sửa')}</FeedbackActionButton><FeedbackActionButton type="button" disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." data-action-tone="danger" onClick={()=>{setEditEntry(event);setCancelOnly(true);}}>{t('Hủy bản ghi')}</FeedbackActionButton></div></DataCell></tr>)}{!historyEvents.length&&<tr><DataCell colSpan={9}>{t('Không có bản ghi phù hợp trong tháng.')}</DataCell></tr>}</tbody></table></DataTable>
   {editEntry&&allowed&&<ActualLaborEdit entry={editEntry} cancelOnly={cancelOnly} employees={employees} manager={false} hr={allowed} fixedLine busy={busy} save={save} close={()=>setEditEntry(null)}/>}
   <p>{t('Dòng đã lưu không gửi lại. Dùng Sửa hoặc Hủy bản ghi tại bảng Đã ghi nhận trong tháng.')}</p>
  </section>;

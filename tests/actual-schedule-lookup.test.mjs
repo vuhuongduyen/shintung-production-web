@@ -37,7 +37,7 @@ test('one toolbar combines month/Line/type/name lookup in one search; changing c
  try{
   const calendar=m.host.querySelector('[data-actual-calendar]');const t=await lookup(m.host);
   assert.equal(calendar.hidden,true);assert.match(results(m.host),/A_NGHI|B_NGHI/);
-  await choose(t.querySelector('[aria-label="Line tra cứu"]'),'B');await click(t.querySelector('[aria-label="Loại biến động tra cứu"]'));await click([...document.querySelectorAll('[role=group] label')].find(n=>n.textContent==='Đi trễ').querySelector('input'));await click(t.querySelector('[aria-label="Loại biến động tra cứu"]')); await change(t.querySelector('[aria-label="Nhân viên tra cứu"]'),'thử B');
+  await choose(t.querySelector('[aria-label="Line tra cứu"]'),'B');await click(t.querySelector('[aria-label="Loại biến động tra cứu"]'));await click([...document.querySelectorAll('[role=group] label')].find(n=>n.textContent==='Đi trễ, về sớm').querySelector('input'));await click(t.querySelector('[aria-label="Loại biến động tra cứu"]')); await change(t.querySelector('[aria-label="Nhân viên tra cứu"]'),'thử B');
   assert.equal(calendar.hidden,true);await enter(t.querySelector('[aria-label="Nhân viên tra cứu"]'));
   assert.equal(calendar.hidden,true);assert.equal(m.host.querySelectorAll('[data-standard-toolbar]').length,1);assert.equal([...m.host.querySelectorAll('button')].filter(n=>n.textContent==='Quay lại').length,1);
   assert.match(results(m.host),/B_TRE/);assert.doesNotMatch(results(m.host),/A_NGHI|B_NGHI|OCT/);assert.equal(lineChanges,0);assert.equal(weekChanges,0);
@@ -145,7 +145,7 @@ test('recall button opens shared 24h form, multi-select submits bounded window w
  const m=await mount(Schedule,{...props,events:[...events,event('B_SOM','B','Về sớm'),event('B_KHO','B','Phụ kho')]});try{
  const t=await lookup(m.host);await click(button(t,'Tìm kiếm'));assert.match(results(m.host),/B_KHO/);
  const trigger=t.querySelector('[aria-label="Loại biến động tra cứu"]');await click(trigger);
- for(const kind of ['Nghỉ','Đi trễ','Về sớm'])await click([...document.querySelectorAll('[role=group] label')].find(n=>n.textContent===kind).querySelector('input'));
+ for(const kind of ['Nghỉ','Đi trễ, về sớm'])await click([...document.querySelectorAll('[role=group] label')].find(n=>n.textContent===kind).querySelector('input'));
  assert.match(results(m.host),/B_KHO/);await click(trigger);await click(button(t,'Tìm kiếm'));
  assert.match(results(m.host),/A_NGHI/);assert.match(results(m.host),/B_TRE/);assert.match(results(m.host),/B_SOM/);assert.doesNotMatch(results(m.host),/B_KHO/);
  assert.equal(m.host.querySelector('.actual-month-results th').textContent,'Nhân viên');assert.match(m.host.querySelector('.actual-month-results tbody td').textContent,/Nhân viên thử/);

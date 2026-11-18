@@ -1,4 +1,8 @@
-import test,{after} from 'node:test';
+import test,{after,beforeEach,afterEach,mock} from 'node:test';
+// October fixtures stay inside their business entry window, regardless of CI date.
+// Only Date is mocked; DOM/Vite timers continue to run normally.
+beforeEach(()=>mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-09T09:00:00Z')}));
+afterEach(()=>mock.timers.reset());
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createServer} from 'vite';
@@ -26,8 +30,8 @@ async function mount(Component=Entry,initial=props){const host=document.createEl
 test('monthly entry saves several kinds in one explicit action, correct dates/Line/employee and no schedule overwrite',async()=>{
  const calls=[],m=await mount(Entry,{...props,save:async body=>{calls.push(body);return true;}});try{
   await change(field(m.host,1,'Nhân viên'),'NV001');await change(field(m.host,1,'Đến ngày'),'2026-10-13');await click(button(m.host,'Thêm dòng'));
-  await change(field(m.host,2,'Nhân viên'),'NV002');await change(field(m.host,2,'Loại ghi nhận'),'Đi trễ');await change(field(m.host,2,'Từ ngày'),'2026-10-14');await change(field(m.host,2,'Đến giờ'),'09:00');
-  assert.equal(calls.length,0);await click(save(m.host));assert.equal(calls.length,2);assert.ok(calls.every(body=>body.action==='line-absence'&&body.line==='A'));assert.deepEqual(calls[0].employees,['TEST-A']);assert.equal(calls[0].dateTo,'2026-10-13');assert.equal(calls[0].effectiveAt,'2026-10-12T01:00:00.000Z');assert.equal(calls[1].absenceType,'Đi trễ');assert.equal(calls[1].endsAt,'2026-10-14T02:00:00.000Z');assert.match(m.host.textContent,/Đã lưu 2 dòng/);assert.equal(save(m.host).disabled,true);
+  await change(field(m.host,2,'Nhân viên'),'NV002');await change(field(m.host,2,'Loại ghi nhận'),'Đi trễ, về sớm');await change(field(m.host,2,'Từ ngày'),'2026-10-14');await change(field(m.host,2,'Đến giờ'),'09:00');
+  assert.equal(calls.length,0);await click(save(m.host));assert.equal(calls.length,2);assert.ok(calls.every(body=>body.action==='line-absence'&&body.line==='A'));assert.deepEqual(calls[0].employees,['TEST-A']);assert.equal(calls[0].dateTo,'2026-10-13');assert.equal(calls[0].effectiveAt,'2026-10-12T01:00:00.000Z');assert.equal(calls[1].absenceType,'Đi trễ, về sớm');assert.equal(calls[1].endsAt,'2026-10-14T02:00:00.000Z');assert.match(m.host.textContent,/Đã lưu 2 dòng/);assert.equal(save(m.host).disabled,true);
  }finally{await m.close();}
 });
 test('invalid employee scope, overlap, dates and no working day block before any request',async()=>{
@@ -54,9 +58,9 @@ test('HR button replaces three tabs, opens separate retained workspace; warehous
   assert.equal(reason.value,'Giữ lý do lịch');await click(button(m.host,'Ghi nhận chấm công'));assert.match(field(m.host.querySelector('[data-hr-attendance-entry]'),1,'Nhân viên').value,/NV001.*Nhân viên thử A/);
  }finally{await m.close();}
 });
-test('month and Line drafts remain separate; all three locales show one entry and the same three HR types',async()=>{
+test('month and Line drafts remain separate; all three locales show one entry and the same two HR types',async()=>{
  const m=await mount();try{await change(field(m.host,1,'Nhân viên'),'NV001');await m.render({...props,line:'B'});assert.equal(field(m.host,1,'Nhân viên').value,'');await change(field(m.host,1,'Nhân viên'),'NV003');await m.render(props);assert.match(field(m.host,1,'Nhân viên').value,/NV001.*Nhân viên thử A/);}finally{await m.close();}
- for(const [locale,title] of [['vi','Ghi nhận chấm công'],['en','Attendance entry'],['zh','出勤登錄']]){document.documentElement.lang=locale;const m=await mount();try{assert.match(m.host.querySelector('h2').textContent,new RegExp(title));assert.deepEqual([...m.host.querySelector('tbody select').options].map(option=>option.value),['Nghỉ','Đi trễ','Về sớm']);assert.equal(m.host.querySelectorAll('[data-standard-toolbar]').length,2);}finally{await m.close();}}document.documentElement.lang='vi';
+ for(const [locale,title] of [['vi','Ghi nhận chấm công'],['en','Attendance entry'],['zh','出勤登錄']]){document.documentElement.lang=locale;const m=await mount();try{assert.match(m.host.querySelector('h2').textContent,new RegExp(title));assert.deepEqual([...m.host.querySelector('tbody select').options].map(option=>option.value),['Nghỉ','Đi trễ, về sớm']);assert.equal(m.host.querySelectorAll('[data-standard-toolbar]').length,2);}finally{await m.close();}}document.documentElement.lang='vi';
 });
 test('monthly entry accepts day 5 outside visible week, combines employee name/code, removes full-day column and spaces actions',async()=>{
  const previous=days.map((day,index)=>({...day,date:`2026-10-${String(5+index).padStart(2,'0')}`}));const calls=[];
@@ -75,7 +79,7 @@ test('drafts can be corrected or deleted and existing month records expose scope
 test('month deadline is inclusive through day 10 GMT+7 and handles year rollover',async()=>{
  const {hrAttendancePeriodOpen,hrAttendanceDeadline}=await import('../lib/hr-attendance-period.mjs');
  assert.equal(hrAttendanceDeadline('2026-12'),'2027-01-10');assert.equal(hrAttendancePeriodOpen('2026-10',Date.parse('2026-11-10T16:59:59.999Z')),true);assert.equal(hrAttendancePeriodOpen('2026-10',Date.parse('2026-11-10T17:00:00.000Z')),false);
- const m=await mount();try{await change(m.host.querySelector('[aria-label="Tháng ghi nhận"]'),'2026-09');assert.equal(save(m.host).disabled,true);assert.match(save(m.host).closest('[role=button]').textContent,/Lưu ghi nhận/);}finally{await m.close();}
+ const m=await mount();try{await change(m.host.querySelector('[aria-label="Tháng ghi nhận"]'),'2026-09');assert.equal(save(m.host).disabled,true);assert.equal(save(m.host).textContent,'Lưu');}finally{await m.close();}
 });
 
 test('unrestricted HR enters C without approved schedule, preserves draft across Line changes and sends employee scope',async()=>{
@@ -116,7 +120,7 @@ test('one Save is below draft table and above complete monthly history; type fil
  let calls=0;const events=['Nghỉ','Đi trễ','Về sớm'].map((absenceType,i)=>({id:`HISTORY-${i}`,kind:'line-absence',attendanceScope:'employee',absenceType,line:['A','B','C'][i],employees:['TEST-A'],effectiveAt:`2026-10-0${i+1}T01:00:00Z`,endsAt:`2026-10-0${i+1}T02:00:00Z`,recordedAt:'2026-10-17T01:00:00Z',approved:true,actor:'Synthetic HR',reason:`Complete note ${i}`}));
  const m=await mount(Entry,{...props,globalHr:true,events,save:async()=>{calls++;return true;}});try{
   await change(field(m.host,1,'Ghi chú'),'Keep draft');assert.equal(m.host.querySelectorAll('[data-hr-save-footer] .primary-button').length,1);assert.equal(m.host.querySelector('[data-standard-toolbar=HrAttendanceEntry]').textContent.includes('Lưu ghi nhận'),false);const footer=m.host.querySelector('[data-hr-save-footer]');assert.ok(footer.previousElementSibling.querySelector('[data-hr-row]'));assert.equal(footer.nextElementSibling.textContent,'Đã ghi nhận trong tháng');assert.equal(m.host.querySelectorAll('[data-hr-history-row]').length,3);
-  const filters=m.host.querySelector('[data-standard-toolbar=HrAttendanceHistory]');for(const kind of ['Nghỉ','Đi trễ','Về sớm']){await click([...filters.querySelectorAll('button')].find(node=>node.textContent===`${kind} · 1`));assert.equal(m.host.querySelectorAll('[data-hr-history-row]').length,1);const record=m.host.querySelector('[data-hr-history-row]');assert.match(record.textContent,new RegExp(kind));assert.match(record.textContent,/Complete note|Synthetic HR/);assert.equal(field(m.host,1,'Ghi chú').value,'Keep draft');}
+  const filters=m.host.querySelector('[data-standard-toolbar=HrAttendanceHistory]');for(const [kind,count] of [['Nghỉ',1],['Đi trễ, về sớm',2]]){await click([...filters.querySelectorAll('button')].find(node=>node.textContent===`${kind} · ${count}`));assert.equal(m.host.querySelectorAll('[data-hr-history-row]').length,count);const record=m.host.querySelector('[data-hr-history-row]');assert.match(record.textContent,new RegExp(kind));assert.match(record.textContent,/Complete note|Synthetic HR/);assert.equal(field(m.host,1,'Ghi chú').value,'Keep draft');}
   await click([...filters.querySelectorAll('button')].find(node=>node.textContent==='Tất cả · 3'));assert.equal(m.host.querySelectorAll('[data-hr-history-row]').length,3);assert.equal(calls,0);
  }finally{await m.close();}
 });
@@ -140,5 +144,32 @@ test('reopening a fully saved batch adds one empty input without resending or de
  const calls=[],initial={...props,globalHr:true,save:async body=>{calls.push(body);return true;}};const m=await mount(Entry,initial);try{
   await change(field(m.host,1,'Nhân viên'),'NV001');await click(save(m.host));assert.equal(calls.length,1);assert.match(row(m.host,1).textContent,/Đã lưu/);
   await m.render({...initial,active:false});await m.render(initial);assert.equal(m.host.querySelectorAll('[data-hr-row]').length,2);assert.match(row(m.host,1).textContent,/Đã lưu/);assert.equal(field(m.host,2,'Nhân viên').value,'');await click(button(row(m.host,2),'Xóa dòng'));assert.equal(m.host.querySelectorAll('[data-hr-row]').length,2);assert.equal(field(m.host,2,'Nhân viên').value,'');assert.equal(calls.length,1);
+ }finally{await m.close();}
+});
+
+test('October entry is open through the final Vietnam deadline millisecond, then read-only without writes',async()=>{
+ mock.timers.setTime(Date.parse('2026-11-10T16:59:59.999Z'));
+ let calls=0;const initial={...props,save:async()=>{calls++;return true;}};
+ const m=await mount(Entry,initial);try{
+  assert.ok(row(m.host,1));await change(field(m.host,1,'Nhân viên'),'NV001');
+  await click(save(m.host));assert.equal(calls,1,'last millisecond of November 10 in GMT+7 remains writable');
+  await click(button(m.host,'Thêm dòng'));await change(field(m.host,2,'Nhân viên'),'NV002');
+  mock.timers.tick(1);await m.render({...initial});
+  assert.equal(field(m.host,2,'Nhân viên').disabled,true,'unsaved entry becomes read-only after the deadline');
+  assert.match(field(m.host,2,'Nhân viên').value,/NV002/,'deadline transition preserves the draft');
+  assert.equal(save(m.host).disabled,true);await click(save(m.host));
+  assert.match(m.host.textContent,/10\/11\/2026|10 tháng sau|hết hạn|khóa/i);
+  assert.equal(calls,1,'crossing deadline and rendering never submits a mutation');
+ }finally{await m.close();}
+});
+
+test('clickable arrows follow the selected cell, add only at end and never save; footer has concise matching actions',async()=>{
+ let writes=0;const m=await mount(Entry,{...props,globalHr:true,save:async()=>{writes++;return true;}});try{
+  const footer=m.host.querySelector('[data-hr-save-footer]');assert.deepEqual([...footer.querySelectorAll('button')].map(b=>b.textContent),['Thêm dòng','Lưu']);
+  const down=m.host.querySelector('button[aria-label="Xuống dòng tiếp theo"]'),up=m.host.querySelector('button[aria-label="Lên dòng trước"]');
+  await act(async()=>field(m.host,1,'Ghi chú').focus());await click(down);assert.equal(document.activeElement,field(m.host,2,'Ghi chú'));
+  await click(up);assert.equal(document.activeElement,field(m.host,1,'Ghi chú'));await click(down);assert.equal(m.host.querySelectorAll('[data-hr-row]').length,2);
+  await click(button(m.host,'Thêm dòng'));assert.equal(document.activeElement,field(m.host,3,'Nhân viên'));assert.equal(writes,0);
+  await m.render({...props,globalHr:true,busy:true});assert.equal(down.disabled,true);assert.equal(up.disabled,true);
  }finally{await m.close();}
 });
