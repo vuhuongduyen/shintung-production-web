@@ -37,6 +37,7 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
  const makeRow=(copy?:Draft):Draft=>{const day=calendarDays.find(day=>day.working&&day.date>=firstDay&&day.date<=lastDay);return {...(copy||{employee:'',kind:'Nghỉ',from:day?.date||firstDay,to:day?.date||firstDay,start:day?.hcStart||'08:00',end:day?.hcEnd||'17:00',note:''}),id:productionRequestId(),token:productionRequestId(),error:undefined,done:false};};
  const [drafts,setDrafts]=useState<Record<string,Draft[]>>(()=>({[context]:[makeRow()]}));
  const [saving,setSaving]=useState(false),[message,setMessage]=useState(''),[historyKind,setHistoryKind]=useState('');
+ const lastCell=useRef<{context:string;id:string;column:number}|null>(null);
  const tableRef=useRef<HTMLDivElement>(null),pendingFocus=useRef<{context:string;id:string;column:number}|null>(null);
  const running=useRef(false),mounted=useRef(true),latest=useRef({context,allowed,active});latest.current={context,allowed,active};
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
@@ -91,11 +92,25 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
   const target=event.target as HTMLElement,cell=target.closest('td');if(!cell||!event.currentTarget.contains(target))return;
   // Open autocomplete/clock pickers own their arrow keys until selection closes.
   if(target.getAttribute('role')==='combobox'&&target.getAttribute('aria-expanded')==='true'&&!findPerson(row.employee)||cell.querySelector('button[aria-expanded=true]')||target.closest('[role=listbox],.cap-clock-picker'))return;
-  event.preventDefault();event.stopPropagation();const column=(cell as HTMLTableCellElement).cellIndex,step=event.key==='ArrowDown'?1:-1;
+  event.preventDefault();event.stopPropagation();navigateRow(index,(cell as HTMLTableCellElement).cellIndex,event.key==='ArrowDown'?1:-1);
+ }
+ function navigateRow(index:number,column:number,step:number){
+  if(disabled)return;
   let next=index+step;while(next>=0&&next<rows.length&&rows[next].done)next+=step;
   if(next>=0&&next<rows.length){focusRow(rows[next].id,column);return;}
-  if(step===1&&rows.length<100){const added=makeRow();pendingFocus.current={context,id:added.id,column};setDrafts(old=>({...old,[context]:[...(old[context]||[]),added]}));}
+  if(step===1&&rows.length<100)addRow(column);
  }
+ function addRow(column=0){
+  if(disabled||rows.length>=100)return;
+  const added=makeRow();pendingFocus.current={context,id:added.id,column};
+  setDrafts(old=>({...old,[context]:[...(old[context]||[]),added]}));
+ }
+ function navigateSelectedRow(step:number){
+  const selected=lastCell.current;
+  const index=selected?.context===context?rows.findIndex(row=>row.id===selected.id&&!row.done):-1;
+  navigateRow(index>=0?index:rows.findIndex(row=>!row.done),index>=0?selected!.column:0,step);
+ }
+
 
  // Unmount input popovers when leaving this screen; row drafts remain in this component.
  if(!active)return null;
@@ -107,10 +122,14 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
    toolbar.action({disabled:saving,disabledExplanation:'Đang lưu. Vui lòng chờ hoàn tất trước khi quay lại.',onClick:back},'Quay lại',true,'back'),
   ]}/>
   <p>{t(globalHr?'Nhập tất cả nhân viên A/B/C, không cần chọn Line. Chỉ tính giờ tại khoảng người đó thực sự tham gia sản xuất ở A/B.':'Mỗi dòng là một trường hợp. Nghỉ nhiều ngày dùng Từ ngày – Đến ngày; ngày không làm việc được bỏ qua.')}</p>
-  <p>{t('Nhấn ↓ để xuống dòng tiếp theo; ở dòng cuối sẽ tự thêm dòng. Nhấn ↑ để quay lại dòng trước.')}</p>
+  <div className={styles.navigation}>
+   <FeedbackActionButton type="button" aria-label={t('Xuống dòng tiếp theo')} disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." onClick={()=>navigateSelectedRow(1)}>↓</FeedbackActionButton>
+   <FeedbackActionButton type="button" aria-label={t('Lên dòng trước')} disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." onClick={()=>navigateSelectedRow(-1)}>↑</FeedbackActionButton>
+   <span>{t('Nhấn ↓ để xuống dòng tiếp theo; ở dòng cuối sẽ tự thêm dòng. Nhấn ↑ để quay lại dòng trước.')}</span>
+  </div>
   {message&&<p role="status">{message}</p>}
   <div ref={tableRef}><DataTable className={`table-wrap ${styles.table}`}><table data-no-pagination="true"><thead><tr>{['Nhân viên','Loại ghi nhận','Từ ngày','Đến ngày','Từ giờ','Đến giờ','Ghi chú','Trạng thái','Thao tác'].map(label=><th key={label}>{t(label)}</th>)}</tr></thead><tbody>
-   {rows.map((row,index)=>{const person=findPerson(row.employee),locked=disabled||row.done;return <tr key={row.id} data-hr-row={index+1} data-hr-draft-id={row.id} onKeyDownCapture={event=>moveRow(event,row,index)} onKeyDown={event=>{if(event.key!=='Enter'||event.defaultPrevented||event.nativeEvent.isComposing||event.nativeEvent.keyCode===229||event.repeat||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey)return;if(!(event.target instanceof HTMLInputElement)||event.target.getAttribute('aria-expanded')==='true')return;event.preventDefault();const inputs=[...event.currentTarget.querySelectorAll<HTMLInputElement|HTMLSelectElement>('input:not(:disabled),select:not(:disabled)')];const next=inputs[inputs.indexOf(event.target)+1];if(next)next.focus();else if(index===rows.length-1&&!disabled&&!row.done&&rows.length<100)setDrafts(old=>({...old,[context]:[...(old[context]||[]),makeRow()]}));}}>
+   {rows.map((row,index)=>{const person=findPerson(row.employee),locked=disabled||row.done;return <tr key={row.id} data-hr-row={index+1} data-hr-draft-id={row.id} onFocusCapture={event=>{const cell=(event.target as HTMLElement).closest('td');if(cell)lastCell.current={context,id:row.id,column:cell.cellIndex};}} onKeyDownCapture={event=>moveRow(event,row,index)} onKeyDown={event=>{if(event.key!=='Enter'||event.defaultPrevented||event.nativeEvent.isComposing||event.nativeEvent.keyCode===229||event.repeat||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey)return;if(!(event.target instanceof HTMLInputElement)||event.target.getAttribute('aria-expanded')==='true')return;event.preventDefault();const inputs=[...event.currentTarget.querySelectorAll<HTMLInputElement|HTMLSelectElement>('input:not(:disabled),select:not(:disabled)')];const next=inputs[inputs.indexOf(event.target)+1];if(next)next.focus();else if(index===rows.length-1&&!disabled&&!row.done&&rows.length<100)setDrafts(old=>({...old,[context]:[...(old[context]||[]),makeRow()]}));}}>
     <DataCell><LookupInput aria-label={`${t('Nhân viên')} ${index+1}`} value={person?`${person.sourceEmployeeId||person.id} · ${person.name||''}`:row.employee} disabled={locked} options={employeeLookupOptions(candidates(row) as {id:string}[]).map(option=>({...option,searchText:`${option.searchText} ${option.label}`}))} locale={locale} placeholder={t('Mã hoặc tên nhân viên')} onChange={event=>update(row.id,{employee:event.target.value})}/></DataCell>
     <DataCell><select aria-label={`${t('Loại ghi nhận')} ${index+1}`} value={row.kind} disabled={locked} onChange={event=>update(row.id,{kind:event.target.value,to:row.from})}>{kinds.map(kind=><option key={kind} value={kind}>{t(kind)}</option>)}</select></DataCell>
     <DataCell><input aria-label={`${t('Từ ngày')} ${index+1}`} type="date" min={firstDay} max={lastDay} value={row.from} disabled={locked} onChange={event=>update(row.id,{from:event.target.value,to:row.kind==='Nghỉ'&&row.to>=event.target.value?row.to:event.target.value})}/></DataCell>
@@ -122,7 +141,7 @@ export default function HrAttendanceEntry({week,line,globalHr=false,days,approve
     <DataCell><div className={styles.actions}><FeedbackActionButton type="button" disabled={disabled||rows.length>=100} disabledExplanation={disabled?'Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận.':'Bảng đã có tối đa 100 dòng. Lưu các dòng hiện tại trước khi nhập tiếp.'} onClick={()=>setDrafts(old=>({...old,[context]:[...(old[context]||[]),makeRow(row)]}))}>{t('Sao chép')}</FeedbackActionButton>{!row.done&&<FeedbackActionButton type="button" disabled={disabled} disabledExplanation="Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận." onClick={()=>{const empty=makeRow();setDrafts(old=>{const remaining=(old[context]||[]).filter(item=>item.id!==row.id);return {...old,[context]:remaining.some(item=>!item.done)?remaining:[...remaining,empty]};});}}>{t('Xóa dòng')}</FeedbackActionButton>}</div></DataCell>
    </tr>;})}
   </tbody></table></DataTable></div>
-  <div className="document-footer-actions" data-hr-save-footer="true"><FeedbackActionButton type="button" disabled={disabled||rows.length>=100} disabledExplanation={disabled?'Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận.':'Bảng đã có tối đa 100 dòng. Lưu các dòng hiện tại trước khi nhập tiếp.'} onClick={()=>setDrafts(old=>({...old,[context]:[...(old[context]||[]),makeRow()]}))}>{t('Thêm dòng')}</FeedbackActionButton><FeedbackActionButton type="button" className="primary-button" disabled={disabled||!outstanding} disabledExplanation={!allowed?'Bạn chưa có quyền ghi nhận chấm công.':!monthOpen?'Tháng này đã hết hạn ghi nhận. Hạn là hết ngày 10 tháng sau.':saving||busy?'Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại.':'Không có dòng mới để lưu.'} onClick={commit}>{saving?t('Đang lưu…'):`${t('Lưu ghi nhận')} · ${outstanding} ${t('dòng')}`}</FeedbackActionButton></div>
+  <div className={`document-footer-actions ${styles.footer}`} data-hr-save-footer="true"><FeedbackActionButton type="button" disabled={disabled||rows.length>=100} disabledExplanation={disabled?'Đang xử lý hoặc tháng đã khóa. Kiểm tra quyền và hạn ghi nhận.':'Bảng đã có tối đa 100 dòng. Lưu các dòng hiện tại trước khi nhập tiếp.'} onClick={()=>addRow()}>{t('Thêm dòng')}</FeedbackActionButton><FeedbackActionButton type="button" className="primary-button" disabled={disabled||!outstanding} disabledExplanation={!allowed?'Bạn chưa có quyền ghi nhận chấm công.':!monthOpen?'Tháng này đã hết hạn ghi nhận. Hạn là hết ngày 10 tháng sau.':saving||busy?'Đang xử lý. Vui lòng chờ hoàn tất rồi thử lại.':'Không có dòng mới để lưu.'} onClick={commit}>{saving?t('Đang lưu…'):t('Lưu')}</FeedbackActionButton></div>
   <h3>{t('Đã ghi nhận trong tháng')}</h3>
   <StandardToolbar name="HrAttendanceHistory" items={[
    ...['',...kinds].map(kind=>toolbar.action({'aria-current':historyKind===kind?'true':undefined,onClick:()=>setHistoryKind(kind)},`${t(kind||'Tất cả')} · ${kind?monthEvents.filter((event:Row)=>attendanceDisplayType(event.absenceType)===kind).length:monthEvents.length}`,true,'action')),
