@@ -12,3 +12,9 @@
 .history td{white-space:normal;min-width:90px}.history td:first-child{min-width:230px}.history td:nth-child(6){min-width:220px;max-width:360px;overflow-wrap:anywhere}
 
 :global(html body) .entry .history td{white-space:normal!important}
+
+.navigation{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:4px 0}
+:global(html body) .entry .footer button,:global(html body) .entry .navigation button{box-sizing:border-box;height:36px;min-height:36px;padding:4px 12px;border:1px solid #b8cfb9;border-radius:4px;background:#fff;color:#286440;font:inherit;cursor:pointer;box-shadow:none}
+:global(html body) .entry .footer button{min-width:100px;font-weight:600}
+:global(html body) .entry .footer button:global(.primary-button){background:#167738;color:#fff;border-color:#167738}
+:global(html body) .entry .footer button:focus-visible,:global(html body) .entry .navigation button:focus-visible{outline:2px solid #286440;outline-offset:2px}

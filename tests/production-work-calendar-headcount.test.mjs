@@ -125,7 +125,7 @@ test('no-calendar days retain concise actual records including pending and open 
  const html=banner({schedules:[],events:[hr({absenceType:'Đi trễ',approved:false,openArrival:true})]});
  assert.equal(countText(html),undefined);
  assert.match(html,/<summary>Nhân lực<\/summary>/);
- assert.match(html,/Đi trễ: Nhân viên giả B0 \(TEST-0\) · 09:00–17:00 · Chưa đến · Chờ duyệt/);
+ assert.match(html,/Đi trễ, về sớm: Nhân viên giả B0 \(TEST-0\) · 09:00–17:00 · Chưa đến · Chờ duyệt/);
  assert.doesNotMatch(html,/Thực tế ·|giờ kết thúc dự kiến|Chờ duyệt điều chỉnh giờ/);
  assert.doesNotMatch(html,/<details[^>]* open/);
  const unnamed=banner({schedules:[],events:[hr({employees:[],count:2})]});
@@ -148,7 +148,7 @@ test('source-only LSX absences retain their Line-resolved record in collapsed fa
  const event=hr({line:undefined,sourceId:'TEST-LSX-SOURCE',absenceType:'Về sớm',effectiveAt:`${date}T16:00:00+07:00`});
  const html=banner({events:[event],orders:[{id:'TEST-LSX-SOURCE',line:'B'}]});
  assert.match(html,/<summary>Ghi nhận khác<\/summary><ul aria-label="Ghi nhận nghỉ Line B">/);
- assert.match(html,/Về sớm: Nhân viên giả B0 \(TEST-0\) · 16:00–17:00/);
+ assert.match(html,/Đi trễ, về sớm: Nhân viên giả B0 \(TEST-0\) · 16:00–17:00/);
  assert.doesNotMatch(html,/<details[^>]* open/);
- assert.doesNotMatch(banner({line:'C',events:[event],orders:[{id:'TEST-LSX-SOURCE',line:'B'}]}),/Về sớm: Nhân viên giả B0/);
+ assert.doesNotMatch(banner({line:'C',events:[event],orders:[{id:'TEST-LSX-SOURCE',line:'B'}]}),/Đi trễ, về sớm: Nhân viên giả B0/);
 });

@@ -1,3 +1,6 @@
+import {readEmployeeAttendance} from './hr-attendance-records.mjs';
+import {hrImportActions} from '../../lib/hr-absence-import.mjs';
+import {handleHrAbsenceImport} from './hr-absence-import.mjs';
 import {progressReadPayload,workspaceReadPayload} from './production-progress-read.mjs';
 import {quantitySourceDatabase} from './production-quantity-cutover.mjs';
 import {quantityCompletion} from '../../lib/production-quantity-intake.mjs';
@@ -388,11 +391,13 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
 // New reporting never derives or rewrites legacy per-order hours from an HR save.
 // Keep the actual attendance/movement timeline and roster validation unchanged.
 async function dailyAttendanceContext(db,actor,calendar,body={}){
+ const hrOnly=body.action==='line-absence'&&body.attendanceScope==='employee'&&canHr(actor)&&!actor.line;
+ const ids=Array.isArray(body.employees)?body.employees.map(upper):[];
  const orderFields=['id','planId','planRowId','sku','name','spec','line','lsxCode','lsxQty','columns','week','syncStatus','status','cancelReason'];
  const projection=`json_object(${orderFields.flatMap(k=>[`'${k}'`,`json_extract(payload,'$.${k}')`]).join(',')})`;
  const [orderRows,eventRows,directory]=await Promise.all([
-  body.action==='warehouse-duty'?Promise.resolve([]):readRecordPages(db,{where:"entity='in_transit'",payloadExpression:projection}),
-  readRecordPages(db,{where:"entity='production_event'",payloadExpression:"json_remove(payload,'$.sourceSnapshot','$.sourceRow','$.history','$.overlapWarnings')"}),
+  hrOnly||body.action==='warehouse-duty'?Promise.resolve([]):readRecordPages(db,{where:"entity='in_transit'",payloadExpression:projection}),
+  hrOnly?readEmployeeAttendance(db,ids,{payloadExpression:"json_remove(payload,'$.sourceSnapshot','$.sourceRow','$.history','$.overlapWarnings')"}):readRecordPages(db,{where:"entity='production_event'",payloadExpression:"json_remove(payload,'$.sourceSnapshot','$.sourceRow','$.history','$.overlapWarnings')"}),
   rows(db,'employees')
  ]);
  const payrollEmployees=directory.map(r=>({...r.payload,id:r.key})),employees=payrollEmployees.map(p=>({...p,active:employeeActiveOn(p)})).filter(p=>p.active!==false);
@@ -408,6 +413,10 @@ export async function mutateProductionWorkflow(db, body, actor, catalog = []) {
  return {...result,...(result.event?{event:visible.events.find(row=>row.id===result.event.id)||null}:{}),...(result.report?{report:visible.reports.find(row=>row.id===result.report.id)||null}:{}),...(result.events?{events:result.events.map(event=>visible.events.find(row=>row.id===event.id)).filter(Boolean)}:{}),...(result.reports?{reports:result.reports.map(report=>visible.reports.find(row=>row.id===report.id)).filter(Boolean)}:{})};
 }
 async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], responseScope={}) {
+  if(hrImportActions.has(body.action)){
+    const policy=await readDailyOutputPolicy(db);
+    return handleHrAbsenceImport(db,body,actor,{policy,commit:(...args)=>commitEvents(...args,true),calendar:async()=>{const c=await schedules(db);return [...c.approved.entries()].map(([key,r])=>({...r,key,line:key.split(':')[1],days:resolveSchedule(c,...key.split(':')).days}));}});
+  }
   if (!workflowActionAllowed(actor,body)) fail("Không có quyền thao tác tại menu này.",403);
   if (!canWork(actor)&&!canHr(actor)) fail("Không có quyền ghi dữ liệu sản xuất.", 403);
   const action = String(body.action || ""), permittedActions = ["daily-output","recalculate-attendance-hours","staff-recall", "staff-recall-approve", "warehouse-duty", "preview-report", "attendance-edit", "attendance-cancel", "line-movement", "attendance-correction", "extra", "start", "transfer", "add", "reduce", "absence", "line-absence", "attendance-override", "schedule", "pause", "resume", "incident", "complete", "approve-hours"];
@@ -460,7 +469,7 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   const expectedCursor=cursorBefore?.payload||JSON.stringify({version:0,token:""});
   const policyGuard={sql:activation.raw===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity='production_reporting_policy' AND record_key='global')":"EXISTS(SELECT 1 FROM app_records WHERE entity='production_reporting_policy' AND record_key='global' AND payload=?)",args:activation.raw===null?[]:[activation.raw]};
   const manifestGuard=activation.manifestKey?{sql:activation.manifestRaw===null?"NOT EXISTS(SELECT 1 FROM app_records WHERE entity='production_legacy_manifest' AND record_key=?)":"EXISTS(SELECT 1 FROM app_records WHERE entity='production_legacy_manifest' AND record_key=? AND payload=?)",args:activation.manifestRaw===null?[activation.manifestKey]:[activation.manifestKey,activation.manifestRaw]}:null;
-  const commit=(db,actor,now,items,report=null,record=null,extraRecords=[])=>commitEvents(db,actor,now,items,report,record,expectedCursor,extraRecords,[policyGuard,...(manifestGuard?[manifestGuard]:[])]);
+  const commit=(db,actor,now,items,report=null,record=null,extraRecords=[])=>commitEvents(db,actor,now,items,report,record,expectedCursor,extraRecords,[policyGuard,...(manifestGuard?[manifestGuard]:[])],Boolean(activation.policy?.active&&action==='line-absence'&&body.attendanceScope==='employee'&&canHr(actor)&&!actor.line));
   const mutationReads=workflowReadSnapshot(db);
   const calendarPromise=schedules(mutationReads);
   const statePromise=activation.policy?.active&&dailyAttendanceActions.has(action)?calendarPromise.then(calendar=>dailyAttendanceContext(mutationReads,actor,calendar,body)):readProductionWorkflow(mutationReads,{...actor,line:null},catalog,{includeDerivedHours:!body.stageEntries,stageValidation:Boolean(body.stageEntries)});
@@ -606,8 +615,8 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
       event={...original,id:crypto.randomUUID(),kind:"attendance-cancel",supersedes:original.id,approvedFrom:original.approvedFrom,approved:true,before:original,after:{cancelled:true},reason,recordedAt:now,actor:actor.login,requestIdempotency:requestId||undefined};
     } else if(action==='attendance-edit'&&original.kind!=='line-movement') {
       const absenceType=String(body.absenceType||original.absenceType);let line=upper(body.line||original.line);
-      const personal=personalHrEvent(original);if(personal&&!['Nghỉ','Đi trễ','Về sớm'].includes(absenceType))fail('HR theo nhân viên chỉ ghi Nghỉ, Đi trễ hoặc Về sớm.');
-      if(!['Nghỉ','Đi trễ','Về sớm','Phụ kho','CV khác'].includes(absenceType)||(!personal&&!['A','B'].includes(line))||!permitted(actor,line))fail('Chọn loại và Line hợp lệ.');
+      const personal=personalHrEvent(original);if(personal&&!['Nghỉ','Đi trễ','Về sớm','Đi trễ, về sớm'].includes(absenceType))fail('HR theo nhân viên chỉ ghi Nghỉ, Đi trễ hoặc Về sớm.');
+      if(!['Nghỉ','Đi trễ','Về sớm','Đi trễ, về sớm','Phụ kho','CV khác'].includes(absenceType)||(!personal&&!['A','B'].includes(line))||!permitted(actor,line))fail('Chọn loại và Line hợp lệ.');
       if(isManagerWork(absenceType)?!canManage(actor):!canHr(actor))fail('Không có quyền sửa loại biến động này.',403);
       const employees=[...new Set((body.employees||original.employees||[]).map(upper))];
       if(!employees.length||employees.some(id=>!state.employees.some(p=>upper(p.id)===id)))fail('Chọn nhân viên trong danh sách.');
@@ -685,9 +694,9 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
       fail("Khoảng nhiều ngày hiện chỉ áp dụng cho đăng ký nghỉ.");
     const directory = new Map(state.employees.map(item=>[upper(item.id),item]));
     if (employees.some(id=>!directory.has(id))) fail("Nhân viên không có trong Danh sách nhân viên đang làm.");
-    if(personal){if(action!=='line-absence'||employees.length!==1||!['Nghỉ','Đi trễ','Về sớm'].includes(body.absenceType))fail('HR theo nhân viên chỉ ghi một người với Nghỉ, Đi trễ hoặc Về sớm.');line=upper(directory.get(employees[0])?.line)||null;}
+    if(personal){if(action!=='line-absence'||employees.length!==1||!['Nghỉ','Đi trễ','Về sớm','Đi trễ, về sớm'].includes(body.absenceType))fail('HR theo nhân viên chỉ ghi một người với Nghỉ, Đi trễ hoặc Về sớm.');line=upper(directory.get(employees[0])?.line)||null;}
     const absenceType=action==="attendance-override"?"Có mặt":String(body.absenceType||"Nghỉ");
-    if(action==="line-absence"&&!["Nghỉ","Đi trễ","Về sớm","Phụ kho","CV khác"].includes(absenceType)) fail("Loại biến động không hợp lệ.");
+    if(action==="line-absence"&&!["Nghỉ","Đi trễ","Về sớm","Đi trễ, về sớm","Phụ kho","CV khác"].includes(absenceType)) fail("Loại biến động không hợp lệ.");
     if(!isManagerWork(absenceType))assertHrAttendancePeriod(fromDate);
     if(isOtherWork(absenceType)&&!String(body.reason||" ").trim())fail("Nhập nội dung công việc khác.");
     const reason=String(body.reason||"").trim()||absenceType;
@@ -889,7 +898,7 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   if (["pause", "incident", "absence"].includes(action) && !String(body.reason || "").trim()) fail("Cần nhập lý do hoặc nội dung sự cố.");
   let endsAt = null;
   if (action === "absence") {
-    if (!["Nghỉ", "Đi trễ", "Về sớm", "Phụ kho", "Việc khác"].includes(body.absenceType || "Nghỉ")) fail("Loại biến động không hợp lệ.");
+    if (!["Nghỉ", "Đi trễ", "Về sớm", "Đi trễ, về sớm", "Phụ kho", "Việc khác"].includes(body.absenceType || "Nghỉ")) fail("Loại biến động không hợp lệ.");
     endsAt = new Date(clock(body.endsAt)).toISOString();
     if (clock(endsAt) <= instant) fail("Thời gian kết thúc phải sau bắt đầu.");
     if (events.some((event) => event.kind === "absence" && event.sourceId === order.id && event.approved !== false &&
@@ -934,9 +943,14 @@ async function mutateProductionWorkflowInternal(db, body, actor, catalog = [], r
   return { event, report };
 }
 
-async function commitEvents(db, actor, now, events, report = null, state = null, expectedCursor = null, extraRecords = [],readGuards=[]) {
+async function commitEvents(db, actor, now, events, report = null, state = null, expectedCursor = null, extraRecords = [],readGuards=[],attendanceFactsOnly=false) {
+  // The dedicated import handler and validated daily personal HR entry opt in.
+  // The import handler constructs employee facts
+  // and verifies every cancellation against the original import. These events
+  // never change station assignments, loan ownership or allocation reservations.
+  if(attendanceFactsOnly&&(!events.length||events.some(e=>e.attendanceScope!=='employee'||e.sourceId||e.destinationId||e.employees?.length!==1||!e.approved||!['line-absence','attendance-cancel'].includes(e.kind)||(e.kind==='attendance-cancel'&&!e.importId)||(e.kind==='line-absence'&&e.supersedes))))fail('Dữ liệu nhập không phải ghi nhận HR độc lập.');
   const quantityOnly=events.length>0&&events.every(e=>isDailyOutput(e)&&e.kind==='daily-output'&&!e.employees?.length&&!e.stageReporting&&!e.destinationId)&&!state&&extraRecords.every(r=>r.quantityProjection===true&&r.entity==='in_transit'&&r.key===report?.transitId);
-  if(!quantityOnly)await assertLegacyAllocationWrite(db,events);
+  if(!quantityOnly&&!attendanceFactsOnly)await assertLegacyAllocationWrite(db,events);
   const key = "global", initial = JSON.stringify({ version: 0, token: "" });
   const initializeCursor=db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('production_cursor',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(key, initial, actor.login, now);
   const inlineCursor=quantityOnly&&expectedCursor!==null;
