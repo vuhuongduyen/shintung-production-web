@@ -45,3 +45,23 @@ test('background refresh preserves unsaved draft and concurrency version; submit
  try{await until(()=>screen.host.querySelector('.actual-day-note'));await input(screen.host.querySelector('.actual-day-note'),'DRAFT');await input(screen.host.querySelector('#actual-reason'),'Synthetic change');await act(async()=>window.dispatchEvent(new CustomEvent('onspa-production-updated')));await flush();assert.equal(screen.host.querySelector('.actual-day-note').value,'DRAFT');await act(async()=>button(screen.host,'Lưu thay đổi').click());assert.equal(request.action,'schedule');assert.equal(request.approvedVersion,4);assert.equal(request.days[0].note,'DRAFT');assert.match(screen.host.textContent,/Version changed/);assert.equal(screen.host.querySelector('.actual-day-note').value,'DRAFT');
  }finally{await screen.close();store.clear();clearProductionSnapshot();}
 });
+
+test('weekly warehouse ACK unlocks and displays saved rows while background refresh is still pending',async()=>{
+ await reset();const employees=[{id:'SYNTHETIC-NV',name:'Quách Chanh Thảo',line:'A',active:true}];
+ const initial={...data,employees,dailyOutputPolicy:{active:true}};let posts=0,gets=0,release;
+ const gate=new Promise(resolve=>{release=resolve;});
+ globalThis.fetch=async(url,options)=>{if(options?.method==='POST'){
+  posts++;const input=JSON.parse(options.body);assert.equal(input.action,'warehouse-duty');assert.equal(input.rows.length,6);
+  return Response.json({event:{id:'ACK-WEEK'},events:[{id:'ACK-WEEK',kind:'warehouse-duty',week,line:'A',rows:input.rows}]});
+ }gets++;return gets===1?Response.json(initial):gate;};
+ const screen=await mount();
+ try{await until(()=>screen.host.querySelector('.actual-day-note'));await act(async()=>button(screen.host,'Phụ kho').click());
+  const picker=screen.host.querySelector('[aria-label="Người trực tuần"]');assert.ok(picker);await choose(picker,'SYNTHETIC-NV');
+  await act(async()=>button(screen.host,'Lưu ghi nhận').click());
+  await until(()=>screen.host.querySelector('.warehouse-duty-note')?.textContent.includes('Đã lưu lịch phụ kho'));
+  assert.equal(posts,1);assert.ok([...screen.host.querySelectorAll('.warehouse-duty tbody select')].every(s=>s.value==='SYNTHETIC-NV'));
+  const add=button(screen.host,'+ Thêm dòng');assert.ok(add);assert.equal(add.disabled,false);assert.equal(add.classList.contains('primary-button'),false);
+  await until(()=>gets>1);assert.equal(add.disabled,false,'background GET is unresolved, but committed save is finished');
+  await act(async()=>add.click());assert.equal(screen.host.querySelectorAll('.warehouse-duty tbody tr').length,7);
+ }finally{release(Response.json(initial));await flush();await screen.close();store.clear();clearProductionSnapshot();}
+});

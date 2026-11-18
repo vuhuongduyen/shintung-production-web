@@ -396,7 +396,7 @@ async function dailyAttendanceContext(db,actor,calendar,body={}){
  const orderFields=['id','planId','planRowId','sku','name','spec','line','lsxCode','lsxQty','columns','week','syncStatus','status','cancelReason'];
  const projection=`json_object(${orderFields.flatMap(k=>[`'${k}'`,`json_extract(payload,'$.${k}')`]).join(',')})`;
  const [orderRows,eventRows,directory]=await Promise.all([
-  hrOnly?Promise.resolve([]):readRecordPages(db,{where:"entity='in_transit'",payloadExpression:projection}),
+  hrOnly||body.action==='warehouse-duty'?Promise.resolve([]):readRecordPages(db,{where:"entity='in_transit'",payloadExpression:projection}),
   hrOnly?readEmployeeAttendance(db,ids,{payloadExpression:"json_remove(payload,'$.sourceSnapshot','$.sourceRow','$.history','$.overlapWarnings')"}):readRecordPages(db,{where:"entity='production_event'",payloadExpression:"json_remove(payload,'$.sourceSnapshot','$.sourceRow','$.history','$.overlapWarnings')"}),
   rows(db,'employees')
  ]);
