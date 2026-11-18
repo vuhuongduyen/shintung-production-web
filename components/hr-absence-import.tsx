@@ -5,26 +5,34 @@ import {FeedbackActionButton} from './action-feedback';
 import {DataTable} from './onspa-ui/DataTable';
 import {productionRequestId} from '../lib/production-request-id.mjs';
 import {HR_IMPORT_LIMIT} from '../lib/hr-absence-import.mjs';
+import {hrImportDateIssue} from '../lib/hr-attendance-period.mjs';
+import {hrImportRequest} from '../lib/hr-import-request.mjs';
 type Row=Record<string,any>;
 export default function HrAbsenceImport({month,allowed,busy,items,t}:{month:string;allowed:boolean;busy:boolean;items:Items;t:(s:string)=>string}){
  const file=useRef<HTMLInputElement>(null),running=useRef(false),generation=useRef(0);
  const [working,setWorking]=useState(false),[message,setMessage]=useState(''),[source,setSource]=useState<Row|null>(null),[preview,setPreview]=useState<Row|null>(null),[history,setHistory]=useState<Row|null>(null),[cancel,setCancel]=useState<Row|null>(null),[reason,setReason]=useState('');
  useEffect(()=>{generation.current++;setSource(null);setPreview(null);setHistory(null);setCancel(null);setMessage('');return()=>{generation.current++;};},[month,allowed]);
  const disabled=busy||working||!allowed;
- const request=async(body:Row)=>{const response=await fetch('/api/production-workflow',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const result=await response.json();if(!response.ok)throw Error(result.error||t('Không thực hiện được thao tác.'));return result;};
+ const request=(body:Row)=>hrImportRequest(body);
  async function run(task:(current:()=>boolean)=>Promise<void>){if(running.current||disabled)return;running.current=true;setWorking(true);setMessage('');const token=generation.current;try{await task(()=>generation.current===token);}catch(e){if(generation.current===token)setMessage(e instanceof Error?e.message:t('Không thực hiện được thao tác.'));}finally{running.current=false;setWorking(false);}}
  const choose=(selected?:File)=>run(async current=>{
   if(!selected)return;
-  setMessage(t('Đang đọc và lưu file…'));setPreview(null);setSource(null);setHistory(null);setCancel(null);
+  setMessage(t('Đang đọc và kiểm tra file…'));setPreview(null);setSource(null);setHistory(null);setCancel(null);
   const {readAbsenceXlsx}=await import('../lib/hr-absence-xlsx');
   const parsed=await readAbsenceXlsx(selected);
   if(!current())return;
   const value={...parsed,fileName:selected.name,month,importId:productionRequestId()};setSource(value);
+  const dateResults=parsed.rows.map((row:Row)=>({...row,status:'error',issue:hrImportDateIssue(row.date,month)}));
+  if(dateResults.length&&dateResults.every((row:Row)=>row.issue)){
+   setPreview({saved:false,count:0,results:dateResults});
+   setMessage(`${t('Không lưu dòng nào')}: ${dateResults.length} ${t('dòng không hợp lệ')}. ${dateResults[0].issue}`);return;
+  }
+  setMessage(t('Đang gửi dữ liệu; chưa xác nhận lưu…'));
   // Exactly one request per explicit file choice. Never retry a write on timeout.
   const result=await request({...value,action:'hr-import-save',automatic:true});
   if(!current())return;
   setPreview(result);
-  setMessage(`${t('Thành công')}: ${result.count||0} · ${t('Trùng')}: ${result.results?.filter((r:Row)=>r.status==='duplicate').length||0} · ${t('Lỗi')}: ${result.results?.filter((r:Row)=>r.status==='error').length||0}${result.replayed?' · '+t('Lần nhập đã được xử lý; không ghi lại.'):''}`);
+  setMessage(`${result.saved?'':t('Không lưu dòng nào')+' · '}${t('Thành công')}: ${result.count||0} · ${t('Trùng')}: ${result.results?.filter((r:Row)=>r.status==='duplicate').length||0} · ${t('Lỗi')}: ${result.results?.filter((r:Row)=>r.status==='error').length||0}${result.replayed?' · '+t('Lần nhập đã được xử lý; không ghi lại.'):''}`);
   if(result.saved)changed();
  });
  const loadHistory=(page=0)=>run(async current=>{const result=await request({action:'hr-import-history',page});if(current()){setHistory(result);setCancel(null);}});

@@ -1,4 +1,6 @@
-import test,{after} from 'node:test';import assert from 'node:assert/strict';
+import test,{after,beforeEach,afterEach,mock} from 'node:test';
+beforeEach(()=>mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-18T06:00:00Z')}));
+afterEach(()=>mock.timers.reset());import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';import {createServer} from 'vite';import {zipSync,strToU8} from 'fflate';
 const dom=new JSDOM('<html><body></body></html>',{url:'https://synthetic.test',pretendToBeVisual:true});
 for(const key of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','CustomEvent','Node','MutationObserver','DOMParser'])globalThis[key]=dom.window[key];
@@ -11,8 +13,8 @@ async function mount(allowed=true,items=[]){const host=document.createElement('d
 const button=(host,text)=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
 const click=async node=>{assert.ok(node);await act(async()=>node.click());};
 const settle=async predicate=>{for(let n=0;n<100&&!predicate();n++)await act(async()=>new Promise(r=>setTimeout(r,10)));assert.ok(predicate());};
-function fixture(){const values=[['Ngày xin phép','Mã nhân viên','Tên NV','Loại nghỉ phép','Tên nghỉ phép','Thời gian bắt đầu','Thời gian kết thúc','Thời gian xin phép'],['16/11/2026','TEST001','Minh Anh','PN','Phép năm','08:00','17:00','08:00']];return new File([zipSync({'xl/workbook.xml':strToU8('<workbook xmlns:r="r"><sheets><sheet name="Data" r:id="r1"/></sheets></workbook>'),'xl/_rels/workbook.xml.rels':strToU8('<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/></Relationships>'),'xl/worksheets/sheet1.xml':strToU8('<worksheet><sheetData>'+values.map((r,i)=>`<row r="${i+1}">`+r.map((v,j)=>`<c r="${String.fromCharCode(65+j)}${i+1}" t="inlineStr"><is><t>${v}</t></is></c>`).join('')+'</row>').join('')+'</sheetData></worksheet>')})],'TEST.xlsx');}
-async function chooseFile(host){const input=host.querySelector('input[type=file]');Object.defineProperty(input,'files',{value:[fixture()],configurable:true});await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));}
+function fixture(date='16/11/2026'){const values=[['Ngày xin phép','Mã nhân viên','Tên NV','Loại nghỉ phép','Tên nghỉ phép','Thời gian bắt đầu','Thời gian kết thúc','Thời gian xin phép'],[date,'TEST001','Minh Anh','PN','Phép năm','08:00','17:00','08:00']];return new File([zipSync({'xl/workbook.xml':strToU8('<workbook xmlns:r="r"><sheets><sheet name="Data" r:id="r1"/></sheets></workbook>'),'xl/_rels/workbook.xml.rels':strToU8('<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/></Relationships>'),'xl/worksheets/sheet1.xml':strToU8('<worksheet><sheetData>'+values.map((r,i)=>`<row r="${i+1}">`+r.map((v,j)=>`<c r="${String.fromCharCode(65+j)}${i+1}" t="inlineStr"><is><t>${v}</t></is></c>`).join('')+'</row>').join('')+'</sheetData></worksheet>')})],'TEST.xlsx');}
+async function chooseFile(host,date){const input=host.querySelector('input[type=file]');Object.defineProperty(input,'files',{value:[fixture(date)],configurable:true});await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));}
 test('file choice automatically saves once and shows read-only results without extra controls',async()=>{
  const calls=[];globalThis.fetch=async(_,options)=>{const b=JSON.parse(options.body);calls.push(b);return new Response(JSON.stringify({saved:true,count:1,results:b.rows.map(r=>({...r,status:'valid'}))}));};
  const m=await mount();try{
@@ -44,4 +46,9 @@ test('HR toolbar keeps month and back before adjacent Excel actions',async()=>{
  const m=await mount(true,[toolbar.field('Tháng ghi nhận',[toolbar.input({type:'month',value:'2026-11',readOnly:true})]),toolbar.action({onClick(){}},'Quay lại',true,'back')]);try{
  assert.deepEqual([...m.host.querySelectorAll('[data-standard-toolbar=HrAttendanceEntry] input,[data-standard-toolbar=HrAttendanceEntry] button')].map(n=>n.tagName==='INPUT'?'month':n.textContent.trim()),['month','Quay lại','Tải file Excel','Hủy lần nhập']);
  }finally{await m.close();}
+});
+
+test('expired October file under November selection shows deadline and makes no write request',async()=>{
+ let calls=0;globalThis.fetch=async()=>{calls++;throw Error('Must not submit expired file');};
+ const m=await mount();try{await chooseFile(m.host,'01/10/2026');await settle(()=>m.host.textContent.includes('Không lưu dòng nào'));assert.match(m.host.textContent,/10\/11\/2026/);assert.equal(calls,0);assert.equal(button(m.host,'Tải file Excel').disabled,false);assert.doesNotMatch(m.host.textContent,/Đang gửi dữ liệu/);}finally{await m.close();}
 });
