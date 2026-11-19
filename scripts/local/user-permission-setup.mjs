@@ -1,3 +1,4 @@
+import {assignedSkuMasterGrants} from '../../lib/sku-master-user-grants.mjs';
 import {tokenHash} from '../../worker/password-auth.mjs';
 import {additivePermissionCatalog,additivePermissionAllowlist} from '../../lib/additive-permission-catalog.mjs';
 import {hrAttendancePermissions} from '../../lib/user-permission-profiles.mjs';
@@ -22,6 +23,7 @@ async function build(db){
   const source=personal&&personal.payload.active!==true?null:personal&&personal.payload.permissionMode!=='DEPARTMENT'?personal:template;
   const before=[...new Set(split(source?.payload.permissions))];
   if(login.toLowerCase()==='haquyen'&&personal?.payload.active!==false)for(const grant of hrAttendancePermissions)if(!before.includes(grant))before.push(grant);
+  for(const grant of assignedSkuMasterGrants(user,personal?.payload))if(!before.includes(grant))before.push(grant);
   const reason=admin(user)?'Admin đã toàn quyền':user.authMode==='quick_line'||user.line||/^LINE_[AB]$/i.test(login)?'Tài khoản Line có phạm vi riêng':user.active!==true?'User ngưng hoạt động':personal&&personal.payload.active!==true?'Quyền cá nhân ngưng hoạt động':!personal&&personals.length?'Bản ghi quyền đã xóa cần đối chiếu':templates.length>1?'Mẫu quyền bộ phận trùng mã cần đối chiếu':personals.length>1||personal&&personal.key!==login?'Cần đối chiếu bản ghi quyền trùng mã':'';
   return {login,name:user.name||login,department:user.department||'',active:user.active===true,eligible:!reason,reason,before,_user:user,_personal:personal?.payload||null};
  });

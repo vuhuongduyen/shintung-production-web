@@ -1,3 +1,4 @@
+import {assignedSkuMasterGrants} from '../lib/sku-master-user-grants.mjs';
 import {closeLegacyReport} from '../scripts/local/production-legacy-close.mjs';
 import {productionReadBatch} from './production-read-batch.mjs';
 import {activeProgressDatabase,workspaceDisplayWorkflow} from '../scripts/local/production-progress-read.mjs';
@@ -97,6 +98,7 @@ export async function sitePrincipal(request,env){
  const grants=withBusinessViews(String(permissionSource?.permissions||'').split(' · ').filter(Boolean),personal?.active!==false);
  // The existing HR account was explicitly assigned attendance entry by the owner.
  if(String(user.login).toLowerCase()==='haquyen'&&personal?.active!==false)for(const grant of hrAttendancePermissions)if(!grants.includes(grant))grants.push(grant);
+ for(const grant of assignedSkuMasterGrants(user,personal))if(!grants.includes(grant))grants.push(grant);
  const role=user.role||'USER',isAdmin=isAdminRole(role);
  return {login:user.email||user.login,email:user.email||null,name:user.name||user.login,userId:user.login,permissionLogin:user.login,department,role,isAdmin,grants,line:['A','B'].includes(String(user.line||'').toUpperCase())?String(user.line).toUpperCase():null,isSetupAdmin:user.isSetupAdmin===true,canReopenPlan:canPlanAction({login:user.login,isAdmin,grants},'reopen')};
 }
