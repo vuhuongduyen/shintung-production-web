@@ -1,3 +1,4 @@
+import {assignedSkuMasterGrants} from '../../lib/sku-master-user-grants.mjs';
 import { confirmationStatus, usageStatus } from "../../lib/sku-state.mjs";
 import { randomUUID } from "node:crypto";
 import { PlanError } from "./production-plan.mjs";
@@ -37,6 +38,7 @@ export async function skuCapability(db, session) {
   );
   const personal = grants.find((r) => !r.p._deleted)?.p;
   if (personal?.active === false) return false;
+  if (assignedSkuMasterGrants(user,personal).includes(SKU_CONFIRM)) return true;
   const departmentGrant = rows.find(
     (r) =>
       r.entity === "department_permissions" &&
