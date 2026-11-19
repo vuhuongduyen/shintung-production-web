@@ -71,12 +71,41 @@ test('CAS race cannot write audit or grants; failed batch rolls back all selecte
  }finally{await c.close();}
 });
 
-test('rejects case-fold duplicate identities, mismatched user and personal record keys before writes',async()=>{
- for(const [entity,key,payload] of [
-  ['users','CUSTOM',{login:'CUSTOM',active:true,department:'KHO'}],
-  ['users','different',{login:'another',active:true,department:'KHO'}],
-  ['permissions','custom',{login:'untouched',active:true,permissionMode:'CUSTOM',permissions:old}],
- ]){const c=await fixture();try{await c.put(entity,key,payload);await assert.rejects(readPermissionSetup(c.db,actor),e=>e.status===409);assert.equal((await c.db.prepare("SELECT COUNT(*) AS n FROM app_records WHERE entity='admin_audit'").first()).n,0);}finally{await c.close();}}
+test('identity conflicts are visible, block affected users and never hide unrelated users',async()=>{
+ for(const [entity,key,payload,blocked] of [
+  ['users','CUSTOM',{login:'CUSTOM',active:true,department:'KHO'},['custom','CUSTOM']],
+  ['users','different',{login:'another',active:true,department:'KHO'},['different']],
+  ['permissions','custom',{login:'untouched',active:true,permissionMode:'CUSTOM',permissions:old},['custom','untouched']],
+  ['permissions','CUSTOM',{login:'CUSTOM',active:true,permissions:old},['custom']],
+  ['permissions','orphan',{login:'orphan',active:true,permissions:old},[]],
+  ['permissions','retired',{login:'retired',active:false,_deleted:true},[]],
+ ]){const c=await fixture();try{
+  await c.put(entity,key,payload);const before=await records(c.db),plan=await readPermissionSetup(c.db,actor);
+  assert.ok(plan.issues.some(issue=>issue.key===key));
+  for(const login of blocked){assert.equal(plan.users.find(u=>u.login===login).eligible,false);await assert.rejects(applyPermissionSetup(c.db,request(plan,{selectedLogins:[login]}),actor),e=>e.status===400);}
+  assert.equal(plan.users.find(u=>u.login==='department').eligible,true);
+  assert.deepEqual(await records(c.db),before);
+  const body=request(plan,{selectedLogins:['department']}),preview=await applyPermissionSetup(c.db,body,actor);
+  await applyPermissionSetup(c.db,{...body,action:'apply',confirmed:true,previewToken:preview.previewToken},actor);
+  assert.deepEqual(await c.get(entity,key),payload);
+  assert.deepEqual((await records(c.db)).filter(r=>!['admin_audit','permission_preview'].includes(r.entity)&&!(r.entity==='permissions'&&r.record_key==='department')),before);
+ }finally{await c.close();}}
+});
+test('SKU assignees remain readable with unrelated legacy permission identities',async()=>{
+ const c=await fixture();try{
+  for(const login of ['nttvy','htndiem']){
+   await c.put('users',login,{login,active:true,department:'KHSX'});
+   await c.put('permissions',login,{login,active:true,permissionMode:'CUSTOM',permissions:old});
+  }
+  await c.put('permissions','legacy',{active:true,permissions:old});
+  const before=await records(c.db),plan=await readPermissionSetup(c.db,actor);
+  const {skuMasterUserGrants}=await import('../lib/sku-master-user-grants.mjs');
+  for(const login of ['nttvy','htndiem']){
+   const user=plan.users.find(u=>u.login===login);assert.equal(user.eligible,true);
+   assert.deepEqual(user.before,[old,...skuMasterUserGrants]);
+  }
+  assert.deepEqual(await records(c.db),before);
+ }finally{await c.close();}
 });
 test('preview receipt is opaque, actor-bound, required and cannot be reused',async()=>{
  const c=await fixture();try{const plan=await readPermissionSetup(c.db,actor),body=request(plan);

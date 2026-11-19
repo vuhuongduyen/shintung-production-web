@@ -34,6 +34,7 @@ import {clientAuthorizationKey} from "../lib/client-authorization-context.mjs";
 import {FeedbackLauncher,FeedbackInbox} from "../components/user-feedback";
 const UserPermissionSetup = deferredScreen(() => import("../components/user-permission-setup"));
 const PermissionHistoryReview = deferredScreen(() => import("../components/permission-history-review"));
+import {assignedSkuMasterGrants} from "../lib/sku-master-user-grants.mjs";
 import {quickLinePermissions,withBusinessViews} from "../lib/user-permission-profiles.mjs";
 import {canPlanAction} from "../lib/production-plan-permissions.mjs";
 import { StandardToolbar, ToolbarPermissions, ExportPermissionContext, toolbar as toolbarConfig } from "../components/standard-toolbar/StandardToolbar";
@@ -9560,7 +9561,7 @@ toolbarSearchOpen && toolbarConfig.group([toolbarConfig.field("TRA THEO",[toolba
                   );
                   const superAdmin = isSuperAdminUser(systemUser);
                   const isLine=systemUser?.authMode === "quick_line";
-                  const effectivePermissions = superAdmin ? allSystemPermissions() : isLine ? quickLinePermissions : withBusinessViews((record.permissionMode === "DEPARTMENT" ? (templates[record.department]?.active ? templates[record.department].permissions : "") : record.permissions).split(" · ").filter(Boolean),record.active);
+                  const effectivePermissions = superAdmin ? allSystemPermissions() : isLine ? quickLinePermissions : withBusinessViews([...(record.permissionMode === "DEPARTMENT" ? (templates[record.department]?.active ? templates[record.department].permissions : "") : record.permissions).split(" · ").filter(Boolean),...assignedSkuMasterGrants(systemUser,record)],record.active);
                   return (
                     <tr key={record.login}>
                       <DataCell kind="code">{record.company}</DataCell>

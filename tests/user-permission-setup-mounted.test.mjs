@@ -418,3 +418,14 @@ for (const stage of ['preview', 'apply']) {
     assert.deepEqual(callbacks, []);
   });
 }
+
+test('identity diagnostics name only affected rows and keep valid users selectable without writes', async t => {
+ const plan=listing();plan.issues=[{entity:'permissions',key:'legacy',login:'',message:'Bản ghi quyền cá nhân không khớp tài khoản.'}];
+ plan.users[1]={...plan.users[1],eligible:false,reason:'Cần đối chiếu bản ghi quyền'};
+ const api=fakeApi(()=>Response.json(plan));const {host}=await mount(t);
+ const diagnostics=host.querySelector('[aria-label="Bản ghi quyền cần đối chiếu"]');
+ assert.match(diagnostics.textContent,/legacy/);assert.match(diagnostics.textContent,/thiếu user/);
+ assert.equal(diagnostics.hasAttribute('data-operation-guidance'),true);
+ assert.equal(checkbox(host,'Chọn user foo').disabled,false);assert.equal(checkbox(host,'Chọn user bar').disabled,true);
+ assert.deepEqual(api.posts(),[]);
+});
