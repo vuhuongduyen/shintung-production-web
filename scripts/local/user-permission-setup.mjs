@@ -13,10 +13,23 @@ async function build(db){
  const serialized=(await db.prepare(snapshotSql).first()).snapshot,rows=JSON.parse(serialized).map(([entity,key,raw])=>({entity,key,payload:JSON.parse(raw)}));
  const lookup=(entity,key)=>rows.filter(r=>r.entity===entity&&identity(r.key)===identity(key));
  const userRows=rows.filter(r=>r.entity==='users');
- const ids=new Set();
- for(const row of userRows){if(!row.key||identity(row.payload.login)!==identity(row.key)||row.payload.login!==row.key||ids.has(identity(row.key)))fail('Định danh user không nhất quán hoặc trùng không phân biệt hoa thường. Cần đối chiếu trước khi phân quyền.');ids.add(identity(row.key));}
- for(const row of rows.filter(r=>r.entity==='permissions')){if(!row.key||row.payload.login!==row.key||!ids.has(identity(row.key)))fail('Định danh bản ghi quyền cá nhân không khớp user. Cần đối chiếu trước khi phân quyền.');}
- for(const row of rows.filter(r=>r.entity==='permissions')){if(lookup('permissions',row.key).length>1)fail('Có nhiều bản ghi quyền cá nhân trùng định danh. Cần đối chiếu trước khi phân quyền.');}
+ // Diagnose each identity independently. A legacy/orphan row must not hide
+ // unrelated users, but any identity it could affect remains unselectable.
+ const conflicts=new Map(),issues=[];
+ const flag=(row,message)=>{
+  const issue={entity:row.entity,key:row.key,login:row.payload.login||'',message};issues.push(issue);
+  for(const value of [row.key,row.payload.login])if(identity(value))conflicts.set(identity(value),message);
+ };
+ for(const row of userRows){
+  if(!row.key||row.payload.login!==row.key||lookup('users',row.key).length!==1)
+   flag(row,'Định danh user không nhất quán hoặc trùng mã. Cần đối chiếu trước khi phân quyền.');
+ }
+ for(const row of rows.filter(r=>r.entity==='permissions')){
+  if(!row.key||row.payload.login!==row.key||lookup('users',row.key).length!==1)
+   flag(row,'Bản ghi quyền cá nhân không khớp tài khoản. Cần đối chiếu; chưa thay đổi dữ liệu.');
+  else if(lookup('permissions',row.key).length>1)
+   flag(row,'Có nhiều bản ghi quyền cá nhân trùng mã. Cần đối chiếu trước khi phân quyền.');
+ }
  const users=rows.filter(r=>r.entity==='users'&&!r.payload._deleted).map(({key:login,payload:user})=>{
   const personals=lookup('permissions',login),personal=personals.find(r=>!r.payload._deleted);
   const templates=lookup('department_permissions',String(user.department||'').trim()).filter(r=>!r.payload._deleted&&r.payload.active===true),template=templates[0];
@@ -24,13 +37,13 @@ async function build(db){
   const before=[...new Set(split(source?.payload.permissions))];
   if(login.toLowerCase()==='haquyen'&&personal?.payload.active!==false)for(const grant of hrAttendancePermissions)if(!before.includes(grant))before.push(grant);
   for(const grant of assignedSkuMasterGrants(user,personal?.payload))if(!before.includes(grant))before.push(grant);
-  const reason=admin(user)?'Admin đã toàn quyền':user.authMode==='quick_line'||user.line||/^LINE_[AB]$/i.test(login)?'Tài khoản Line có phạm vi riêng':user.active!==true?'User ngưng hoạt động':personal&&personal.payload.active!==true?'Quyền cá nhân ngưng hoạt động':!personal&&personals.length?'Bản ghi quyền đã xóa cần đối chiếu':templates.length>1?'Mẫu quyền bộ phận trùng mã cần đối chiếu':personals.length>1||personal&&personal.key!==login?'Cần đối chiếu bản ghi quyền trùng mã':'';
-  return {login,name:user.name||login,department:user.department||'',active:user.active===true,eligible:!reason,reason,before,_user:user,_personal:personal?.payload||null};
+  const reason=conflicts.get(identity(login))|| (admin(user)?'Admin đã toàn quyền':user.authMode==='quick_line'||user.line||/^LINE_[AB]$/i.test(login)?'Tài khoản Line có phạm vi riêng':user.active!==true?'User ngưng hoạt động':personal&&personal.payload.active!==true?'Quyền cá nhân ngưng hoạt động':!personal&&personals.length?'Bản ghi quyền đã xóa cần đối chiếu':templates.length>1?'Mẫu quyền bộ phận trùng mã cần đối chiếu':personals.length>1||personal&&personal.key!==login?'Cần đối chiếu bản ghi quyền trùng mã':'');
+  return {login,name:user.name||login,department:user.department||'',active:user.active===true,eligible:!reason,reason,before:conflicts.has(identity(login))?[]:before,_user:user,_personal:personal?.payload||null};
  });
- return {serialized,revision:await tokenHash(serialized),users};
+ return {serialized,revision:await tokenHash(serialized),users,issues};
 }
 const publicUser=({_user,_personal,...user})=>user;
-export async function readPermissionSetup(db,actor){assertAdmin(actor);const plan=await build(db);return {revision:plan.revision,users:plan.users.map(publicUser),catalog:additivePermissionCatalog};}
+export async function readPermissionSetup(db,actor){assertAdmin(actor);const plan=await build(db);return {revision:plan.revision,users:plan.users.map(publicUser),issues:plan.issues,catalog:additivePermissionCatalog};}
 function selection(body,plan){
  if(!body||!['preview','apply'].includes(body.action))fail('Chọn user và quyền cần bổ sung, sau đó xem trước.',400);
  if(body.expectedRevision!==plan.revision)fail('Danh sách user hoặc quyền vừa thay đổi. Đóng và mở lại thiết lập để đối chiếu.');

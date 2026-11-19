@@ -5,7 +5,7 @@ import {DataCell} from './onspa-ui/DataCell';
 import {useEffect,useRef,useState} from 'react';
 import {apiFetch as fetch} from '../lib/data-sync';
 type User={login:string;name:string;department:string;active:boolean;eligible:boolean;reason:string;before:string[]};
-type Plan={revision:string;users:User[];catalog:{group:string;menus:{label:string;grants:string[]}[]}[]};
+type Plan={issues?:{entity:string;key:string;login:string;message:string}[];revision:string;users:User[];catalog:{group:string;menus:{label:string;grants:string[]}[]}[]};
 type Preview={revision:string;previewToken:string;selectedLogins:string[];grants:string[];users:(User&{added:string[];after:string[]})[];changedUsers:number};
 export default function UserPermissionSetup({onClose,onApplied}:{onClose:()=>void;onApplied:()=>void}){
  const [plan,setPlan]=useState<Plan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[selected,setSelected]=useState<string[]>([]),[grants,setGrants]=useState<string[]>([]),[preview,setPreview]=useState<Preview|null>(null),[stale,setStale]=useState(false);
@@ -30,8 +30,9 @@ export default function UserPermissionSetup({onClose,onApplied}:{onClose:()=>voi
  return <><FeedbackActionButton className="panel-backdrop" aria-label="Đóng thiết lập quyền" disabled={busy} disabledExplanation="Đang xử lý. Vui lòng chờ hoàn tất." onClick={onClose}/><aside className="detail-panel user-edit-panel" role="dialog" aria-modal="true" aria-labelledby="permission-setup-heading" style={{width:'min(1100px, 96vw)'}}>
   <div className="detail-header"><div><p>PHÂN QUYỀN NGƯỜI DÙNG</p><h2 id="permission-setup-heading">Bổ sung quyền cho user được chọn</h2></div><FeedbackActionButton onClick={onClose} disabled={busy} disabledExplanation="Đang xử lý. Vui lòng chờ hoàn tất." aria-label="Đóng">×</FeedbackActionButton></div>
   <p>Chọn user và từng quyền cần thêm. Giữ mọi quyền hiện có; không thiết lập lại toàn bộ user hoặc quyền bộ phận.</p>
-  {error&&<p role="alert" className="production-inline-message error">{error}</p>}
+  {error&&<p role="alert" data-operation-guidance="true" className="production-inline-message error">{error}</p>}
   {!plan&&!error&&<p>Đang tra quyền hiện tại…</p>}
+  {plan?.issues?.length? <section aria-label="Bản ghi quyền cần đối chiếu" data-operation-guidance="true"><p>Những bản ghi dưới đây cần đối chiếu. Chỉ tài khoản liên quan bị khóa bổ sung quyền; các tài khoản hợp lệ vẫn sử dụng được.</p><ul>{plan.issues.map((issue,index)=><li key={index}>{issue.entity === 'users' ? 'Tài khoản' : 'Quyền cá nhân'}: {issue.key || '(thiếu mã)'} · User trong bản ghi: {issue.login || '(thiếu user)'} — {issue.message}</li>)}</ul></section>:null}
   {plan&&!preview&&<>
    <DataTable className="table-wrap"><table data-no-pagination="true"><thead><tr><th>Chọn</th><th>ID user</th><th>Họ tên</th><th>Bộ phận</th><th>Quyền hiện tại</th></tr></thead><tbody>{plan.users.map(user=><tr key={user.login}><DataCell><input type="checkbox" aria-label={`Chọn user ${user.login}`} checked={selected.includes(user.login)} disabled={blocked||!user.eligible} onChange={()=>toggle(user.login,selected,setSelected)}/></DataCell><DataCell kind="code">{user.login}</DataCell><DataCell>{user.name}</DataCell><DataCell>{user.department}</DataCell><DataCell>{user.reason||`${user.before.length} quyền`}<details><summary>Xem quyền hiện tại</summary>{user.before.map(grant=><div key={grant}>{grant}</div>)}</details></DataCell></tr>)}</tbody></table></DataTable>
    <p>Đã chọn {selected.length} user · {grants.length} quyền bổ sung. Mở từng nhóm để chọn đúng menu và thao tác.</p>
