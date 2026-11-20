@@ -2,16 +2,16 @@ name: Kiểm tra mã nguồn ONSPA
 
 on:
   pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, staging]
+    types: [opened, synchronize, reopened]
   push:
-    branches: [main, source-sync/live-v807-20261102]
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -34,13 +34,19 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Ghi nhận commit và cây mã được kiểm tra
+        run: node scripts/ci/provenance.mjs
       - name: Cài dependencies theo lockfile
         run: npm ci --no-audit --no-fund
+      - name: Kiểm tra hợp đồng nhanh trước khi dùng các shard
+        run: npm run test:ci-contract
       - name: Kiểm tra TypeScript
         run: npm run typecheck
 
   build-test:
     name: Build và kiểm thử (${{ matrix.shard }}/3)
+    needs: typecheck
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -48,6 +54,11 @@ jobs:
       matrix:
         shard: [1, 2, 3]
     steps:
+      - name: Báo lỗi nếu kiểm tra nhanh hoặc kiểu dữ liệu chưa đạt
+        if: ${{ needs.typecheck.result != 'success' }}
+        run: |
+          echo "::error::Kiểm tra nhanh hoặc TypeScript chưa đạt; chưa chạy build/test đầy đủ."
+          exit 1
       - name: Lấy mã nguồn
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -57,6 +68,8 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Ghi nhận commit và cây mã được kiểm tra
+        run: node scripts/ci/provenance.mjs
       - name: Cài dependencies theo lockfile
         run: npm ci --no-audit --no-fund
       - name: Build để kiểm thử cả Worker đã biên dịch
