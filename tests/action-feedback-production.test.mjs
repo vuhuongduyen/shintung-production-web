@@ -147,7 +147,7 @@ test('ActualWorkSchedule missing reason preserves focus and sends no save; valid
 });
 test('ActualWorkSchedule busy/unapproved/nonmanager guards still block saves',async()=>{
  for(const extra of [{busy:true},{approved:undefined},{manager:false}]){const saves=[],view=await mount(el(ActualWorkSchedule,scheduleProps({...extra,save:async v=>{saves.push(v);return true;}})));try{
-  const save=button(view.host,'Lưu thay đổi');if(extra.manager===false){assert.equal(save.getAttribute('aria-disabled'),'true');await click(save);}else{assert.equal(save.disabled,true);await click(save.closest('[role=button]'));}assert.match(alert(view.host),extra.manager===false?/không có quyền/:extra.busy?/Đang xử lý/:/chưa được duyệt/);assert.deepEqual(saves,[]);
+  const save=button(view.host,'Lưu thay đổi');if(extra.manager===false){assert.equal(save.getAttribute('aria-disabled'),'true');await click(save);}else{assert.equal(save.disabled,true);await click(save.closest('[role=button]'));}assert.match(alert(view.host),extra.manager===false?/không có quyền/:extra.busy?/Đang xử lý/:/Chưa có lịch làm việc được duyệt cho tuần 12\/10\/2026 · Line A/);assert.deepEqual(saves,[]);
  }finally{await view.close();}}
 });
 
