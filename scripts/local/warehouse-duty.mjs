@@ -1,3 +1,4 @@
+import {scheduleReadinessMessage} from '../../lib/actual-schedule-readiness.mjs';
 import {warehouseHelpers,dutyDates,latestDuty,dutyRows} from '../../lib/warehouse-duty.mjs';
 import {effectiveAttendance,transferStaffCandidates} from '../../lib/production-attendance.mjs';
 const fail=(message,status=422)=>{throw Object.assign(new Error(message),{status});};
@@ -10,7 +11,7 @@ export function buildWarehouseDuty({body,state,actor,now,canManage,permitted,aff
  if(!['A','B'].includes(line)||!permitted(actor,line))fail('Không có quyền ghi phụ kho cho Line này.',403);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(week||'')||!Number.isFinite(Date.parse(week))||new Date(week).toISOString().slice(0,10)!==week||new Date(week).getUTCDay()!==1)fail('Chọn tuần bắt đầu vào Thứ Hai.');
  const reference=state.approvedSchedules.find(r=>r.key===`${week}:${line}`);
- if(!reference)fail(`Tuần ${week} · Line ${line}: chưa có lịch làm việc được duyệt. Chờ KHSX đồng ý Capacity trước khi nhập phụ kho.`,409);
+ if(!reference)fail(scheduleReadinessMessage(week,line,state.scheduleReadiness),409);
  const old=latestDuty(state.events,week,line);
  if((body.expectedId||null)!==(old?.id||null))fail('Lịch phụ kho đã thay đổi. Tải lại trước khi lưu.',409);
  const dates=dutyDates(week),active=effectiveAttendance(state.events,true),before=dutyRows(state.events,week,line,active);

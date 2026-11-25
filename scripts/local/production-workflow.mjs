@@ -1,3 +1,4 @@
+import {capacityReadiness} from '../../lib/actual-schedule-readiness.mjs';
 import {readEmployeeAttendance} from './hr-attendance-records.mjs';
 import {hrImportActions} from '../../lib/hr-absence-import.mjs';
 import {handleHrAbsenceImport} from './hr-absence-import.mjs';
@@ -159,7 +160,8 @@ async function schedules(db, capacityRead = rows(db, "capacity")) {
             dailyHcLeave: accepted.dailyHcLeave || [], dailyOtLeave: accepted.dailyOtLeave || [], otWorkers: accepted.otWorkers } });
     }
   }
-  return { actual, approved };
+  const readiness = capacityRecords.filter(record=>!record.payload._deleted).flatMap(record=>(record.payload.rows||[]).map(row=>({key:`${record.key}:${row.line}`,stage:capacityReadiness(row,approved.has(`${record.key}:${row.line}`))})));
+  return { actual, approved, readiness };
 }
 const weekOf = (date) => monday(date);
 const withoutLine = (day) => { const { line, ...rest } = day || {}; return rest; };
@@ -374,6 +376,7 @@ export async function readProductionWorkflow(db, actor, catalog = [], {includeDe
     payrollEmployees:reviewReportId?[]:directory.map(row=>({...row.payload,id:row.key})).filter(row=>!row._deleted&&(permitted(readActor,row.line)||scopedRosterIds.has(row.id)||actor.line&&(projectedHr.some(event=>event.employees.includes(row.id))||effectiveAttendance(allEvents).some(event=>event.destinationLine===actor.line&&event.employees?.includes(row.id))))).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}),
     employees: reviewReportId?[]:employeeDirectory.filter((row) => row.active !== false && (canManage(actor) || permitted(readActor, row.line)||scopedRosterIds.has(row.id)||actor.line&&activeStaffMovement(allEvents,row.id,observationTime)?.destinationLine===actor.line)).map(row=>permitted(readActor,row.line)?row:{id:row.id,name:row.name,line:row.line,active:row.active}).concat(actor.line?employeeDirectory.filter(person=>!permitted(readActor,person.line)&&!scopedRosterIds.has(person.id)&&projectedHr.some(event=>event.employees.includes(person.id))&&person.active!==false&&!canManage(actor)&&activeStaffMovement(allEvents,person.id,observationTime)?.destinationLine!==actor.line).map(person=>({id:person.id,name:person.name,line:person.line,active:person.active})):[]),
     actualSchedules: reviewReportId?[]:[...calendar.actual.values()].filter((row) => permitted(readActor, row.line)),
+    scheduleReadiness: reviewReportId?[]:calendar.readiness.filter(row=>permitted(readActor,row.key.split(":")[1])),
     approvedSchedules: reviewReportId?[]:[...calendar.approved.entries()].filter(([key]) => permitted(readActor, key.split(":")[1])).map(([key, reference]) => ({ key, ...reference, days: resolveSchedule(calendar, ...key.split(":")).days })),
     rights: { stageLive:true, crossLineView, historyImport:Boolean(actor.isAdmin&&!actor.line),hr:canHr(actor), ...productionMenuRights(actor), line: actor.line || null },
   };
@@ -403,7 +406,7 @@ async function dailyAttendanceContext(db,actor,calendar,body={}){
  const payrollEmployees=directory.map(r=>({...r.payload,id:r.key})),employees=payrollEmployees.map(p=>({...p,active:employeeActiveOn(p)})).filter(p=>p.active!==false);
  const orders=orderRows.map(r=>normalizeTransit({...JSON.parse(r.payload),id:r.record_key})).filter(o=>o.syncStatus==='ĐÃ ĐỒNG BỘ'&&o.lsxCode||o.status==='HỦY');
  const events=eventRows.map(r=>JSON.parse(r.payload)).filter(e=>!isDailyOutput(e)).map(e=>({...e,employeeDetails:eventEmployees(e,payrollEmployees)}));
- return {orders,events,reports:[],employees,payrollEmployees,actualSchedules:[...calendar.actual.values()],approvedSchedules:[...calendar.approved.entries()].map(([key,reference])=>({key,...reference,days:resolveSchedule(calendar,...key.split(':')).days})),rights:{...productionMenuRights(actor),hr:canHr(actor),line:null}};
+ return {orders,events,reports:[],employees,payrollEmployees,scheduleReadiness:calendar.readiness.filter(row=>permitted(actor,row.key.split(":")[1])),actualSchedules:[...calendar.actual.values()],approvedSchedules:[...calendar.approved.entries()].map(([key,reference])=>({key,...reference,days:resolveSchedule(calendar,...key.split(':')).days})),rights:{...productionMenuRights(actor),hr:canHr(actor),line:null}};
 }
 export async function mutateProductionWorkflow(db, body, actor, catalog = []) {
  const responseScope={};

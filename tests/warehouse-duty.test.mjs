@@ -29,7 +29,7 @@ test('missing approved schedule blocks both advance planning and actual hours wi
  await db.prepare("DELETE FROM app_records WHERE entity='capacity'").run();
  const before=(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
  for(const complete of [false,true]){const body=payload();if(complete){body.rows[0].start='08:00';body.rows[0].end='09:00';}
- await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),e=>e.status===409&&/chưa có lịch/.test(e.message));}
+ await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),e=>e.status===409&&/chưa có lịch/i.test(e.message));}
  assert.deepEqual((await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results,before);
 }));
 
@@ -83,7 +83,22 @@ test('a draft Capacity, another week or another Line cannot authorize a warehous
   if(variant==='other-week'){body.week='2026-10-26';body.rows=dutyDates(body.week).map(date=>({date,employee:'NV0',start:'',end:''}));}
   await db.prepare("UPDATE app_records SET payload=? WHERE entity='capacity' AND record_key=?").bind(JSON.stringify(capacity),week).run();
   const before=(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
-  await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),e=>e.status===409&&/chưa có lịch/.test(e.message));
+  await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),e=>e.status===409&&/chưa có lịch/i.test(e.message));
+  assert.deepEqual((await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results,before);
+ }
+}));
+
+
+test('schedule readiness is projected from Capacity and used by blocked saves without writes',()=>fixture(async db=>{
+ const raw=await db.prepare("SELECT payload FROM app_records WHERE entity='capacity' AND record_key=?").bind(week).first();
+ const original=JSON.parse(raw.payload);
+ for(const stage of ['draft','await-sync','pending','rejected']){
+  const capacity=structuredClone(original),row=capacity.rows[0];row.status=stage==='draft'?'Nháp':'Đã xác nhận';row.reviewStatus=stage;row.request=stage==='pending'?{kind:'capacity',status:'pending',version:row.version}:null;
+  await db.prepare("UPDATE app_records SET payload=? WHERE entity='capacity' AND record_key=?").bind(JSON.stringify(capacity),week).run();
+  const before=(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
+  const state=await readProductionWorkflow(db,manager);assert.deepEqual(state.scheduleReadiness,[{key:week+':A',stage}]);assert.equal(state.approvedSchedules.length,0);
+  const expected={draft:/QLSX chưa xác nhận/,'await-sync':/chưa đồng bộ/,pending:/Đang chờ KHSX xét duyệt/,rejected:/KHSX đã từ chối/}[stage];
+  await assert.rejects(()=>mutateProductionWorkflow(db,payload(),manager),e=>e.status===409&&expected.test(e.message));
   assert.deepEqual((await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results,before);
  }
 }));
