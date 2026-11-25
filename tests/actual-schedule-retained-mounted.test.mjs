@@ -93,3 +93,15 @@ test('removed approval blocks a retained edited calendar after background refres
   await act(async()=>button(screen.host,'Lưu thay đổi').click());assert.equal(posts,0);
  }finally{await screen.close();store.clear();clearProductionSnapshot();}
 });
+
+
+test('missing schedule guidance follows the matching persisted workflow stage after refresh',async()=>{
+ await reset();let stage='draft';globalThis.fetch=async()=>Response.json({...data,approvedSchedules:data.approvedSchedules.filter(s=>s.key!==`${week}:A`),scheduleReadiness:[{key:`${week}:A`,stage},{key:`${week}:B`,stage:'pending'}]});const screen=await mount();
+ try{
+  for(const [next,pattern] of [['draft',/QLSX chưa xác nhận/],['await-sync',/chưa đồng bộ sang KHSX/],['pending',/Đang chờ KHSX xét duyệt/],['rejected',/KHSX đã từ chối/]]){
+   stage=next;await act(async()=>window.dispatchEvent(new CustomEvent('onspa-production-updated')));
+   await until(()=>pattern.test(screen.host.querySelector('.actual-schedule-blocked')?.textContent||''));
+   assert.equal(screen.host.querySelector('.warehouse-duty'),null);assert.equal(button(screen.host,'Lưu thay đổi').disabled,true);
+  }
+ }finally{await screen.close();store.clear();clearProductionSnapshot();}
+});
