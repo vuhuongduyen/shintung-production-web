@@ -25,10 +25,12 @@ test('permissions, allowed people, invalid time, stale version and overlap rejec
  body.rows[0].start='08:00';body.rows[0].end='09:00';body.rows[1].start='08:30';body.rows[1].end='09:30';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),/trùng khoảng/);const state=await readProductionWorkflow(db,manager);assert.equal(state.events.filter(e=>e.kind==='warehouse-duty').length,0);assert.equal(state.events.filter(e=>e.kind==='line-absence').length,1);
 }));
 
-test('missing approved schedule blocks actual hours but still allows advance planning',()=>fixture(async db=>{
+test('missing approved schedule blocks both advance planning and actual hours without writes',()=>fixture(async db=>{
  await db.prepare("DELETE FROM app_records WHERE entity='capacity'").run();
- const body=payload();const plan=await mutateProductionWorkflow(db,body,manager);assert.equal(plan.events.length,1);
- body.expectedId=plan.event.id;body.requestIdempotency=crypto.randomUUID();body.rows[0].start='08:00';body.rows[0].end='09:00';await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),/chưa có lịch/);
+ const before=(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
+ for(const complete of [false,true]){const body=payload();if(complete){body.rows[0].start='08:00';body.rows[0].end='09:00';}
+ await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),e=>e.status===409&&/chưa có lịch/.test(e.message));}
+ assert.deepEqual((await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results,before);
 }));
 
 test('multiple intervals on one day persist separately and reject overlapping additions',()=>fixture(async db=>{
@@ -68,4 +70,20 @@ test('unchanged recorded duty and its employee attribution remain intact after a
  const state=await readProductionWorkflow(db,manager),next={...original,expectedId:first.event.id,requestIdempotency:crypto.randomUUID(),rows:dutyRows(state.events,week,'A',effectiveAttendance(state.events,true)).map(r=>({...r,employee:r.date==='2026-10-20'?'NV1':r.employee}))};
  const result=await mutateProductionWorkflow(db,next,manager);assert.equal(result.events.length,1);assert.equal(result.event.rows[0].attendanceId,first.events[1].id);assert.equal(result.event.rows[0].employee,'NV0');
  const after=await readProductionWorkflow(db,manager);assert.deepEqual(after.events.find(e=>e.id===first.events[1].id),state.events.find(e=>e.id===first.events[1].id));
+}));
+
+test('a draft Capacity, another week or another Line cannot authorize a warehouse save',()=>fixture(async db=>{
+ const row=await db.prepare("SELECT payload FROM app_records WHERE entity='capacity' AND record_key=?").bind(week).first();
+ const original=JSON.parse(row.payload);
+ for(const variant of ['draft','pending','other-line','other-week']){
+  const capacity=structuredClone(original);const body=payload();
+  if(variant==='draft'){capacity.rows[0].status='Nháp';capacity.rows[0].reviewStatus='draft';}
+  if(variant==='pending')capacity.rows[0].reviewStatus='pending';
+  if(variant==='other-line')capacity.rows[0].line='B';
+  if(variant==='other-week'){body.week='2026-10-26';body.rows=dutyDates(body.week).map(date=>({date,employee:'NV0',start:'',end:''}));}
+  await db.prepare("UPDATE app_records SET payload=? WHERE entity='capacity' AND record_key=?").bind(JSON.stringify(capacity),week).run();
+  const before=(await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results;
+  await assert.rejects(()=>mutateProductionWorkflow(db,body,manager),e=>e.status===409&&/chưa có lịch/.test(e.message));
+  assert.deepEqual((await db.prepare('SELECT * FROM app_records ORDER BY entity,record_key').all()).results,before);
+ }
 }));

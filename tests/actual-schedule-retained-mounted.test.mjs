@@ -65,3 +65,31 @@ test('weekly warehouse ACK unlocks and displays saved rows while background refr
   await act(async()=>add.click());assert.equal(screen.host.querySelectorAll('.warehouse-duty tbody tr').length,7);
  }finally{release(Response.json(initial));await flush();await screen.close();store.clear();clearProductionSnapshot();}
 });
+
+test('missing week blocks entry immediately, keeps lookup, and reopens only for the matching approved Line/week',async()=>{
+ await reset();let posts=0;globalThis.fetch=async(url,opts)=>{if(opts?.method==='POST')posts++;return Response.json({...data,approvedSchedules:data.approvedSchedules.filter(s=>s.key!==`${week}:A`)});};const screen=await mount();
+ try{
+  await until(()=>screen.host.querySelector('.actual-schedule-blocked'));
+  const warning=screen.host.querySelector('.actual-schedule-blocked');assert.match(warning.textContent,/02\/11\/2026.*Line A/);assert.equal(warning.getAttribute('role'),'alert');assert.equal(warning.getAttribute('data-operation-guidance'),'true');
+  assert.equal(screen.host.querySelector('.warehouse-duty'),null);assert.equal(screen.host.querySelector('#actual-reason').disabled,true);assert.equal(button(screen.host,'Lưu thay đổi').disabled,true);
+  for(const b of screen.host.querySelectorAll('#hr-attendance-launch'))assert.equal(b.disabled,true);
+  assert.equal(button(screen.host,'Thu hồi nhân sự'),undefined);
+  assert.equal(screen.host.querySelector('[aria-label="Tuần kế hoạch"]').disabled,false);
+  await choose(lineSelect(screen.host),'B');await until(()=>screen.host.querySelector('.actual-day-note'));assert.equal(screen.host.querySelector('.actual-schedule-blocked'),null);
+  await act(async()=>button(screen.host,'Phụ kho').click());assert.ok(screen.host.querySelector('.warehouse-duty'));
+  await choose(lineSelect(screen.host),'A');await until(()=>screen.host.querySelector('.actual-schedule-blocked'));assert.equal(screen.host.querySelector('.warehouse-duty'),null);
+  await input(screen.host.querySelector('[aria-label="Tuần kế hoạch"]'),'2026-11-09');await until(()=>screen.host.querySelector('.actual-day-note'));assert.equal(screen.host.querySelector('.actual-schedule-blocked'),null);
+  assert.equal(posts,0);
+ }finally{await screen.close();store.clear();clearProductionSnapshot();}
+});
+
+test('removed approval blocks a retained edited calendar after background refresh without saving the draft',async()=>{
+ await reset();let approved=true,posts=0;globalThis.fetch=async(url,opts)=>{if(opts?.method==='POST')posts++;return Response.json({...data,approvedSchedules:approved?data.approvedSchedules:[]});};const screen=await mount();
+ try{
+  await until(()=>screen.host.querySelector('.actual-day-note'));await input(screen.host.querySelector('.actual-day-note'),'UNSAVED');
+  approved=false;await act(async()=>window.dispatchEvent(new CustomEvent('onspa-production-updated')));
+  await until(()=>screen.host.querySelector('.actual-schedule-blocked'));
+  assert.equal(screen.host.querySelector('.actual-day-note'),null);assert.equal(button(screen.host,'Lưu thay đổi').disabled,true);assert.equal(screen.host.querySelector('.warehouse-duty'),null);
+  await act(async()=>button(screen.host,'Lưu thay đổi').click());assert.equal(posts,0);
+ }finally{await screen.close();store.clear();clearProductionSnapshot();}
+});
