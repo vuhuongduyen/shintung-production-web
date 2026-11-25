@@ -488,3 +488,5 @@ html body .app-shell .production-work-screen .daily-output-table .work-product{w
 .production-daily-report-modal>header .production-daily-product dt{font-size:inherit;font-weight:600;color:inherit}
 .production-daily-report-modal>header .production-daily-product dd{margin:0;min-width:0;overflow-wrap:anywhere;font-size:inherit;font-weight:400;color:inherit}
 .production-daily-report-modal>.production-modal-body{min-height:0}
+
+.actual-schedule .actual-schedule-blocked{color:#b91c1c;background:#fef2f2;border-color:#fca5a5;font-weight:700;}

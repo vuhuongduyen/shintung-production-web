@@ -9,6 +9,8 @@ export function buildWarehouseDuty({body,state,actor,now,canManage,permitted,aff
  const {week,line}=body;
  if(!['A','B'].includes(line)||!permitted(actor,line))fail('Không có quyền ghi phụ kho cho Line này.',403);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(week||'')||!Number.isFinite(Date.parse(week))||new Date(week).toISOString().slice(0,10)!==week||new Date(week).getUTCDay()!==1)fail('Chọn tuần bắt đầu vào Thứ Hai.');
+ const reference=state.approvedSchedules.find(r=>r.key===`${week}:${line}`);
+ if(!reference)fail(`Tuần ${week} · Line ${line}: chưa có lịch làm việc được duyệt. Chờ KHSX đồng ý Capacity trước khi nhập phụ kho.`,409);
  const old=latestDuty(state.events,week,line);
  if((body.expectedId||null)!==(old?.id||null))fail('Lịch phụ kho đã thay đổi. Tải lại trước khi lưu.',409);
  const dates=dutyDates(week),active=effectiveAttendance(state.events,true),before=dutyRows(state.events,week,line,active);
@@ -36,7 +38,6 @@ export function buildWarehouseDuty({body,state,actor,now,canManage,permitted,aff
   const effectiveAt=new Date(`${date}T${row.start}:00+07:00`).toISOString(),endsAt=new Date(`${date}T${row.end}:00+07:00`).toISOString();
   const duplicate=[...active,...created].find(e=>['absence','line-absence','attendance-override'].includes(e.kind)&&e.employees?.includes(row.employee)&&Date.parse(e.effectiveAt)<Date.parse(endsAt)&&Date.parse(e.endsAt)>Date.parse(effectiveAt));
   if(duplicate)fail(`Ngày ${date}: nhân viên có nghỉ hoặc phụ kho trùng khoảng giờ. Chưa lưu thay đổi nào.`,409);
-  const reference=state.approvedSchedules.find(r=>r.key===`${week}:${line}`);
   if(!reference?.days?.some(d=>d.date===date&&d.working))fail(`Ngày ${date}: chưa có lịch làm việc được duyệt tại Line ${line}.`,409);
   const eligible=transferStaffCandidates({references:state.approvedSchedules,events:state.events,employees:candidates.filter(p=>p.id===row.employee),line,effectiveAt,endsAt});
   if(!eligible.some(p=>p.id===row.employee))fail(`Ngày ${date}: nhân viên không có mặt đủ khoảng giờ tại Line ${line}. Kiểm tra lịch, nghỉ hoặc chuyển Line.`,409);
