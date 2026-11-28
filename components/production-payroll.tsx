@@ -1,4 +1,5 @@
 'use client';
+import PayrollMissingRates from './payroll-missing-rates';
 import {isDailyOutput} from '../lib/production-report-model.mjs';
 import traceStyles from './production-payroll-trace.module.css';
 import {payrollTrace,traceValue,traceLabels} from '../lib/production-payroll-trace.mjs';
@@ -73,7 +74,8 @@ export default function ProductionPayroll({orders:liveOrders,reports:liveReports
   {exportBusy&&<p role="status">{t('Đang tạo file…')}</p>}{exportMessage&&<p role="alert">{exportMessage}</p>}
   <div className="actual-tabs">{[['summary','Tổng hợp tháng'],['orders','Giờ công theo LSX'],['employees','Giờ và tiền từng NV'],['funds','Theo dõi quỹ sản lượng']].map(([id,label])=><FeedbackActionButton key={id} className={tab===id?'selected':''} onClick={()=>{setTab(id);setPage(1);setFormulaOpen(null);}}>{t(label)}</FeedbackActionButton>)}</div>
   {tab==='summary'&&<p>{t('Bấm vào kết quả có mũi tên để xem phép tính. Ô màu xanh là kết quả; ô màu vàng là dữ liệu dùng để tính.')}</p>}
-  {tab!=='funds'&&result.issues.length>0&&<p className="payroll-incomplete" role="status">{t('Chưa đủ dữ liệu tính quỹ')}: {result.issues.slice(0,3).map(issueText).join(' · ')}{result.issues.length>3?` (+${result.issues.length-3})`:''}. {t('Số giờ đang hiển thị chỉ theo các ngày đã có lịch và dữ liệu. Kiểm tra Lịch SX thực tế trước khi tính tiền.')}</p>}
+  {tab!=='funds'&&result.issues.length>0&&<p className="payroll-incomplete" role="status">{t('Chưa đủ dữ liệu tính quỹ')}: {result.issues.slice(0,3).map(issueText).join(' · ')}{result.issues.length>3?` (+${result.issues.length-3})`:''}.</p>}
+  {tab!=='funds'&&<PayrollMissingRates overviews={overviews} locale={locale}/>}
   {tab==='funds'?<>
    <h3 className="payroll-section-title">{t('Theo dõi quỹ sản lượng')}</h3>
    <p>{t('Số tiền dự tính theo dữ liệu hiện tại, chưa xác nhận đã chi. Quỹ mặc định 6.000.000 đồng/tháng; thay đổi quỹ và lựa chọn NV chỉ áp dụng trong lần mở menu này.')}</p>

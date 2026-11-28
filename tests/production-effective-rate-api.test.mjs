@@ -120,3 +120,27 @@ test('legacy live V1 uses its existing update date despite generated PDF V1 in m
  assert.equal(old.report.rateBasis.value,.017);assert.equal(now.report.rateBasis.value,.03);assert.equal(now.report.rateBasis.dateBasis,'updated-date');assert.equal(now.report.rateBasis.recordedAt,'2026-11-09T03:00:00Z');
  assert.deepEqual((await records(c.db)).filter(r=>['labor_hours','labor_hours_history'].includes(r.entity)),before);
 }));
+
+test('legacy historical insertion uses stored later revisions and preserves reports across authenticated save/read',()=>dailyFixture(async c=>{
+ await c.put('sku',c.order.sku,{code:c.order.sku,name:'Synthetic',confirmation_status:'Đã xác nhận',usage_status:'Đang sử dụng'});
+ await mutateProductionWorkflow(c.db,c.body(),actor);
+ const old={sku:c.order.sku,version:2,laborHour:.044,updatedAt:'2026-10-22T01:00:00Z'};
+ await c.db.prepare("UPDATE app_records SET payload=? WHERE entity='labor_hours' AND record_key=?").bind(JSON.stringify(old),c.order.sku).run();
+ for(const [version,date,value] of [[1,'2026-10-21',.06],[2,'2026-10-22',.044]])await c.put('labor_hours_history','synthetic-'+version,{id:'synthetic-'+version,sku:c.order.sku,version,newLaborHour:value,at:date+'T01:00:00Z'});
+ const before=(await records(c.db)).filter(r=>r.entity==='production_report'||r.entity==='labor_hours_history');
+ const call=await reviewer(c),saved=await call('/api/labor-hours',{mode:'edit',sku:c.order.sku,laborHour:.06,expectedVersion:2,effectiveFrom:'2026-10-19',reason:'Synthetic historical evidence'});
+ assert.equal(saved.status,200,JSON.stringify(saved.body));assert.equal(saved.body.payload.laborHour,.044);
+ const {effectiveValueOn}=await import('../lib/effective-dated-value.mjs');
+ const versions=saved.body.payload.effectiveVersions;assert.equal(effectiveValueOn(versions,'2026-10-19').basis.value,.06);assert.equal(effectiveValueOn(versions,'2026-10-22').basis.value,.044);
+ const after=await records(c.db);for(const row of before)assert.deepEqual(after.find(r=>r.entity===row.entity&&r.record_key===row.record_key),row);
+ const read=await call('/api/records?entity=labor_hours');assert.equal(read.status,200);assert.equal(read.body.records.find(r=>r.key===c.order.sku).payload.laborHour,.044);
+}));
+
+test('concurrent labor history correction aborts publication and adds no audit',()=>dailyFixture(async c=>{
+ await c.put('sku',c.order.sku,{code:c.order.sku,name:'Synthetic',confirmation_status:'Đã xác nhận',usage_status:'Đang sử dụng'});
+ let injected=false,writing=false;const db=new Proxy(c.db,{get(target,key){if(key==='prepare')return sql=>{if(sql.startsWith('UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity=?'))writing=true;return target.prepare(sql);};if(key==='batch')return async statements=>{if(writing&&!injected){injected=true;await c.put('labor_hours_history','synthetic-race',{sku:c.order.sku,version:1,newLaborHour:.01,at:'2026-10-01T01:00:00Z'});}return target.batch(statements);};return typeof target[key]==='function'?target[key].bind(target):target[key];}});
+ const call=await reviewer({...c,db}),before=await c.db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours'").first();
+ const result=await call('/api/labor-hours',{mode:'edit',sku:c.order.sku,laborHour:.03,expectedVersion:2,effectiveFrom:'2026-10-09',reason:'Synthetic concurrent history'});
+ assert.equal(result.status,409);assert.deepEqual(await c.db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours'").first(),before);
+ assert.equal((await records(c.db)).filter(r=>r.entity==='labor_hours_history').length,1);
+}));
