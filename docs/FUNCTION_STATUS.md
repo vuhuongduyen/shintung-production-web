@@ -184,3 +184,13 @@ Thêm hai nút trong màn HR, xem trước/đối chiếu và lưu một giao d�
 17/11: cập nhật yêu cầu TRVS dùng chung “Đi trễ, về sớm”; nhập thủ công chỉ chọn Nghỉ hoặc Đi trễ, về sớm. Bản ghi cũ giữ nguyên payload, gom nhãn khi xem/lọc. Điều chỉnh thứ tự thanh HR theo vị trí đã chọn, bỏ phân trang trùng của lịch sử nhập. Chưa triển khai bản bổ sung này.
 
 17/11 — yêu cầu mới: chọn Excel tự kiểm/lưu dòng hợp lệ trong một request, bỏ thanh kiểm tra/xác nhận/hủy tải và thao tác bỏ dòng. Hủy dùng lịch sử phía trên. Không retry ghi khi lỗi; giữ chống trùng/khóa kỳ/quyền. Tối ưu chuỗi đọc sự kiện tránh quét JSON lặp. Đang kiểm local, chưa QA/deploy bản bổ sung.
+
+
+## 2026-11-28 — Dated labor updates and payroll diagnostics (PR candidate)
+
+- Existing direct entry/edit and PDF effective-date controls are retained. Editing shows the proposed start and the next known rate boundary.
+- First dated publication of a legacy master retains its dated history, so inserting an earlier interval does not replace the current later rate. The write checks the master/history snapshot atomically; operation timestamps and existing report/Plan evidence remain unchanged.
+- Payroll diagnostics list authorized Line, SKU, product, work order and production date for missing non-omitted rate evidence. The unrelated blanket calendar instruction is removed. Missing evidence still blocks allocation.
+- Synthetic regression coverage: historical interval insertion, later/current rates, source history immutability, report basis preservation, same-day updates, future dates, concurrent writes/history changes, direct/PDF forms, and scoped missing-rate display. TypeScript and production build passed.
+- MAIN source inspected: v854 / 128595acf5d23bff48539c5e27f5cb8932e76848; PR base staging 1cd7216cc286f35bb1e84edf6d9a56539885f599. No production data writes, migration, merge or deployment. Real-browser acceptance of the changed code and post-deployment full data comparison remain pending.
+- Coordination: PR13 also touches the Worker/local API containers. Apply only the labor-hours route delta; do not replace whole MAIN API files with staging copies.

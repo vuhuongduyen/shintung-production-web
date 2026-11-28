@@ -1,5 +1,5 @@
 import {readLaborReferences} from './production-labor-reference.mjs';
-import {readLaborHistory} from './labor-rate-source.mjs';
+import {readLaborHistory,readLaborRateSource} from './labor-rate-source.mjs';
 import {productionUnassignedReminder} from './production-unassigned-alert.mjs';
 import {commitRecordWithAudit} from '../../lib/record-mutation-audit.mjs';
 import {adminReadPaths,adminReadResponse} from '../../lib/admin-readonly.mjs';
@@ -144,9 +144,10 @@ export function localTestPlugin(testOptions = {}){
      const skuRows=(await connection.db.prepare("SELECT record_key,payload FROM app_records WHERE entity='sku'").all()).results,master=skuRows.find(r=>r.record_key.toUpperCase()===sku);if(!master)return send(409,{error:'SKU không tồn tại trong SKU Master TEST.'});
      const saved=await connection.db.prepare("SELECT payload FROM app_records WHERE entity='labor_hours' AND record_key=?").bind(sku).first(),base=siteLaborHours([]).find(r=>r.key===sku)?.payload||null,old=saved?JSON.parse(saved.payload):base;if(mode==='create'&&old)return send(409,{error:'SKU đã có Giờ công/SP đang hiệu lực.'});if(mode==='edit'&&!old)return send(409,{error:'SKU chưa có Giờ công/SP để sửa.'});
      if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==Number(old?.version||0))return send(409,{error:conflictMessage,current:old});
+     const rateSource=await readLaborRateSource(connection.db,sku);
      const now=new Date().toISOString();let current,history;
-     try{({current,history}=buildLaborHoursRevision({old,sku,value,effectiveFrom:body.effectiveFrom,note,source,reason,actor:session.login,now,mode}));}catch(error){return send(error.status||409,{error:error.message});}
-     const write=saved?connection.db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='labor_hours' AND record_key=? AND payload=?").bind(JSON.stringify(current),session.login,now,sku,saved.payload):connection.db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES('labor_hours',?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING").bind(sku,JSON.stringify(current),session.login,now);
+     try{({current,history}=buildLaborHoursRevision({old,sku,value,effectiveFrom:body.effectiveFrom,legacyVersions:rateSource.menu?.resolvedRateVersions||[],note,source,reason,actor:session.login,now,mode}));}catch(error){return send(error.status||409,{error:error.message});}
+     const write=saved?connection.db.prepare("UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity='labor_hours' AND record_key=? AND payload=? AND "+rateSource.guards[0].sql).bind(JSON.stringify(current),session.login,now,sku,saved.payload,...rateSource.guards[0].args):connection.db.prepare("INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT 'labor_hours',?,?,?,? WHERE "+rateSource.guards[0].sql+" ON CONFLICT(entity,record_key) DO NOTHING").bind(sku,JSON.stringify(current),session.login,now,...rateSource.guards[0].args);
      const changes=await connection.db.batch([write,connection.db.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE changes()=1').bind('labor_hours_history',history.id,JSON.stringify(history),session.login,now)]);
      if(changes[0].meta.changes!==1)return send(409,{error:conflictMessage});return send(200,{ok:true,payload:current,history});
     }

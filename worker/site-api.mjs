@@ -3,7 +3,7 @@ import {productionReadBatch} from './production-read-batch.mjs';
 import {activeProgressDatabase,workspaceDisplayWorkflow} from '../scripts/local/production-progress-read.mjs';
 import {importLaborReferenceSnapshot} from '../scripts/local/production-labor-reference-import.mjs';
 import {readLaborReferences} from '../scripts/local/production-labor-reference.mjs';
-import {readLaborHistory} from '../scripts/local/labor-rate-source.mjs';
+import {readLaborHistory,readLaborRateSource} from '../scripts/local/labor-rate-source.mjs';
 import {frozenPendingReport} from '../scripts/local/production-quantity-cutover.mjs';
 import {decideDailyWithdrawal} from '../scripts/local/production-warehouse-withdrawal.mjs';
 import {readLegacyPreservation} from '../scripts/local/production-legacy-preservation.mjs';
@@ -356,11 +356,12 @@ async function handleSiteApi(request,env,timing){
    if(mode==='edit'&&!old)return json({error:'SKU chưa có Giờ công/SP để sửa.'},409);
    if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==Number(old?.version||0))
     return json({error:conflictMessage,current:old,updatedBy:old?.updatedBy||null,updatedAt:old?.updatedAt||null},409);
+   const rateSource=await readLaborRateSource(env.DB,sku);
    const now=new Date().toISOString();let current,history;
-   try{({current,history}=buildLaborHoursRevision({old,sku,value,effectiveFrom:body.effectiveFrom,note,source,reason,actor:actor.login,now,mode}));}catch(e){return json({error:e.message},e.status||409);}
+   try{({current,history}=buildLaborHoursRevision({old,sku,value,effectiveFrom:body.effectiveFrom,legacyVersions:rateSource.menu?.resolvedRateVersions||[],note,source,reason,actor:actor.login,now,mode}));}catch(e){return json({error:e.message},e.status||409);}
    const write=saved
-    ?env.DB.prepare('UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity=? AND record_key=? AND payload=?').bind(JSON.stringify(current),actor.login,now,'labor_hours',sku,saved.payload)
-    :env.DB.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(entity,record_key) DO NOTHING').bind('labor_hours',sku,JSON.stringify(current),actor.login,now);
+    ?env.DB.prepare('UPDATE app_records SET payload=?,updated_by=?,updated_at=? WHERE entity=? AND record_key=? AND payload=? AND '+rateSource.guards[0].sql).bind(JSON.stringify(current),actor.login,now,'labor_hours',sku,saved.payload,...rateSource.guards[0].args)
+    :env.DB.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE '+rateSource.guards[0].sql+' ON CONFLICT(entity,record_key) DO NOTHING').bind('labor_hours',sku,JSON.stringify(current),actor.login,now,...rateSource.guards[0].args);
    const result=await env.DB.batch([
     write,
     env.DB.prepare('INSERT INTO app_records(entity,record_key,payload,updated_by,updated_at) SELECT ?,?,?,?,? WHERE changes()=1').bind('labor_hours_history',history.id,JSON.stringify(history),actor.login,now),
