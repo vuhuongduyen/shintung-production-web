@@ -26,6 +26,7 @@ type MasterSku = {
   status: string;
 };
 type LaborRecord = {
+  resolvedRateVersions?: {validFrom:string;validTo?:string|null;value:number}[];
   cancelled?:boolean;
   retainedLaborHour?:number;
   status?:string;
@@ -523,7 +524,8 @@ toolbar.action({"onClick": () => undefined},<>Tìm kiếm
               <div className="leadtime-form-grid">
                 <fieldset>
                   <legend>Thông tin sản phẩm</legend>
-                  <label><span>Ngày hiệu lực *</span><input required type="date" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></label><p>Ngày hiệu lực là mốc áp dụng nghiệp vụ, có thể sửa khi có căn cứ. Bản cũ chưa có ngày hiệu lực dùng ngày cập nhật của từng phiên bản. Thời điểm thao tác thật vẫn lưu trong lịch sử; phiếu và kế hoạch đã chốt giữ căn cứ cũ.</p>
+                  <label><span>Ngày hiệu lực *</span><input required type="date" aria-label="Ngày hiệu lực" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></label><p>Ngày hiệu lực là mốc áp dụng nghiệp vụ, có thể sửa khi có căn cứ. Bản cũ chưa có ngày hiệu lực dùng ngày cập nhật của từng phiên bản. Thời điểm thao tác thật vẫn lưu trong lịch sử; phiếu và kế hoạch đã chốt giữ căn cứ cũ.</p>
+                  {panel==='edit'&&effectiveFrom&&<p role="status">{message('Mức đang nhập áp dụng từ ', '輸入的定額適用起日：')}{formatDate(effectiveFrom)}{selectedRecord?.resolvedRateVersions?.filter(v=>v.validFrom>effectiveFrom).sort((a,b)=>a.validFrom.localeCompare(b.validFrom))[0]?.validFrom ? <> {message('đến trước ', '，截至此日前：')}{formatDate(selectedRecord.resolvedRateVersions.filter(v=>v.validFrom>effectiveFrom).sort((a,b)=>a.validFrom.localeCompare(b.validFrom))[0].validFrom)}</> : null}. {message('Lưu tạo phiên bản mới và giữ lịch sử. Chọn đúng mức giờ cho khoảng ngày cần bổ sung; các phiên bản ngày sau giữ nguyên.', '儲存會建立新版本並保留歷史。請選擇補充期間的正確工時，後續日期的版本保持不變。')}</p>}
                   <label>
                     <span>SKU *</span>
                     <input
