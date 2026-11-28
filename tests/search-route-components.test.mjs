@@ -166,17 +166,18 @@ for (const method of ['enter','click']) {
   test(`ProductionPayroll real month and closed Line lookup apply by generated Search/${method}`,async()=>{
     window.sessionStorage.setItem('onspa-payroll-month','2026-10');
     const view=await mount(el(ProductionPayroll,{orders,reports,events:[],schedules:[],employees:[],open:never,refresh:never}));
+    const orderBody=()=>view.host.querySelector('table[aria-label="Giờ công theo LSX"] tbody')?.textContent||'';
     try {
       assert.match(view.host.querySelector('.payroll-section-title').textContent,/10\/2026/);
       await click(button(view.host,'Tra cứu'));
       const month=toolbar(view.host).querySelector('input[type=month]');await change(month,'2026-11');
       assert.match(view.host.querySelector('.payroll-section-title').textContent,/10\/2026/);
       await search(view.host,month,method);assert.match(view.host.querySelector('.payroll-section-title').textContent,/11\/2026/);
-      await click(button(view.host,'Giờ công theo LSX'));assert.doesNotMatch(body(view.host),/LSX-BETA/);
+      await click(button(view.host,'Giờ công theo LSX'));assert.ok(view.host.querySelector('table[aria-label="Giờ công theo LSX"]'));assert.match(view.host.querySelector('section[aria-label="Căn cứ giờ công cần kiểm tra"]').textContent,/LSX-BETA/);assert.doesNotMatch(orderBody(),/LSX-BETA/);
       await choose(toolbar(view.host).querySelector('select'),'line');
       const line=toolbar(view.host).querySelectorAll('select')[1];await choose(line,'B');
-      await openPickerEnter(line);assert.doesNotMatch(body(view.host),/LSX-BETA/);
-      await search(view.host,line,method);assert.match(body(view.host),/LSX-BETA/);assert.doesNotMatch(body(view.host),/LSX-ALPHA/);
+      await openPickerEnter(line);assert.doesNotMatch(orderBody(),/LSX-BETA/);
+      await search(view.host,line,method);assert.match(orderBody(),/LSX-BETA/);assert.doesNotMatch(orderBody(),/LSX-ALPHA/);
       assert.equal(window.sessionStorage.getItem('onspa-payroll-month'),'2026-11');
     } finally {await view.close();}
   });
