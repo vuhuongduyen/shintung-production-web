@@ -42,3 +42,12 @@ test('mounted monthly totals, staff eligibility, line selection and missing date
   await render(employees.map(e=>e.id==='THAO'?{...e,startDate:''}:e));assert.match(host.textContent,/Thiếu ngày bắt đầu hợp lệ/);assert.match(host.textContent,/Chưa đủ dữ liệu tính quỹ/);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+test('missing-rate warning identifies both Lines, product and production date without misleading calendar instructions',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const orders=['A','B'].map(line=>({id:line,line,sku:'SYNTHETIC-'+line,name:'Synthetic '+line,lsxCode:'TEST-'+line}));
+ const reports=orders.map(o=>({id:o.id,transitId:o.id,kind:'completion',reviewStatus:'Đã xác nhận',productionDate:'2026-10-09',approvedQuantity:8}));
+ try{await act(async()=>root.render(React.createElement(Screen,{employees:[],orders,reports,schedules:[],events:[],open:()=>{},refresh:async()=>true})));
+ const warning=host.querySelector('section[aria-label="Căn cứ giờ công cần kiểm tra"]');assert.ok(warning);assert.match(warning.textContent,/SYNTHETIC-A/);assert.match(warning.textContent,/SYNTHETIC-B/);assert.match(warning.textContent,/09\/10\/2026/);assert.match(warning.textContent,/Dữ liệu cơ bản/);assert.doesNotMatch(host.textContent,/Kiểm tra Lịch SX thực tế trước khi tính tiền/);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
